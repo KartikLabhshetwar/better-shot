@@ -18,9 +18,11 @@ jobs:
           - platform: macos-latest
             target: aarch64-apple-darwin
             name: macOS-arm64
+            bundle: dmg
           - platform: macos-latest
             target: x86_64-apple-darwin
             name: macOS-x64
+            bundle: dmg
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -57,8 +59,8 @@ jobs:
             
             | Platform | Architecture | Download |
             |----------|--------------|----------|
-            | macOS | Apple Silicon (M1/M2/M3) | `better-shot_*_aarch64.dmg` |
-            | macOS | Intel | `better-shot_*_x64.dmg` |
+            | macOS | Apple Silicon (M1/M2/M3) | `bettershot_*_aarch64.dmg` |
+            | macOS | Intel | `bettershot_*_x64.dmg` |
             
             ## Installation
             
@@ -68,9 +70,16 @@ jobs:
             2. Open the DMG and drag Better Shot to Applications
             3. On first launch, right-click the app and select "Open" to bypass Gatekeeper
             4. Grant Screen Recording permission when prompted in System Settings
+            
+            ## What's New
+            
+            - Initial release of Better Shot
+            - Region, fullscreen, and window capture modes
+            - Image editor with backgrounds and effects
+            - Global keyboard shortcuts
           releaseDraft: true
           prerelease: false
-          args: --target ${{ matrix.target }}
+          args: --bundles ${{ matrix.bundle }} --target ${{ matrix.target }}
 
   publish:
     needs: build
@@ -96,4 +105,6 @@ jobs:
                 draft: false,
               });
               console.log(`Published release: ${draftRelease.html_url}`);
+            } else {
+              console.log(`No draft release found for tag: ${tagName}`);
             }

@@ -38,6 +38,16 @@ Better Shot is a fast, lightweight screenshot tool built with Tauri and React. I
 
 ## Installation
 
+### Download Pre-built Release
+
+1. Go to [Releases](https://github.com/KartikLabhshetwar/better-shot/releases)
+2. Download the appropriate DMG file:
+   - **Apple Silicon** (M1, M2, M3): `bettershot_*_aarch64.dmg`
+   - **Intel Mac**: `bettershot_*_x64.dmg`
+3. Open the DMG and drag Better Shot to Applications
+4. On first launch, right-click the app and select "Open" to bypass Gatekeeper
+5. Grant Screen Recording permission when prompted
+
 ### From Source
 
 ```bash
@@ -137,6 +147,20 @@ Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTIN
 - Submit pull requests
 - Improve documentation
 - Star the project
+
+## Creating Releases
+
+To create a new release, see [RELEASE.md](RELEASE.md) for detailed instructions.
+
+Quick version:
+
+```bash
+# Update version numbers, then:
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+GitHub Actions will automatically build and publish the release with DMG files for both Apple Silicon and Intel Macs.
 
 ## License
 
