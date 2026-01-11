@@ -14,7 +14,10 @@ const Slider = React.forwardRef<HTMLInputElement, SliderProps>(
       onValueChange?.(newValue);
     };
 
-    const percentage = ((value[0] - min) / (max - min)) * 100;
+    const minNum = Number(min);
+    const maxNum = Number(max);
+    const valueNum = Number(value[0] ?? 0);
+    const percentage = ((valueNum - minNum) / (maxNum - minNum)) * 100;
 
     return (
       <div className="relative w-full">
@@ -30,10 +33,10 @@ const Slider = React.forwardRef<HTMLInputElement, SliderProps>(
             background: `linear-gradient(to right, rgb(59 130 246) 0%, rgb(59 130 246) ${percentage}%, rgb(63 63 70) ${percentage}%, rgb(63 63 70) 100%)`,
           }}
           ref={ref}
-          value={value[0]}
+          value={valueNum}
           onChange={handleChange}
-          min={min}
-          max={max}
+          min={minNum}
+          max={maxNum}
           step={step}
           {...props}
         />
