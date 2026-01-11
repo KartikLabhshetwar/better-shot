@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import "./ImageEditor.css";
 
 interface ImageEditorProps {
@@ -16,6 +16,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [copied, setCopied] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
 
@@ -180,6 +181,31 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
     }, "image/png");
   };
 
+  const handleCopy = async () => {
+    if (!canvasRef.current) return;
+    
+    try {
+      // Get the canvas data as base64
+      const dataUrl = canvasRef.current.toDataURL("image/png");
+      
+      // Save to temp file and copy to clipboard via Rust backend
+      const tempPath = await invoke<string>("save_edited_image", {
+        imageData: dataUrl,
+        saveDir: "/tmp",
+        copyToClip: true,
+      });
+      
+      console.log("Copied to clipboard from:", tempPath);
+      setCopied(true);
+      
+      // Reset copied state after 2 seconds
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+      setError(`Failed to copy: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
   return (
     <div className="image-editor">
       <div className="image-editor-header">
@@ -187,6 +213,9 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
         <div className="image-editor-actions">
           <button onClick={onCancel} className="btn-cancel">
             Cancel
+          </button>
+          <button onClick={handleCopy} className="btn-copy" disabled={!imageLoaded}>
+            {copied ? "Copied!" : "Copy"}
           </button>
           <button onClick={handleSave} className="btn-save" disabled={!imageLoaded}>
             Save
