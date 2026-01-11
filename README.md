@@ -1,3 +1,6 @@
+<img width="2848" height="1504" alt="og" src="https://github.com/user-attachments/assets/cdfc44bc-8c1a-4878-a1f7-c3bded91b391" />
+
+
 # Better Shot
 
 > An open-source alternative to CleanShot X for macOS. Capture, edit, and enhance your screenshots with professional quality.
