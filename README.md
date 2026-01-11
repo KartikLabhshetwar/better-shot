@@ -13,29 +13,11 @@ A fast, lightweight screenshot tool for macOS with region selection and image ed
 
 ## Installation
 
-### For End Users
-
-#### Option 1: Download Pre-built Binary (Recommended)
-
-1. Download the latest release from the [Releases page](https://github.com/yourusername/better-shot/releases)
-2. Extract the `.dmg` file
-3. Drag **Better Shot** to your **Applications** folder
-4. Open from Applications (first launch may require right-click → Open due to macOS security)
-
-#### Option 2: Build from Source
-
-If you prefer to build from source, you'll need:
-
-**Prerequisites:**
-- [Rust](https://www.rust-lang.org/tools/install) (latest stable)
-- [Node.js](https://nodejs.org/) (v18 or higher)
-- [pnpm](https://pnpm.io/)
-
 **Build Steps:**
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/better-shot.git
+git clone https://github.com/KartikLabhshetwar/better-shot.git
 cd better-shot
 
 # Install dependencies
@@ -92,6 +74,7 @@ pnpm tauri dev
 ```
 
 This will:
+
 - Start the Vite dev server for the frontend
 - Compile the Rust backend
 - Launch the Tauri application window with hot-reload
