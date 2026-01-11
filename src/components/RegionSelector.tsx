@@ -142,7 +142,7 @@ export function RegionSelector({ onSelect, onCancel, monitorShots }: RegionSelec
   return (
     <div 
       ref={overlayRef} 
-      className={`fixed inset-0 bg-transparent z-[10000] cursor-none select-none overflow-hidden transition-opacity duration-150 ${isReady ? 'opacity-100' : 'opacity-0'}`}
+      className={`fixed inset-0 bg-transparent z-50 cursor-none select-none overflow-hidden transition-opacity ${isReady ? 'opacity-100' : 'opacity-0'}`}
     >
       {normalizedShots.map((shot) => (
         <img
@@ -213,18 +213,18 @@ export function RegionSelector({ onSelect, onCancel, monitorShots }: RegionSelec
             height: `${selectionBox.height}px`,
           }}
         >
-          <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-black/85 text-white px-2.5 py-1 text-xs font-medium rounded backdrop-blur-sm border border-white/10 whitespace-nowrap">
+          <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-black/85 text-white px-2.5 py-1 text-xs font-medium rounded backdrop-blur-sm border border-white/10 whitespace-nowrap tabular-nums">
             {selectionBox.width} x {selectionBox.height}
           </div>
-          <div className="absolute -top-1 -left-1 w-2 h-2 bg-blue-500 border border-white rounded-sm" />
-          <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 border border-white rounded-sm" />
-          <div className="absolute -bottom-1 -left-1 w-2 h-2 bg-blue-500 border border-white rounded-sm" />
-          <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-blue-500 border border-white rounded-sm" />
+          <div className="absolute -top-1 -left-1 size-2 bg-blue-500 border border-white rounded-sm" />
+          <div className="absolute -top-1 -right-1 size-2 bg-blue-500 border border-white rounded-sm" />
+          <div className="absolute -bottom-1 -left-1 size-2 bg-blue-500 border border-white rounded-sm" />
+          <div className="absolute -bottom-1 -right-1 size-2 bg-blue-500 border border-white rounded-sm" />
         </div>
       )}
 
       <div 
-        className="fixed h-px bg-blue-500/80 pointer-events-none z-[10002] shadow-[0_0_2px_rgba(0,0,0,0.5)]"
+        className="fixed h-px bg-blue-500/80 pointer-events-none z-[51] shadow-[0_0_2px_rgba(0,0,0,0.5)]"
         style={{ 
           top: `${cursorPos.y}px`,
           left: `${cursorPos.x - 40}px`,
@@ -232,7 +232,7 @@ export function RegionSelector({ onSelect, onCancel, monitorShots }: RegionSelec
         }}
       />
       <div 
-        className="fixed w-px bg-blue-500/80 pointer-events-none z-[10002] shadow-[0_0_2px_rgba(0,0,0,0.5)]"
+        className="fixed w-px bg-blue-500/80 pointer-events-none z-[51] shadow-[0_0_2px_rgba(0,0,0,0.5)]"
         style={{ 
           left: `${cursorPos.x}px`,
           top: `${cursorPos.y - 40}px`,
@@ -241,7 +241,7 @@ export function RegionSelector({ onSelect, onCancel, monitorShots }: RegionSelec
       />
       
       <div 
-        className="fixed bg-black/75 text-white px-1.5 py-0.5 text-[11px] font-mono rounded pointer-events-none z-[10003] whitespace-nowrap"
+        className="fixed bg-black/75 text-white px-1.5 py-0.5 text-[11px] font-mono rounded pointer-events-none z-[52] whitespace-nowrap tabular-nums"
         style={{
           left: `${cursorPos.x + 15}px`,
           top: `${cursorPos.y + 15}px`,
@@ -250,7 +250,7 @@ export function RegionSelector({ onSelect, onCancel, monitorShots }: RegionSelec
         {Math.round(cursorPos.x)}, {Math.round(cursorPos.y)}
       </div>
 
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-black/85 text-white px-6 py-3 rounded-lg text-sm pointer-events-none backdrop-blur-md border border-white/15 z-[10003]">
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-black/85 text-white px-6 py-3 rounded-lg text-sm pointer-events-none backdrop-blur-md border border-white/15 z-[52] text-pretty">
         Click and drag to select region &bull; Press ESC to cancel
       </div>
     </div>

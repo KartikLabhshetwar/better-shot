@@ -287,11 +287,11 @@ function App() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-8 bg-zinc-950 text-zinc-50">
+    <main className="min-h-dvh flex flex-col items-center justify-center p-8 bg-zinc-950 text-zinc-50">
       <div className="w-full max-w-2xl space-y-6">
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-zinc-50 font-mono tracking-tight">Better Shot</h1>
-          <p className="text-zinc-400 text-sm">Professional screenshot workflow</p>
+          <h1 className="text-4xl font-bold text-zinc-50 font-mono text-balance">Better Shot</h1>
+          <p className="text-zinc-400 text-sm text-pretty">Professional screenshot workflow</p>
         </div>
 
         <Card className="bg-zinc-900 border-zinc-800">
@@ -318,7 +318,7 @@ function App() {
                 checked={copyToClipboard}
                 onChange={(e) => setCopyToClipboard(e.target.checked)}
                 disabled={isCapturing}
-                className="w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-zinc-400 focus:ring-2 focus:ring-zinc-600 disabled:opacity-50 cursor-pointer"
+                className="size-4 rounded border-zinc-700 bg-zinc-800 text-zinc-400 focus:ring-2 focus:ring-zinc-600 disabled:opacity-50 cursor-pointer"
               />
               <label htmlFor="copy-clipboard" className="text-sm text-zinc-300 cursor-pointer flex-1">
                 Copy to clipboard
@@ -332,7 +332,7 @@ function App() {
             >
               {isCapturing ? (
                 <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin size-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
@@ -344,15 +344,15 @@ function App() {
             </Button>
 
             {error && (
-              <div className="p-4 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-400 text-sm">
-                <div className="font-medium text-zinc-300 mb-1">Error</div>
+              <div className="p-4 bg-red-950/30 border border-red-800/50 rounded-lg text-red-400 text-sm text-pretty">
+                <div className="font-medium text-red-300 mb-1">Error</div>
                 {error}
               </div>
             )}
             
             {lastSavedPath && (
-              <div className="p-4 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-400 text-sm break-all">
-                <div className="font-medium text-zinc-300 mb-1">Saved successfully</div>
+              <div className="p-4 bg-emerald-950/30 border border-emerald-800/50 rounded-lg text-emerald-400 text-sm break-all text-pretty">
+                <div className="font-medium text-emerald-300 mb-1">Saved successfully</div>
                 {lastSavedPath}
               </div>
             )}
@@ -366,11 +366,11 @@ function App() {
               <div className="space-y-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400">Capture</span>
-                  <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs">⌘⇧2</kbd>
+                  <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘⇧2</kbd>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400">Save</span>
-                  <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs">⌘S</kbd>
+                  <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘S</kbd>
                 </div>
               </div>
             </CardContent>

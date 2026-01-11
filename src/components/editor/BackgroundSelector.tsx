@@ -47,7 +47,7 @@ export function BackgroundSelector({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-zinc-200 font-mono">Background</h3>
+        <h3 className="text-sm font-medium text-zinc-200 font-mono text-balance">Background</h3>
       </div>
       
       {/* Solid Colors */}
@@ -58,8 +58,9 @@ export function BackgroundSelector({
             <button
               key={type}
               onClick={() => onBackgroundTypeChange(type)}
+              aria-label={`Select ${type} background`}
               className={cn(
-                "w-10 h-10 rounded-lg transition-all",
+                "size-10 rounded-lg transition-all",
                 type === "transparent" && "bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImNoZWNrZXJib2FyZCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cmVjdCB3aWR0aD0iNSIgaGVpZ2h0PSI1IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iNSIgd2lkdGg9IjUiIGhlaWdodD0iNSIgZmlsbD0iI2UwZTBlMCIvPjxyZWN0IHk9IjUiIHdpZHRoPSI1IiBoZWlnaHQ9IjUiIGZpbGw9IiNlMGUwZTAiLz48cmVjdCB4PSI1IiB5PSI1IiB3aWR0aD0iNSIgaGVpZ2h0PSI1IiBmaWxsPSIjZmZmIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIGZpbGw9InVybCgjY2hlY2tlcmJvYXJkKSIvPjwvc3ZnPg==')]",
                 backgroundType === type
                   ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-zinc-900"
@@ -73,8 +74,9 @@ export function BackgroundSelector({
           <div className="relative">
             <button
               onClick={() => onBackgroundTypeChange("custom")}
+              aria-label="Select custom color background"
               className={cn(
-                "w-10 h-10 rounded-lg transition-all",
+                "size-10 rounded-lg transition-all",
                 backgroundType === "custom"
                   ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-zinc-900"
                   : "ring-1 ring-zinc-700 hover:ring-zinc-500"
@@ -106,6 +108,7 @@ export function BackgroundSelector({
                 onBackgroundTypeChange("gradient");
                 onGradientSelect?.(gradient);
               }}
+              aria-label={`Select ${gradient.name} gradient`}
               className={cn(
                 "w-full aspect-square rounded-lg transition-all",
                 backgroundType === "gradient" && selectedGradient === gradient.id

@@ -16,14 +16,14 @@ export function EffectsPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-zinc-200 font-mono">Background Effects</h3>
+        <h3 className="text-sm font-medium text-zinc-200 font-mono text-balance">Background Effects</h3>
       </div>
       
       <div className="space-y-6">
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <label className="text-xs text-zinc-400 font-medium">Blur</label>
-            <span className="text-xs text-zinc-400 font-mono">{blurAmount}px</span>
+            <span className="text-xs text-zinc-400 font-mono tabular-nums">{blurAmount}px</span>
           </div>
           <Slider
             value={[blurAmount]}
@@ -38,7 +38,7 @@ export function EffectsPanel({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <label className="text-xs text-zinc-400 font-medium">Noise</label>
-            <span className="text-xs text-zinc-400 font-mono">{noiseAmount}%</span>
+            <span className="text-xs text-zinc-400 font-mono tabular-nums">{noiseAmount}%</span>
           </div>
           <Slider
             value={[noiseAmount]}

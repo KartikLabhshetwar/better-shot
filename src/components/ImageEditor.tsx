@@ -461,9 +461,9 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
   }, [imageLoaded, isSaving, isCopying, handleSave, handleCopy, onCancel]);
 
   return (
-    <div className="flex flex-col h-screen bg-zinc-950 text-zinc-50">
+    <div className="flex flex-col h-dvh bg-zinc-950 text-zinc-50">
       <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900">
-        <h2 className="text-xl font-semibold text-zinc-50">Edit Screenshot</h2>
+        <h2 className="text-xl font-semibold text-zinc-50 text-balance">Edit Screenshot</h2>
         <div className="flex gap-3">
           <Button 
             variant="outline" 
@@ -481,7 +481,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
           >
             {isCopying ? (
               <span className="flex items-center gap-2">
-                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
@@ -502,7 +502,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
           >
             {isSaving ? (
               <span className="flex items-center gap-2">
-                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
@@ -548,11 +548,11 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
             {error && (
               <Card className="bg-red-950/30 border-red-800/50">
                 <CardContent className="pt-6">
-                  <div className="text-sm text-red-400">
+                  <div className="text-sm text-red-400 text-pretty">
                     <strong className="block mb-1 text-red-300">Error:</strong>
                     {error}
                     <br />
-                    <small className="text-zinc-500 break-all mt-2 block">Path: {imagePath}</small>
+                    <small className="text-zinc-500 break-all mt-2 block text-pretty">Path: {imagePath}</small>
                   </div>
                 </CardContent>
               </Card>
@@ -569,14 +569,14 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
                 className="max-w-full max-h-full rounded-lg shadow-2xl border border-zinc-800" 
               />
             ) : imageLoaded ? (
-              <div className="text-zinc-400 text-base">Generating preview...</div>
+              <div className="text-zinc-400 text-base text-pretty">Generating preview...</div>
             ) : error ? (
               <div className="text-center text-red-400 p-5">
-                <p className="mb-2 text-base font-medium">Could not load image</p>
-                <small className="text-zinc-500 text-xs">{error}</small>
+                <p className="mb-2 text-base font-medium text-balance">Could not load image</p>
+                <small className="text-zinc-500 text-xs text-pretty">{error}</small>
               </div>
             ) : (
-              <div className="text-zinc-400 text-base">Loading image...</div>
+              <div className="text-zinc-400 text-base text-pretty">Loading image...</div>
             )}
             <canvas ref={canvasRef} style={{ display: "none" }} />
           </div>

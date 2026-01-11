@@ -26,7 +26,7 @@ export function AssetGrid({ categories, selectedImage, onImageSelect }: AssetGri
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-zinc-200 font-mono">Wallpapers</h3>
+        <h3 className="text-sm font-medium text-zinc-200 font-mono text-balance">Wallpapers</h3>
       </div>
       
       {categories.length > 1 && (
@@ -35,8 +35,9 @@ export function AssetGrid({ categories, selectedImage, onImageSelect }: AssetGri
             <button
               key={category.name}
               onClick={() => setActiveCategory(category.name)}
+              aria-label={`Select ${category.name} category`}
               className={cn(
-                "flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200",
+                "flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all",
                 activeCategory === category.name
                   ? "bg-zinc-700 text-white shadow-sm"
                   : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/30"
@@ -53,8 +54,9 @@ export function AssetGrid({ categories, selectedImage, onImageSelect }: AssetGri
           <button
             key={asset.id}
             onClick={() => onImageSelect(asset.src)}
+            aria-label={`Select ${asset.name} background`}
             className={cn(
-              "group relative aspect-square rounded-lg overflow-hidden border transition-all duration-200",
+              "group relative aspect-square rounded-lg overflow-hidden border transition-all",
               selectedImage === asset.src
                 ? "border-blue-500 ring-2 ring-blue-500/20"
                 : "border-zinc-800 hover:border-zinc-600 hover:scale-[1.02]"
@@ -63,12 +65,12 @@ export function AssetGrid({ categories, selectedImage, onImageSelect }: AssetGri
             <img
               src={asset.src}
               alt={asset.name}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+              className="w-full h-full object-cover transition-transform group-hover:scale-110"
             />
             {selectedImage === asset.src && (
-              <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center animate-in fade-in duration-200">
-                <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center shadow-lg transform scale-100">
-                  <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
+                <div className="size-6 rounded-full bg-blue-500 flex items-center justify-center shadow-lg">
+                  <svg className="size-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
