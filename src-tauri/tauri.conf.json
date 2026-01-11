@@ -13,10 +13,10 @@
     "windows": [
       {
         "title": "Better Shot",
-        "width": 400,
-        "height": 320,
-        "minWidth": 350,
-        "minHeight": 280,
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
         "transparent": false,
         "decorations": true,
         "alwaysOnTop": false,

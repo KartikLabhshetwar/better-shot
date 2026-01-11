@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import "./RegionSelector.css";
 
 interface Region {
   x: number;
@@ -133,12 +132,14 @@ export function RegionSelector({ onSelect, onCancel, monitorShots }: RegionSelec
   }, [isSelecting, startPos, currentPos, bounds, onSelect, onCancel]);
 
   return (
-    <div ref={overlayRef} className="region-selector-overlay">
-      {/* Screenshot images as background */}
+    <div 
+      ref={overlayRef} 
+      className="fixed inset-0 bg-transparent z-[10000] cursor-none select-none overflow-hidden"
+    >
       {normalizedShots.map((shot) => (
         <img
           key={shot.id}
-          className="region-selector-shot"
+          className="absolute object-contain select-none pointer-events-none"
           src={shot.url}
           alt={`Captured monitor ${shot.id}`}
           style={{
@@ -151,12 +152,10 @@ export function RegionSelector({ onSelect, onCancel, monitorShots }: RegionSelec
         />
       ))}
 
-      {/* Dim overlay with cutout for selection */}
       {selectionBox ? (
         <>
-          {/* Top dim */}
           <div 
-            className="region-selector-dim"
+            className="absolute bg-black/50 pointer-events-none"
             style={{
               top: 0,
               left: 0,
@@ -164,9 +163,8 @@ export function RegionSelector({ onSelect, onCancel, monitorShots }: RegionSelec
               height: `${selectionBox.y}px`,
             }}
           />
-          {/* Left dim */}
           <div 
-            className="region-selector-dim"
+            className="absolute bg-black/50 pointer-events-none"
             style={{
               top: `${selectionBox.y}px`,
               left: 0,
@@ -174,9 +172,8 @@ export function RegionSelector({ onSelect, onCancel, monitorShots }: RegionSelec
               height: `${selectionBox.height}px`,
             }}
           />
-          {/* Right dim */}
           <div 
-            className="region-selector-dim"
+            className="absolute bg-black/50 pointer-events-none"
             style={{
               top: `${selectionBox.y}px`,
               left: `${selectionBox.x + selectionBox.width}px`,
@@ -184,9 +181,8 @@ export function RegionSelector({ onSelect, onCancel, monitorShots }: RegionSelec
               height: `${selectionBox.height}px`,
             }}
           />
-          {/* Bottom dim */}
           <div 
-            className="region-selector-dim"
+            className="absolute bg-black/50 pointer-events-none"
             style={{
               top: `${selectionBox.y + selectionBox.height}px`,
               left: 0,
@@ -196,13 +192,12 @@ export function RegionSelector({ onSelect, onCancel, monitorShots }: RegionSelec
           />
         </>
       ) : (
-        <div className="region-selector-dim region-selector-dim-full" />
+        <div className="absolute inset-0 bg-black/50 pointer-events-none" />
       )}
 
-      {/* Selection box border */}
       {selectionBox && selectionBox.width > 0 && selectionBox.height > 0 && (
         <div
-          className="region-selector-box"
+          className="absolute border-2 border-blue-500 bg-transparent pointer-events-none shadow-[0_0_0_1px_rgba(0,0,0,0.3),inset_0_0_0_1px_rgba(255,255,255,0.1)]"
           style={{
             left: `${selectionBox.x}px`,
             top: `${selectionBox.y}px`,
@@ -210,30 +205,27 @@ export function RegionSelector({ onSelect, onCancel, monitorShots }: RegionSelec
             height: `${selectionBox.height}px`,
           }}
         >
-          <div className="region-selector-info">
+          <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-black/85 text-white px-2.5 py-1 text-xs font-medium rounded backdrop-blur-sm border border-white/10 whitespace-nowrap">
             {selectionBox.width} x {selectionBox.height}
           </div>
-          {/* Corner handles */}
-          <div className="selection-handle handle-nw" />
-          <div className="selection-handle handle-ne" />
-          <div className="selection-handle handle-sw" />
-          <div className="selection-handle handle-se" />
+          <div className="absolute -top-1 -left-1 w-2 h-2 bg-blue-500 border border-white rounded-sm" />
+          <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 border border-white rounded-sm" />
+          <div className="absolute -bottom-1 -left-1 w-2 h-2 bg-blue-500 border border-white rounded-sm" />
+          <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-blue-500 border border-white rounded-sm" />
         </div>
       )}
 
-      {/* Crosshair cursor - full screen spanning lines */}
       <div 
-        className="crosshair-horizontal"
+        className="fixed left-0 right-0 h-px bg-blue-500/80 pointer-events-none z-[10002] shadow-[0_0_2px_rgba(0,0,0,0.5)]"
         style={{ top: `${cursorPos.y}px` }}
       />
       <div 
-        className="crosshair-vertical"
+        className="fixed top-0 bottom-0 w-px bg-blue-500/80 pointer-events-none z-[10002] shadow-[0_0_2px_rgba(0,0,0,0.5)]"
         style={{ left: `${cursorPos.x}px` }}
       />
       
-      {/* Cursor position indicator */}
       <div 
-        className="cursor-coords"
+        className="fixed bg-black/75 text-white px-1.5 py-0.5 text-[11px] font-mono rounded pointer-events-none z-[10003] whitespace-nowrap"
         style={{
           left: `${cursorPos.x + 15}px`,
           top: `${cursorPos.y + 15}px`,
@@ -242,8 +234,7 @@ export function RegionSelector({ onSelect, onCancel, monitorShots }: RegionSelec
         {Math.round(cursorPos.x)}, {Math.round(cursorPos.y)}
       </div>
 
-      {/* Instructions */}
-      <div className="region-selector-instructions">
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-black/85 text-white px-6 py-3 rounded-lg text-sm pointer-events-none backdrop-blur-md border border-white/15 z-[10003]">
         Click and drag to select region &bull; Press ESC to cancel
       </div>
     </div>

@@ -1,0 +1,82 @@
+import { useState } from "react";
+import { cn } from "@/lib/utils";
+
+export interface Asset {
+  id: string;
+  src: string;
+  name: string;
+}
+
+export interface AssetCategory {
+  name: string;
+  assets: Asset[];
+}
+
+interface AssetGridProps {
+  categories: AssetCategory[];
+  selectedImage: string | null;
+  onImageSelect: (imageSrc: string) => void;
+}
+
+export function AssetGrid({ categories, selectedImage, onImageSelect }: AssetGridProps) {
+  const [activeCategory, setActiveCategory] = useState(categories[0]?.name || "");
+
+  const currentCategory = categories.find((cat) => cat.name === activeCategory);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium text-zinc-200">Assets Wallpapers</h3>
+      </div>
+      
+      {categories.length > 1 && (
+        <div className="flex p-1 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
+          {categories.map((category) => (
+            <button
+              key={category.name}
+              onClick={() => setActiveCategory(category.name)}
+              className={cn(
+                "flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200",
+                activeCategory === category.name
+                  ? "bg-zinc-700 text-white shadow-sm"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/30"
+              )}
+            >
+              {category.name === "Background Images" ? "Images" : category.name === "Mac Assets" ? "Mac" : category.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-2 max-h-[400px] overflow-y-auto pr-4 pb-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-zinc-700 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
+        {currentCategory?.assets.map((asset) => (
+          <button
+            key={asset.id}
+            onClick={() => onImageSelect(asset.src)}
+            className={cn(
+              "group relative aspect-square rounded-lg overflow-hidden border transition-all duration-200",
+              selectedImage === asset.src
+                ? "border-blue-500 ring-2 ring-blue-500/20"
+                : "border-zinc-800 hover:border-zinc-600 hover:scale-[1.02]"
+            )}
+          >
+            <img
+              src={asset.src}
+              alt={asset.name}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+            />
+            {selectedImage === asset.src && (
+              <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center animate-in fade-in duration-200">
+                <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center shadow-lg transform scale-100">
+                  <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              </div>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

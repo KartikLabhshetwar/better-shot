@@ -5,7 +5,8 @@ import { getCurrentWindow, PhysicalSize, LogicalSize, PhysicalPosition } from "@
 import { register, unregisterAll } from "@tauri-apps/plugin-global-shortcut";
 import { RegionSelector } from "./components/RegionSelector";
 import { ImageEditor } from "./components/ImageEditor";
-import "./App.css";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
 type AppMode = "main" | "selecting" | "editing";
 type MonitorShot = {
@@ -129,7 +130,7 @@ function App() {
       // Restore window on error
       await appWindow.setFullscreen(false);
       await appWindow.setDecorations(true);
-      await appWindow.setSize(new LogicalSize(800, 600));
+      await appWindow.setSize(new LogicalSize(1200, 800));
       await appWindow.center();
       await appWindow.show().catch(() => {});
     } finally {
@@ -188,7 +189,7 @@ function App() {
       console.log("Cropped screenshot path:", croppedPath);
       
       // Resize window to fit the editor
-      await appWindow.setSize(new LogicalSize(900, 700));
+      await appWindow.setSize(new LogicalSize(1200, 800));
       await appWindow.center();
       await appWindow.show();
       
@@ -196,7 +197,10 @@ function App() {
       setMode("editing");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-      await appWindow.setSize(new LogicalSize(800, 600));
+      await appWindow.setFullscreen(false);
+      await appWindow.setAlwaysOnTop(false);
+      await appWindow.setDecorations(true);
+      await appWindow.setSize(new LogicalSize(1200, 800));
       await appWindow.center();
       await appWindow.show();
       setMode("main");
@@ -209,7 +213,7 @@ function App() {
     await appWindow.setFullscreen(false);
     await appWindow.setAlwaysOnTop(false);
     await appWindow.setDecorations(true);
-    await appWindow.setSize(new LogicalSize(800, 600));
+    await appWindow.setSize(new LogicalSize(1200, 800));
     await appWindow.center();
     await appWindow.show();
     setMode("main");
@@ -227,14 +231,20 @@ function App() {
       });
       setLastSavedPath(savedPath);
       
-      await appWindow.setSize(new LogicalSize(800, 600));
+      await appWindow.setFullscreen(false);
+      await appWindow.setAlwaysOnTop(false);
+      await appWindow.setDecorations(true);
+      await appWindow.setSize(new LogicalSize(1200, 800));
       await appWindow.center();
       await appWindow.show();
       setMode("main");
       setTempScreenshotPath(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-      await appWindow.setSize(new LogicalSize(800, 600));
+      await appWindow.setFullscreen(false);
+      await appWindow.setAlwaysOnTop(false);
+      await appWindow.setDecorations(true);
+      await appWindow.setSize(new LogicalSize(1200, 800));
       await appWindow.center();
       await appWindow.show();
       setMode("main");
@@ -243,7 +253,10 @@ function App() {
 
   async function handleEditorCancel() {
     const appWindow = getCurrentWindow();
-    await appWindow.setSize(new LogicalSize(800, 600));
+    await appWindow.setFullscreen(false);
+    await appWindow.setAlwaysOnTop(false);
+    await appWindow.setDecorations(true);
+    await appWindow.setSize(new LogicalSize(1200, 800));
     await appWindow.center();
     await appWindow.show();
     setMode("main");
@@ -271,47 +284,60 @@ function App() {
   }
 
   return (
-    <main className="container">
-      <h1>Better Shot</h1>
+    <main className="min-h-screen flex flex-col items-center justify-center p-8 bg-zinc-950 text-zinc-50">
+      <h1 className="text-4xl font-bold mb-8 text-zinc-50">Better Shot</h1>
 
-      <div className="capture-section">
-        <div className="form-group">
-          <label htmlFor="save-dir">Save Directory:</label>
-          <input
-            id="save-dir"
-            type="text"
-            value={saveDir}
-            onChange={(e) => setSaveDir(e.target.value)}
-            placeholder="Enter save directory path"
-            disabled={isCapturing}
-          />
-        </div>
+      <Card className="w-full max-w-lg bg-zinc-900/50 border-zinc-800">
+        <CardContent className="p-6 space-y-6">
+          <div className="space-y-2">
+            <label htmlFor="save-dir" className="text-sm font-medium text-zinc-300 block">
+              Save Directory:
+            </label>
+            <input
+              id="save-dir"
+              type="text"
+              value={saveDir}
+              onChange={(e) => setSaveDir(e.target.value)}
+              placeholder="Enter save directory path"
+              disabled={isCapturing}
+              className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-md text-zinc-50 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+          </div>
 
-        <div className="form-group">
-          <label>
+          <div className="flex items-center gap-2">
             <input
               type="checkbox"
+              id="copy-clipboard"
               checked={copyToClipboard}
               onChange={(e) => setCopyToClipboard(e.target.checked)}
               disabled={isCapturing}
+              className="w-4 h-4 rounded border-zinc-700 bg-zinc-800 text-blue-600 focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             />
-            Copy to clipboard
-          </label>
-        </div>
+            <label htmlFor="copy-clipboard" className="text-sm text-zinc-300 cursor-pointer">
+              Copy to clipboard
+            </label>
+          </div>
 
-        <button
-          onClick={handleCapture}
-          disabled={isCapturing}
-          className="capture-button"
-        >
-          {isCapturing ? "Capturing..." : "Capture Region"}
-        </button>
+          <Button
+            onClick={handleCapture}
+            disabled={isCapturing}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 text-base font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isCapturing ? "Capturing..." : "Capture Region"}
+          </Button>
 
-        {error && <p className="error">{error}</p>}
-        {lastSavedPath && (
-          <p className="success">Saved to: {lastSavedPath}</p>
-        )}
-      </div>
+          {error && (
+            <div className="p-3 bg-red-950/30 border border-red-800/50 rounded-md text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+          {lastSavedPath && (
+            <div className="p-3 bg-emerald-950/30 border border-emerald-800/50 rounded-md text-emerald-400 text-sm break-all">
+              Saved to: {lastSavedPath}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </main>
   );
 }
