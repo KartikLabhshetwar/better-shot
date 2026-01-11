@@ -14,6 +14,7 @@ pub struct MonitorShot {
     pub y: i32,
     pub width: u32,
     pub height: u32,
+    pub scale_factor: f32,
     pub path: String,
 }
 
@@ -65,6 +66,8 @@ fn capture_single_monitor(monitor: &Monitor, save_path: &PathBuf) -> AppResult<M
         .map_err(|e| format!("Failed to get monitor width: {}", e))?;
     let height = monitor.height()
         .map_err(|e| format!("Failed to get monitor height: {}", e))?;
+    let scale_factor = monitor.scale_factor()
+        .map_err(|e| format!("Failed to get monitor scale factor: {}", e))?;
 
     Ok(MonitorShot {
         id: monitor_id,
@@ -72,6 +75,7 @@ fn capture_single_monitor(monitor: &Monitor, save_path: &PathBuf) -> AppResult<M
         y,
         width,
         height,
+        scale_factor,
         path: screenshot_path.to_string_lossy().into_owned(),
     })
 }

@@ -7,6 +7,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Custom error type for better error handling
 pub type AppResult<T> = Result<T, String>;
 
+/// Get the user's Desktop directory path (cross-platform)
+pub fn get_desktop_path() -> AppResult<String> {
+    let desktop = dirs::desktop_dir().ok_or("Failed to get Desktop directory")?;
+    Ok(desktop.to_string_lossy().into_owned())
+}
+
 /// Get current timestamp in milliseconds
 pub fn get_timestamp() -> AppResult<u64> {
     SystemTime::now()

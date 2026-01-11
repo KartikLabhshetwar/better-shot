@@ -10,7 +10,9 @@ mod image;
 mod screenshot;
 mod utils;
 
-use commands::{capture_all_monitors, capture_once, capture_region, save_edited_image};
+use commands::{
+    capture_all_monitors, capture_once, capture_region, get_desktop_directory, save_edited_image,
+};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -22,7 +24,8 @@ pub fn run() {
             capture_once,
             capture_all_monitors,
             capture_region,
-            save_edited_image
+            save_edited_image,
+            get_desktop_directory
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -13,11 +13,15 @@
     "windows": [
       {
         "title": "Better Shot",
-        "width": 800,
-        "height": 600,
+        "width": 400,
+        "height": 320,
+        "minWidth": 350,
+        "minHeight": 280,
         "transparent": false,
         "decorations": true,
-        "alwaysOnTop": false
+        "alwaysOnTop": false,
+        "center": true,
+        "resizable": true
       }
     ],
     "security": {

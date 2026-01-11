@@ -18,6 +18,7 @@ interface RegionSelectorProps {
     y: number;
     width: number;
     height: number;
+    scale_factor: number;
     path: string;
   }[];
 }

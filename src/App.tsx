@@ -7,8 +7,6 @@ import { RegionSelector } from "./components/RegionSelector";
 import { ImageEditor } from "./components/ImageEditor";
 import "./App.css";
 
-const DEFAULT_SAVE_DIR = `${window.location.origin.includes("localhost") ? "/tmp" : ""}/Pictures/BetterShot`;
-
 type AppMode = "main" | "selecting" | "editing";
 type MonitorShot = {
   id: number;
@@ -16,12 +14,13 @@ type MonitorShot = {
   y: number;
   width: number;
   height: number;
+  scale_factor: number;
   path: string;
 };
 
 function App() {
   const [mode, setMode] = useState<AppMode>("main");
-  const [saveDir, setSaveDir] = useState(DEFAULT_SAVE_DIR);
+  const [saveDir, setSaveDir] = useState<string>("");
   const [copyToClipboard, setCopyToClipboard] = useState(true);
   const [lastSavedPath, setLastSavedPath] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -30,24 +29,24 @@ function App() {
   const [monitorShots, setMonitorShots] = useState<MonitorShot[]>([]);
 
   useEffect(() => {
+    const initializeDesktopPath = async () => {
+      try {
+        const desktopPath = await invoke<string>("get_desktop_directory");
+        setSaveDir(desktopPath);
+      } catch (err) {
+        console.error("Failed to get Desktop directory:", err);
+        setError(`Failed to get Desktop directory: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    };
+    initializeDesktopPath();
+  }, []);
+
+  useEffect(() => {
     const setupHotkeys = async () => {
       try {
-        await register("CommandOrControl+Shift+S", async () => {
-          setIsCapturing(true);
-          setError(null);
-
-          try {
-            const savedPath = await invoke<string>("capture_once", {
-              saveDir,
-              copyToClip: copyToClipboard,
-            });
-            setLastSavedPath(savedPath);
-          } catch (err) {
-            setError(err instanceof Error ? err.message : String(err));
-            setLastSavedPath(null);
-          } finally {
-            setIsCapturing(false);
-          }
+        await register("CommandOrControl+Shift+2", () => {
+          // Use the same workflow as the Capture Region button
+          handleCapture();
         });
       } catch (err) {
         console.error("Failed to register hotkey:", err);
@@ -78,9 +77,9 @@ function App() {
       await appWindow.hide();
 
       // Small delay to ensure window is hidden
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-      // Capture all monitors
+      // Capture all monitors (save to temp directory for temporary use)
       const shots = await invoke<MonitorShot[]>("capture_all_monitors", {
         saveDir: "/tmp",
       });
@@ -115,11 +114,23 @@ function App() {
 
       setMode("selecting");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      // Check if it's a permission-related error
+      if (errorMessage.toLowerCase().includes("permission") || 
+          errorMessage.toLowerCase().includes("access") ||
+          errorMessage.toLowerCase().includes("denied")) {
+        setError(
+          "Screen Recording permission required. Please go to System Settings > Privacy & Security > Screen Recording and enable access for Better Shot, then restart the app."
+        );
+      } else {
+        setError(errorMessage);
+      }
       setLastSavedPath(null);
       // Restore window on error
       await appWindow.setFullscreen(false);
       await appWindow.setDecorations(true);
+      await appWindow.setSize(new LogicalSize(800, 600));
+      await appWindow.center();
       await appWindow.show().catch(() => {});
     } finally {
       setIsCapturing(false);
@@ -158,10 +169,12 @@ function App() {
       ).shot;
 
       // Convert absolute screen coordinates to coordinates relative to the monitor's screenshot
-      const relX = Math.max(0, Math.floor(region.x - target.x));
-      const relY = Math.max(0, Math.floor(region.y - target.y));
-      const relWidth = Math.max(1, Math.floor(Math.min(region.width, target.width - relX)));
-      const relHeight = Math.max(1, Math.floor(Math.min(region.height, target.height - relY)));
+      // Apply scale factor for Retina displays (image is captured at physical pixels)
+      const scaleFactor = target.scale_factor || 1;
+      const relX = Math.max(0, Math.floor((region.x - target.x) * scaleFactor));
+      const relY = Math.max(0, Math.floor((region.y - target.y) * scaleFactor));
+      const relWidth = Math.max(1, Math.floor(region.width * scaleFactor));
+      const relHeight = Math.max(1, Math.floor(region.height * scaleFactor));
 
       const croppedPath = await invoke<string>("capture_region", {
         screenshotPath: target.path,
@@ -205,6 +218,7 @@ function App() {
   }
 
   async function handleEditorSave(editedImageData: string) {
+    const appWindow = getCurrentWindow();
     try {
       const savedPath = await invoke<string>("save_edited_image", {
         imageData: editedImageData,
@@ -212,14 +226,26 @@ function App() {
         copyToClip: copyToClipboard,
       });
       setLastSavedPath(savedPath);
+      
+      await appWindow.setSize(new LogicalSize(800, 600));
+      await appWindow.center();
+      await appWindow.show();
       setMode("main");
       setTempScreenshotPath(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      await appWindow.setSize(new LogicalSize(800, 600));
+      await appWindow.center();
+      await appWindow.show();
+      setMode("main");
     }
   }
 
-  function handleEditorCancel() {
+  async function handleEditorCancel() {
+    const appWindow = getCurrentWindow();
+    await appWindow.setSize(new LogicalSize(800, 600));
+    await appWindow.center();
+    await appWindow.show();
     setMode("main");
     setTempScreenshotPath(null);
   }
