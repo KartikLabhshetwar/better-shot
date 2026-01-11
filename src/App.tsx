@@ -74,19 +74,22 @@ function App() {
     const appWindow = getCurrentWindow();
 
     try {
-      // Hide the window first before taking screenshot
+      // Prepare window properties first (while still hidden) - this reduces jitter
+      await Promise.all([
+        appWindow.setDecorations(false),
+        appWindow.setAlwaysOnTop(true),
+      ]);
+
+      // Hide the window before taking screenshot
       await appWindow.hide();
 
-      // Longer delay to ensure window is fully hidden before screenshot
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      // Minimal delay - just enough for window to hide
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Capture all monitors (save to temp directory for temporary use)
+      // Capture all monitors
       const shots = await invoke<MonitorShot[]>("capture_all_monitors", {
         saveDir: "/tmp",
       });
-      
-      // Set state and prepare window in parallel for faster response
-      setMonitorShots(shots);
 
       // Calculate total bounds across all monitors
       const bounds = shots.reduce(
@@ -102,18 +105,17 @@ function App() {
       const width = bounds.maxX - bounds.minX;
       const height = bounds.maxY - bounds.minY;
 
-      // Set window properties in parallel for faster setup
-      await Promise.all([
-        appWindow.setDecorations(false),
-        appWindow.setAlwaysOnTop(true),
-      ]);
-
-      // Position, size, and show - these need to be sequential
+      // Set position and size together, then fullscreen
       await appWindow.setPosition(new PhysicalPosition(bounds.minX, bounds.minY));
       await appWindow.setSize(new PhysicalSize(width, height));
-      await appWindow.setFullscreen(true);
       
+      // Set mode BEFORE showing window so React renders immediately
+      setMonitorShots(shots);
       setMode("selecting");
+      
+      // Small delay for React to render, then show
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      await appWindow.setFullscreen(true);
       await appWindow.show();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);

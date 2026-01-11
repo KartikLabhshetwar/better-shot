@@ -27,7 +27,15 @@ export function RegionSelector({ onSelect, onCancel, monitorShots }: RegionSelec
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
   const [currentPos, setCurrentPos] = useState({ x: 0, y: 0 });
   const [cursorPos, setCursorPos] = useState({ x: -100, y: -100 });
+  const [isReady, setIsReady] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
+
+  // Fade in after mount for smooth appearance
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setIsReady(true));
+    });
+  }, []);
 
   // Calculate the bounds offset (for multi-monitor support)
   const bounds = useMemo(() => {
@@ -134,7 +142,7 @@ export function RegionSelector({ onSelect, onCancel, monitorShots }: RegionSelec
   return (
     <div 
       ref={overlayRef} 
-      className="fixed inset-0 bg-transparent z-[10000] cursor-none select-none overflow-hidden"
+      className={`fixed inset-0 bg-transparent z-[10000] cursor-none select-none overflow-hidden transition-opacity duration-150 ${isReady ? 'opacity-100' : 'opacity-0'}`}
     >
       {normalizedShots.map((shot) => (
         <img

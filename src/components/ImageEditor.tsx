@@ -2,9 +2,11 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { BackgroundSelector } from "./editor/BackgroundSelector";
+import { BackgroundSelector, gradientOptions, type GradientOption } from "./editor/BackgroundSelector";
 import { AssetGrid, type AssetCategory } from "./editor/AssetGrid";
 import { EffectsPanel } from "./editor/EffectsPanel";
+import { ImageRoundnessControl } from "./editor/ImageRoundnessControl";
+import { createHighQualityCanvas } from "@/lib/canvas-utils";
 
 // Import all background images
 import bgImage13 from "@/assets/bg-images/asset-13.jpg";
@@ -90,13 +92,17 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
   const [backgroundType, setBackgroundType] = useState<BackgroundType>("image");
   const [customColor, setCustomColor] = useState("#667eea");
   const [selectedImage, setSelectedImage] = useState<string | null>(bgImage25);
-  const [blurAmount, setBlurAmount] = useState(0);
+  const [selectedGradient, setSelectedGradient] = useState<GradientOption>(gradientOptions[0]);
+  const [blurAmount, setBlurAmount] = useState(20);
   const [noiseAmount, setNoiseAmount] = useState(0);
+  const [borderRadius, setBorderRadius] = useState(18);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [bgImageLoaded, setBgImageLoaded] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isCopying, setIsCopying] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const bgImageRef = useRef<HTMLImageElement | null>(null);
@@ -127,8 +133,8 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
         break;
       case "gradient": {
         const gradient = ctx.createLinearGradient(0, 0, width, height);
-        gradient.addColorStop(0, "#667eea");
-        gradient.addColorStop(1, "#764ba2");
+        gradient.addColorStop(0, selectedGradient.colors[0]);
+        gradient.addColorStop(1, selectedGradient.colors[1]);
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, width, height);
         break;
@@ -147,7 +153,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
         }
         break;
     }
-  }, [backgroundType, customColor, selectedImage]);
+  }, [backgroundType, customColor, selectedImage, selectedGradient]);
 
   const applyNoiseToBackground = useCallback((ctx: CanvasRenderingContext2D, width: number, height: number, amount: number) => {
     if (amount === 0) return;
@@ -190,52 +196,71 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
   const updatePreview = useCallback(() => {
     if (!imageRef.current || !canvasRef.current || !imageLoaded) return;
 
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
     const img = imageRef.current;
     const padding = 100;
-    const borderRadius = 12;
     const bgWidth = img.width + padding * 2;
     const bgHeight = img.height + padding * 2;
 
+    const canvas = canvasRef.current;
     canvas.width = bgWidth;
     canvas.height = bgHeight;
+    const ctx = canvas.getContext("2d", { alpha: true });
+    if (!ctx) return;
 
-    // Create a temporary canvas for the background with effects
-    const bgCanvas = document.createElement("canvas");
-    bgCanvas.width = bgWidth;
-    bgCanvas.height = bgHeight;
-    const bgCtx = bgCanvas.getContext("2d");
-    if (!bgCtx) return;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
 
-    // Draw background to a temporary canvas first
     const tempBgCanvas = document.createElement("canvas");
     tempBgCanvas.width = bgWidth;
     tempBgCanvas.height = bgHeight;
     const tempBgCtx = tempBgCanvas.getContext("2d");
     if (!tempBgCtx) return;
     
-    // Draw the background (solid colors, gradients, or images)
     drawBackground(tempBgCtx, bgWidth, bgHeight);
 
-    // Apply blur using filter - must be set before drawing
+    const bgCanvas = document.createElement("canvas");
+    bgCanvas.width = bgWidth;
+    bgCanvas.height = bgHeight;
+    const bgCtx = bgCanvas.getContext("2d");
+    if (!bgCtx) return;
+
     if (blurAmount > 0) {
-      // Create a new canvas for the blurred version
-      const blurredCanvas = document.createElement("canvas");
-      blurredCanvas.width = bgWidth;
-      blurredCanvas.height = bgHeight;
-      const blurredCtx = blurredCanvas.getContext("2d");
-      if (blurredCtx) {
-        // Set filter before drawing
-        blurredCtx.filter = `blur(${blurAmount}px)`;
-        // Draw the background to the blurred canvas
-        blurredCtx.drawImage(tempBgCanvas, 0, 0);
-        // Reset filter
-        blurredCtx.filter = "none";
-        // Copy blurred result to bgCtx
-        bgCtx.drawImage(blurredCanvas, 0, 0);
+      // Extend canvas size to prevent edge clipping during blur
+      const blurPadding = blurAmount * 3;
+      const extendedWidth = bgWidth + blurPadding * 2;
+      const extendedHeight = bgHeight + blurPadding * 2;
+      
+      const extendedCanvas = document.createElement("canvas");
+      extendedCanvas.width = extendedWidth;
+      extendedCanvas.height = extendedHeight;
+      const extendedCtx = extendedCanvas.getContext("2d");
+      
+      if (extendedCtx) {
+        // Draw background at offset position
+        extendedCtx.drawImage(tempBgCanvas, blurPadding, blurPadding);
+        
+        // Fill edges by extending the background
+        extendedCtx.drawImage(tempBgCanvas, 0, 0, bgWidth, 1, blurPadding, 0, bgWidth, blurPadding);
+        extendedCtx.drawImage(tempBgCanvas, 0, bgHeight - 1, bgWidth, 1, blurPadding, blurPadding + bgHeight, bgWidth, blurPadding);
+        extendedCtx.drawImage(tempBgCanvas, 0, 0, 1, bgHeight, 0, blurPadding, blurPadding, bgHeight);
+        extendedCtx.drawImage(tempBgCanvas, bgWidth - 1, 0, 1, bgHeight, blurPadding + bgWidth, blurPadding, blurPadding, bgHeight);
+        
+        // Apply blur to extended canvas
+        const blurredExtCanvas = document.createElement("canvas");
+        blurredExtCanvas.width = extendedWidth;
+        blurredExtCanvas.height = extendedHeight;
+        const blurredExtCtx = blurredExtCanvas.getContext("2d");
+        
+        if (blurredExtCtx) {
+          blurredExtCtx.filter = `blur(${blurAmount}px)`;
+          blurredExtCtx.drawImage(extendedCanvas, 0, 0);
+          blurredExtCtx.filter = "none";
+          
+          // Crop back to original size
+          bgCtx.drawImage(blurredExtCanvas, blurPadding, blurPadding, bgWidth, bgHeight, 0, 0, bgWidth, bgHeight);
+        } else {
+          bgCtx.drawImage(tempBgCanvas, 0, 0);
+        }
       } else {
         bgCtx.drawImage(tempBgCanvas, 0, 0);
       }
@@ -243,15 +268,12 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
       bgCtx.drawImage(tempBgCanvas, 0, 0);
     }
 
-    // Apply noise after blur
     if (noiseAmount > 0) {
       applyNoiseToBackground(bgCtx, bgWidth, bgHeight, noiseAmount);
     }
 
-    // Draw the blurred/noised background to main canvas
     ctx.drawImage(bgCanvas, 0, 0);
 
-    // Draw the main image with shadow
     ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
     ctx.shadowBlur = 20;
     ctx.shadowOffsetX = 0;
@@ -278,7 +300,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
         setPreviewUrl(url);
       }
     }, "image/png");
-  }, [imageLoaded, drawBackground, previewUrl, blurAmount, noiseAmount, applyNoiseToBackground]);
+  }, [imageLoaded, drawBackground, previewUrl, blurAmount, noiseAmount, applyNoiseToBackground, borderRadius]);
 
   useEffect(() => {
     setError(null);
@@ -316,7 +338,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
     if (imageLoaded && (backgroundType !== "image" || bgImageLoaded)) {
       updatePreview();
     }
-  }, [imageLoaded, backgroundType, customColor, blurAmount, noiseAmount, selectedImage, bgImageLoaded, updatePreview]);
+  }, [imageLoaded, backgroundType, customColor, blurAmount, noiseAmount, selectedImage, bgImageLoaded, borderRadius, selectedGradient, updatePreview]);
 
   useEffect(() => {
     return () => {
@@ -326,25 +348,74 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
     };
   }, [previewUrl]);
 
-  const handleSave = () => {
-    if (!canvasRef.current) return;
-    
-    canvasRef.current.toBlob((blob) => {
-      if (blob) {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          onSave(reader.result as string);
-        };
-        reader.readAsDataURL(blob);
-      }
-    }, "image/png");
-  };
+  const renderHighQualityCanvas = useCallback((): HTMLCanvasElement | null => {
+    if (!imageRef.current) return null;
 
-  const handleCopy = async () => {
-    if (!canvasRef.current) return;
-    
     try {
-      const dataUrl = canvasRef.current.toDataURL("image/png");
+      return createHighQualityCanvas({
+        image: imageRef.current,
+        backgroundType,
+        customColor,
+        selectedImage,
+        bgImage: bgImageRef.current,
+        blurAmount,
+        noiseAmount,
+        borderRadius,
+        padding: 100,
+        gradientColors: selectedGradient.colors,
+      });
+    } catch (err) {
+      setError(`Failed to render high-quality image: ${err instanceof Error ? err.message : String(err)}`);
+      return null;
+    }
+  }, [backgroundType, customColor, selectedImage, blurAmount, noiseAmount, borderRadius, selectedGradient]);
+
+  const handleSave = useCallback(() => {
+    if (!imageRef.current || isSaving || isCopying) return;
+    
+    setIsSaving(true);
+    const highQualityCanvas = renderHighQualityCanvas();
+    
+    if (!highQualityCanvas) {
+      setIsSaving(false);
+      return;
+    }
+
+    highQualityCanvas.toBlob(
+      (blob) => {
+        if (blob) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            onSave(reader.result as string);
+            setIsSaving(false);
+          };
+          reader.onerror = () => {
+            setError("Failed to read image data");
+            setIsSaving(false);
+          };
+          reader.readAsDataURL(blob);
+        } else {
+          setIsSaving(false);
+        }
+      },
+      "image/png",
+      1.0
+    );
+  }, [renderHighQualityCanvas, onSave, isSaving, isCopying]);
+
+  const handleCopy = useCallback(async () => {
+    if (!imageRef.current || isSaving || isCopying) return;
+    
+    setIsCopying(true);
+    try {
+      const highQualityCanvas = renderHighQualityCanvas();
+      
+      if (!highQualityCanvas) {
+        setIsCopying(false);
+        return;
+      }
+
+      const dataUrl = highQualityCanvas.toDataURL("image/png");
       
       await invoke<string>("save_edited_image", {
         imageData: dataUrl,
@@ -356,13 +427,38 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       setError(`Failed to copy: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsCopying(false);
     }
-  };
+  }, [renderHighQualityCanvas, isSaving, isCopying]);
 
   const handleImageSelect = (imageSrc: string) => {
     setSelectedImage(imageSrc);
     setBackgroundType("image");
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        if (imageLoaded && !isSaving && !isCopying) {
+          handleSave();
+        }
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "c" && e.shiftKey) {
+        e.preventDefault();
+        if (imageLoaded && !isSaving && !isCopying) {
+          handleCopy();
+        }
+      }
+      if (e.key === "Escape") {
+        onCancel();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [imageLoaded, isSaving, isCopying, handleSave, handleCopy, onCancel]);
 
   return (
     <div className="flex flex-col h-screen bg-zinc-950 text-zinc-50">
@@ -379,18 +475,42 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
           <Button 
             variant="default" 
             onClick={handleCopy} 
-            disabled={!imageLoaded}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50"
+            disabled={!imageLoaded || isSaving || isCopying}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 relative"
+            title="Copy to clipboard (⌘⇧C)"
           >
-            {copied ? "Copied!" : "Copy"}
+            {isCopying ? (
+              <span className="flex items-center gap-2">
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Copying...
+              </span>
+            ) : copied ? (
+              "Copied!"
+            ) : (
+              "Copy"
+            )}
           </Button>
           <Button 
             variant="default" 
             onClick={handleSave} 
-            disabled={!imageLoaded}
+            disabled={!imageLoaded || isSaving || isCopying}
             className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+            title="Save image (⌘S)"
           >
-            Save
+            {isSaving ? (
+              <span className="flex items-center gap-2">
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Saving...
+              </span>
+            ) : (
+              "Save"
+            )}
           </Button>
         </div>
       </div>
@@ -401,8 +521,10 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
             <BackgroundSelector
               backgroundType={backgroundType as "transparent" | "white" | "black" | "gray" | "gradient" | "custom"}
               customColor={customColor}
+              selectedGradient={selectedGradient.id}
               onBackgroundTypeChange={(type) => setBackgroundType(type)}
               onCustomColorChange={setCustomColor}
+              onGradientSelect={setSelectedGradient}
             />
 
             <AssetGrid
@@ -416,6 +538,11 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
               noiseAmount={noiseAmount}
               onBlurChange={setBlurAmount}
               onNoiseChange={setNoiseAmount}
+            />
+
+            <ImageRoundnessControl
+              borderRadius={borderRadius}
+              onBorderRadiusChange={setBorderRadius}
             />
 
             {error && (
