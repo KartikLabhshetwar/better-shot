@@ -77,13 +77,15 @@ function App() {
       // Hide the window first before taking screenshot
       await appWindow.hide();
 
-      // Small delay to ensure window is hidden
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      // Longer delay to ensure window is fully hidden before screenshot
+      await new Promise((resolve) => setTimeout(resolve, 150));
 
       // Capture all monitors (save to temp directory for temporary use)
       const shots = await invoke<MonitorShot[]>("capture_all_monitors", {
         saveDir: "/tmp",
       });
+      
+      // Set state and prepare window in parallel for faster response
       setMonitorShots(shots);
 
       // Calculate total bounds across all monitors
@@ -100,20 +102,19 @@ function App() {
       const width = bounds.maxX - bounds.minX;
       const height = bounds.maxY - bounds.minY;
 
-      // Position and size the window to cover all monitors
-      const position = new PhysicalPosition(bounds.minX, bounds.minY);
-      await appWindow.setPosition(position);
-      
-      const size = new PhysicalSize(width, height);
-      await appWindow.setSize(size);
+      // Set window properties in parallel for faster setup
+      await Promise.all([
+        appWindow.setDecorations(false),
+        appWindow.setAlwaysOnTop(true),
+      ]);
 
-      // Make window fullscreen and always on top for selection
-      await appWindow.setDecorations(false);
-      await appWindow.setAlwaysOnTop(true);
+      // Position, size, and show - these need to be sequential
+      await appWindow.setPosition(new PhysicalPosition(bounds.minX, bounds.minY));
+      await appWindow.setSize(new PhysicalSize(width, height));
       await appWindow.setFullscreen(true);
-      await appWindow.show();
-
+      
       setMode("selecting");
+      await appWindow.show();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       // Check if it's a permission-related error

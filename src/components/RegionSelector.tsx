@@ -216,12 +216,20 @@ export function RegionSelector({ onSelect, onCancel, monitorShots }: RegionSelec
       )}
 
       <div 
-        className="fixed left-0 right-0 h-px bg-blue-500/80 pointer-events-none z-[10002] shadow-[0_0_2px_rgba(0,0,0,0.5)]"
-        style={{ top: `${cursorPos.y}px` }}
+        className="fixed h-px bg-blue-500/80 pointer-events-none z-[10002] shadow-[0_0_2px_rgba(0,0,0,0.5)]"
+        style={{ 
+          top: `${cursorPos.y}px`,
+          left: `${cursorPos.x - 40}px`,
+          width: '80px',
+        }}
       />
       <div 
-        className="fixed top-0 bottom-0 w-px bg-blue-500/80 pointer-events-none z-[10002] shadow-[0_0_2px_rgba(0,0,0,0.5)]"
-        style={{ left: `${cursorPos.x}px` }}
+        className="fixed w-px bg-blue-500/80 pointer-events-none z-[10002] shadow-[0_0_2px_rgba(0,0,0,0.5)]"
+        style={{ 
+          left: `${cursorPos.x}px`,
+          top: `${cursorPos.y - 40}px`,
+          height: '80px',
+        }}
       />
       
       <div 

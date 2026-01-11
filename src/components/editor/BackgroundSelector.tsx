@@ -19,7 +19,7 @@ export function BackgroundSelector({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-zinc-200">Background</h3>
+        <h3 className="text-sm font-medium text-zinc-200 font-mono">Background</h3>
       </div>
       
       <div className="grid grid-cols-3 gap-2">

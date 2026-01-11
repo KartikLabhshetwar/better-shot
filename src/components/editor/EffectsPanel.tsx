@@ -16,7 +16,7 @@ export function EffectsPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-zinc-200">Background Effects</h3>
+        <h3 className="text-sm font-medium text-zinc-200 font-mono">Background Effects</h3>
       </div>
       
       <div className="space-y-6">

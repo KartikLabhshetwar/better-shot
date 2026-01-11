@@ -26,7 +26,7 @@ export function AssetGrid({ categories, selectedImage, onImageSelect }: AssetGri
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-zinc-200">Assets Wallpapers</h3>
+        <h3 className="text-sm font-medium text-zinc-200 font-mono">Wallpapers</h3>
       </div>
       
       {categories.length > 1 && (
@@ -42,7 +42,7 @@ export function AssetGrid({ categories, selectedImage, onImageSelect }: AssetGri
                   : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/30"
               )}
             >
-              {category.name === "Background Images" ? "Images" : category.name === "Mac Assets" ? "Mac" : category.name}
+              {category.name === "Wallpapers" ? "Wallpapers" : category.name === "Mac Assets" ? "Mac" : category.name}
             </button>
           ))}
         </div>

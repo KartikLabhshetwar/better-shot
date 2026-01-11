@@ -45,7 +45,7 @@ type BackgroundType = "transparent" | "white" | "black" | "gray" | "gradient" | 
 
 const assetCategories: AssetCategory[] = [
   {
-    name: "Background Images",
+    name: "Wallpapers",
     assets: [
       { id: "bg-13", src: bgImage13, name: "Background 13" },
       { id: "bg-18", src: bgImage18, name: "Background 18" },
@@ -87,9 +87,9 @@ const assetCategories: AssetCategory[] = [
 ];
 
 export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
-  const [backgroundType, setBackgroundType] = useState<BackgroundType>("gradient");
+  const [backgroundType, setBackgroundType] = useState<BackgroundType>("image");
   const [customColor, setCustomColor] = useState("#667eea");
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(bgImage25);
   const [blurAmount, setBlurAmount] = useState(0);
   const [noiseAmount, setNoiseAmount] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
