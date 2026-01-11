@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
 interface Region {
@@ -23,35 +23,42 @@ interface RegionSelectorProps {
 }
 
 export function RegionSelector({ onSelect, onCancel, monitorShots }: RegionSelectorProps) {
-  const [isSelecting, setIsSelecting] = useState(false);
-  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
-  const [currentPos, setCurrentPos] = useState({ x: 0, y: 0 });
-  const [cursorPos, setCursorPos] = useState({ x: -100, y: -100 });
-  const [isReady, setIsReady] = useState(false);
-  const overlayRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rafRef = useRef<number>(0);
+  
+  // Selection state stored in refs for performance
+  const isSelectingRef = useRef(false);
+  const startRef = useRef({ x: 0, y: 0 });
+  const currentRef = useRef({ x: 0, y: 0 });
+  const needsUpdateRef = useRef(false);
 
-  // Fade in after mount for smooth appearance
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => setIsReady(true));
-    });
-  }, []);
-
-  // Calculate the bounds offset (for multi-monitor support)
+  // Calculate bounds for multi-monitor
   const bounds = useMemo(() => {
-    if (!monitorShots.length) {
-      return { minX: 0, minY: 0 };
-    }
-    return monitorShots.reduce(
+    if (!monitorShots.length) return { minX: 0, minY: 0, width: 0, height: 0 };
+    const result = monitorShots.reduce(
       (acc, s) => ({
         minX: Math.min(acc.minX, s.x),
         minY: Math.min(acc.minY, s.y),
+        maxX: Math.max(acc.maxX, s.x + s.width),
+        maxY: Math.max(acc.maxY, s.y + s.height),
       }),
-      { minX: monitorShots[0].x, minY: monitorShots[0].y }
+      { 
+        minX: monitorShots[0].x, 
+        minY: monitorShots[0].y,
+        maxX: monitorShots[0].x + monitorShots[0].width,
+        maxY: monitorShots[0].y + monitorShots[0].height,
+      }
     );
+    return {
+      minX: result.minX,
+      minY: result.minY,
+      width: result.maxX - result.minX,
+      height: result.maxY - result.minY,
+    };
   }, [monitorShots]);
 
-  // Normalize shots for rendering (adjust positions relative to window)
+  // Normalized shots for rendering
   const normalizedShots = useMemo(
     () =>
       monitorShots.map((shot) => ({
@@ -63,195 +70,204 @@ export function RegionSelector({ onSelect, onCancel, monitorShots }: RegionSelec
     [monitorShots, bounds.minX, bounds.minY]
   );
 
-  // Calculate the selection box in window coordinates (for rendering)
-  const selectionBox = useMemo(() => {
-    if (!isSelecting) return null;
-    
-    const x = Math.min(startPos.x, currentPos.x);
-    const y = Math.min(startPos.y, currentPos.y);
-    const width = Math.abs(currentPos.x - startPos.x);
-    const height = Math.abs(currentPos.y - startPos.y);
-    
-    return { x, y, width, height };
-  }, [isSelecting, startPos, currentPos]);
-
+  // Canvas rendering loop - runs on RAF for smooth updates
   useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d", { alpha: true });
+    if (!ctx) return;
+
+    // Set canvas size to match container
+    const updateCanvasSize = () => {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = bounds.width * dpr;
+      canvas.height = bounds.height * dpr;
+      canvas.style.width = `${bounds.width}px`;
+      canvas.style.height = `${bounds.height}px`;
+      ctx.scale(dpr, dpr);
+    };
+    updateCanvasSize();
+
+    const render = () => {
+      if (!needsUpdateRef.current && isSelectingRef.current) {
+        rafRef.current = requestAnimationFrame(render);
+        return;
+      }
+
+      // Clear canvas
+      ctx.clearRect(0, 0, bounds.width, bounds.height);
+
+      if (isSelectingRef.current || needsUpdateRef.current) {
+        const x = Math.min(startRef.current.x, currentRef.current.x);
+        const y = Math.min(startRef.current.y, currentRef.current.y);
+        const width = Math.abs(currentRef.current.x - startRef.current.x);
+        const height = Math.abs(currentRef.current.y - startRef.current.y);
+
+        if (width > 0 && height > 0) {
+          // Draw dark overlay with cutout (using composite operation for performance)
+          ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+          
+          // Top
+          ctx.fillRect(0, 0, bounds.width, y);
+          // Left
+          ctx.fillRect(0, y, x, height);
+          // Right
+          ctx.fillRect(x + width, y, bounds.width - x - width, height);
+          // Bottom
+          ctx.fillRect(0, y + height, bounds.width, bounds.height - y - height);
+
+          // Selection border
+          ctx.strokeStyle = "#3b82f6";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x, y, width, height);
+
+          // Corner handles
+          const handleSize = 6;
+          ctx.fillStyle = "#3b82f6";
+          const corners = [
+            [x - handleSize/2, y - handleSize/2],
+            [x + width - handleSize/2, y - handleSize/2],
+            [x - handleSize/2, y + height - handleSize/2],
+            [x + width - handleSize/2, y + height - handleSize/2],
+          ];
+          corners.forEach(([cx, cy]) => {
+            ctx.fillRect(cx, cy, handleSize, handleSize);
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(cx, cy, handleSize, handleSize);
+          });
+
+          // Dimension label
+          const label = `${Math.round(width)} × ${Math.round(height)}`;
+          ctx.font = "12px ui-monospace, monospace";
+          const textMetrics = ctx.measureText(label);
+          const labelPadding = 8;
+          const labelHeight = 20;
+          const labelWidth = textMetrics.width + labelPadding * 2;
+          const labelX = x + width / 2 - labelWidth / 2;
+          const labelY = y - labelHeight - 8;
+
+          if (labelY > 0) {
+            ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+            ctx.beginPath();
+            ctx.roundRect(labelX, labelY, labelWidth, labelHeight, 4);
+            ctx.fill();
+
+            ctx.fillStyle = "#fff";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(label, x + width / 2, labelY + labelHeight / 2);
+          }
+        }
+        needsUpdateRef.current = false;
+      } else {
+        // No selection - just draw the overlay
+        ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+        ctx.fillRect(0, 0, bounds.width, bounds.height);
+      }
+
+      rafRef.current = requestAnimationFrame(render);
+    };
+
+    rafRef.current = requestAnimationFrame(render);
+
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, [bounds.width, bounds.height]);
+
+  // Event handlers
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
     const handleMouseDown = (e: MouseEvent) => {
       e.preventDefault();
-      setIsSelecting(true);
-      setStartPos({ x: e.clientX, y: e.clientY });
-      setCurrentPos({ x: e.clientX, y: e.clientY });
+      isSelectingRef.current = true;
+      startRef.current = { x: e.clientX, y: e.clientY };
+      currentRef.current = { x: e.clientX, y: e.clientY };
+      needsUpdateRef.current = true;
     };
 
     const handleMouseMove = (e: MouseEvent) => {
-      setCursorPos({ x: e.clientX, y: e.clientY });
-      
-      if (isSelecting) {
-        setCurrentPos({ x: e.clientX, y: e.clientY });
-      }
+      if (!isSelectingRef.current) return;
+      currentRef.current = { x: e.clientX, y: e.clientY };
+      needsUpdateRef.current = true;
     };
 
     const handleMouseUp = () => {
-      if (isSelecting) {
-        setIsSelecting(false);
-        
-        // Calculate region with proper width/height
-        const x = Math.min(startPos.x, currentPos.x);
-        const y = Math.min(startPos.y, currentPos.y);
-        const width = Math.abs(currentPos.x - startPos.x);
-        const height = Math.abs(currentPos.y - startPos.y);
-        
-        if (width > 10 && height > 10) {
-          // Convert window coords to absolute screen coords for cropping
-          const region: Region = {
-            x: x + bounds.minX,
-            y: y + bounds.minY,
-            width,
-            height,
-          };
-          onSelect(region);
-        }
+      if (!isSelectingRef.current) return;
+      isSelectingRef.current = false;
+
+      const x = Math.min(startRef.current.x, currentRef.current.x);
+      const y = Math.min(startRef.current.y, currentRef.current.y);
+      const width = Math.abs(currentRef.current.x - startRef.current.x);
+      const height = Math.abs(currentRef.current.y - startRef.current.y);
+
+      if (width > 10 && height > 10) {
+        onSelect({
+          x: x + bounds.minX,
+          y: y + bounds.minY,
+          width,
+          height,
+        });
+      } else {
+        // Reset selection if too small
+        needsUpdateRef.current = true;
       }
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onCancel();
-      }
+      if (e.key === "Escape") onCancel();
     };
 
-    // Initialize cursor position
-    const initCursor = (e: MouseEvent) => {
-      setCursorPos({ x: e.clientX, y: e.clientY });
-    };
-
-    document.addEventListener("mousedown", handleMouseDown);
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-    document.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("mousemove", initCursor, { once: true });
+    container.addEventListener("mousedown", handleMouseDown);
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      document.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-      document.removeEventListener("keydown", handleKeyDown);
+      container.removeEventListener("mousedown", handleMouseDown);
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isSelecting, startPos, currentPos, bounds, onSelect, onCancel]);
+  }, [bounds.minX, bounds.minY, onSelect, onCancel]);
 
   return (
-    <div 
-      ref={overlayRef} 
-      className={`fixed inset-0 bg-transparent z-50 cursor-none select-none overflow-hidden transition-opacity ${isReady ? 'opacity-100' : 'opacity-0'}`}
+    <div
+      ref={containerRef}
+      className="fixed inset-0 z-50 cursor-crosshair select-none overflow-hidden"
     >
+      {/* Screenshot backgrounds */}
       {normalizedShots.map((shot) => (
         <img
           key={shot.id}
-          className="absolute object-contain select-none pointer-events-none"
           src={shot.url}
-          alt={`Captured monitor ${shot.id}`}
-          style={{
-            left: `${shot.left}px`,
-            top: `${shot.top}px`,
-            width: `${shot.width}px`,
-            height: `${shot.height}px`,
-          }}
+          alt=""
           draggable={false}
+          className="absolute select-none pointer-events-none"
+          style={{
+            left: shot.left,
+            top: shot.top,
+            width: shot.width,
+            height: shot.height,
+          }}
         />
       ))}
 
-      {selectionBox ? (
-        <>
-          <div 
-            className="absolute bg-black/50 pointer-events-none"
-            style={{
-              top: 0,
-              left: 0,
-              right: 0,
-              height: `${selectionBox.y}px`,
-            }}
-          />
-          <div 
-            className="absolute bg-black/50 pointer-events-none"
-            style={{
-              top: `${selectionBox.y}px`,
-              left: 0,
-              width: `${selectionBox.x}px`,
-              height: `${selectionBox.height}px`,
-            }}
-          />
-          <div 
-            className="absolute bg-black/50 pointer-events-none"
-            style={{
-              top: `${selectionBox.y}px`,
-              left: `${selectionBox.x + selectionBox.width}px`,
-              right: 0,
-              height: `${selectionBox.height}px`,
-            }}
-          />
-          <div 
-            className="absolute bg-black/50 pointer-events-none"
-            style={{
-              top: `${selectionBox.y + selectionBox.height}px`,
-              left: 0,
-              right: 0,
-              bottom: 0,
-            }}
-          />
-        </>
-      ) : (
-        <div className="absolute inset-0 bg-black/50 pointer-events-none" />
-      )}
-
-      {selectionBox && selectionBox.width > 0 && selectionBox.height > 0 && (
-        <div
-          className="absolute border-2 border-blue-500 bg-transparent pointer-events-none shadow-[0_0_0_1px_rgba(0,0,0,0.3),inset_0_0_0_1px_rgba(255,255,255,0.1)]"
-          style={{
-            left: `${selectionBox.x}px`,
-            top: `${selectionBox.y}px`,
-            width: `${selectionBox.width}px`,
-            height: `${selectionBox.height}px`,
-          }}
-        >
-          <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-black/85 text-white px-2.5 py-1 text-xs font-medium rounded backdrop-blur-sm border border-white/10 whitespace-nowrap tabular-nums">
-            {selectionBox.width} x {selectionBox.height}
-          </div>
-          <div className="absolute -top-1 -left-1 size-2 bg-blue-500 border border-white rounded-sm" />
-          <div className="absolute -top-1 -right-1 size-2 bg-blue-500 border border-white rounded-sm" />
-          <div className="absolute -bottom-1 -left-1 size-2 bg-blue-500 border border-white rounded-sm" />
-          <div className="absolute -bottom-1 -right-1 size-2 bg-blue-500 border border-white rounded-sm" />
-        </div>
-      )}
-
-      <div 
-        className="fixed h-px bg-blue-500/80 pointer-events-none z-[51] shadow-[0_0_2px_rgba(0,0,0,0.5)]"
-        style={{ 
-          top: `${cursorPos.y}px`,
-          left: `${cursorPos.x - 40}px`,
-          width: '80px',
-        }}
+      {/* Canvas overlay for selection - GPU accelerated */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 pointer-events-none"
       />
-      <div 
-        className="fixed w-px bg-blue-500/80 pointer-events-none z-[51] shadow-[0_0_2px_rgba(0,0,0,0.5)]"
-        style={{ 
-          left: `${cursorPos.x}px`,
-          top: `${cursorPos.y - 40}px`,
-          height: '80px',
-        }}
-      />
-      
-      <div 
-        className="fixed bg-black/75 text-white px-1.5 py-0.5 text-[11px] font-mono rounded pointer-events-none z-[52] whitespace-nowrap tabular-nums"
-        style={{
-          left: `${cursorPos.x + 15}px`,
-          top: `${cursorPos.y + 15}px`,
-        }}
-      >
-        {Math.round(cursorPos.x)}, {Math.round(cursorPos.y)}
-      </div>
 
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-black/85 text-white px-6 py-3 rounded-lg text-sm pointer-events-none backdrop-blur-md border border-white/15 z-[52] text-pretty">
-        Click and drag to select region &bull; Press ESC to cancel
+      {/* Instructions */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded-lg text-sm pointer-events-none">
+        Drag to select · ESC to cancel
       </div>
     </div>
   );

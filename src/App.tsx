@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, PhysicalSize, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
 import { register, unregisterAll } from "@tauri-apps/plugin-global-shortcut";
+import { toast } from "sonner";
 import { RegionSelector } from "./components/RegionSelector";
 import { ImageEditor } from "./components/ImageEditor";
 import { Button } from "@/components/ui/button";
@@ -19,11 +20,32 @@ type MonitorShot = {
   path: string;
 };
 
+// Helper to restore window to normal state
+async function restoreWindow() {
+  const appWindow = getCurrentWindow();
+  
+  // Hide first for clean transition
+  await appWindow.hide();
+  
+  // Exit fullscreen
+  await appWindow.setFullscreen(false);
+  
+  // Wait for fullscreen transition
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  
+  // Reset window properties
+  await appWindow.setAlwaysOnTop(false);
+  await appWindow.setSize(new LogicalSize(1200, 800));
+  await appWindow.center();
+  
+  // Show the window - decorations should be intact since we never disabled them
+  await appWindow.show();
+}
+
 function App() {
   const [mode, setMode] = useState<AppMode>("main");
   const [saveDir, setSaveDir] = useState<string>("");
   const [copyToClipboard, setCopyToClipboard] = useState(true);
-  const [lastSavedPath, setLastSavedPath] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [tempScreenshotPath, setTempScreenshotPath] = useState<string | null>(null);
@@ -74,13 +96,8 @@ function App() {
     const appWindow = getCurrentWindow();
 
     try {
-      // Prepare window properties first (while still hidden) - this reduces jitter
-      await Promise.all([
-        appWindow.setDecorations(false),
-        appWindow.setAlwaysOnTop(true),
-      ]);
-
-      // Hide the window before taking screenshot
+      // Hide the window before taking screenshot - DON'T touch decorations
+      // Fullscreen mode will hide the titlebar automatically
       await appWindow.hide();
 
       // Minimal delay - just enough for window to hide
@@ -105,17 +122,20 @@ function App() {
       const width = bounds.maxX - bounds.minX;
       const height = bounds.maxY - bounds.minY;
 
-      // Set position and size together, then fullscreen
-      await appWindow.setPosition(new PhysicalPosition(bounds.minX, bounds.minY));
-      await appWindow.setSize(new PhysicalSize(width, height));
-      
       // Set mode BEFORE showing window so React renders immediately
       setMonitorShots(shots);
       setMode("selecting");
+
+      // Set position and size for fullscreen selection
+      await appWindow.setPosition(new PhysicalPosition(bounds.minX, bounds.minY));
+      await appWindow.setSize(new PhysicalSize(width, height));
       
-      // Small delay for React to render, then show
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Use fullscreen which automatically hides decorations on macOS
+      await appWindow.setAlwaysOnTop(true);
       await appWindow.setFullscreen(true);
+      
+      // Small delay for window to transition, then show
+      await new Promise((resolve) => setTimeout(resolve, 10));
       await appWindow.show();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -129,13 +149,8 @@ function App() {
       } else {
         setError(errorMessage);
       }
-      setLastSavedPath(null);
       // Restore window on error
-      await appWindow.setFullscreen(false);
-      await appWindow.setDecorations(true);
-      await appWindow.setSize(new LogicalSize(1200, 800));
-      await appWindow.center();
-      await appWindow.show().catch(() => {});
+      await restoreWindow();
     } finally {
       setIsCapturing(false);
     }
@@ -144,14 +159,7 @@ function App() {
   async function handleRegionSelect(region: { x: number; y: number; width: number; height: number }) {
     if (!monitorShots.length) return;
 
-    const appWindow = getCurrentWindow();
-
     try {
-      // First, reset window state before processing
-      await appWindow.setFullscreen(false);
-      await appWindow.setAlwaysOnTop(false);
-      await appWindow.setDecorations(true);
-      
       // Find which monitor contains most of the selection
       const target = monitorShots.reduce(
         (best, shot) => {
@@ -173,7 +181,6 @@ function App() {
       ).shot;
 
       // Convert absolute screen coordinates to coordinates relative to the monitor's screenshot
-      // Apply scale factor for Retina displays (image is captured at physical pixels)
       const scaleFactor = target.scale_factor || 1;
       const relX = Math.max(0, Math.floor((region.x - target.x) * scaleFactor));
       const relY = Math.max(0, Math.floor((region.y - target.y) * scaleFactor));
@@ -189,79 +196,56 @@ function App() {
         saveDir: "/tmp",
       });
       
-      console.log("Cropped screenshot path:", croppedPath);
-      
-      // Resize window to fit the editor
-      await appWindow.setSize(new LogicalSize(1200, 800));
-      await appWindow.center();
-      await appWindow.show();
+      // Restore window with decorations
+      await restoreWindow();
       
       setTempScreenshotPath(croppedPath);
       setMode("editing");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-      await appWindow.setFullscreen(false);
-      await appWindow.setAlwaysOnTop(false);
-      await appWindow.setDecorations(true);
-      await appWindow.setSize(new LogicalSize(1200, 800));
-      await appWindow.center();
-      await appWindow.show();
+      await restoreWindow();
       setMode("main");
       setMonitorShots([]);
     }
   }
 
   async function handleRegionCancel() {
-    const appWindow = getCurrentWindow();
-    await appWindow.setFullscreen(false);
-    await appWindow.setAlwaysOnTop(false);
-    await appWindow.setDecorations(true);
-    await appWindow.setSize(new LogicalSize(1200, 800));
-    await appWindow.center();
-    await appWindow.show();
+    await restoreWindow();
     setMode("main");
     setTempScreenshotPath(null);
     setMonitorShots([]);
   }
 
   async function handleEditorSave(editedImageData: string) {
-    const appWindow = getCurrentWindow();
     try {
       const savedPath = await invoke<string>("save_edited_image", {
         imageData: editedImageData,
         saveDir,
         copyToClip: copyToClipboard,
       });
-      setLastSavedPath(savedPath);
       
-      await appWindow.setFullscreen(false);
-      await appWindow.setAlwaysOnTop(false);
-      await appWindow.setDecorations(true);
-      await appWindow.setSize(new LogicalSize(1200, 800));
-      await appWindow.center();
-      await appWindow.show();
+      toast.success("Image saved", {
+        description: savedPath,
+        duration: 4000,
+      });
+      
+      await restoreWindow();
       setMode("main");
       setTempScreenshotPath(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      await appWindow.setFullscreen(false);
-      await appWindow.setAlwaysOnTop(false);
-      await appWindow.setDecorations(true);
-      await appWindow.setSize(new LogicalSize(1200, 800));
-      await appWindow.center();
-      await appWindow.show();
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage);
+      toast.error("Failed to save image", {
+        description: errorMessage,
+        duration: 5000,
+      });
+      await restoreWindow();
       setMode("main");
     }
   }
 
   async function handleEditorCancel() {
-    const appWindow = getCurrentWindow();
-    await appWindow.setFullscreen(false);
-    await appWindow.setAlwaysOnTop(false);
-    await appWindow.setDecorations(true);
-    await appWindow.setSize(new LogicalSize(1200, 800));
-    await appWindow.center();
-    await appWindow.show();
+    await restoreWindow();
     setMode("main");
     setTempScreenshotPath(null);
   }
@@ -347,13 +331,6 @@ function App() {
               <div className="p-4 bg-red-950/30 border border-red-800/50 rounded-lg text-red-400 text-sm text-pretty">
                 <div className="font-medium text-red-300 mb-1">Error</div>
                 {error}
-              </div>
-            )}
-            
-            {lastSavedPath && (
-              <div className="p-4 bg-emerald-950/30 border border-emerald-800/50 rounded-lg text-emerald-400 text-sm break-all text-pretty">
-                <div className="font-medium text-emerald-300 mb-1">Saved successfully</div>
-                {lastSavedPath}
               </div>
             )}
           </CardContent>

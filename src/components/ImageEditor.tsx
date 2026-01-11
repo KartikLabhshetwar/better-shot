@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { BackgroundSelector, gradientOptions, type GradientOption } from "./editor/BackgroundSelector";
@@ -106,6 +108,26 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const bgImageRef = useRef<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    const restoreWindowState = async () => {
+      try {
+        const appWindow = getCurrentWindow();
+        await Promise.all([
+          appWindow.setFullscreen(false),
+          appWindow.setAlwaysOnTop(false),
+        ]);
+        await appWindow.setDecorations(true);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        await appWindow.setDecorations(true);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        await appWindow.setDecorations(true);
+      } catch (err) {
+        console.error("Failed to restore window decorations:", err);
+      }
+    };
+    restoreWindowState();
+  }, []);
 
   const drawBackground = useCallback((ctx: CanvasRenderingContext2D, width: number, height: number) => {
     switch (backgroundType) {
@@ -424,9 +446,17 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
       });
       
       setCopied(true);
+      toast.success("Copied to clipboard", {
+        duration: 2000,
+      });
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      setError(`Failed to copy: ${err instanceof Error ? err.message : String(err)}`);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(`Failed to copy: ${errorMessage}`);
+      toast.error("Failed to copy", {
+        description: errorMessage,
+        duration: 3000,
+      });
     } finally {
       setIsCopying(false);
     }
