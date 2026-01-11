@@ -231,6 +231,51 @@ pub async fn native_capture_fullscreen(save_dir: String) -> Result<String, Strin
     }
 }
 
+/// Play the macOS screenshot sound
+#[tauri::command]
+pub async fn play_screenshot_sound() -> Result<(), String> {
+    // macOS system screenshot sound path
+    let sound_path = "/System/Library/Components/CoreAudio.component/Contents/SharedSupport/SystemSounds/system/Screen Capture.aif";
+    
+    // Use afplay to play the sound asynchronously (non-blocking)
+    std::thread::spawn(move || {
+        let _ = Command::new("afplay")
+            .arg(sound_path)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn();
+    });
+    
+    Ok(())
+}
+
+/// Get the current mouse cursor position (for determining which screen to open editor on)
+#[tauri::command]
+pub async fn get_mouse_position() -> Result<(f64, f64), String> {
+    // Use AppleScript to get mouse position - it's the most reliable cross-version approach
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg("tell application \"System Events\" to return (get position of mouse)")
+        .output()
+        .map_err(|e| format!("Failed to get mouse position: {}", e))?;
+    
+    if !output.status.success() {
+        return Err("Failed to get mouse position".to_string());
+    }
+    
+    let position_str = String::from_utf8_lossy(&output.stdout);
+    let parts: Vec<&str> = position_str.trim().split(", ").collect();
+    
+    if parts.len() != 2 {
+        return Err("Invalid mouse position format".to_string());
+    }
+    
+    let x: f64 = parts[0].parse().map_err(|_| "Failed to parse X coordinate")?;
+    let y: f64 = parts[1].parse().map_err(|_| "Failed to parse Y coordinate")?;
+    
+    Ok((x, y))
+}
+
 /// Capture specific window using macOS native screencapture
 #[tauri::command]
 pub async fn native_capture_window(save_dir: String) -> Result<String, String> {
