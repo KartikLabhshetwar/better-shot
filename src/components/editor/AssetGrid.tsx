@@ -15,10 +15,11 @@ export interface AssetCategory {
 interface AssetGridProps {
   categories: AssetCategory[];
   selectedImage: string | null;
+  backgroundType: string;
   onImageSelect: (imageSrc: string) => void;
 }
 
-export function AssetGrid({ categories, selectedImage, onImageSelect }: AssetGridProps) {
+export function AssetGrid({ categories, selectedImage, backgroundType, onImageSelect }: AssetGridProps) {
   const [activeCategory, setActiveCategory] = useState(categories[0]?.name || "");
 
   const currentCategory = categories.find((cat) => cat.name === activeCategory);
@@ -67,7 +68,7 @@ export function AssetGrid({ categories, selectedImage, onImageSelect }: AssetGri
               alt={asset.name}
               className="w-full h-full object-cover transition-transform group-hover:scale-110"
             />
-            {selectedImage === asset.src && (
+            {backgroundType === "image" && selectedImage === asset.src && (
               <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
                 <div className="size-6 rounded-full bg-blue-500 flex items-center justify-center shadow-lg">
                   <svg className="size-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">

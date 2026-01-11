@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { ImageEditor } from "./components/ImageEditor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
+import { hasCompletedOnboarding } from "@/lib/onboarding";
 
 type AppMode = "main" | "editing";
 type CaptureMode = "region" | "fullscreen" | "window";
@@ -68,6 +70,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [tempScreenshotPath, setTempScreenshotPath] = useState<string | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     const initializeDesktopPath = async () => {
@@ -80,6 +83,10 @@ function App() {
       }
     };
     initializeDesktopPath();
+
+    if (!hasCompletedOnboarding()) {
+      setShowOnboarding(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -212,6 +219,10 @@ function App() {
         onCancel={handleEditorCancel}
       />
     );
+  }
+
+  if (showOnboarding) {
+    return <OnboardingFlow onComplete={() => setShowOnboarding(false)} />;
   }
 
   return (

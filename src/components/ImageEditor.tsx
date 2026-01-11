@@ -560,6 +560,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
             <AssetGrid
               categories={assetCategories}
               selectedImage={selectedImage}
+              backgroundType={backgroundType}
               onImageSelect={handleImageSelect}
             />
 

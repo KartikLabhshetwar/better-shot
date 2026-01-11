@@ -101,24 +101,37 @@ export function BackgroundSelector({
       <div className="space-y-2">
         <span className="text-xs text-zinc-500">Gradients</span>
         <div className="grid grid-cols-4 gap-2">
-          {gradientOptions.map((gradient) => (
-            <button
-              key={gradient.id}
-              onClick={() => {
-                onBackgroundTypeChange("gradient");
-                onGradientSelect?.(gradient);
-              }}
-              aria-label={`Select ${gradient.name} gradient`}
-              className={cn(
-                "w-full aspect-square rounded-lg transition-all",
-                backgroundType === "gradient" && selectedGradient === gradient.id
-                  ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-zinc-900"
-                  : "ring-1 ring-zinc-700 hover:ring-zinc-500"
-              )}
-              style={{ background: gradient.gradient }}
-              title={gradient.name}
-            />
-          ))}
+          {gradientOptions.map((gradient) => {
+            const isSelected = backgroundType === "gradient" && selectedGradient === gradient.id;
+            return (
+              <button
+                key={gradient.id}
+                onClick={() => {
+                  onBackgroundTypeChange("gradient");
+                  onGradientSelect?.(gradient);
+                }}
+                aria-label={`Select ${gradient.name} gradient`}
+                className={cn(
+                  "relative w-full aspect-square rounded-lg transition-all overflow-hidden",
+                  isSelected
+                    ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-zinc-900"
+                    : "ring-1 ring-zinc-700 hover:ring-zinc-500"
+                )}
+                style={{ background: gradient.gradient }}
+                title={gradient.name}
+              >
+                {isSelected && (
+                  <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
+                    <div className="size-6 rounded-full bg-blue-500 flex items-center justify-center shadow-lg">
+                      <svg className="size-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  </div>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
