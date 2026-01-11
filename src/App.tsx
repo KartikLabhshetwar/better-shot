@@ -4,12 +4,15 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
 import { availableMonitors } from "@tauri-apps/api/window";
 import { register, unregisterAll } from "@tauri-apps/plugin-global-shortcut";
+import { Store } from "@tauri-apps/plugin-store";
 import { toast } from "sonner";
 import { ImageEditor } from "./components/ImageEditor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
 import { hasCompletedOnboarding } from "@/lib/onboarding";
+import { processScreenshotWithDefaultBackground } from "@/lib/auto-process";
 
 type AppMode = "main" | "editing";
 type CaptureMode = "region" | "fullscreen" | "window";
@@ -67,13 +70,14 @@ function App() {
   const [mode, setMode] = useState<AppMode>("main");
   const [saveDir, setSaveDir] = useState<string>("");
   const [copyToClipboard, setCopyToClipboard] = useState(true);
+  const [autoApplyBackground, setAutoApplyBackground] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [tempScreenshotPath, setTempScreenshotPath] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
-    const initializeDesktopPath = async () => {
+    const initializeApp = async () => {
       try {
         const desktopPath = await invoke<string>("get_desktop_directory");
         setSaveDir(desktopPath);
@@ -81,8 +85,31 @@ function App() {
         console.error("Failed to get Desktop directory:", err);
         setError(`Failed to get Desktop directory: ${err instanceof Error ? err.message : String(err)}`);
       }
+
+      try {
+        const store = await Store.load("settings.json", {
+          defaults: {
+            copyToClipboard: true,
+            autoApplyBackground: false,
+          },
+          autoSave: true,
+        });
+
+        const savedCopyToClip = await store.get<boolean>("copyToClipboard");
+        if (savedCopyToClip !== null && savedCopyToClip !== undefined) {
+          setCopyToClipboard(savedCopyToClip);
+        }
+
+        const savedAutoApply = await store.get<boolean>("autoApplyBackground");
+        if (savedAutoApply !== null && savedAutoApply !== undefined) {
+          setAutoApplyBackground(savedAutoApply);
+        }
+      } catch (err) {
+        console.error("Failed to load settings:", err);
+      }
     };
-    initializeDesktopPath();
+
+    initializeApp();
 
     if (!hasCompletedOnboarding()) {
       setShowOnboarding(true);
@@ -113,7 +140,7 @@ function App() {
       unlisten3.then((fn) => fn());
       unregisterAll().catch(console.error);
     };
-  }, [saveDir, copyToClipboard]);
+  }, [saveDir, copyToClipboard, autoApplyBackground]);
 
   async function handleCapture(captureMode: CaptureMode = "region") {
     if (isCapturing) return;
@@ -137,11 +164,38 @@ function App() {
         saveDir: "/tmp",
       });
 
-      // Play screenshot sound on successful capture
       invoke("play_screenshot_sound").catch(console.error);
 
-      // Get mouse position AFTER capture to determine which screen to open editor on
-      // This ensures the editor opens on the monitor where the user took the screenshot
+      if (autoApplyBackground) {
+        try {
+          const processedImageData = await processScreenshotWithDefaultBackground(screenshotPath);
+          
+          const savedPath = await invoke<string>("save_edited_image", {
+            imageData: processedImageData,
+            saveDir,
+            copyToClip: copyToClipboard,
+          });
+
+          toast.success("Screenshot processed and saved", {
+            description: savedPath,
+            duration: 3000,
+          });
+
+          // Don't restore window - keep running in background (accessible from system tray)
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          setError(`Failed to process screenshot: ${errorMessage}`);
+          toast.error("Failed to process screenshot", {
+            description: errorMessage,
+            duration: 5000,
+          });
+          // Don't restore window on error either - keep running in background
+        } finally {
+          setIsCapturing(false);
+        }
+        return;
+      }
+
       let mouseX: number | undefined;
       let mouseY: number | undefined;
       try {
@@ -149,7 +203,6 @@ function App() {
         mouseX = x;
         mouseY = y;
       } catch {
-        // Fallback - will use default center behavior
       }
 
       setTempScreenshotPath(screenshotPath);
@@ -229,7 +282,7 @@ function App() {
     <main className="min-h-dvh flex flex-col items-center justify-center p-8 bg-zinc-950 text-zinc-50">
       <div className="w-full max-w-2xl space-y-6">
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-zinc-50 font-mono text-balance">Better Shot</h1>
+          <h1 className="text-5xl font-bold text-zinc-50 text-balance">Better Shot</h1>
           <p className="text-zinc-400 text-sm text-pretty">Professional screenshot workflow</p>
         </div>
 
@@ -250,51 +303,69 @@ function App() {
               />
             </div>
 
-            <div className="flex items-center gap-3 p-3 bg-zinc-800 rounded-lg border border-zinc-700">
-              <input
-                type="checkbox"
-                id="copy-clipboard"
-                checked={copyToClipboard}
-                onChange={(e) => setCopyToClipboard(e.target.checked)}
-                disabled={isCapturing}
-                className="size-4 rounded border-zinc-700 bg-zinc-800 text-zinc-400 focus:ring-2 focus:ring-zinc-600 disabled:opacity-50 cursor-pointer"
-              />
-              <label htmlFor="copy-clipboard" className="text-sm text-zinc-300 cursor-pointer flex-1">
+            <div className="flex items-center justify-between">
+              <label htmlFor="copy-clipboard" className="text-sm text-zinc-300 cursor-pointer">
                 Copy to clipboard
               </label>
+              <Switch
+                id="copy-clipboard"
+                checked={copyToClipboard}
+                onCheckedChange={async (checked) => {
+                  setCopyToClipboard(checked);
+                  try {
+                    const store = await Store.load("settings.json");
+                    await store.set("copyToClipboard", checked);
+                    await store.save();
+                  } catch (err) {
+                    console.error("Failed to save setting:", err);
+                  }
+                }}
+                disabled={isCapturing}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <label htmlFor="auto-apply-bg" className="text-sm text-zinc-300 cursor-pointer">
+                Auto-apply background
+              </label>
+              <Switch
+                id="auto-apply-bg"
+                checked={autoApplyBackground}
+                onCheckedChange={async (checked) => {
+                  setAutoApplyBackground(checked);
+                  try {
+                    const store = await Store.load("settings.json");
+                    await store.set("autoApplyBackground", checked);
+                    await store.save();
+                  } catch (err) {
+                    console.error("Failed to save setting:", err);
+                  }
+                }}
+                disabled={isCapturing}
+              />
             </div>
 
             <div className="grid grid-cols-3 gap-3">
               <Button
                 onClick={() => handleCapture("region")}
                 disabled={isCapturing}
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-50 py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-700 transition-all flex flex-col gap-1"
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-50 py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-700 transition-all"
               >
-                <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5a1 1 0 011-1h4a1 1 0 010 2H6v3a1 1 0 01-2 0V5zM4 19a1 1 0 001 1h4a1 1 0 100-2H6v-3a1 1 0 10-2 0v4zM20 5a1 1 0 00-1-1h-4a1 1 0 100 2h3v3a1 1 0 102 0V5zM20 19a1 1 0 01-1 1h-4a1 1 0 110-2h3v-3a1 1 0 112 0v4z" />
-                </svg>
-                <span className="text-xs">Region</span>
+                Region
               </Button>
               <Button
                 onClick={() => handleCapture("fullscreen")}
                 disabled={isCapturing}
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-50 py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-700 transition-all flex flex-col gap-1"
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-50 py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-700 transition-all"
               >
-                <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                <span className="text-xs">Screen</span>
+                Screen
               </Button>
               <Button
                 onClick={() => handleCapture("window")}
                 disabled={isCapturing}
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-50 py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-700 transition-all flex flex-col gap-1"
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-50 py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-700 transition-all"
               >
-                <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5a2 2 0 012-2h12a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V5z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 3v2M12 3v2M16 3v2" />
-                </svg>
-                <span className="text-xs">Window</span>
+                Window
               </Button>
             </div>
 
@@ -309,9 +380,9 @@ function App() {
             )}
 
             {error && (
-              <div className="p-4 bg-red-950/30 border border-red-800/50 rounded-lg text-red-400 text-sm text-pretty">
+              <div className="p-4 bg-red-950/30 border border-red-800/50 rounded-lg">
                 <div className="font-medium text-red-300 mb-1">Error</div>
-                {error}
+                <div className="text-red-400 text-sm text-pretty">{error}</div>
               </div>
             )}
           </CardContent>

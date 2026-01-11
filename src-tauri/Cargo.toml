@@ -27,5 +27,6 @@ tauri = { version = "2", features = ["protocol-asset", "macos-private-api", "tra
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-screenshots = "2"
+tauri-plugin-store = "2"
 xcap = "0.8"
 

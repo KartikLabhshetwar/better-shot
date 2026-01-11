@@ -11,9 +11,9 @@ mod screenshot;
 mod utils;
 
 use commands::{
-    capture_all_monitors, capture_once, capture_region, get_desktop_directory,
-    get_mouse_position, native_capture_fullscreen, native_capture_interactive,
-    native_capture_window, play_screenshot_sound, save_edited_image,
+    capture_all_monitors, capture_once, capture_region, get_desktop_directory, get_mouse_position,
+    native_capture_fullscreen, native_capture_interactive, native_capture_window,
+    play_screenshot_sound, save_edited_image,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -22,6 +22,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_screenshots::init())
+        .plugin(tauri_plugin_store::Builder::default().build())
         .setup(|app| {
             use tauri::Manager;
 
