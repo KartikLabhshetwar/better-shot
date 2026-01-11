@@ -14,12 +14,26 @@
       {
         "title": "Better Shot",
         "width": 800,
-        "height": 600
+        "height": 600,
+        "transparent": false,
+        "decorations": true,
+        "alwaysOnTop": false
       }
     ],
     "security": {
-      "csp": null
-    }
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "**",
+          "/tmp/**",
+          "/var/**",
+          "$HOME/Pictures/**",
+          "$PICTURES/**"
+        ]
+      }
+    },
+    "macOSPrivateApi": true
   },
   "bundle": {
     "active": true,

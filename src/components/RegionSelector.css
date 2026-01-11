@@ -1,0 +1,139 @@
+.region-selector-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  z-index: 10000;
+  cursor: none;
+  user-select: none;
+  overflow: hidden;
+}
+
+.region-selector-shot {
+  position: absolute;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.region-selector-dim {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+.region-selector-dim-full {
+  inset: 0;
+}
+
+.region-selector-box {
+  position: absolute;
+  border: 2px solid #4a9eff;
+  background: transparent;
+  pointer-events: none;
+  box-shadow: 
+    0 0 0 1px rgba(0, 0, 0, 0.3),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.region-selector-info {
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: white;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+  white-space: nowrap;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Selection handles at corners */
+.selection-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #4a9eff;
+  border: 1px solid #fff;
+  border-radius: 1px;
+}
+
+.handle-nw {
+  top: -4px;
+  left: -4px;
+}
+
+.handle-ne {
+  top: -4px;
+  right: -4px;
+}
+
+.handle-sw {
+  bottom: -4px;
+  left: -4px;
+}
+
+.handle-se {
+  bottom: -4px;
+  right: -4px;
+}
+
+/* Full-screen crosshair lines */
+.crosshair-horizontal {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(74, 158, 255, 0.8);
+  pointer-events: none;
+  z-index: 10002;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+}
+
+.crosshair-vertical {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(74, 158, 255, 0.8);
+  pointer-events: none;
+  z-index: 10002;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Cursor coordinates display */
+.cursor-coords {
+  position: fixed;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: monospace;
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 10003;
+  white-space: nowrap;
+}
+
+.region-selector-instructions {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  pointer-events: none;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  z-index: 10003;
+}
