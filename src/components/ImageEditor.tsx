@@ -2,8 +2,10 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { toast } from "sonner";
+import { Copy, Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { BackgroundSelector, gradientOptions, type GradientOption } from "./editor/BackgroundSelector";
 import { AssetGrid, type AssetCategory } from "./editor/AssetGrid";
 import { EffectsPanel } from "./editor/EffectsPanel";
@@ -29,15 +31,6 @@ import macImage7 from "@/assets/mac/mac-asset-7.png";
 import macImage8 from "@/assets/mac/mac-asset-8.jpg";
 import macImage9 from "@/assets/mac/mac-asset-9.jpg";
 import macImage10 from "@/assets/mac/mac-asset-10.jpg";
-
-import mesh1 from "@/assets/mesh/mesh1.webp";
-import mesh2 from "@/assets/mesh/mesh2.webp";
-import mesh3 from "@/assets/mesh/mesh3.webp";
-import mesh4 from "@/assets/mesh/mesh4.webp";
-import mesh5 from "@/assets/mesh/mesh5.webp";
-import mesh6 from "@/assets/mesh/mesh6.webp";
-import mesh7 from "@/assets/mesh/mesh7.webp";
-import mesh8 from "@/assets/mesh/mesh8.webp";
 
 interface ImageEditorProps {
   imagePath: string;
@@ -75,34 +68,20 @@ const assetCategories: AssetCategory[] = [
       { id: "mac-10", src: macImage10, name: "Mac 10" },
     ],
   },
-  {
-    name: "Mesh",
-    assets: [
-      { id: "mesh-1", src: mesh1, name: "Mesh 1" },
-      { id: "mesh-2", src: mesh2, name: "Mesh 2" },
-      { id: "mesh-3", src: mesh3, name: "Mesh 3" },
-      { id: "mesh-4", src: mesh4, name: "Mesh 4" },
-      { id: "mesh-5", src: mesh5, name: "Mesh 5" },
-      { id: "mesh-6", src: mesh6, name: "Mesh 6" },
-      { id: "mesh-7", src: mesh7, name: "Mesh 7" },
-      { id: "mesh-8", src: mesh8, name: "Mesh 8" },
-    ],
-  },
 ];
 
 export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
   const [backgroundType, setBackgroundType] = useState<BackgroundType>("image");
   const [customColor, setCustomColor] = useState("#667eea");
-  const [selectedImage, setSelectedImage] = useState<string | null>(bgImage25);
+  const [selectedImage, setSelectedImage] = useState<string | null>(bgImage18);
   const [selectedGradient, setSelectedGradient] = useState<GradientOption>(gradientOptions[0]);
-  const [blurAmount, setBlurAmount] = useState(20);
+  const [blurAmount, setBlurAmount] = useState(0);
   const [noiseAmount, setNoiseAmount] = useState(0);
   const [borderRadius, setBorderRadius] = useState(18);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [bgImageLoaded, setBgImageLoaded] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -154,11 +133,15 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
         ctx.fillRect(0, 0, width, height);
         break;
       case "gradient": {
-        const gradient = ctx.createLinearGradient(0, 0, width, height);
-        gradient.addColorStop(0, selectedGradient.colors[0]);
-        gradient.addColorStop(1, selectedGradient.colors[1]);
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, width, height);
+        if (bgImageRef.current && selectedGradient.src) {
+          ctx.drawImage(bgImageRef.current, 0, 0, width, height);
+        } else {
+          const gradient = ctx.createLinearGradient(0, 0, width, height);
+          gradient.addColorStop(0, selectedGradient.colors[0]);
+          gradient.addColorStop(1, selectedGradient.colors[1]);
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, width, height);
+        }
         break;
       }
       case "custom":
@@ -209,11 +192,24 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
         setBgImageLoaded(false);
       };
       img.src = selectedImage;
+    } else if (backgroundType === "gradient" && selectedGradient.src) {
+      setBgImageLoaded(false);
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        bgImageRef.current = img;
+        setBgImageLoaded(true);
+      };
+      img.onerror = () => {
+        setError("Failed to load gradient image");
+        setBgImageLoaded(false);
+      };
+      img.src = selectedGradient.src;
     } else {
       bgImageRef.current = null;
       setBgImageLoaded(false);
     }
-  }, [backgroundType, selectedImage]);
+  }, [backgroundType, selectedImage, selectedGradient]);
 
   const updatePreview = useCallback(() => {
     if (!imageRef.current || !canvasRef.current || !imageLoaded) return;
@@ -357,7 +353,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
   }, [imagePath]);
 
   useEffect(() => {
-    if (imageLoaded && (backgroundType !== "image" || bgImageLoaded)) {
+    if (imageLoaded && ((backgroundType !== "image" && backgroundType !== "gradient") || bgImageLoaded)) {
       updatePreview();
     }
   }, [imageLoaded, backgroundType, customColor, blurAmount, noiseAmount, selectedImage, bgImageLoaded, borderRadius, selectedGradient, updatePreview]);
@@ -379,12 +375,12 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
         backgroundType,
         customColor,
         selectedImage,
-        bgImage: bgImageRef.current,
+        bgImage: backgroundType === "image" ? bgImageRef.current : null,
         blurAmount,
         noiseAmount,
         borderRadius,
         padding: 100,
-        gradientColors: selectedGradient.colors,
+        gradientImage: backgroundType === "gradient" ? bgImageRef.current : null,
       });
     } catch (err) {
       setError(`Failed to render high-quality image: ${err instanceof Error ? err.message : String(err)}`);
@@ -445,11 +441,9 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
         copyToClip: true,
       });
       
-      setCopied(true);
-      toast.success("Copied to clipboard", {
+      toast.success("Screenshot copied to clipboard!", {
         duration: 2000,
       });
-      setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       setError(`Failed to copy: ${errorMessage}`);
@@ -502,51 +496,55 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
           >
             Cancel
           </Button>
-          <Button 
-            variant="default" 
-            onClick={handleCopy} 
-            disabled={!imageLoaded || isSaving || isCopying}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 relative"
-            title="Copy to clipboard (⌘⇧C)"
-          >
-            {isCopying ? (
-              <span className="flex items-center gap-2">
-                <svg className="animate-spin size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Copying...
-              </span>
-            ) : copied ? (
-              "Copied!"
-            ) : (
-              "Copy"
-            )}
-          </Button>
-          <Button 
-            variant="default" 
-            onClick={handleSave} 
-            disabled={!imageLoaded || isSaving || isCopying}
-            className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
-            title="Save image (⌘S)"
-          >
-            {isSaving ? (
-              <span className="flex items-center gap-2">
-                <svg className="animate-spin size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Saving...
-              </span>
-            ) : (
-              "Save"
-            )}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  onClick={handleCopy} 
+                  disabled={!imageLoaded || isSaving || isCopying}
+                  size="icon"
+                  className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-50 disabled:opacity-50 data-[state=on]:bg-zinc-800"
+                >
+                  {isCopying ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Copy className="size-4" aria-hidden="true" />
+                  )}
+                  <span className="sr-only">Copy to clipboard</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Copy to Clipboard</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  onClick={handleSave} 
+                  disabled={!imageLoaded || isSaving || isCopying}
+                  size="icon"
+                  className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-50 disabled:opacity-50"
+                >
+                  {isSaving ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Save className="size-4" aria-hidden="true" />
+                  )}
+                  <span className="sr-only">Save image</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Save</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        <div className="w-96 p-6 border-r border-zinc-800 bg-zinc-900 overflow-y-auto">
+        <div className="w-72 p-6 border-r border-zinc-900 bg-zinc-900 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <div className="space-y-6">
             <BackgroundSelector
               backgroundType={backgroundType as "transparent" | "white" | "black" | "gray" | "gradient" | "custom"}

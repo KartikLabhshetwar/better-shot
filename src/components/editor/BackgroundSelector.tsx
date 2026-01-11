@@ -1,23 +1,31 @@
 import { cn } from "@/lib/utils";
+import mesh1 from "@/assets/mesh/mesh1.webp";
+import mesh2 from "@/assets/mesh/mesh2.webp";
+import mesh3 from "@/assets/mesh/mesh3.webp";
+import mesh4 from "@/assets/mesh/mesh4.webp";
+import mesh5 from "@/assets/mesh/mesh5.webp";
+import mesh6 from "@/assets/mesh/mesh6.webp";
+import mesh7 from "@/assets/mesh/mesh7.webp";
+import mesh8 from "@/assets/mesh/mesh8.webp";
 
 type BackgroundType = "transparent" | "white" | "black" | "gray" | "gradient" | "custom";
 
 interface GradientOption {
   id: string;
   name: string;
-  gradient: string;
+  src: string;
   colors: [string, string];
 }
 
 const gradientOptions: GradientOption[] = [
-  { id: "purple-pink", name: "Purple Pink", gradient: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", colors: ["#667eea", "#764ba2"] },
-  { id: "blue-cyan", name: "Blue Cyan", gradient: "linear-gradient(135deg, #0093E9 0%, #80D0C7 100%)", colors: ["#0093E9", "#80D0C7"] },
-  { id: "orange-red", name: "Orange Red", gradient: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)", colors: ["#f093fb", "#f5576c"] },
-  { id: "green-teal", name: "Green Teal", gradient: "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)", colors: ["#11998e", "#38ef7d"] },
-  { id: "sunset", name: "Sunset", gradient: "linear-gradient(135deg, #fa709a 0%, #fee140 100%)", colors: ["#fa709a", "#fee140"] },
-  { id: "ocean", name: "Ocean", gradient: "linear-gradient(135deg, #2E3192 0%, #1BFFFF 100%)", colors: ["#2E3192", "#1BFFFF"] },
-  { id: "peach", name: "Peach", gradient: "linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)", colors: ["#ffecd2", "#fcb69f"] },
-  { id: "night", name: "Night", gradient: "linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)", colors: ["#0f0c29", "#24243e"] },
+  { id: "mesh-1", name: "Mesh 1", src: mesh1, colors: ["#667eea", "#764ba2"] },
+  { id: "mesh-2", name: "Mesh 2", src: mesh2, colors: ["#0093E9", "#80D0C7"] },
+  { id: "mesh-3", name: "Mesh 3", src: mesh3, colors: ["#f093fb", "#f5576c"] },
+  { id: "mesh-4", name: "Mesh 4", src: mesh4, colors: ["#11998e", "#38ef7d"] },
+  { id: "mesh-5", name: "Mesh 5", src: mesh5, colors: ["#fa709a", "#fee140"] },
+  { id: "mesh-6", name: "Mesh 6", src: mesh6, colors: ["#2E3192", "#1BFFFF"] },
+  { id: "mesh-7", name: "Mesh 7", src: mesh7, colors: ["#ffecd2", "#fcb69f"] },
+  { id: "mesh-8", name: "Mesh 8", src: mesh8, colors: ["#0f0c29", "#24243e"] },
 ];
 
 interface BackgroundSelectorProps {
@@ -117,9 +125,13 @@ export function BackgroundSelector({
                     ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-zinc-900"
                     : "ring-1 ring-zinc-700 hover:ring-zinc-500"
                 )}
-                style={{ background: gradient.gradient }}
                 title={gradient.name}
               >
+                <img
+                  src={gradient.src}
+                  alt={gradient.name}
+                  className="w-full h-full object-cover"
+                />
                 {isSelected && (
                   <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
                     <div className="size-6 rounded-full bg-blue-500 flex items-center justify-center shadow-lg">

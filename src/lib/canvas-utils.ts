@@ -9,7 +9,7 @@ export interface RenderOptions {
   borderRadius: number;
   padding: number;
   scale?: number;
-  gradientColors?: [string, string];
+  gradientImage?: HTMLImageElement | null;
 }
 
 export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasElement {
@@ -24,7 +24,7 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
     borderRadius,
     padding,
     scale = window.devicePixelRatio || 2,
-    gradientColors = ["#667eea", "#764ba2"],
+    gradientImage = null,
   } = options;
 
   const bgWidth = image.width + padding * 2;
@@ -47,7 +47,7 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
   const tempBgCtx = tempBgCanvas.getContext("2d");
   if (!tempBgCtx) throw new Error("Failed to get temp canvas context");
 
-  drawBackground(tempBgCtx, bgWidth, bgHeight, backgroundType, customColor, selectedImage, bgImage, gradientColors);
+  drawBackground(tempBgCtx, bgWidth, bgHeight, backgroundType, customColor, selectedImage, bgImage, gradientImage);
 
   const bgCanvas = document.createElement("canvas");
   bgCanvas.width = bgWidth;
@@ -137,7 +137,7 @@ function drawBackground(
   customColor: string,
   selectedImage: string | null,
   bgImage: HTMLImageElement | null,
-  gradientColors: [string, string] = ["#667eea", "#764ba2"]
+  gradientImage: HTMLImageElement | null
 ) {
   switch (backgroundType) {
     case "transparent": {
@@ -164,11 +164,12 @@ function drawBackground(
       ctx.fillRect(0, 0, width, height);
       break;
     case "gradient": {
-      const gradient = ctx.createLinearGradient(0, 0, width, height);
-      gradient.addColorStop(0, gradientColors[0]);
-      gradient.addColorStop(1, gradientColors[1]);
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, width, height);
+      if (gradientImage) {
+        ctx.drawImage(gradientImage, 0, 0, width, height);
+      } else {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, width, height);
+      }
       break;
     }
     case "custom":

@@ -50,17 +50,17 @@ export function AssetGrid({ categories, selectedImage, backgroundType, onImageSe
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-2 max-h-[400px] overflow-y-auto pr-4 pb-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-zinc-700 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
+      <div className="grid grid-cols-4 gap-2 max-h-[400px] overflow-y-auto pr-4 pb-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-zinc-700 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
         {currentCategory?.assets.map((asset) => (
           <button
             key={asset.id}
             onClick={() => onImageSelect(asset.src)}
             aria-label={`Select ${asset.name} background`}
             className={cn(
-              "group relative aspect-square rounded-lg overflow-hidden border transition-all",
-              selectedImage === asset.src
-                ? "border-blue-500 ring-2 ring-blue-500/20"
-                : "border-zinc-800 hover:border-zinc-600 hover:scale-[1.02]"
+              "group relative w-full aspect-square rounded-lg overflow-hidden transition-all",
+              backgroundType === "image" && selectedImage === asset.src
+                ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-zinc-900"
+                : "ring-1 ring-zinc-700 hover:ring-zinc-500"
             )}
           >
             <img
