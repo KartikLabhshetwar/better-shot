@@ -3,16 +3,58 @@
 import { motion } from "framer-motion"
 import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
-import { Download, ChevronDown } from "lucide-react"
+import { Download, ChevronDown, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 export default function Hero() {
   const [mounted, setMounted] = useState(false)
+  const [starCount, setStarCount] = useState(0)
+  const [targetStars, setTargetStars] = useState(0)
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  useEffect(() => {
+    const fetchStarCount = async () => {
+      try {
+        const response = await fetch("https://api.github.com/repos/KartikLabhshetwar/better-shot")
+        if (response.ok) {
+          const data = await response.json()
+          setTargetStars(data.stargazers_count || 0)
+        }
+      } catch (error) {
+        console.error("Failed to fetch star count:", error)
+      }
+    }
+
+    if (mounted) {
+      fetchStarCount()
+    }
+  }, [mounted])
+
+  useEffect(() => {
+    if (targetStars === 0) return
+
+    const duration = 2000
+    const steps = 60
+    const increment = targetStars / steps
+    const stepDuration = duration / steps
+
+    let current = 0
+    const timer = setInterval(() => {
+      current += increment
+      if (current >= targetStars) {
+        setStarCount(targetStars)
+        clearInterval(timer)
+      } else {
+        setStarCount(Math.floor(current))
+      }
+    }, stepDuration)
+
+    return () => clearInterval(timer)
+  }, [targetStars])
 
   if (!mounted) {
     return null
@@ -90,10 +132,15 @@ export default function Hero() {
               rel="noopener noreferrer"
               className={cn(
                 "text-sm text-muted-foreground",
-                "hover:text-foreground transition-colors"
+                "hover:text-foreground transition-colors",
+                "flex items-center gap-2"
               )}
             >
-              Star us on GitHub
+              <Star className="h-4 w-4 fill-current" />
+              <span>Star us on GitHub</span>
+              {starCount > 0 && (
+                <span className="tabular-nums">{starCount.toLocaleString()}</span>
+              )}
             </a>
           </motion.div>
         </div>

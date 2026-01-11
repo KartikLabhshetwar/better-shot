@@ -7,11 +7,11 @@ import "./globals.css"
 export const metadata: Metadata = {
   title: "Better Shot - Free Screenshot Tool for macOS",
   description: "An open-source alternative to CleanShot X for macOS. Capture, edit, and enhance your screenshots with professional quality.",
-  metadataBase: new URL("https://bettershot.app"),
+  metadataBase: new URL("https://bettershot.site"),
   openGraph: {
     title: "Better Shot - Free Screenshot Tool for macOS",
     description: "An open-source alternative to CleanShot X for macOS. Capture, edit, and enhance your screenshots with professional quality.",
-    url: "https://bettershot.app",
+    url: "https://bettershot.site",
     siteName: "Better Shot",
     images: [
       {
