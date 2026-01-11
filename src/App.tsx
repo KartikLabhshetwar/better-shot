@@ -115,17 +115,6 @@ function App() {
     setError(null);
 
     const appWindow = getCurrentWindow();
-    
-    // Get mouse position before capture to determine which screen to open editor on
-    let mouseX: number | undefined;
-    let mouseY: number | undefined;
-    try {
-      const [x, y] = await invoke<[number, number]>("get_mouse_position");
-      mouseX = x;
-      mouseY = y;
-    } catch {
-      // Fallback - will use default center behavior
-    }
 
     try {
       await appWindow.hide();
@@ -143,6 +132,18 @@ function App() {
 
       // Play screenshot sound on successful capture
       invoke("play_screenshot_sound").catch(console.error);
+
+      // Get mouse position AFTER capture to determine which screen to open editor on
+      // This ensures the editor opens on the monitor where the user took the screenshot
+      let mouseX: number | undefined;
+      let mouseY: number | undefined;
+      try {
+        const [x, y] = await invoke<[number, number]>("get_mouse_position");
+        mouseX = x;
+        mouseY = y;
+      } catch {
+        // Fallback - will use default center behavior
+      }
 
       setTempScreenshotPath(screenshotPath);
       setMode("editing");
