@@ -86,7 +86,7 @@ pnpm test:rust
 ## Project Structure
 
 ```text
-better-shot/
+bettershot/
 ├── src/                    # Frontend React application
 │   ├── components/         # React components
 │   │   ├── editor/         # Image editor components
