@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
+import { getCurrentWindow, LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
+import { availableMonitors } from "@tauri-apps/api/window";
 import { register, unregisterAll } from "@tauri-apps/plugin-global-shortcut";
 import { toast } from "sonner";
 import { ImageEditor } from "./components/ImageEditor";
@@ -11,12 +12,53 @@ import { Card, CardContent } from "@/components/ui/card";
 type AppMode = "main" | "editing";
 type CaptureMode = "region" | "fullscreen" | "window";
 
-async function restoreWindow() {
+async function restoreWindowOnScreen(mouseX?: number, mouseY?: number) {
   const appWindow = getCurrentWindow();
   await appWindow.setSize(new LogicalSize(1200, 800));
-  await appWindow.center();
+
+  // If we have mouse coordinates, position the window on the same screen
+  if (mouseX !== undefined && mouseY !== undefined) {
+    try {
+      const monitors = await availableMonitors();
+      
+      // Find the monitor where the mouse cursor is
+      const targetMonitor = monitors.find((monitor) => {
+        const pos = monitor.position;
+        const size = monitor.size;
+        return (
+          mouseX >= pos.x &&
+          mouseX < pos.x + size.width &&
+          mouseY >= pos.y &&
+          mouseY < pos.y + size.height
+        );
+      });
+
+      if (targetMonitor) {
+        // Center the window on the target monitor
+        const windowWidth = 1200;
+        const windowHeight = 800;
+        const centerX = targetMonitor.position.x + (targetMonitor.size.width - windowWidth) / 2;
+        const centerY = targetMonitor.position.y + (targetMonitor.size.height - windowHeight) / 2;
+        
+        await appWindow.setPosition(new LogicalPosition(centerX, centerY));
+      } else {
+        // Fallback to center on primary monitor
+        await appWindow.center();
+      }
+    } catch {
+      // Fallback to center
+      await appWindow.center();
+    }
+  } else {
+    await appWindow.center();
+  }
+
   await appWindow.show();
   await appWindow.setFocus();
+}
+
+async function restoreWindow() {
+  await restoreWindowOnScreen();
 }
 
 function App() {
@@ -73,6 +115,17 @@ function App() {
     setError(null);
 
     const appWindow = getCurrentWindow();
+    
+    // Get mouse position before capture to determine which screen to open editor on
+    let mouseX: number | undefined;
+    let mouseY: number | undefined;
+    try {
+      const [x, y] = await invoke<[number, number]>("get_mouse_position");
+      mouseX = x;
+      mouseY = y;
+    } catch {
+      // Fallback - will use default center behavior
+    }
 
     try {
       await appWindow.hide();
@@ -88,9 +141,12 @@ function App() {
         saveDir: "/tmp",
       });
 
+      // Play screenshot sound on successful capture
+      invoke("play_screenshot_sound").catch(console.error);
+
       setTempScreenshotPath(screenshotPath);
       setMode("editing");
-      await restoreWindow();
+      await restoreWindowOnScreen(mouseX, mouseY);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       if (errorMessage.includes("cancelled") || errorMessage.includes("was cancelled")) {
