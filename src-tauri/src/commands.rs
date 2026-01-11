@@ -96,6 +96,48 @@ fn is_screencapture_running() -> bool {
     }
 }
 
+/// Check screen recording permission by attempting a minimal test
+/// This helps macOS recognize the permission is already granted
+fn check_and_activate_permission() -> Result<(), String> {
+    let test_path = std::env::temp_dir().join(format!("bs_test_{}.png", std::process::id()));
+
+    let output = Command::new("screencapture")
+        .arg("-x")
+        .arg("-T")
+        .arg("0")
+        .arg(&test_path)
+        .stderr(Stdio::piped())
+        .stdout(Stdio::piped())
+        .output();
+
+    match output {
+        Ok(o) => {
+            let stderr = String::from_utf8_lossy(&o.stderr);
+            let _ = std::fs::remove_file(&test_path);
+
+            if stderr.contains("permission")
+                || stderr.contains("denied")
+                || stderr.contains("not authorized")
+            {
+                return Err("Screen Recording permission not granted".to_string());
+            }
+
+            Ok(())
+        }
+        Err(e) => {
+            let err_msg = e.to_string();
+            if err_msg.contains("permission")
+                || err_msg.contains("denied")
+                || err_msg.contains("not authorized")
+            {
+                Err("Screen Recording permission not granted".to_string())
+            } else {
+                Ok(())
+            }
+        }
+    }
+}
+
 /// Capture screenshot using macOS native screencapture with interactive selection
 /// This properly handles Screen Recording permissions through the system
 #[tauri::command]
@@ -108,28 +150,39 @@ pub async fn native_capture_interactive(save_dir: String) -> Result<String, Stri
         return Err("Another screenshot capture is already in progress".to_string());
     }
 
+    check_and_activate_permission().map_err(|e| {
+        format!("Permission check failed: {}. Please ensure Screen Recording permission is granted in System Settings > Privacy & Security > Screen Recording.", e)
+    })?;
+
     let filename = generate_filename("screenshot", "png")?;
     let save_path = PathBuf::from(&save_dir);
     let screenshot_path = save_path.join(&filename);
     let path_str = screenshot_path.to_string_lossy().to_string();
 
-    let mut child = Command::new("screencapture")
+    let child = Command::new("screencapture")
         .arg("-i")
         .arg("-x")
         .arg(&path_str)
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Failed to run screencapture: {}", e))?;
 
-    let status = child
-        .wait()
+    let output = child
+        .wait_with_output()
         .map_err(|e| format!("Failed to wait for screencapture: {}", e))?;
 
-    if !status.success() {
+    if !output.status.success() {
         if screenshot_path.exists() {
             let _ = std::fs::remove_file(&screenshot_path);
+        }
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("permission")
+            || stderr.contains("denied")
+            || stderr.contains("not authorized")
+        {
+            return Err("Screen Recording permission required. Please grant permission in System Settings > Privacy & Security > Screen Recording and restart the app.".to_string());
         }
         return Err("Screenshot was cancelled or failed".to_string());
     }
@@ -151,6 +204,10 @@ pub async fn native_capture_fullscreen(save_dir: String) -> Result<String, Strin
     if is_screencapture_running() {
         return Err("Another screenshot capture is already in progress".to_string());
     }
+
+    check_and_activate_permission().map_err(|e| {
+        format!("Permission check failed: {}. Please ensure Screen Recording permission is granted in System Settings > Privacy & Security > Screen Recording.", e)
+    })?;
 
     let filename = generate_filename("screenshot", "png")?;
     let save_path = PathBuf::from(&save_dir);
@@ -185,28 +242,39 @@ pub async fn native_capture_window(save_dir: String) -> Result<String, String> {
         return Err("Another screenshot capture is already in progress".to_string());
     }
 
+    check_and_activate_permission().map_err(|e| {
+        format!("Permission check failed: {}. Please ensure Screen Recording permission is granted in System Settings > Privacy & Security > Screen Recording.", e)
+    })?;
+
     let filename = generate_filename("screenshot", "png")?;
     let save_path = PathBuf::from(&save_dir);
     let screenshot_path = save_path.join(&filename);
     let path_str = screenshot_path.to_string_lossy().to_string();
 
-    let mut child = Command::new("screencapture")
+    let child = Command::new("screencapture")
         .arg("-w")
         .arg("-x")
         .arg(&path_str)
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Failed to run screencapture: {}", e))?;
 
-    let status = child
-        .wait()
+    let output = child
+        .wait_with_output()
         .map_err(|e| format!("Failed to wait for screencapture: {}", e))?;
 
-    if !status.success() {
+    if !output.status.success() {
         if screenshot_path.exists() {
             let _ = std::fs::remove_file(&screenshot_path);
+        }
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("permission")
+            || stderr.contains("denied")
+            || stderr.contains("not authorized")
+        {
+            return Err("Screen Recording permission required. Please grant permission in System Settings > Privacy & Security > Screen Recording and restart the app.".to_string());
         }
         return Err("Screenshot was cancelled or failed".to_string());
     }
