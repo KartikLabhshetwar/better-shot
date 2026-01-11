@@ -1,45 +1,22 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { getCurrentWindow, PhysicalSize, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
+import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { register, unregisterAll } from "@tauri-apps/plugin-global-shortcut";
 import { toast } from "sonner";
-import { RegionSelector } from "./components/RegionSelector";
 import { ImageEditor } from "./components/ImageEditor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-type AppMode = "main" | "selecting" | "editing";
-type MonitorShot = {
-  id: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  scale_factor: number;
-  path: string;
-};
+type AppMode = "main" | "editing";
+type CaptureMode = "region" | "fullscreen" | "window";
 
-// Helper to restore window to normal state
 async function restoreWindow() {
   const appWindow = getCurrentWindow();
-  
-  // Hide first for clean transition
-  await appWindow.hide();
-  
-  // Exit fullscreen
-  await appWindow.setFullscreen(false);
-  
-  // Wait for fullscreen transition
-  await new Promise((resolve) => setTimeout(resolve, 100));
-  
-  // Reset window properties
-  await appWindow.setAlwaysOnTop(false);
   await appWindow.setSize(new LogicalSize(1200, 800));
   await appWindow.center();
-  
-  // Show the window - decorations should be intact since we never disabled them
   await appWindow.show();
+  await appWindow.setFocus();
 }
 
 function App() {
@@ -49,7 +26,6 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [tempScreenshotPath, setTempScreenshotPath] = useState<string | null>(null);
-  const [monitorShots, setMonitorShots] = useState<MonitorShot[]>([]);
 
   useEffect(() => {
     const initializeDesktopPath = async () => {
@@ -67,10 +43,9 @@ function App() {
   useEffect(() => {
     const setupHotkeys = async () => {
       try {
-        await register("CommandOrControl+Shift+2", () => {
-          // Use the same workflow as the Capture Region button
-          handleCapture();
-        });
+        await register("CommandOrControl+Shift+2", () => handleCapture("region"));
+        await register("CommandOrControl+Shift+3", () => handleCapture("fullscreen"));
+        await register("CommandOrControl+Shift+4", () => handleCapture("window"));
       } catch (err) {
         console.error("Failed to register hotkey:", err);
         setError(`Hotkey registration failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -79,141 +54,66 @@ function App() {
 
     setupHotkeys();
 
-    const unlisten = listen("capture-triggered", () => {
-      handleCapture();
-    });
+    const unlisten1 = listen("capture-triggered", () => handleCapture("region"));
+    const unlisten2 = listen("capture-fullscreen", () => handleCapture("fullscreen"));
+    const unlisten3 = listen("capture-window", () => handleCapture("window"));
 
     return () => {
-      unlisten.then((fn) => fn());
+      unlisten1.then((fn) => fn());
+      unlisten2.then((fn) => fn());
+      unlisten3.then((fn) => fn());
       unregisterAll().catch(console.error);
     };
   }, [saveDir, copyToClipboard]);
 
-  async function handleCapture() {
+  async function handleCapture(captureMode: CaptureMode = "region") {
+    if (isCapturing) return;
+    
     setIsCapturing(true);
     setError(null);
 
     const appWindow = getCurrentWindow();
 
     try {
-      // Hide the window before taking screenshot - DON'T touch decorations
-      // Fullscreen mode will hide the titlebar automatically
       await appWindow.hide();
+      await new Promise((resolve) => setTimeout(resolve, 400));
 
-      // Minimal delay - just enough for window to hide
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      const commandMap: Record<CaptureMode, string> = {
+        region: "native_capture_interactive",
+        fullscreen: "native_capture_fullscreen",
+        window: "native_capture_window",
+      };
 
-      // Capture all monitors
-      const shots = await invoke<MonitorShot[]>("capture_all_monitors", {
+      const screenshotPath = await invoke<string>(commandMap[captureMode], {
         saveDir: "/tmp",
       });
 
-      // Calculate total bounds across all monitors
-      const bounds = shots.reduce(
-        (acc, s) => ({
-          minX: Math.min(acc.minX, s.x),
-          minY: Math.min(acc.minY, s.y),
-          maxX: Math.max(acc.maxX, s.x + s.width),
-          maxY: Math.max(acc.maxY, s.y + s.height),
-        }),
-        { minX: Number.POSITIVE_INFINITY, minY: Number.POSITIVE_INFINITY, maxX: Number.NEGATIVE_INFINITY, maxY: Number.NEGATIVE_INFINITY }
-      );
-
-      const width = bounds.maxX - bounds.minX;
-      const height = bounds.maxY - bounds.minY;
-
-      // Set mode BEFORE showing window so React renders immediately
-      setMonitorShots(shots);
-      setMode("selecting");
-
-      // Set position and size for fullscreen selection
-      await appWindow.setPosition(new PhysicalPosition(bounds.minX, bounds.minY));
-      await appWindow.setSize(new PhysicalSize(width, height));
-      
-      // Use fullscreen which automatically hides decorations on macOS
-      await appWindow.setAlwaysOnTop(true);
-      await appWindow.setFullscreen(true);
-      
-      // Small delay for window to transition, then show
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      await appWindow.show();
+      setTempScreenshotPath(screenshotPath);
+      setMode("editing");
+      await restoreWindow();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      // Check if it's a permission-related error
-      if (errorMessage.toLowerCase().includes("permission") || 
-          errorMessage.toLowerCase().includes("access") ||
-          errorMessage.toLowerCase().includes("denied")) {
+      if (errorMessage.includes("cancelled") || errorMessage.includes("was cancelled")) {
+        await restoreWindow();
+      } else if (errorMessage.includes("already in progress")) {
+        setError("Please wait for the current screenshot to complete");
+        await restoreWindow();
+      } else if (
+        errorMessage.toLowerCase().includes("permission") ||
+        errorMessage.toLowerCase().includes("access") ||
+        errorMessage.toLowerCase().includes("denied")
+      ) {
         setError(
           "Screen Recording permission required. Please go to System Settings > Privacy & Security > Screen Recording and enable access for Better Shot, then restart the app."
         );
+        await restoreWindow();
       } else {
         setError(errorMessage);
+        await restoreWindow();
       }
-      // Restore window on error
-      await restoreWindow();
     } finally {
       setIsCapturing(false);
     }
-  }
-
-  async function handleRegionSelect(region: { x: number; y: number; width: number; height: number }) {
-    if (!monitorShots.length) return;
-
-    try {
-      // Find which monitor contains most of the selection
-      const target = monitorShots.reduce(
-        (best, shot) => {
-          const overlapX = Math.max(region.x, shot.x);
-          const overlapY = Math.max(region.y, shot.y);
-          const overlapRight = Math.min(region.x + region.width, shot.x + shot.width);
-          const overlapBottom = Math.min(region.y + region.height, shot.y + shot.height);
-          
-          const overlapWidth = Math.max(0, overlapRight - overlapX);
-          const overlapHeight = Math.max(0, overlapBottom - overlapY);
-          const area = overlapWidth * overlapHeight;
-          
-          if (area > best.area) {
-            return { shot, area };
-          }
-          return best;
-        },
-        { shot: monitorShots[0], area: 0 }
-      ).shot;
-
-      // Convert absolute screen coordinates to coordinates relative to the monitor's screenshot
-      const scaleFactor = target.scale_factor || 1;
-      const relX = Math.max(0, Math.floor((region.x - target.x) * scaleFactor));
-      const relY = Math.max(0, Math.floor((region.y - target.y) * scaleFactor));
-      const relWidth = Math.max(1, Math.floor(region.width * scaleFactor));
-      const relHeight = Math.max(1, Math.floor(region.height * scaleFactor));
-
-      const croppedPath = await invoke<string>("capture_region", {
-        screenshotPath: target.path,
-        x: relX,
-        y: relY,
-        width: relWidth,
-        height: relHeight,
-        saveDir: "/tmp",
-      });
-      
-      // Restore window with decorations
-      await restoreWindow();
-      
-      setTempScreenshotPath(croppedPath);
-      setMode("editing");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      await restoreWindow();
-      setMode("main");
-      setMonitorShots([]);
-    }
-  }
-
-  async function handleRegionCancel() {
-    await restoreWindow();
-    setMode("main");
-    setTempScreenshotPath(null);
-    setMonitorShots([]);
   }
 
   async function handleEditorSave(editedImageData: string) {
@@ -223,13 +123,12 @@ function App() {
         saveDir,
         copyToClip: copyToClipboard,
       });
-      
+
       toast.success("Image saved", {
         description: savedPath,
         duration: 4000,
       });
-      
-      await restoreWindow();
+
       setMode("main");
       setTempScreenshotPath(null);
     } catch (err) {
@@ -239,25 +138,13 @@ function App() {
         description: errorMessage,
         duration: 5000,
       });
-      await restoreWindow();
       setMode("main");
     }
   }
 
   async function handleEditorCancel() {
-    await restoreWindow();
     setMode("main");
     setTempScreenshotPath(null);
-  }
-
-  if (mode === "selecting") {
-    return (
-      <RegionSelector
-        onSelect={handleRegionSelect}
-        onCancel={handleRegionCancel}
-        monitorShots={monitorShots}
-      />
-    );
   }
 
   if (mode === "editing" && tempScreenshotPath) {
@@ -309,23 +196,49 @@ function App() {
               </label>
             </div>
 
-            <Button
-              onClick={handleCapture}
-              disabled={isCapturing}
-              className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-50 py-3 text-base font-medium disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-700 transition-all"
-            >
-              {isCapturing ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin size-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Capturing...
-                </span>
-              ) : (
-                "Capture Region"
-              )}
-            </Button>
+            <div className="grid grid-cols-3 gap-3">
+              <Button
+                onClick={() => handleCapture("region")}
+                disabled={isCapturing}
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-50 py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-700 transition-all flex flex-col gap-1"
+              >
+                <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5a1 1 0 011-1h4a1 1 0 010 2H6v3a1 1 0 01-2 0V5zM4 19a1 1 0 001 1h4a1 1 0 100-2H6v-3a1 1 0 10-2 0v4zM20 5a1 1 0 00-1-1h-4a1 1 0 100 2h3v3a1 1 0 102 0V5zM20 19a1 1 0 01-1 1h-4a1 1 0 110-2h3v-3a1 1 0 112 0v4z" />
+                </svg>
+                <span className="text-xs">Region</span>
+              </Button>
+              <Button
+                onClick={() => handleCapture("fullscreen")}
+                disabled={isCapturing}
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-50 py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-700 transition-all flex flex-col gap-1"
+              >
+                <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                <span className="text-xs">Screen</span>
+              </Button>
+              <Button
+                onClick={() => handleCapture("window")}
+                disabled={isCapturing}
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-50 py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-700 transition-all flex flex-col gap-1"
+              >
+                <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5a2 2 0 012-2h12a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V5z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 3v2M12 3v2M16 3v2" />
+                </svg>
+                <span className="text-xs">Window</span>
+              </Button>
+            </div>
+
+            {isCapturing && (
+              <div className="flex items-center justify-center gap-2 text-zinc-400 text-sm">
+                <svg className="animate-spin size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Waiting for selection...
+              </div>
+            )}
 
             {error && (
               <div className="p-4 bg-red-950/30 border border-red-800/50 rounded-lg text-red-400 text-sm text-pretty">
@@ -336,39 +249,29 @@ function App() {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardContent className="p-5">
-              <h3 className="font-medium text-zinc-200 mb-4 text-sm">Quick Actions</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400">Capture</span>
-                  <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘⇧2</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400">Save</span>
-                  <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘S</kbd>
-                </div>
+        <Card className="bg-zinc-900 border-zinc-800">
+          <CardContent className="p-5">
+            <h3 className="font-medium text-zinc-200 mb-4 text-sm">Keyboard Shortcuts</h3>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-400">Region</span>
+                <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘⇧2</kbd>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardContent className="p-5">
-              <h3 className="font-medium text-zinc-200 mb-4 text-sm">Editor Controls</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400">Copy</span>
-                  <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs">⌘⇧C</kbd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-400">Cancel</span>
-                  <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs">Esc</kbd>
-                </div>
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-400">Screen</span>
+                <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘⇧3</kbd>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-400">Window</span>
+                <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘⇧4</kbd>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-400">Save</span>
+                <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘S</kbd>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </main>
   );

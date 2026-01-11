@@ -1,5 +1,8 @@
 //! Tauri commands module
 
+use std::path::PathBuf;
+use std::process::{Command, Stdio};
+use std::sync::Mutex;
 use tauri::AppHandle;
 
 use crate::clipboard::copy_image_to_clipboard;
@@ -7,7 +10,9 @@ use crate::image::{copy_screenshot_to_dir, crop_image, save_base64_image, CropRe
 use crate::screenshot::{
     capture_all_monitors as capture_monitors, capture_primary_monitor, MonitorShot,
 };
-use crate::utils::get_desktop_path;
+use crate::utils::{generate_filename, get_desktop_path};
+
+static SCREENCAPTURE_LOCK: Mutex<()> = Mutex::new(());
 
 /// Quick capture of primary monitor
 #[tauri::command]
@@ -76,4 +81,139 @@ pub async fn save_edited_image(
 #[tauri::command]
 pub async fn get_desktop_directory() -> Result<String, String> {
     get_desktop_path()
+}
+
+/// Check if screencapture is already running
+fn is_screencapture_running() -> bool {
+    let output = Command::new("pgrep")
+        .arg("-x")
+        .arg("screencapture")
+        .output();
+
+    match output {
+        Ok(o) => o.status.success(),
+        Err(_) => false,
+    }
+}
+
+/// Capture screenshot using macOS native screencapture with interactive selection
+/// This properly handles Screen Recording permissions through the system
+#[tauri::command]
+pub async fn native_capture_interactive(save_dir: String) -> Result<String, String> {
+    let _lock = SCREENCAPTURE_LOCK
+        .lock()
+        .map_err(|e| format!("Failed to acquire lock: {}", e))?;
+
+    if is_screencapture_running() {
+        return Err("Another screenshot capture is already in progress".to_string());
+    }
+
+    let filename = generate_filename("screenshot", "png")?;
+    let save_path = PathBuf::from(&save_dir);
+    let screenshot_path = save_path.join(&filename);
+    let path_str = screenshot_path.to_string_lossy().to_string();
+
+    let mut child = Command::new("screencapture")
+        .arg("-i")
+        .arg("-x")
+        .arg(&path_str)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| format!("Failed to run screencapture: {}", e))?;
+
+    let status = child
+        .wait()
+        .map_err(|e| format!("Failed to wait for screencapture: {}", e))?;
+
+    if !status.success() {
+        if screenshot_path.exists() {
+            let _ = std::fs::remove_file(&screenshot_path);
+        }
+        return Err("Screenshot was cancelled or failed".to_string());
+    }
+
+    if screenshot_path.exists() {
+        Ok(path_str)
+    } else {
+        Err("Screenshot was cancelled or failed".to_string())
+    }
+}
+
+/// Capture full screen using macOS native screencapture
+#[tauri::command]
+pub async fn native_capture_fullscreen(save_dir: String) -> Result<String, String> {
+    let _lock = SCREENCAPTURE_LOCK
+        .lock()
+        .map_err(|e| format!("Failed to acquire lock: {}", e))?;
+
+    if is_screencapture_running() {
+        return Err("Another screenshot capture is already in progress".to_string());
+    }
+
+    let filename = generate_filename("screenshot", "png")?;
+    let save_path = PathBuf::from(&save_dir);
+    let screenshot_path = save_path.join(&filename);
+    let path_str = screenshot_path.to_string_lossy().to_string();
+
+    let status = Command::new("screencapture")
+        .arg("-x")
+        .arg(&path_str)
+        .status()
+        .map_err(|e| format!("Failed to run screencapture: {}", e))?;
+
+    if !status.success() {
+        return Err("Screenshot failed".to_string());
+    }
+
+    if screenshot_path.exists() {
+        Ok(path_str)
+    } else {
+        Err("Screenshot failed".to_string())
+    }
+}
+
+/// Capture specific window using macOS native screencapture
+#[tauri::command]
+pub async fn native_capture_window(save_dir: String) -> Result<String, String> {
+    let _lock = SCREENCAPTURE_LOCK
+        .lock()
+        .map_err(|e| format!("Failed to acquire lock: {}", e))?;
+
+    if is_screencapture_running() {
+        return Err("Another screenshot capture is already in progress".to_string());
+    }
+
+    let filename = generate_filename("screenshot", "png")?;
+    let save_path = PathBuf::from(&save_dir);
+    let screenshot_path = save_path.join(&filename);
+    let path_str = screenshot_path.to_string_lossy().to_string();
+
+    let mut child = Command::new("screencapture")
+        .arg("-w")
+        .arg("-x")
+        .arg(&path_str)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| format!("Failed to run screencapture: {}", e))?;
+
+    let status = child
+        .wait()
+        .map_err(|e| format!("Failed to wait for screencapture: {}", e))?;
+
+    if !status.success() {
+        if screenshot_path.exists() {
+            let _ = std::fs::remove_file(&screenshot_path);
+        }
+        return Err("Screenshot was cancelled or failed".to_string());
+    }
+
+    if screenshot_path.exists() {
+        Ok(path_str)
+    } else {
+        Err("Screenshot was cancelled or failed".to_string())
+    }
 }
