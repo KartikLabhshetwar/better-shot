@@ -22,7 +22,15 @@ export async function loadImage(src: string): Promise<HTMLImageElement> {
       imageCache.set(src, img);
       resolve(img);
     };
-    img.onerror = reject;
+    img.onerror = (event) => {
+      // Create a proper Error object with useful debugging information
+      const error = new Error(
+        `Failed to load image: ${src}. This may be due to CORS restrictions, ` +
+        `invalid path, or asset protocol scope issues in production builds.`
+      );
+      console.error("Image load error:", { src, event });
+      reject(error);
+    };
     img.src = src;
   });
 }
