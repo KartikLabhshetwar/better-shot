@@ -66,10 +66,19 @@ jobs:
                - **Apple Silicon** (M1, M2, M3): Download the `aarch64` version
                - **Intel Mac**: Download the `x64` version
             2. Open the DMG and drag Better Shot to Applications
-            3. **First Launch**: Right-click the app → **Open** → Click **Open** again to bypass Gatekeeper
+            3. **First Launch** - Choose one method (recommended):
+            
+               **Option A: Right-Click Method** (Easiest)
+               - Right-click the app → **Open** → Click **Open** in the dialog
+               
+               **Option B: Terminal Method** (One command, no dialogs) (recommended)
+               ```bash
+               xattr -d com.apple.quarantine /Applications/bettershot.app
+               ```
+               
             4. Grant Screen Recording permission when prompted in System Settings
             
-            **Note**: This app uses ad-hoc signing. You'll need to right-click and select "Open" on first launch.
+            > **Note**: This is an ad-hoc signed indie app. macOS shows a warning for apps not notarized through Apple's $99/year developer program. The app is completely safe and open source.
             
             ## What's New
             

@@ -65,8 +65,19 @@ Better Shot is a fast, lightweight screenshot tool built with Tauri and React. I
    - **Apple Silicon** (M1, M2, M3): `bettershot_*_aarch64.dmg`
    - **Intel Mac**: `bettershot_*_x64.dmg`
 3. Open the DMG and drag Better Shot to Applications
-4. On first launch, right-click the app and select "Open" to bypass Gatekeeper
+4. **First Launch** (choose one method):
+   
+   **Option A: Right-Click Method** (Easiest)
+   - Right-click the app → **Open** → Click **Open** in the dialog
+   
+   **Option B: Terminal Method** (One command, no dialogs) (recommended)
+   ```bash
+   xattr -d com.apple.quarantine /Applications/bettershot.app
+   ```
+   
 5. Grant Screen Recording permission when prompted
+
+> **Note**: Better Shot is ad-hoc signed (free indie app). macOS Gatekeeper shows a warning for apps not notarized through Apple's $99/year developer program. The app is safe - you can [view the source code](https://github.com/KartikLabhshetwar/better-shot) and build it yourself.
 
 ### From Source
 
