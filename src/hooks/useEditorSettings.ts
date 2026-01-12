@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { Store } from "@tauri-apps/plugin-store";
 import { gradientOptions, type GradientOption } from "@/components/editor/BackgroundSelector";
+import { resolveBackgroundPath, getDefaultBackgroundPath } from "@/lib/asset-registry";
 
 // Import all background images
 import bgImage13 from "@/assets/bg-images/asset-13.jpg";
@@ -80,7 +81,7 @@ export const assetCategories: AssetCategory[] = [
 ];
 
 const DEFAULT_GRADIENT = gradientOptions[0];
-const DEFAULT_IMAGE = bgImage18;
+const DEFAULT_IMAGE = getDefaultBackgroundPath();
 
 export function useEditorSettings(): [EditorSettings, EditorSettingsActions] {
   // Background state
@@ -103,9 +104,11 @@ export function useEditorSettings(): [EditorSettings, EditorSettingsActions] {
     const loadDefaultBackground = async () => {
       try {
         const store = await Store.load("settings.json");
-        const defaultBg = await store.get<string>("defaultBackgroundImage");
-        if (defaultBg) {
-          setSelectedImageSrc(defaultBg);
+        const storedBg = await store.get<string>("defaultBackgroundImage");
+        if (storedBg) {
+          // Resolve stored value (asset ID or data URL) to actual path
+          const resolvedPath = resolveBackgroundPath(storedBg);
+          setSelectedImageSrc(resolvedPath);
         }
       } catch (err) {
         console.error("Failed to load default background from store:", err);

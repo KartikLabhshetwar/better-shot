@@ -34,6 +34,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
   // Save/copy state
   const [isSaving, setIsSaving] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
+  const [tempDir, setTempDir] = useState<string>("/private/tmp");
   
   // Annotation state
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
@@ -68,6 +69,11 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
       }
     };
     restoreWindowState();
+
+    // Get the system temp directory
+    invoke<string>("get_temp_directory")
+      .then((dir) => setTempDir(dir))
+      .catch((err) => console.error("Failed to get temp directory:", err));
   }, []);
 
   // Load main screenshot image
@@ -156,7 +162,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
       
       await invoke<string>("save_edited_image", {
         imageData: dataUrl,
-        saveDir: "/tmp",
+        saveDir: tempDir,
         copyToClip: true,
       });
       
@@ -173,7 +179,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
     } finally {
       setIsCopying(false);
     }
-  }, [screenshotImage, annotations, renderHighQualityCanvas, isSaving, isCopying]);
+  }, [screenshotImage, annotations, renderHighQualityCanvas, isSaving, isCopying, tempDir]);
 
   // Keyboard shortcuts for save/copy
   useEffect(() => {

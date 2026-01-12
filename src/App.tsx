@@ -15,6 +15,7 @@ import { hasCompletedOnboarding } from "@/lib/onboarding";
 import { processScreenshotWithDefaultBackground } from "@/lib/auto-process";
 import { SettingsIcon } from "./components/SettingsIcon";
 import { PreferencesPage } from "./components/preferences/PreferencesPage";
+import { migrateStoredValue, isAssetId, isDataUrl } from "@/lib/asset-registry";
 import type { KeyboardShortcut } from "./components/preferences/KeyboardShortcutManager";
 
 type AppMode = "main" | "editing" | "preferences";
@@ -92,6 +93,7 @@ function App() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [shortcuts, setShortcuts] = useState<KeyboardShortcut[]>(DEFAULT_SHORTCUTS);
   const [settingsVersion, setSettingsVersion] = useState(0);
+  const [tempDir, setTempDir] = useState<string>("/tmp");
 
   // Load settings function
   const loadSettings = useCallback(async () => {
@@ -154,6 +156,15 @@ function App() {
         setError(`Failed to get Desktop directory: ${err instanceof Error ? err.message : String(err)}`);
       }
 
+      // Get the system temp directory (canonicalized to resolve symlinks)
+      try {
+        const systemTempDir = await invoke<string>("get_temp_directory");
+        setTempDir(systemTempDir);
+      } catch (err) {
+        console.error("Failed to get temp directory, using fallback:", err);
+        // Keep the default /tmp fallback
+      }
+
       // Load settings from store
       try {
         const store = await Store.load("settings.json", {
@@ -190,6 +201,18 @@ function App() {
         const savedShortcuts = await store.get<KeyboardShortcut[]>("keyboardShortcuts");
         if (savedShortcuts && savedShortcuts.length > 0) {
           setShortcuts(savedShortcuts);
+        }
+
+        // Migrate legacy background image paths to asset IDs
+        const savedBackgroundImage = await store.get<string>("defaultBackgroundImage");
+        if (savedBackgroundImage && !isAssetId(savedBackgroundImage) && !isDataUrl(savedBackgroundImage)) {
+          // This is a legacy path that needs migration
+          const migratedValue = migrateStoredValue(savedBackgroundImage);
+          if (migratedValue && migratedValue !== savedBackgroundImage) {
+            console.log(`Migrating background image: ${savedBackgroundImage} -> ${migratedValue}`);
+            await store.set("defaultBackgroundImage", migratedValue);
+            await store.save();
+          }
         }
       } catch (err) {
         console.error("Failed to load settings:", err);
@@ -295,7 +318,7 @@ function App() {
       };
 
       const screenshotPath = await invoke<string>(commandMap[captureMode], {
-        saveDir: "/tmp",
+        saveDir: tempDir,
       });
 
       invoke("play_screenshot_sound").catch(console.error);

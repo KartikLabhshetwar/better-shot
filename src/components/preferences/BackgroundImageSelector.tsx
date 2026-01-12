@@ -5,25 +5,47 @@ import { Upload, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { assetCategories } from "@/hooks/useEditorSettings";
 import { cn } from "@/lib/utils";
+import { 
+  toStorableValue, 
+  isDataUrl,
+  getAssetIdFromPath 
+} from "@/lib/asset-registry";
 
 interface BackgroundImageSelectorProps {
   onImageSelect: (imageSrc: string) => void;
 }
 
 export function BackgroundImageSelector({ onImageSelect }: BackgroundImageSelectorProps) {
+  // selectedImage stores the asset ID or data URL (storable value)
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Helper to check if an asset is selected (compares by ID)
+  const isSelected = useCallback((assetSrc: string): boolean => {
+    if (!selectedImage) return false;
+    
+    // For data URLs (uploaded images), compare directly
+    if (isDataUrl(assetSrc)) {
+      return selectedImage === assetSrc;
+    }
+    
+    // For registry assets, compare by asset ID
+    const assetId = getAssetIdFromPath(assetSrc);
+    return assetId === selectedImage;
+  }, [selectedImage]);
 
   useEffect(() => {
     const loadSettings = async () => {
       try {
         const store = await Store.load("settings.json");
-        const defaultBg = await store.get<string>("defaultBackgroundImage");
+        const storedBg = await store.get<string>("defaultBackgroundImage");
         const uploaded = await store.get<string[]>("uploadedBackgroundImages");
         
-        if (defaultBg) {
-          setSelectedImage(defaultBg);
+        if (storedBg) {
+          // Resolve the stored value to an actual path for display
+          // But keep tracking by the stored value (ID or data URL)
+          setSelectedImage(storedBg);
         }
         if (uploaded) {
           setUploadedImages(uploaded);
@@ -36,12 +58,22 @@ export function BackgroundImageSelector({ onImageSelect }: BackgroundImageSelect
   }, []);
 
   const handleImageSelect = useCallback(async (imageSrc: string) => {
-    setSelectedImage(imageSrc);
+    // Convert the runtime path to a storable value (asset ID or data URL)
+    const storableValue = toStorableValue(imageSrc);
+    
+    if (!storableValue) {
+      console.error("Cannot store this image path:", imageSrc);
+      toast.error("Failed to save background selection");
+      return;
+    }
+    
+    setSelectedImage(storableValue);
     onImageSelect(imageSrc);
     
     try {
       const store = await Store.load("settings.json");
-      await store.set("defaultBackgroundImage", imageSrc);
+      // Store the asset ID, not the runtime path
+      await store.set("defaultBackgroundImage", storableValue);
       await store.save();
       toast.success("Default background updated");
     } catch (err) {
@@ -138,7 +170,7 @@ export function BackgroundImageSelector({ onImageSelect }: BackgroundImageSelect
                     onClick={() => handleImageSelect(img)}
                     className={cn(
                       "relative w-full aspect-square rounded-lg overflow-hidden border-2 transition-all",
-                      selectedImage === img
+                      isSelected(img)
                         ? "border-blue-500 ring-2 ring-blue-500/50"
                         : "border-zinc-700 hover:border-zinc-600"
                     )}
@@ -148,7 +180,7 @@ export function BackgroundImageSelector({ onImageSelect }: BackgroundImageSelect
                       alt={`Uploaded ${index + 1}`}
                       className="w-full h-full object-cover"
                     />
-                    {selectedImage === img && (
+                    {isSelected(img) && (
                       <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
                         <Check className="size-5 text-blue-400" aria-hidden="true" />
                       </div>
@@ -177,7 +209,7 @@ export function BackgroundImageSelector({ onImageSelect }: BackgroundImageSelect
                   onClick={() => handleImageSelect(asset.src)}
                   className={cn(
                     "relative w-full aspect-square rounded-lg overflow-hidden border-2 transition-all",
-                    selectedImage === asset.src
+                    isSelected(asset.src)
                       ? "border-blue-500 ring-2 ring-blue-500/50"
                       : "border-zinc-700 hover:border-zinc-600"
                   )}
@@ -187,7 +219,7 @@ export function BackgroundImageSelector({ onImageSelect }: BackgroundImageSelect
                     alt={asset.name}
                     className="w-full h-full object-cover"
                   />
-                  {selectedImage === asset.src && (
+                  {isSelected(asset.src) && (
                     <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
                       <Check className="size-5 text-blue-400" aria-hidden="true" />
                     </div>

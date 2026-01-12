@@ -70,12 +70,10 @@ export function PreferencesPage({ onBack, onSettingsChange }: PreferencesPagePro
     onSettingsChange?.();
   }, [onSettingsChange]);
 
-  const handleImageSelect = useCallback(async (imageSrc: string) => {
+  const handleImageSelect = useCallback(async (_imageSrc: string) => {
     try {
-      const store = await Store.load("settings.json");
-      await store.set("defaultBackgroundImage", imageSrc);
-      await store.save();
-      toast.success("Default background updated");
+      // The BackgroundImageSelector now handles converting to storable value
+      // and saving to store, so we just need to notify of the change
       onSettingsChange?.();
     } catch (err) {
       console.error("Failed to save default background:", err);

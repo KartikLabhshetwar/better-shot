@@ -83,6 +83,19 @@ pub async fn get_desktop_directory() -> Result<String, String> {
     get_desktop_path()
 }
 
+/// Get the system temp directory path (cross-platform)
+/// Returns the canonical/resolved path to avoid symlink issues
+#[tauri::command]
+pub async fn get_temp_directory() -> Result<String, String> {
+    let temp_dir = std::env::temp_dir();
+    // Canonicalize to resolve symlinks (e.g., /tmp -> /private/tmp on macOS)
+    let canonical = temp_dir.canonicalize().unwrap_or(temp_dir);
+    canonical
+        .to_str()
+        .map(|s| s.to_string())
+        .ok_or_else(|| "Failed to convert temp directory path to string".to_string())
+}
+
 /// Check if screencapture is already running
 fn is_screencapture_running() -> bool {
     let output = Command::new("pgrep")
