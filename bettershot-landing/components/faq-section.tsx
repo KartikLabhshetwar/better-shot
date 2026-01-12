@@ -30,7 +30,7 @@ export function FAQSection() {
     {
       question: "What editing features are included?",
       answer:
-        "You can add beautiful backgrounds from a curated library, upload your own custom images, use solid colors or gradients, apply blur and noise effects, and adjust border radius. The editor also includes annotation tools for adding shapes, arrows, text, and numbered labels. All edits are non-destructive and export at maximum quality.",
+        "You can add beautiful backgrounds from a curated library, upload your own custom images, use solid colors or gradients, apply blur and noise effects, add customizable shadows with adjustable blur, offset, and opacity, and adjust border radius. The editor also includes annotation tools for adding shapes, arrows, text, and numbered labels. All edits are non-destructive and export at maximum quality.",
     },
     {
       question: "Can I customize keyboard shortcuts?",

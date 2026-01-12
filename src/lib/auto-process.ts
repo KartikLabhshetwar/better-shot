@@ -41,6 +41,12 @@ export async function processScreenshotWithDefaultBackground(
               noiseAmount: 0,
               borderRadius: 18,
               padding: 100,
+              shadow: {
+                blur: 20,
+                offsetX: 0,
+                offsetY: 10,
+                opacity: 30,
+              },
             });
 
             canvas.toBlob(

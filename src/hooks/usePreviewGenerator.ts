@@ -288,19 +288,39 @@ export function usePreviewGenerator({
         // Draw final background
         ctx.drawImage(finalBgCanvas, 0, 0);
 
-        // Draw screenshot with shadow and rounded corners
+        // Create temporary canvas for rounded image
+        const imageCanvas = document.createElement("canvas");
+        imageCanvas.width = screenshotImage.width;
+        imageCanvas.height = screenshotImage.height;
+        const imageCtx = imageCanvas.getContext("2d");
+        if (!imageCtx) {
+          setError("Failed to get image canvas context");
+          return;
+        }
+
+        imageCtx.imageSmoothingEnabled = true;
+        imageCtx.imageSmoothingQuality = "high";
+
+        imageCtx.beginPath();
+        imageCtx.roundRect(0, 0, screenshotImage.width, screenshotImage.height, settings.borderRadius);
+        imageCtx.closePath();
+        imageCtx.clip();
+
+        imageCtx.drawImage(screenshotImage, 0, 0, screenshotImage.width, screenshotImage.height);
+
+        // Draw rounded image with shadow
         ctx.save();
-        ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
-        ctx.shadowBlur = 20;
+        ctx.shadowColor = `rgba(0, 0, 0, ${settings.shadow.opacity / 100})`;
+        ctx.shadowBlur = settings.shadow.blur;
+        ctx.shadowOffsetX = settings.shadow.offsetX;
+        ctx.shadowOffsetY = settings.shadow.offsetY;
+
+        ctx.drawImage(imageCanvas, padding, padding);
+
+        ctx.shadowColor = "transparent";
+        ctx.shadowBlur = 0;
         ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 10;
-
-        ctx.beginPath();
-        ctx.roundRect(padding, padding, screenshotImage.width, screenshotImage.height, settings.borderRadius);
-        ctx.closePath();
-        ctx.clip();
-
-        ctx.drawImage(screenshotImage, padding, padding, screenshotImage.width, screenshotImage.height);
+        ctx.shadowOffsetY = 0;
         ctx.restore();
 
         // Check again if this render is still current
@@ -339,6 +359,10 @@ export function usePreviewGenerator({
     settings.blurAmount,
     settings.noiseAmount,
     settings.borderRadius,
+    settings.shadow.blur,
+    settings.shadow.offsetX,
+    settings.shadow.offsetY,
+    settings.shadow.opacity,
     canvasRef,
     padding,
   ]);
@@ -376,6 +400,7 @@ export function usePreviewGenerator({
           borderRadius: settings.borderRadius,
           padding,
           gradientImage: settings.backgroundType === "gradient" ? bgImage : null,
+          shadow: settings.shadow,
         });
 
         if (annotations.length > 0) {

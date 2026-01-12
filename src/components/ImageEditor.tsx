@@ -340,8 +340,13 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
               <EffectsPanel
                 blurAmount={settings.blurAmount}
                 noiseAmount={settings.noiseAmount}
+                shadow={settings.shadow}
                 onBlurChange={settingsActions.setBlurAmount}
                 onNoiseChange={settingsActions.setNoiseAmount}
+                onShadowBlurChange={settingsActions.setShadowBlur}
+                onShadowOffsetXChange={settingsActions.setShadowOffsetX}
+                onShadowOffsetYChange={settingsActions.setShadowOffsetY}
+                onShadowOpacityChange={settingsActions.setShadowOpacity}
               />
 
               <ImageRoundnessControl

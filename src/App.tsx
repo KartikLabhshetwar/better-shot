@@ -17,6 +17,7 @@ import { SettingsIcon } from "./components/SettingsIcon";
 import { PreferencesPage } from "./components/preferences/PreferencesPage";
 import { migrateStoredValue, isAssetId, isDataUrl } from "@/lib/asset-registry";
 import type { KeyboardShortcut } from "./components/preferences/KeyboardShortcutManager";
+import { Crop, Monitor, AppWindowMac } from "lucide-react";
 
 type AppMode = "main" | "editing" | "preferences";
 type CaptureMode = "region" | "fullscreen" | "window";
@@ -469,22 +470,25 @@ function App() {
               <Button
                 onClick={() => handleCapture("region")}
                 disabled={isCapturing}
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-50 py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-700 transition-all"
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-50 py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-700 transition-all flex items-center justify-center gap-2"
               >
+                <Crop className="size-4" aria-hidden="true" />
                 Region
               </Button>
               <Button
                 onClick={() => handleCapture("fullscreen")}
                 disabled={isCapturing}
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-50 py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-700 transition-all"
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-50 py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-700 transition-all flex items-center justify-center gap-2"
               >
+                <Monitor className="size-4" aria-hidden="true" />
                 Screen
               </Button>
               <Button
                 onClick={() => handleCapture("window")}
                 disabled={isCapturing}
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-50 py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-700 transition-all"
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-50 py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-700 transition-all flex items-center justify-center gap-2"
               >
+                <AppWindowMac className="size-4" aria-hidden="true" />
                 Window
               </Button>
             </div>

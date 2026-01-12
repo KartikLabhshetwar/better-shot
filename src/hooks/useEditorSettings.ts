@@ -27,6 +27,13 @@ import type { AssetCategory } from "@/components/editor/AssetGrid";
 
 export type BackgroundType = "transparent" | "white" | "black" | "gray" | "gradient" | "custom" | "image";
 
+export interface ShadowSettings {
+  blur: number;
+  offsetX: number;
+  offsetY: number;
+  opacity: number;
+}
+
 export interface EditorSettings {
   backgroundType: BackgroundType;
   customColor: string;
@@ -37,6 +44,7 @@ export interface EditorSettings {
   blurAmount: number;
   noiseAmount: number;
   borderRadius: number;
+  shadow: ShadowSettings;
 }
 
 export interface EditorSettingsActions {
@@ -48,6 +56,10 @@ export interface EditorSettingsActions {
   setNoiseAmount: (amount: number) => void;
   setBorderRadius: (radius: number) => void;
   handleImageSelect: (imageSrc: string) => void;
+  setShadowBlur: (blur: number) => void;
+  setShadowOffsetX: (offsetX: number) => void;
+  setShadowOffsetY: (offsetY: number) => void;
+  setShadowOpacity: (opacity: number) => void;
 }
 
 export const assetCategories: AssetCategory[] = [
@@ -98,6 +110,12 @@ export function useEditorSettings(): [EditorSettings, EditorSettingsActions] {
   const [blurAmount, setBlurAmount] = useState(0);
   const [noiseAmount, setNoiseAmount] = useState(0);
   const [borderRadius, setBorderRadius] = useState(18);
+  
+  // Shadow state
+  const [shadowBlur, setShadowBlur] = useState(20);
+  const [shadowOffsetX, setShadowOffsetX] = useState(0);
+  const [shadowOffsetY, setShadowOffsetY] = useState(10);
+  const [shadowOpacity, setShadowOpacity] = useState(30);
 
   // Load default background from store on mount
   useEffect(() => {
@@ -128,6 +146,12 @@ export function useEditorSettings(): [EditorSettings, EditorSettingsActions] {
     blurAmount,
     noiseAmount,
     borderRadius,
+    shadow: {
+      blur: shadowBlur,
+      offsetX: shadowOffsetX,
+      offsetY: shadowOffsetY,
+      opacity: shadowOpacity,
+    },
   }), [
     backgroundType,
     customColor,
@@ -138,6 +162,10 @@ export function useEditorSettings(): [EditorSettings, EditorSettingsActions] {
     blurAmount,
     noiseAmount,
     borderRadius,
+    shadowBlur,
+    shadowOffsetX,
+    shadowOffsetY,
+    shadowOpacity,
   ]);
 
   // Actions
@@ -165,6 +193,10 @@ export function useEditorSettings(): [EditorSettings, EditorSettingsActions] {
     setNoiseAmount,
     setBorderRadius,
     handleImageSelect,
+    setShadowBlur,
+    setShadowOffsetX,
+    setShadowOffsetY,
+    setShadowOpacity,
   }), [setGradient, handleImageSelect, setSelectedImage]);
 
   return [settings, actions];

@@ -1,3 +1,5 @@
+import type { ShadowSettings } from "@/hooks/useEditorSettings";
+
 export interface RenderOptions {
   image: HTMLImageElement;
   backgroundType: "transparent" | "white" | "black" | "gray" | "gradient" | "custom" | "image";
@@ -10,6 +12,7 @@ export interface RenderOptions {
   padding: number;
   scale?: number;
   gradientImage?: HTMLImageElement | null;
+  shadow?: ShadowSettings;
 }
 
 export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasElement {
@@ -26,6 +29,7 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
     // Use scale = 1 to match preview exactly - the image is already at full resolution
     scale = 1,
     gradientImage = null,
+    shadow = { blur: 20, offsetX: 0, offsetY: 10, opacity: 30 },
   } = options;
 
   const bgWidth = image.width + padding * 2;
@@ -112,27 +116,34 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
 
   ctx.drawImage(bgCanvas, 0, 0);
 
-  // Save context before clipping so we can restore it for annotations
+  const imageCanvas = document.createElement("canvas");
+  imageCanvas.width = image.width;
+  imageCanvas.height = image.height;
+  const imageCtx = imageCanvas.getContext("2d");
+  if (!imageCtx) throw new Error("Failed to get image canvas context");
+
+  imageCtx.imageSmoothingEnabled = true;
+  imageCtx.imageSmoothingQuality = "high";
+
+  imageCtx.beginPath();
+  imageCtx.roundRect(0, 0, image.width, image.height, borderRadius);
+  imageCtx.closePath();
+  imageCtx.clip();
+
+  imageCtx.drawImage(image, 0, 0, image.width, image.height);
+
   ctx.save();
+  ctx.shadowColor = `rgba(0, 0, 0, ${shadow.opacity / 100})`;
+  ctx.shadowBlur = shadow.blur;
+  ctx.shadowOffsetX = shadow.offsetX;
+  ctx.shadowOffsetY = shadow.offsetY;
 
-  ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
-  ctx.shadowBlur = 20;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 10;
-
-  ctx.beginPath();
-  ctx.roundRect(padding, padding, image.width, image.height, borderRadius);
-  ctx.closePath();
-  ctx.clip();
-
-  ctx.drawImage(image, padding, padding, image.width, image.height);
+  ctx.drawImage(imageCanvas, padding, padding);
 
   ctx.shadowColor = "transparent";
   ctx.shadowBlur = 0;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 0;
-
-  // Reset clipping path so annotations can be drawn anywhere on the canvas
   ctx.restore();
 
   // Re-apply scale for annotations if needed (restore removed the previous scale)

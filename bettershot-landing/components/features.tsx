@@ -15,7 +15,7 @@ const features = [
   },
   {
     title: "Powerful Image Editor",
-    description: "Add beautiful backgrounds, gradients, blur effects, and adjust border radius. Make your screenshots stand out.",
+    description: "Add beautiful backgrounds, gradients, blur effects, customizable shadows, and adjust border radius. Make your screenshots stand out.",
     icon: Image,
     color: "from-purple-500 to-pink-500",
   },

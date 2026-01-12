@@ -248,7 +248,7 @@ pub async fn my_command(param: String) -> Result<String, String> {
 Write tests for **critical paths only**:
 
 - Core screenshot capture functionality
-- Image processing operations
+- Image processing operations (blur, shadow, background effects)
 - Clipboard operations
 - Annotation rendering and manipulation
 - Error handling in critical flows
