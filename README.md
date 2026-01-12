@@ -1,4 +1,5 @@
-<img width="2848" height="1504" alt="og" src="https://github.com/user-attachments/assets/cdfc44bc-8c1a-4878-a1f7-c3bded91b391" />
+<img width="3600" height="2025" alt="stage-1768238789948" src="https://github.com/user-attachments/assets/3051266a-5179-440f-a747-7980abd7bac3" />
+
 
 # Better Shot
 
