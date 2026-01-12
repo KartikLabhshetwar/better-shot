@@ -23,7 +23,8 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
     noiseAmount,
     borderRadius,
     padding,
-    scale = window.devicePixelRatio || 2,
+    // Use scale = 1 to match preview exactly - the image is already at full resolution
+    scale = 1,
     gradientImage = null,
   } = options;
 
@@ -37,7 +38,9 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
   const ctx = canvas.getContext("2d", { alpha: true, desynchronized: true });
   if (!ctx) throw new Error("Failed to get canvas context");
 
-  ctx.scale(scale, scale);
+  if (scale !== 1) {
+    ctx.scale(scale, scale);
+  }
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
 
@@ -109,6 +112,9 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
 
   ctx.drawImage(bgCanvas, 0, 0);
 
+  // Save context before clipping so we can restore it for annotations
+  ctx.save();
+
   ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
   ctx.shadowBlur = 20;
   ctx.shadowOffsetX = 0;
@@ -125,6 +131,15 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
   ctx.shadowBlur = 0;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 0;
+
+  // Reset clipping path so annotations can be drawn anywhere on the canvas
+  ctx.restore();
+
+  // Re-apply scale for annotations if needed (restore removed the previous scale)
+  if (scale !== 1) {
+    ctx.save();
+    ctx.scale(scale, scale);
+  }
 
   return canvas;
 }

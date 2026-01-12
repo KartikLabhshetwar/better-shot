@@ -1,6 +1,5 @@
 <img width="2848" height="1504" alt="og" src="https://github.com/user-attachments/assets/cdfc44bc-8c1a-4878-a1f7-c3bded91b391" />
 
-
 # Better Shot
 
 > An open-source alternative to CleanShot X for macOS. Capture, edit, and enhance your screenshots with professional quality.
@@ -22,6 +21,15 @@ Better Shot is a fast, lightweight screenshot tool built with Tauri and React. I
 - **Visual Effects** - Adjustable blur and noise for professional polish
 - **Border Radius** - Control image roundness for modern aesthetics
 - **High-Quality Export** - Export at maximum quality for presentations and documentation
+
+### Annotation Tools
+
+- **Drawing Tools** - Circle, rectangle, line, and arrow annotations
+- **Text Annotations** - Add customizable text with adjustable font size
+- **Number Labels** - Auto-incrementing numbered badges for step-by-step guides
+- **Customizable Properties** - Full control over colors, opacity, borders, and alignment
+- **Interactive Editing** - Select, move, and delete annotations with mouse or keyboard
+- **Professional Styling** - Fine-tune fill colors, border widths, and opacity for each annotation
 
 ### Workflow
 
@@ -92,25 +100,30 @@ This permission is required for the app to capture screenshots of your screen.
 2. **Capture** - Use global hotkeys (`⌘⇧2`, `⌘⇧3`, or `⌘⇧4`) or click buttons in the app
 3. **Select** - For region capture, click and drag to select the area
 4. **Edit** - Add backgrounds, effects, blur, and adjust border radius
-5. **Export** - Press `⌘S` to save or `⌘⇧C` to copy to clipboard
+5. **Annotate** - Use the annotation toolbar to add shapes, arrows, text, and numbered labels
+6. **Customize** - Select any annotation to adjust colors, opacity, borders, and other properties
+7. **Export** - Press `⌘S` to save or `⌘⇧C` to copy to clipboard
 
 ### Keyboard Shortcuts
 
-| Action              | Shortcut   |
-| ------------------- | ---------- |
-| Capture Region      | `⌘⇧2`      |
-| Capture Fullscreen  | `⌘⇧3`      |
-| Capture Window      | `⌘⇧4`      |
-| Save Image          | `⌘S`       |
-| Copy to Clipboard   | `⌘⇧C`      |
-| Cancel              | `Esc`      |
+| Action | Shortcut |
+| --- | --- |
+| Capture Region | `⌘⇧2` |
+| Capture Fullscreen | `⌘⇧3` |
+| Capture Window | `⌘⇧4` |
+| Save Image | `⌘S` |
+| Copy to Clipboard | `⌘⇧C` |
+| Delete Annotation | `Delete` or `Backspace` |
+| Cancel | `Esc` |
 
 ### Typical Workflow
 
 1. **Capture**: Use global hotkeys from anywhere or click buttons in the app
 2. **Select**: For region capture, click and drag to select the area you want
 3. **Edit**: Customize with backgrounds, gradients, blur effects, and roundness controls
-4. **Export**: Save to your chosen directory or copy directly to clipboard for instant sharing
+4. **Annotate**: Add shapes, arrows, text, and numbered labels to highlight important areas
+5. **Customize**: Select annotations to adjust colors, opacity, borders, and alignment
+6. **Export**: Save to your chosen directory or copy directly to clipboard for instant sharing
 
 ## Development
 
@@ -150,20 +163,6 @@ Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTIN
 - Submit pull requests
 - Improve documentation
 - Star the project
-
-## Creating Releases
-
-To create a new release, see [RELEASE.md](RELEASE.md) for detailed instructions.
-
-Quick version:
-
-```bash
-# Update version numbers, then:
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-GitHub Actions will automatically build and publish the release with DMG files for both Apple Silicon and Intel Macs.
 
 ## License
 

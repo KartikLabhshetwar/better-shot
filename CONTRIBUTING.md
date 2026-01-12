@@ -90,9 +90,21 @@ bettershot/
 ├── src/                    # Frontend React application
 │   ├── components/         # React components
 │   │   ├── editor/         # Image editor components
+│   │   │   ├── AnnotationCanvas.tsx    # Canvas for drawing annotations
+│   │   │   ├── AnnotationToolbar.tsx   # Toolbar for annotation tools
+│   │   │   ├── PropertiesPanel.tsx     # Panel for editing annotation properties
+│   │   │   ├── BackgroundSelector.tsx  # Background selection UI
+│   │   │   ├── AssetGrid.tsx           # Asset library grid
+│   │   │   ├── EffectsPanel.tsx        # Blur and noise controls
+│   │   │   └── ImageRoundnessControl.tsx # Border radius control
 │   │   ├── landing/        # Landing page components
 │   │   └── ui/             # Reusable UI primitives
 │   ├── lib/                # Utility functions
+│   │   ├── annotation-utils.ts  # Annotation rendering utilities
+│   │   ├── canvas-utils.ts      # Canvas manipulation utilities
+│   │   └── utils.ts              # General utilities
+│   ├── types/              # TypeScript type definitions
+│   │   └── annotations.ts  # Annotation type definitions
 │   └── assets/             # Static assets (images, etc.)
 ├── src-tauri/              # Rust backend (Tauri)
 │   ├── src/
@@ -225,6 +237,7 @@ Write tests for **critical paths only**:
 - Core screenshot capture functionality
 - Image processing operations
 - Clipboard operations
+- Annotation rendering and manipulation
 - Error handling in critical flows
 
 ### Test Structure
@@ -343,6 +356,15 @@ When creating a PR, include:
 4. Ensure accessibility (keyboard navigation, ARIA labels)
 5. Use `cn` utility for class merging
 6. Test with different screen sizes
+
+### Adding a New Annotation Type
+
+1. Add the annotation type to `src/types/annotations.ts`
+2. Update `AnnotationCanvas.tsx` to handle creation and rendering
+3. Add tool icon to `AnnotationToolbar.tsx`
+4. Add property controls to `PropertiesPanel.tsx` if needed
+5. Update `annotation-utils.ts` for rendering logic
+6. Test drawing, selection, movement, and deletion
 
 ## Getting Help
 

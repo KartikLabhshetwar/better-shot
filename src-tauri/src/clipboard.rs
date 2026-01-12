@@ -1,29 +1,28 @@
 //! Clipboard operations module
 
 use crate::utils::AppResult;
-use arboard::Clipboard;
+use std::process::Command;
 
-/// Copy an image file to the system clipboard
+/// Copy an image file to the system clipboard using macOS native APIs
+/// This approach works with clipboard managers like Raycast
 pub fn copy_image_to_clipboard(image_path: &str) -> AppResult<()> {
-    let img = image::open(image_path).map_err(|e| format!("Failed to open image: {}", e))?;
+    // Use osascript to copy the image file to clipboard
+    // This method properly integrates with macOS clipboard and clipboard managers
+    let script = format!(
+        r#"set the clipboard to (read (POSIX file "{}") as «class PNGf»)"#,
+        image_path
+    );
 
-    let rgba_img = img.to_rgba8();
-    let width = rgba_img.width() as usize;
-    let height = rgba_img.height() as usize;
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg(&script)
+        .output()
+        .map_err(|e| format!("Failed to execute osascript: {}", e))?;
 
-    // Convert to raw RGBA bytes
-    let rgba_data: Vec<u8> = rgba_img.pixels().flat_map(|pixel| pixel.0).collect();
-
-    let mut clipboard =
-        Clipboard::new().map_err(|e| format!("Failed to initialize clipboard: {}", e))?;
-
-    clipboard
-        .set_image(arboard::ImageData {
-            width,
-            height,
-            bytes: rgba_data.into(),
-        })
-        .map_err(|e| format!("Failed to copy to clipboard: {}", e))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to copy image to clipboard: {}", stderr));
+    }
 
     Ok(())
 }
