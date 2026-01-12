@@ -4,7 +4,7 @@ import { motion, useInView } from "framer-motion"
 import { useRef } from "react"
 import { geist } from "@/lib/fonts"
 import { cn } from "@/lib/utils"
-import { Camera, Image, Zap, Lock, Palette, Download } from "lucide-react"
+import { Camera, Image, Zap, Lock, Palette, Download, Settings, Keyboard, Upload } from "lucide-react"
 
 const features = [
   {
@@ -20,6 +20,30 @@ const features = [
     color: "from-purple-500 to-pink-500",
   },
   {
+    title: "Annotation Tools",
+    description: "Add shapes, arrows, text, and numbered labels. Customize colors, opacity, borders, and alignment for professional annotations.",
+    icon: Palette,
+    color: "from-rose-500 to-red-500",
+  },
+  {
+    title: "Customizable Preferences",
+    description: "Set default backgrounds, upload your own images, customize keyboard shortcuts, and configure all settings to match your workflow.",
+    icon: Settings,
+    color: "from-violet-500 to-purple-500",
+  },
+  {
+    title: "Keyboard Shortcut Management",
+    description: "Customize your keyboard shortcuts, enable or disable them, and add new shortcuts. Full control over your capture workflow.",
+    icon: Keyboard,
+    color: "from-orange-500 to-red-500",
+  },
+  {
+    title: "Upload Custom Backgrounds",
+    description: "Upload your own background images and set them as default. Choose from built-in wallpapers or use your own custom images.",
+    icon: Upload,
+    color: "from-teal-500 to-cyan-500",
+  },
+  {
     title: "Lightning Fast",
     description: "Built with Rust and Tauri for native performance. Minimal resource usage compared to Electron apps.",
     icon: Zap,
@@ -30,12 +54,6 @@ const features = [
     description: "All processing happens locally on your machine. No cloud uploads, no data collection. Your screenshots stay yours.",
     icon: Lock,
     color: "from-green-500 to-emerald-500",
-  },
-  {
-    title: "Beautiful Backgrounds",
-    description: "Choose from curated wallpapers, Mac assets, mesh patterns, or create custom backgrounds with solid colors and gradients.",
-    icon: Palette,
-    color: "from-rose-500 to-red-500",
   },
   {
     title: "Easy Export",
