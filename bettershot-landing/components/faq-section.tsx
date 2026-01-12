@@ -25,12 +25,27 @@ export function FAQSection() {
     {
       question: "What capture modes are available?",
       answer:
-        "Better Shot supports three capture modes: Region Capture (⌘⇧2) to select any area, Fullscreen Capture (⌘⇧3) for your entire screen, and Window Capture (⌘⇧4) to capture a specific window. All modes work with global hotkeys from anywhere.",
+        "Better Shot supports three capture modes: Region Capture (⌘⇧2) to select any area, Fullscreen Capture (⌘⇧3) for your entire screen, and Window Capture (⌘⇧4) to capture a specific window. All modes work with global hotkeys from anywhere, and you can customize these shortcuts in Preferences.",
     },
     {
       question: "What editing features are included?",
       answer:
-        "You can add beautiful backgrounds from a curated library, use custom solid colors or gradients, apply blur and noise effects, and adjust border radius. All edits are non-destructive and export at maximum quality.",
+        "You can add beautiful backgrounds from a curated library, upload your own custom images, use solid colors or gradients, apply blur and noise effects, and adjust border radius. The editor also includes annotation tools for adding shapes, arrows, text, and numbered labels. All edits are non-destructive and export at maximum quality.",
+    },
+    {
+      question: "Can I customize keyboard shortcuts?",
+      answer:
+        "Yes! Better Shot includes a Preferences page where you can customize all keyboard shortcuts. You can edit existing shortcuts, add new ones, enable or disable them, and remove custom shortcuts. Changes are saved automatically and take effect immediately.",
+    },
+    {
+      question: "Can I set a default background?",
+      answer:
+        "Absolutely! In Preferences, you can choose any background from the built-in library or upload your own images. Set one as your default background, and it will be used when you enable Auto-apply background mode for instant captures without opening the editor.",
+    },
+    {
+      question: "What annotation tools are available?",
+      answer:
+        "Better Shot includes a full set of annotation tools: circles, rectangles, lines, arrows, text annotations, and auto-incrementing numbered labels. You can customize colors, opacity, borders, alignment, and font sizes. Select any annotation to edit its properties in the properties panel.",
     },
     {
       question: "Do I need special permissions?",
