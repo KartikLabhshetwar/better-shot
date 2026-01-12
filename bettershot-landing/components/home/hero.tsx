@@ -3,59 +3,18 @@
 import { motion } from "framer-motion"
 import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
-import { Download, ChevronDown, Star } from "lucide-react"
+import { Download, ChevronDown, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { trackDownload } from "@/lib/analytics"
+import { HeroVideoDialog } from "@/components/ui/hero-video-dialog"
 
 export default function Hero() {
   const [mounted, setMounted] = useState(false)
-  const [starCount, setStarCount] = useState(0)
-  const [targetStars, setTargetStars] = useState(0)
 
   useEffect(() => {
     setMounted(true)
   }, [])
-
-  useEffect(() => {
-    const fetchStarCount = async () => {
-      try {
-        const response = await fetch("https://api.github.com/repos/KartikLabhshetwar/better-shot")
-        if (response.ok) {
-          const data = await response.json()
-          setTargetStars(data.stargazers_count || 0)
-        }
-      } catch (error) {
-        console.error("Failed to fetch star count:", error)
-      }
-    }
-
-    if (mounted) {
-      fetchStarCount()
-    }
-  }, [mounted])
-
-  useEffect(() => {
-    if (targetStars === 0) return
-
-    const duration = 2000
-    const steps = 60
-    const increment = targetStars / steps
-    const stepDuration = duration / steps
-
-    let current = 0
-    const timer = setInterval(() => {
-      current += increment
-      if (current >= targetStars) {
-        setStarCount(targetStars)
-        clearInterval(timer)
-      } else {
-        setStarCount(Math.floor(current))
-      }
-    }, stepDuration)
-
-    return () => clearInterval(timer)
-  }, [targetStars])
 
   if (!mounted) {
     return null
@@ -77,6 +36,20 @@ export default function Hero() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full pt-28 sm:pt-36 lg:pt-55">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
           <div className="flex flex-col">
+            <div className="mb-6">
+            <a
+          href="https://peerlist.io/code_kartik/project/better-shot--free-screenshot-tool-for-macos"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-block"
+        >
+          <img
+            src="https://peerlist.io/api/v1/projects/embed/PRJHLKL6L8JN6LDL8CEAJQOLAOMDMK?showUpvote=true&theme=dark"
+            alt="Better Shot - Free Screenshot Tool for macOS"
+            style={{ width: "auto", height: "72px" }}
+          />
+        </a>
+            </div>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -129,22 +102,25 @@ export default function Hero() {
                 <ChevronDown className="mr-2 h-5 w-5" />
                 Download for macOS
               </Button>
-              <a
-                href="https://github.com/KartikLabhshetwar/better-shot"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(
-                  "text-sm text-muted-foreground",
-                  "hover:text-foreground transition-colors",
-                  "flex items-center gap-2"
-                )}
-              >
-                <Star className="h-4 w-4 fill-current" />
-                <span>Star us on GitHub</span>
-                {starCount > 0 && (
-                  <span className="tabular-nums">{starCount.toLocaleString()}</span>
-                )}
-              </a>
+              <HeroVideoDialog
+                videoSrc="https://www.youtube.com/embed/Pi5Ag_ZRsEo"
+                thumbnailSrc="https://img.youtube.com/vi/Pi5Ag_ZRsEo/maxresdefault.jpg"
+                thumbnailAlt="Better Shot Demo Video"
+                animationStyle="from-center"
+                trigger={
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className={cn(
+                      "rounded-lg border-2",
+                      "hover:bg-background/50 transition-all px-6 py-3 text-base font-medium"
+                    )}
+                  >
+                    <Play className="mr-2 h-5 w-5" />
+                    View Demo
+                  </Button>
+                }
+              />
             </motion.div>
           </div>
 
@@ -154,6 +130,7 @@ export default function Hero() {
             transition={{ duration: 0.5, delay: 0.3 }}
             className="flex items-start justify-center lg:justify-end"
           >
+           
             <img
               src="/hero.png"
               alt="Better Shot Screenshot"

@@ -1,16 +1,22 @@
 "use client"
 import { useState, useEffect } from "react"
+import { Star } from "lucide-react"
 import Hero from "@/components/home/hero"
+import Link from "next/link"
 import Features from "@/components/features"
 import { TestimonialsSection } from "@/components/testimonials"
 import { NewReleasePromo } from "@/components/new-release-promo"
 import { FAQSection } from "@/components/faq-section"
 import { StickyFooter } from "@/components/sticky-footer"
 import { trackDownload } from "@/lib/analytics"
+import { cn } from "@/lib/utils"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
 export default function Home() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [starCount, setStarCount] = useState(0)
+  const [targetStars, setTargetStars] = useState(0)
 
   useEffect(() => {
     const root = window.document.documentElement
@@ -26,6 +32,44 @@ export default function Home() {
     window.addEventListener("scroll", handleScroll)
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
+
+  useEffect(() => {
+    const fetchStarCount = async () => {
+      try {
+        const response = await fetch("https://api.github.com/repos/KartikLabhshetwar/better-shot")
+        if (response.ok) {
+          const data = await response.json()
+          setTargetStars(data.stargazers_count || 0)
+        }
+      } catch (error) {
+        console.error("Failed to fetch star count:", error)
+      }
+    }
+
+    fetchStarCount()
+  }, [])
+
+  useEffect(() => {
+    if (targetStars === 0) return
+
+    const duration = 800
+    const steps = 40
+    const increment = targetStars / steps
+    const stepDuration = duration / steps
+
+    let current = 0
+    const timer = setInterval(() => {
+      current += increment
+      if (current >= targetStars) {
+        setStarCount(targetStars)
+        clearInterval(timer)
+      } else {
+        setStarCount(Math.floor(current))
+      }
+    }, stepDuration)
+
+    return () => clearInterval(timer)
+  }, [targetStars])
 
   const handleMobileNavClick = (elementId: string) => {
     setIsMobileMenuOpen(false)
@@ -79,9 +123,9 @@ export default function Home() {
           />
         </a>
 
-        <div className="absolute inset-0 hidden flex-1 flex-row items-center justify-center space-x-2 text-sm font-medium text-muted-foreground transition duration-200 hover:text-foreground md:flex md:space-x-2">
+        <div className="absolute inset-0 hidden flex-1 flex-row items-center justify-center space-x-2 text-sm font-medium text-muted-foreground transition duration-200 hover:text-foreground md:flex md:space-x-2 pointer-events-none">
           <a
-            className="relative px-4 py-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            className="relative px-4 py-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer pointer-events-auto"
             onClick={(e) => {
               e.preventDefault()
               const element = document.getElementById("features")
@@ -100,7 +144,7 @@ export default function Home() {
             <span className="relative z-20">Features</span>
           </a>
           <a
-            className="relative px-4 py-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            className="relative px-4 py-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer pointer-events-auto"
             onClick={(e) => {
               e.preventDefault()
               const element = document.getElementById("faq")
@@ -120,8 +164,33 @@ export default function Home() {
           </a>
         </div>
 
-        <div className="flex items-center gap-4">
-
+        <div className="flex items-center gap-4 relative z-10">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <a
+                href="https://github.com/KartikLabhshetwar/better-shot"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  "inline-flex items-center gap-2 px-3 py-2 rounded-md",
+                  "bg-[#2a2a2a] border border-[#3a3a3a]",
+                  "text-[#e5e5e5] hover:text-white",
+                  "transition-colors cursor-pointer",
+                  "text-sm font-medium"
+                )}
+              >
+                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                {starCount > 0 ? (
+                  <span className="tabular-nums text-[#e5e5e5]">{starCount.toLocaleString()}</span>
+                ) : (
+                  <span className="text-[#e5e5e5]">Star</span>
+                )}
+              </a>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Star us on GitHub</p>
+            </TooltipContent>
+          </Tooltip>
           <a
             href="https://github.com/KartikLabhshetwar/better-shot/releases/latest"
             target="_blank"
@@ -184,6 +253,26 @@ export default function Home() {
                 FAQ
               </button>
               <div className="border-t border-border/50 pt-4 mt-4 flex flex-col space-y-3">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Link
+                      href="https://github.com/KartikLabhshetwar/better-shot"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-[#2a2a2a] border border-[#3a3a3a] text-[#e5e5e5] hover:text-white transition-colors text-base font-medium"
+                    >
+                      <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                      {starCount > 0 ? (
+                        <span className="tabular-nums text-[#e5e5e5]">{starCount.toLocaleString()}</span>
+                      ) : (
+                        <span className="text-[#e5e5e5]">Star us on GitHub</span>
+                      )}
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Star us on GitHub</p>
+                  </TooltipContent>
+                </Tooltip>
                 <a
                   href="https://github.com/KartikLabhshetwar/better-shot/releases/latest"
                   target="_blank"
