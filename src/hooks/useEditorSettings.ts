@@ -1,4 +1,5 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { Store } from "@tauri-apps/plugin-store";
 import { gradientOptions, type GradientOption } from "@/components/editor/BackgroundSelector";
 
 // Import all background images
@@ -96,6 +97,22 @@ export function useEditorSettings(): [EditorSettings, EditorSettingsActions] {
   const [blurAmount, setBlurAmount] = useState(0);
   const [noiseAmount, setNoiseAmount] = useState(0);
   const [borderRadius, setBorderRadius] = useState(18);
+
+  // Load default background from store on mount
+  useEffect(() => {
+    const loadDefaultBackground = async () => {
+      try {
+        const store = await Store.load("settings.json");
+        const defaultBg = await store.get<string>("defaultBackgroundImage");
+        if (defaultBg) {
+          setSelectedImageSrc(defaultBg);
+        }
+      } catch (err) {
+        console.error("Failed to load default background from store:", err);
+      }
+    };
+    loadDefaultBackground();
+  }, []);
 
   // Memoized settings object - only changes when actual values change
   const settings = useMemo<EditorSettings>(() => ({

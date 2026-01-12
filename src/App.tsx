@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
@@ -13,20 +13,38 @@ import { Switch } from "@/components/ui/switch";
 import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
 import { hasCompletedOnboarding } from "@/lib/onboarding";
 import { processScreenshotWithDefaultBackground } from "@/lib/auto-process";
+import { SettingsIcon } from "./components/SettingsIcon";
+import { PreferencesPage } from "./components/preferences/PreferencesPage";
+import type { KeyboardShortcut } from "./components/preferences/KeyboardShortcutManager";
 
-type AppMode = "main" | "editing";
+type AppMode = "main" | "editing" | "preferences";
 type CaptureMode = "region" | "fullscreen" | "window";
+
+const DEFAULT_SHORTCUTS: KeyboardShortcut[] = [
+  { id: "region", action: "Capture Region", shortcut: "CommandOrControl+Shift+2", enabled: true },
+  { id: "fullscreen", action: "Capture Screen", shortcut: "CommandOrControl+Shift+3", enabled: false },
+  { id: "window", action: "Capture Window", shortcut: "CommandOrControl+Shift+4", enabled: false },
+];
+
+function formatShortcut(shortcut: string): string {
+  return shortcut
+    .replace(/CommandOrControl/g, "⌘")
+    .replace(/Command/g, "⌘")
+    .replace(/Control/g, "⌃")
+    .replace(/Shift/g, "⇧")
+    .replace(/Alt/g, "⌥")
+    .replace(/Option/g, "⌥")
+    .replace(/\+/g, "");
+}
 
 async function restoreWindowOnScreen(mouseX?: number, mouseY?: number) {
   const appWindow = getCurrentWindow();
   await appWindow.setSize(new LogicalSize(1200, 800));
 
-  // If we have mouse coordinates, position the window on the same screen
   if (mouseX !== undefined && mouseY !== undefined) {
     try {
       const monitors = await availableMonitors();
       
-      // Find the monitor where the mouse cursor is
       const targetMonitor = monitors.find((monitor) => {
         const pos = monitor.position;
         const size = monitor.size;
@@ -39,7 +57,6 @@ async function restoreWindowOnScreen(mouseX?: number, mouseY?: number) {
       });
 
       if (targetMonitor) {
-        // Center the window on the target monitor
         const windowWidth = 1200;
         const windowHeight = 800;
         const centerX = targetMonitor.position.x + (targetMonitor.size.width - windowWidth) / 2;
@@ -47,11 +64,9 @@ async function restoreWindowOnScreen(mouseX?: number, mouseY?: number) {
         
         await appWindow.setPosition(new LogicalPosition(centerX, centerY));
       } else {
-        // Fallback to center on primary monitor
         await appWindow.center();
       }
     } catch {
-      // Fallback to center
       await appWindow.center();
     }
   } else {
@@ -75,17 +90,71 @@ function App() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [tempScreenshotPath, setTempScreenshotPath] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [shortcuts, setShortcuts] = useState<KeyboardShortcut[]>(DEFAULT_SHORTCUTS);
+  const [settingsVersion, setSettingsVersion] = useState(0);
 
+  // Load settings function
+  const loadSettings = useCallback(async () => {
+    try {
+      const store = await Store.load("settings.json", {
+        defaults: {
+          copyToClipboard: true,
+          autoApplyBackground: false,
+        },
+        autoSave: true,
+      });
+
+      const savedCopyToClip = await store.get<boolean>("copyToClipboard");
+      if (savedCopyToClip !== null && savedCopyToClip !== undefined) {
+        setCopyToClipboard(savedCopyToClip);
+      }
+
+      const savedAutoApply = await store.get<boolean>("autoApplyBackground");
+      if (savedAutoApply !== null && savedAutoApply !== undefined) {
+        setAutoApplyBackground(savedAutoApply);
+      }
+
+      const savedSaveDir = await store.get<string>("saveDir");
+      if (savedSaveDir) {
+        setSaveDir(savedSaveDir);
+      }
+
+      const savedShortcuts = await store.get<KeyboardShortcut[]>("keyboardShortcuts");
+      if (savedShortcuts && savedShortcuts.length > 0) {
+        const mergedShortcuts = savedShortcuts.map((savedShortcut) => {
+          const defaultShortcut = DEFAULT_SHORTCUTS.find((d) => d.id === savedShortcut.id);
+          if (defaultShortcut) {
+            return { ...savedShortcut, enabled: defaultShortcut.enabled };
+          }
+          return savedShortcut;
+        });
+        const defaultIds = new Set(DEFAULT_SHORTCUTS.map((d) => d.id));
+        const customShortcuts = savedShortcuts.filter((s) => !defaultIds.has(s.id));
+        const finalShortcuts = [...mergedShortcuts, ...customShortcuts];
+        setShortcuts(finalShortcuts);
+        await store.set("keyboardShortcuts", finalShortcuts);
+        await store.save();
+      } else {
+        setShortcuts(DEFAULT_SHORTCUTS);
+      }
+    } catch (err) {
+      console.error("Failed to load settings:", err);
+    }
+  }, []);
+
+  // Initial app setup
   useEffect(() => {
     const initializeApp = async () => {
+      // First get the desktop path as the default
+      let desktopPath = "";
       try {
-        const desktopPath = await invoke<string>("get_desktop_directory");
-        setSaveDir(desktopPath);
+        desktopPath = await invoke<string>("get_desktop_directory");
       } catch (err) {
         console.error("Failed to get Desktop directory:", err);
         setError(`Failed to get Desktop directory: ${err instanceof Error ? err.message : String(err)}`);
       }
 
+      // Load settings from store
       try {
         const store = await Store.load("settings.json", {
           defaults: {
@@ -104,8 +173,30 @@ function App() {
         if (savedAutoApply !== null && savedAutoApply !== undefined) {
           setAutoApplyBackground(savedAutoApply);
         }
+
+        // Only use saved directory if it's a non-empty string, otherwise use desktop
+        const savedSaveDir = await store.get<string>("saveDir");
+        if (savedSaveDir && savedSaveDir.trim() !== "") {
+          setSaveDir(savedSaveDir);
+        } else {
+          // Use desktop as default and save it
+          setSaveDir(desktopPath);
+          if (desktopPath) {
+            await store.set("saveDir", desktopPath);
+            await store.save();
+          }
+        }
+
+        const savedShortcuts = await store.get<KeyboardShortcut[]>("keyboardShortcuts");
+        if (savedShortcuts && savedShortcuts.length > 0) {
+          setShortcuts(savedShortcuts);
+        }
       } catch (err) {
         console.error("Failed to load settings:", err);
+        // Still set desktop as fallback
+        if (desktopPath) {
+          setSaveDir(desktopPath);
+        }
       }
     };
 
@@ -116,14 +207,32 @@ function App() {
     }
   }, []);
 
+  // Setup hotkeys whenever settings change
   useEffect(() => {
     const setupHotkeys = async () => {
       try {
-        await register("CommandOrControl+Shift+2", () => handleCapture("region"));
-        await register("CommandOrControl+Shift+3", () => handleCapture("fullscreen"));
-        await register("CommandOrControl+Shift+4", () => handleCapture("window"));
+        await unregisterAll();
+        
+        const actionMap: Record<string, CaptureMode> = {
+          "Capture Region": "region",
+          "Capture Screen": "fullscreen",
+          "Capture Window": "window",
+        };
+
+        for (const shortcut of shortcuts) {
+          if (!shortcut.enabled) continue;
+          
+          const action = actionMap[shortcut.action];
+          if (action) {
+            try {
+              await register(shortcut.shortcut, () => handleCapture(action));
+            } catch (err) {
+              console.error(`Failed to register shortcut ${shortcut.shortcut}:`, err);
+            }
+          }
+        }
       } catch (err) {
-        console.error("Failed to register hotkey:", err);
+        console.error("Failed to setup hotkeys:", err);
         setError(`Hotkey registration failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     };
@@ -140,7 +249,32 @@ function App() {
       unlisten3.then((fn) => fn());
       unregisterAll().catch(console.error);
     };
-  }, [saveDir, copyToClipboard, autoApplyBackground]);
+  }, [shortcuts, settingsVersion]);
+
+  // Reload settings when coming back from preferences
+  const handleSettingsChange = useCallback(async () => {
+    await loadSettings();
+    setSettingsVersion(v => v + 1);
+  }, [loadSettings]);
+
+  // Toggle auto-apply from main page
+  const handleAutoApplyToggle = useCallback(async (checked: boolean) => {
+    setAutoApplyBackground(checked);
+    try {
+      const store = await Store.load("settings.json");
+      await store.set("autoApplyBackground", checked);
+      await store.save();
+    } catch (err) {
+      console.error("Failed to save auto-apply setting:", err);
+      toast.error("Failed to save setting");
+    }
+  }, []);
+
+  const handleBackFromPreferences = useCallback(async () => {
+    await loadSettings();
+    setSettingsVersion(v => v + 1);
+    setMode("main");
+  }, [loadSettings]);
 
   async function handleCapture(captureMode: CaptureMode = "region") {
     if (isCapturing) return;
@@ -180,8 +314,6 @@ function App() {
             description: savedPath,
             duration: 3000,
           });
-
-          // Don't restore window - keep running in background (accessible from system tray)
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : String(err);
           setError(`Failed to process screenshot: ${errorMessage}`);
@@ -189,7 +321,6 @@ function App() {
             description: errorMessage,
             duration: 5000,
           });
-          // Don't restore window on error either - keep running in background
         } finally {
           setIsCapturing(false);
         }
@@ -264,6 +395,17 @@ function App() {
     setTempScreenshotPath(null);
   }
 
+  // Get shortcut display for a specific action
+  const getShortcutDisplay = (actionId: string): string => {
+    const shortcut = shortcuts.find(s => s.id === actionId);
+    if (shortcut && shortcut.enabled) {
+      return formatShortcut(shortcut.shortcut);
+    }
+    // Fallback to defaults
+    const defaultShortcut = DEFAULT_SHORTCUTS.find(s => s.id === actionId);
+    return defaultShortcut ? formatShortcut(defaultShortcut.shortcut) : "—";
+  };
+
   if (mode === "editing" && tempScreenshotPath) {
     return (
       <ImageEditor
@@ -278,73 +420,28 @@ function App() {
     return <OnboardingFlow onComplete={() => setShowOnboarding(false)} />;
   }
 
+  if (mode === "preferences") {
+    return (
+      <PreferencesPage 
+        onBack={handleBackFromPreferences} 
+        onSettingsChange={handleSettingsChange}
+      />
+    );
+  }
+
   return (
     <main className="min-h-dvh flex flex-col items-center justify-center p-8 bg-zinc-950 text-zinc-50">
       <div className="w-full max-w-2xl space-y-6">
-        <div className="text-center space-y-2">
+        <div className="relative text-center space-y-2">
+          <div className="absolute top-0 right-0">
+            <SettingsIcon onClick={() => setMode("preferences")} />
+          </div>
           <h1 className="text-5xl font-bold text-zinc-50 text-balance">Better Shot</h1>
           <p className="text-zinc-400 text-sm text-pretty">Professional screenshot workflow</p>
         </div>
 
         <Card className="bg-zinc-900 border-zinc-800">
           <CardContent className="p-6 space-y-6">
-            <div className="space-y-2">
-              <label htmlFor="save-dir" className="text-sm font-medium text-zinc-300 block">
-                Save Directory
-              </label>
-              <input
-                id="save-dir"
-                type="text"
-                value={saveDir}
-                onChange={(e) => setSaveDir(e.target.value)}
-                placeholder="Enter save directory path"
-                disabled={isCapturing}
-                className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-zinc-600 focus:border-zinc-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-mono text-sm"
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <label htmlFor="copy-clipboard" className="text-sm text-zinc-300 cursor-pointer">
-                Copy to clipboard
-              </label>
-              <Switch
-                id="copy-clipboard"
-                checked={copyToClipboard}
-                onCheckedChange={async (checked) => {
-                  setCopyToClipboard(checked);
-                  try {
-                    const store = await Store.load("settings.json");
-                    await store.set("copyToClipboard", checked);
-                    await store.save();
-                  } catch (err) {
-                    console.error("Failed to save setting:", err);
-                  }
-                }}
-                disabled={isCapturing}
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <label htmlFor="auto-apply-bg" className="text-sm text-zinc-300 cursor-pointer">
-                Auto-apply background
-              </label>
-              <Switch
-                id="auto-apply-bg"
-                checked={autoApplyBackground}
-                onCheckedChange={async (checked) => {
-                  setAutoApplyBackground(checked);
-                  try {
-                    const store = await Store.load("settings.json");
-                    await store.set("autoApplyBackground", checked);
-                    await store.save();
-                  } catch (err) {
-                    console.error("Failed to save setting:", err);
-                  }
-                }}
-                disabled={isCapturing}
-              />
-            </div>
-
             <div className="grid grid-cols-3 gap-3">
               <Button
                 onClick={() => handleCapture("region")}
@@ -367,6 +464,21 @@ function App() {
               >
                 Window
               </Button>
+            </div>
+
+            {/* Quick Toggle for Auto-apply */}
+            <div className="flex items-center justify-between py-2 px-1">
+              <div className="flex-1">
+                <label htmlFor="auto-apply-toggle" className="text-sm font-medium text-zinc-300 cursor-pointer block">
+                  Auto-apply background
+                </label>
+                <p className="text-xs text-zinc-500">Apply default background and save instantly</p>
+              </div>
+              <Switch
+                id="auto-apply-toggle"
+                checked={autoApplyBackground}
+                onCheckedChange={handleAutoApplyToggle}
+              />
             </div>
 
             {isCapturing && (
@@ -394,15 +506,21 @@ function App() {
             <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-zinc-400">Region</span>
-                <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘⇧2</kbd>
+                <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">
+                  {getShortcutDisplay("region")}
+                </kbd>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-zinc-400">Screen</span>
-                <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘⇧3</kbd>
+                <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">
+                  {getShortcutDisplay("fullscreen")}
+                </kbd>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-zinc-400">Window</span>
-                <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘⇧4</kbd>
+                <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">
+                  {getShortcutDisplay("window")}
+                </kbd>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-zinc-400">Save</span>

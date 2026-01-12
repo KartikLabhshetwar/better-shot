@@ -1,11 +1,24 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { Store } from "@tauri-apps/plugin-store";
 import { createHighQualityCanvas } from "./canvas-utils";
 import bgImage18 from "@/assets/bg-images/asset-18.jpg";
 
 export async function processScreenshotWithDefaultBackground(
   imagePath: string
 ): Promise<string> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
+    let defaultBgImage: string = bgImage18;
+    
+    try {
+      const store = await Store.load("settings.json");
+      const savedDefaultBg = await store.get<string>("defaultBackgroundImage");
+      if (savedDefaultBg) {
+        defaultBgImage = savedDefaultBg;
+      }
+    } catch (err) {
+      console.error("Failed to load default background from settings:", err);
+    }
+
     const img = new Image();
     img.crossOrigin = "anonymous";
     
@@ -20,7 +33,7 @@ export async function processScreenshotWithDefaultBackground(
               image: img,
               backgroundType: "image",
               customColor: "#667eea",
-              selectedImage: bgImage18,
+              selectedImage: defaultBgImage,
               bgImage: bgImg,
               blurAmount: 0,
               noiseAmount: 0,
@@ -55,7 +68,7 @@ export async function processScreenshotWithDefaultBackground(
           reject(new Error("Failed to load background image"));
         };
         
-        bgImg.src = bgImage18;
+        bgImg.src = defaultBgImage;
       } catch (err) {
         reject(err);
       }

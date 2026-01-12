@@ -97,19 +97,32 @@ bettershot/
 │   │   │   ├── AssetGrid.tsx           # Asset library grid
 │   │   │   ├── EffectsPanel.tsx        # Blur and noise controls
 │   │   │   └── ImageRoundnessControl.tsx # Border radius control
+│   │   ├── preferences/    # Settings and preferences
+│   │   │   ├── PreferencesPage.tsx         # Main preferences page
+│   │   │   ├── BackgroundImageSelector.tsx # Default background picker
+│   │   │   └── KeyboardShortcutManager.tsx # Shortcut configuration
+│   │   ├── onboarding/     # First-run onboarding flow
+│   │   │   ├── OnboardingFlow.tsx      # Multi-step onboarding
+│   │   │   ├── OnboardingStep.tsx      # Individual step component
+│   │   │   └── OnboardingProgress.tsx  # Progress indicator
 │   │   ├── landing/        # Landing page components
 │   │   └── ui/             # Reusable UI primitives
+│   ├── hooks/              # Custom React hooks
+│   │   ├── useEditorSettings.ts    # Editor state management
+│   │   └── usePreviewGenerator.ts  # Canvas preview generation
 │   ├── lib/                # Utility functions
 │   │   ├── annotation-utils.ts  # Annotation rendering utilities
 │   │   ├── canvas-utils.ts      # Canvas manipulation utilities
-│   │   └── utils.ts              # General utilities
+│   │   ├── auto-process.ts      # Auto-apply background logic
+│   │   ├── onboarding.ts        # Onboarding state management
+│   │   └── utils.ts             # General utilities
 │   ├── types/              # TypeScript type definitions
 │   │   └── annotations.ts  # Annotation type definitions
 │   └── assets/             # Static assets (images, etc.)
 ├── src-tauri/              # Rust backend (Tauri)
 │   ├── src/
 │   │   ├── commands.rs     # Tauri command handlers
-│   │   ├── clipboard.rs    # Clipboard operations
+│   │   ├── clipboard.rs    # Clipboard operations (native macOS)
 │   │   ├── image.rs        # Image processing
 │   │   ├── screenshot.rs   # Screenshot capture
 │   │   ├── utils.rs        # Utility functions
@@ -318,8 +331,11 @@ When creating a PR, include:
 - **Rust**: System programming language
 - **Tauri 2**: Desktop app framework
 - **xcap**: Screenshot capture library
-- **arboard**: Clipboard operations
 - **image**: Image processing
+
+### Plugins
+- **@tauri-apps/plugin-store**: Settings persistence
+- **@tauri-apps/plugin-global-shortcut**: Global hotkeys
 
 ### Development Tools
 - **pnpm**: Package manager
@@ -365,6 +381,22 @@ When creating a PR, include:
 4. Add property controls to `PropertiesPanel.tsx` if needed
 5. Update `annotation-utils.ts` for rendering logic
 6. Test drawing, selection, movement, and deletion
+
+### Adding a New Setting
+
+1. Add the setting key to the store in `src/components/preferences/PreferencesPage.tsx`
+2. Update the `GeneralSettings` interface if it's a general setting
+3. Add UI controls in the appropriate preferences card
+4. Load the setting in `src/App.tsx` during initialization
+5. Use `store.set()` and `store.save()` to persist changes
+6. Call `onSettingsChange?.()` to notify parent components
+
+### Modifying Keyboard Shortcuts
+
+1. Shortcuts are managed in `src/components/preferences/KeyboardShortcutManager.tsx`
+2. Default shortcuts are defined in `src/App.tsx` as `DEFAULT_SHORTCUTS`
+3. Shortcuts are registered using `@tauri-apps/plugin-global-shortcut`
+4. Changes trigger re-registration via `settingsVersion` state
 
 ## Getting Help
 

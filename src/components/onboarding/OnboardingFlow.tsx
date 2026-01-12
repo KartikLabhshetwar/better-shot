@@ -110,7 +110,7 @@ const ONBOARDING_STEPS = [
   {
     id: "shortcuts",
     title: "Keyboard Shortcuts",
-    description: "Work faster with these global hotkeys. They work even when the app is hidden.",
+    description: "Work faster with global hotkeys. They work even when the app is hidden, and you can customize them in Preferences.",
     icon: (
       <svg className="size-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
@@ -141,13 +141,16 @@ const ONBOARDING_STEPS = [
             ⌘⇧4
           </kbd>
         </div>
+        <p className="text-xs text-zinc-500 text-center pt-2">
+          Customize these shortcuts anytime in Preferences
+        </p>
       </div>
     ),
   },
   {
     id: "settings",
-    title: "Configure Settings",
-    description: "Customize where screenshots are saved and enable clipboard copying.",
+    title: "Settings & Preferences",
+    description: "Customize your workflow with powerful settings. Access them anytime via the gear icon.",
     icon: (
       <svg className="size-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
@@ -167,9 +170,21 @@ const ONBOARDING_STEPS = [
     content: (
       <div className="space-y-4">
         <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
+          <div className="text-sm font-medium text-zinc-200 mb-2">Auto-apply Background</div>
+          <p className="text-xs text-zinc-400 text-pretty">
+            Enable this on the main screen to instantly apply your default background and save - no editor needed. Perfect for quick captures.
+          </p>
+        </div>
+        <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
+          <div className="text-sm font-medium text-zinc-200 mb-2">Default Background</div>
+          <p className="text-xs text-zinc-400 text-pretty">
+            Set your preferred background in Preferences. It will be used for auto-apply mode and as the default in the editor.
+          </p>
+        </div>
+        <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
           <div className="text-sm font-medium text-zinc-200 mb-2">Save Directory</div>
           <p className="text-xs text-zinc-400 text-pretty">
-            Choose where your screenshots are saved. Defaults to your Desktop.
+            Screenshots save to your Desktop by default. Change this in Preferences.
           </p>
         </div>
         <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
@@ -257,13 +272,15 @@ const ONBOARDING_STEPS = [
       </svg>
     ),
     content: (
-      <div className="space-y-3 text-center">
+      <div className="space-y-4 text-center">
         <p className="text-sm text-zinc-400 text-pretty">
-          Press <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘⇧2</kbd> to capture a region, or use the buttons above.
+          Press <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘⇧2</kbd> to capture a region, or use the buttons on the main screen.
         </p>
-        <p className="text-xs text-zinc-500 text-pretty">
-          You can always access this onboarding from the menu bar if you need a refresher.
-        </p>
+        <div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
+          <p className="text-xs text-zinc-500 text-pretty">
+            <span className="text-zinc-400 font-medium">Pro tip:</span> Enable "Auto-apply background" on the main screen for instant captures with your default background - no editing required.
+          </p>
+        </div>
       </div>
     ),
   },

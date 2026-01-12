@@ -34,10 +34,19 @@ Better Shot is a fast, lightweight screenshot tool built with Tauri and React. I
 ### Workflow
 
 - **Global Hotkeys** - Capture from anywhere, even when the app is hidden
+- **Customizable Shortcuts** - Configure your own keyboard shortcuts in Preferences
+- **Auto-apply Background** - Instantly apply default background and save without opening editor
 - **Clipboard Integration** - Automatically copy screenshots to clipboard
-- **Custom Save Directory** - Choose where your screenshots are saved
+- **Custom Save Directory** - Choose where your screenshots are saved (defaults to Desktop)
+- **Settings Persistence** - All preferences are saved and restored automatically
 - **System Tray Integration** - Access from the menu bar
 - **Native Performance** - Built with Rust and Tauri for minimal resource usage
+
+### Preferences
+
+- **General Settings** - Configure save directory and clipboard behavior
+- **Default Background** - Set a default background for auto-apply mode
+- **Keyboard Shortcuts** - Customize capture shortcuts with enable/disable toggles
 
 ### Why Better Shot?
 
@@ -104,7 +113,18 @@ This permission is required for the app to capture screenshots of your screen.
 6. **Customize** - Select any annotation to adjust colors, opacity, borders, and other properties
 7. **Export** - Press `⌘S` to save or `⌘⇧C` to copy to clipboard
 
+### Quick Workflow with Auto-apply
+
+For faster workflows, enable **Auto-apply background** on the main screen:
+
+1. Toggle on "Auto-apply background" on the main page
+2. Set your preferred default background in Preferences
+3. Capture a screenshot - it will automatically apply the background and save instantly
+4. No editor needed - perfect for quick captures with consistent styling
+
 ### Keyboard Shortcuts
+
+Shortcuts are customizable in Preferences. Default shortcuts:
 
 | Action | Shortcut |
 | --- | --- |
@@ -149,8 +169,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development setup and contri
 - **Backend**: Rust, Tauri 2
 - **Key Libraries**:
   - `xcap` - Screenshot capture
-  - `arboard` - Clipboard operations
   - `image` - Image processing
+  - `@tauri-apps/plugin-store` - Settings persistence
+  - `@tauri-apps/plugin-global-shortcut` - Global hotkeys
 
 ## Contributing
 
