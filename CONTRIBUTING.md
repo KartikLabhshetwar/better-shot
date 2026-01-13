@@ -398,6 +398,21 @@ When creating a PR, include:
 3. Shortcuts are registered using `@tauri-apps/plugin-global-shortcut`
 4. Changes trigger re-registration via `settingsVersion` state
 
+### Updating the Homepage Keyboard Shortcuts Display
+
+The homepage shows a comprehensive keyboard shortcuts reference organized into two sections:
+
+1. **Capture Shortcuts** - Dynamic shortcuts from user preferences (Region, Screen, Window, Cancel)
+2. **Editor Shortcuts** - Fixed editor shortcuts (Save, Copy, Undo, Redo, Delete annotation, Close editor)
+
+To modify the shortcuts display:
+
+1. Edit the `Keyboard Shortcuts` card in `src/App.tsx` (around line 558)
+2. Capture shortcuts use `getShortcutDisplay()` to show user-configured values
+3. Editor shortcuts are hardcoded with symbol representations (`⌘`, `⇧`, `⌥`, `⌫`)
+4. Use `<kbd>` elements with `tabular-nums` class for consistent display
+5. Follow the existing pattern: label on the left, `<kbd>` on the right
+
 ## Getting Help
 
 - **Issues**: Check existing issues before creating new ones

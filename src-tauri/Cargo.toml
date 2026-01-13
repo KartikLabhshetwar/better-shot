@@ -1,6 +1,6 @@
 [package]
 name = "bettershot"
-version = "0.1.5"
+version = "0.1.6"
 description = "A Better Shot App"
 authors = ["kartik labhshetwar"]
 edition = "2021"
@@ -22,7 +22,7 @@ dirs = "5"
 image = "0.24"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tauri = { version = "2", features = ["protocol-asset", "macos-private-api", "tray-icon"] }
+tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-screenshots = "2"

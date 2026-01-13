@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { toast } from "sonner";
-import { Copy, Save, Loader2 } from "lucide-react";
+import { Copy, Save, Loader2, Undo2, Redo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -14,7 +14,7 @@ import { AnnotationToolbar } from "./editor/AnnotationToolbar";
 import { AnnotationCanvas } from "./editor/AnnotationCanvas";
 import { PropertiesPanel } from "./editor/PropertiesPanel";
 import { Annotation, ToolType } from "@/types/annotations";
-import { useEditorSettings, usePreviewGenerator, assetCategories } from "@/hooks";
+import { useEditorState, usePreviewGenerator, assetCategories } from "@/hooks";
 
 interface ImageEditorProps {
   imagePath: string;
@@ -23,8 +23,9 @@ interface ImageEditorProps {
 }
 
 export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
-  // Use custom hooks for settings and preview generation
-  const [settings, settingsActions] = useEditorSettings();
+  // Use combined editor state hook with undo/redo for both settings and annotations
+  const editorState = useEditorState();
+  const { settings, annotations, canUndo, canRedo, undo, redo } = editorState;
   
   // Screenshot image state
   const [screenshotImage, setScreenshotImage] = useState<HTMLImageElement | null>(null);
@@ -36,8 +37,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
   const [isCopying, setIsCopying] = useState(false);
   const [tempDir, setTempDir] = useState<string>("/private/tmp");
   
-  // Annotation state
-  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  // Annotation UI state (not part of undo/redo)
   const [selectedTool, setSelectedTool] = useState<ToolType>("select");
   const [selectedAnnotation, setSelectedAnnotation] = useState<Annotation | null>(null);
   
@@ -181,52 +181,39 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
     }
   }, [screenshotImage, annotations, renderHighQualityCanvas, isSaving, isCopying, tempDir]);
 
-  // Keyboard shortcuts for save/copy
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
-        e.preventDefault();
-        if (imageLoaded && !isSaving && !isCopying) {
-          handleSave();
-        }
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === "c" && e.shiftKey) {
-        e.preventDefault();
-        if (imageLoaded && !isSaving && !isCopying) {
-          handleCopy();
-        }
-      }
-      if (e.key === "Escape") {
-        onCancel();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [imageLoaded, isSaving, isCopying, handleSave, handleCopy, onCancel]);
-
   // Annotation handlers
   const handleAnnotationAdd = useCallback((annotation: Annotation) => {
-    setAnnotations((prev) => [...prev, annotation]);
+    editorState.addAnnotation(annotation);
     setSelectedAnnotation(annotation);
     setSelectedTool("select");
-  }, []);
+  }, [editorState]);
 
   const handleAnnotationUpdate = useCallback((annotation: Annotation) => {
-    setAnnotations((prev) => prev.map((ann) => (ann.id === annotation.id ? annotation : ann)));
+    editorState.updateAnnotation(annotation);
     setSelectedAnnotation(annotation);
-  }, []);
+  }, [editorState]);
 
   const handleAnnotationDelete = useCallback((id: string) => {
-    setAnnotations((prev) => prev.filter((ann) => ann.id !== id));
+    editorState.deleteAnnotation(id);
     setSelectedAnnotation((prev) => prev?.id === id ? null : prev);
-  }, []);
+  }, [editorState]);
 
   const handleDeleteSelected = useCallback(() => {
     if (selectedAnnotation) {
       handleAnnotationDelete(selectedAnnotation.id);
     }
   }, [selectedAnnotation, handleAnnotationDelete]);
+
+  // Undo/Redo handlers
+  const handleUndo = useCallback(() => {
+    undo();
+    setSelectedAnnotation(null);
+  }, [undo]);
+
+  const handleRedo = useCallback(() => {
+    redo();
+    setSelectedAnnotation(null);
+  }, [redo]);
 
   // Delete annotation with keyboard
   useEffect(() => {
@@ -246,13 +233,95 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedAnnotation, handleAnnotationDelete]);
 
+  // Keyboard shortcuts for save/copy/undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip if typing in input fields
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      // Save: Cmd+S
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        if (imageLoaded && !isSaving && !isCopying) {
+          handleSave();
+        }
+      }
+      // Copy: Cmd+Shift+C
+      if ((e.metaKey || e.ctrlKey) && e.key === "c" && e.shiftKey) {
+        e.preventDefault();
+        if (imageLoaded && !isSaving && !isCopying) {
+          handleCopy();
+        }
+      }
+      // Undo: Cmd+Z
+      if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+      // Redo: Cmd+Shift+Z or Cmd+Y
+      if ((e.metaKey || e.ctrlKey) && ((e.key === "z" && e.shiftKey) || e.key === "y")) {
+        e.preventDefault();
+        handleRedo();
+      }
+      // Cancel: Escape
+      if (e.key === "Escape") {
+        onCancel();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [imageLoaded, isSaving, isCopying, handleSave, handleCopy, handleUndo, handleRedo, onCancel]);
+
   // Find selected gradient for BackgroundSelector
   const selectedGradientOption = gradientOptions.find(g => g.id === settings.gradientId) || gradientOptions[0];
 
   return (
     <div className="flex flex-col h-dvh bg-zinc-950 text-zinc-50">
       <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900">
-        <h2 className="text-xl font-semibold text-zinc-50 text-balance">Edit Screenshot</h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-xl font-semibold text-zinc-50 text-balance">Edit Screenshot</h2>
+          <TooltipProvider>
+            <div className="flex gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleUndo}
+                    disabled={!canUndo}
+                    className="text-zinc-400 hover:text-zinc-50 hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                    aria-label="Undo"
+                  >
+                    <Undo2 className="size-4" aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Undo <kbd className="ml-1 text-xs opacity-70">⌘Z</kbd></p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleRedo}
+                    disabled={!canRedo}
+                    className="text-zinc-400 hover:text-zinc-50 hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                    aria-label="Redo"
+                  >
+                    <Redo2 className="size-4" aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Redo <kbd className="ml-1 text-xs opacity-70">⌘⇧Z</kbd></p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
+        </div>
         <div className="flex gap-3">
           <Button 
             variant="outline" 
@@ -325,33 +394,33 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
                 backgroundType={settings.backgroundType as "transparent" | "white" | "black" | "gray" | "gradient" | "custom"}
                 customColor={settings.customColor}
                 selectedGradient={selectedGradientOption.id}
-                onBackgroundTypeChange={settingsActions.setBackgroundType}
-                onCustomColorChange={settingsActions.setCustomColor}
-                onGradientSelect={settingsActions.setGradient}
+                onBackgroundTypeChange={editorState.setBackgroundType}
+                onCustomColorChange={editorState.setCustomColor}
+                onGradientSelect={editorState.setGradient}
               />
 
               <AssetGrid
                 categories={assetCategories}
                 selectedImage={settings.selectedImageSrc}
                 backgroundType={settings.backgroundType}
-                onImageSelect={settingsActions.handleImageSelect}
+                onImageSelect={editorState.handleImageSelect}
               />
 
               <EffectsPanel
                 blurAmount={settings.blurAmount}
                 noiseAmount={settings.noiseAmount}
                 shadow={settings.shadow}
-                onBlurChange={settingsActions.setBlurAmount}
-                onNoiseChange={settingsActions.setNoiseAmount}
-                onShadowBlurChange={settingsActions.setShadowBlur}
-                onShadowOffsetXChange={settingsActions.setShadowOffsetX}
-                onShadowOffsetYChange={settingsActions.setShadowOffsetY}
-                onShadowOpacityChange={settingsActions.setShadowOpacity}
+                onBlurChange={editorState.setBlurAmount}
+                onNoiseChange={editorState.setNoiseAmount}
+                onShadowBlurChange={editorState.setShadowBlur}
+                onShadowOffsetXChange={editorState.setShadowOffsetX}
+                onShadowOffsetYChange={editorState.setShadowOffsetY}
+                onShadowOpacityChange={editorState.setShadowOpacity}
               />
 
               <ImageRoundnessControl
                 borderRadius={settings.borderRadius}
-                onBorderRadiusChange={settingsActions.setBorderRadius}
+                onBorderRadiusChange={editorState.setBorderRadius}
               />
 
               {error && (

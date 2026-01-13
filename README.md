@@ -137,17 +137,27 @@ For faster workflows, enable **Auto-apply background** on the main screen:
 
 ### Keyboard Shortcuts
 
-Shortcuts are customizable in Preferences. Default shortcuts:
+The homepage displays a comprehensive keyboard shortcuts reference, organized into **Capture** and **Editor** sections. Capture shortcuts are customizable in Preferences.
 
-| Action | Shortcut |
+#### Capture Shortcuts
+
+| Action | Default Shortcut |
 | --- | --- |
 | Capture Region | `⌘⇧2` |
 | Capture Fullscreen | `⌘⇧3` |
 | Capture Window | `⌘⇧4` |
+| Cancel Selection | `Esc` |
+
+#### Editor Shortcuts
+
+| Action | Shortcut |
+| --- | --- |
 | Save Image | `⌘S` |
-| Copy to Clipboard | `⌘⇧C` |
+| Copy to Clipboard | `⇧⌘C` |
+| Undo | `⌘Z` |
+| Redo | `⇧⌘Z` |
 | Delete Annotation | `Delete` or `Backspace` |
-| Cancel | `Esc` |
+| Close Editor | `Esc` |
 
 ### Typical Workflow
 

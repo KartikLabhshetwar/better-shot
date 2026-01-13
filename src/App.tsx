@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
@@ -95,6 +95,14 @@ function App() {
   const [shortcuts, setShortcuts] = useState<KeyboardShortcut[]>(DEFAULT_SHORTCUTS);
   const [settingsVersion, setSettingsVersion] = useState(0);
   const [tempDir, setTempDir] = useState<string>("/tmp");
+
+  // Refs to hold current values for use in callbacks that may have stale closures
+  const settingsRef = useRef({ autoApplyBackground, saveDir, copyToClipboard, tempDir });
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    settingsRef.current = { autoApplyBackground, saveDir, copyToClipboard, tempDir };
+  }, [autoApplyBackground, saveDir, copyToClipboard, tempDir]);
 
   // Load settings function
   const loadSettings = useCallback(async () => {
@@ -307,6 +315,9 @@ function App() {
     setError(null);
 
     const appWindow = getCurrentWindow();
+    
+    // Read current settings from ref to avoid stale closure issues
+    const { autoApplyBackground: shouldAutoApply, saveDir: currentSaveDir, copyToClipboard: shouldCopyToClipboard, tempDir: currentTempDir } = settingsRef.current;
 
     try {
       await appWindow.hide();
@@ -319,38 +330,11 @@ function App() {
       };
 
       const screenshotPath = await invoke<string>(commandMap[captureMode], {
-        saveDir: tempDir,
+        saveDir: currentTempDir,
       });
 
-      invoke("play_screenshot_sound").catch(console.error);
-
-      if (autoApplyBackground) {
-        try {
-          const processedImageData = await processScreenshotWithDefaultBackground(screenshotPath);
-          
-          const savedPath = await invoke<string>("save_edited_image", {
-            imageData: processedImageData,
-            saveDir,
-            copyToClip: copyToClipboard,
-          });
-
-          toast.success("Screenshot processed and saved", {
-            description: savedPath,
-            duration: 3000,
-          });
-        } catch (err) {
-          const errorMessage = err instanceof Error ? err.message : String(err);
-          setError(`Failed to process screenshot: ${errorMessage}`);
-          toast.error("Failed to process screenshot", {
-            description: errorMessage,
-            duration: 5000,
-          });
-        } finally {
-          setIsCapturing(false);
-        }
-        return;
-      }
-
+      // Get mouse position IMMEDIATELY after screenshot completes
+      // This captures where the user finished their selection
       let mouseX: number | undefined;
       let mouseY: number | undefined;
       try {
@@ -358,6 +342,42 @@ function App() {
         mouseX = x;
         mouseY = y;
       } catch {
+        // Silently fail - will fall back to centering
+      }
+
+      invoke("play_screenshot_sound").catch(console.error);
+
+      if (shouldAutoApply) {
+        
+        try {
+          const processedImageData = await processScreenshotWithDefaultBackground(screenshotPath);
+          
+          const savedPath = await invoke<string>("save_edited_image", {
+            imageData: processedImageData,
+            saveDir: currentSaveDir,
+            copyToClip: shouldCopyToClipboard,
+          });
+
+          toast.success("Screenshot processed and saved", {
+            description: savedPath,
+            duration: 3000,
+          });
+          
+          // Ensure window stays hidden after auto-apply
+          await appWindow.hide();
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          setError(`Failed to process screenshot: ${errorMessage}`);
+          toast.error("Failed to process screenshot", {
+            description: errorMessage,
+            duration: 5000,
+          });
+          // Even on error, keep window hidden in auto-apply mode
+          await appWindow.hide();
+        } finally {
+          setIsCapturing(false);
+        }
+        return;
       }
 
       setTempScreenshotPath(screenshotPath);
@@ -366,10 +386,15 @@ function App() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       if (errorMessage.includes("cancelled") || errorMessage.includes("was cancelled")) {
-        await restoreWindow();
+        // Only restore window if not in auto-apply mode
+        if (!shouldAutoApply) {
+          await restoreWindow();
+        }
       } else if (errorMessage.includes("already in progress")) {
         setError("Please wait for the current screenshot to complete");
-        await restoreWindow();
+        if (!shouldAutoApply) {
+          await restoreWindow();
+        }
       } else if (
         errorMessage.toLowerCase().includes("permission") ||
         errorMessage.toLowerCase().includes("access") ||
@@ -378,10 +403,13 @@ function App() {
         setError(
           "Screen Recording permission required. Please go to System Settings > Privacy & Security > Screen Recording and enable access for Better Shot, then restart the app."
         );
+        // Always show window for permission errors so user can see the message
         await restoreWindow();
       } else {
         setError(errorMessage);
-        await restoreWindow();
+        if (!shouldAutoApply) {
+          await restoreWindow();
+        }
       }
     } finally {
       setIsCapturing(false);
@@ -528,30 +556,66 @@ function App() {
         </Card>
 
         <Card className="bg-zinc-900 border-zinc-800">
-          <CardContent className="p-5">
-            <h3 className="font-medium text-zinc-200 mb-4 text-sm">Keyboard Shortcuts</h3>
-            <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-zinc-400">Region</span>
-                <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">
-                  {getShortcutDisplay("region")}
-                </kbd>
+          <CardContent className="p-5 space-y-4">
+            <h3 className="font-medium text-zinc-200 text-sm">Keyboard Shortcuts</h3>
+            
+            {/* Capture Shortcuts */}
+            <div className="space-y-2">
+              <p className="text-xs text-zinc-500 uppercase tracking-wide">Capture</p>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Region</span>
+                  <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">
+                    {getShortcutDisplay("region")}
+                  </kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Screen</span>
+                  <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">
+                    {getShortcutDisplay("fullscreen")}
+                  </kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Window</span>
+                  <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">
+                    {getShortcutDisplay("window")}
+                  </kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Cancel</span>
+                  <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">Esc</kbd>
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-zinc-400">Screen</span>
-                <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">
-                  {getShortcutDisplay("fullscreen")}
-                </kbd>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-zinc-400">Window</span>
-                <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">
-                  {getShortcutDisplay("window")}
-                </kbd>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-zinc-400">Save</span>
-                <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘S</kbd>
+            </div>
+
+            {/* Editor Shortcuts */}
+            <div className="space-y-2">
+              <p className="text-xs text-zinc-500 uppercase tracking-wide">Editor</p>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Save</span>
+                  <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘S</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Copy</span>
+                  <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⇧⌘C</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Undo</span>
+                  <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘Z</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Redo</span>
+                  <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⇧⌘Z</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Delete annotation</span>
+                  <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌫</kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">Close editor</span>
+                  <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">Esc</kbd>
+                </div>
               </div>
             </div>
           </CardContent>
