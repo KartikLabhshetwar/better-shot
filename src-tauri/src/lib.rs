@@ -12,8 +12,8 @@ mod utils;
 
 use commands::{
     capture_all_monitors, capture_once, capture_region, get_desktop_directory, get_mouse_position,
-    get_temp_directory, native_capture_fullscreen, native_capture_interactive, native_capture_window,
-    play_screenshot_sound, save_edited_image,
+    get_temp_directory, native_capture_fullscreen, native_capture_interactive,
+    native_capture_window, play_screenshot_sound, save_edited_image,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
