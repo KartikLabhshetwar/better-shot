@@ -242,7 +242,7 @@ async fn native_capture_interactive_macos(save_dir: String) -> Result<String, St
     }
 }
 
-/// Windows implementation using Snipping Tool
+/// Windows implementation using xcap library
 #[cfg(target_os = "windows")]
 async fn native_capture_interactive_windows(save_dir: String) -> Result<String, String> {
     use xcap::Monitor;
@@ -251,8 +251,7 @@ async fn native_capture_interactive_windows(save_dir: String) -> Result<String, 
         .lock()
         .map_err(|e| format!("Failed to acquire lock: {}", e))?;
 
-    // On Windows, we use xcap library for screen capture since Snipping Tool
-    // doesn't provide a good programmatic interface.
+    // On Windows, we use xcap library for screen capture.
     // For interactive selection, we capture all monitors and let the frontend handle selection.
     let monitors = Monitor::all().map_err(|e| format!("Failed to get monitors: {}", e))?;
 

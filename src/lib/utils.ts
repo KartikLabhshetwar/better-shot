@@ -17,17 +17,6 @@ export function isMacOS(): boolean {
 }
 
 /**
- * Detect if running on Windows
- * Uses navigator.platform for browser context
- */
-export function isWindows(): boolean {
-  if (typeof navigator !== 'undefined') {
-    return navigator.platform.toLowerCase().includes('win');
-  }
-  return false;
-}
-
-/**
  * Format keyboard shortcut for display based on platform
  * Converts from Tauri format to human-readable format
  */
@@ -53,20 +42,4 @@ export function formatShortcutForPlatform(shortcut: string): string {
       .replace(/Option/g, "Alt")
       .replace(/\+/g, "+");
   }
-}
-
-/**
- * Get the modifier key symbol for the current platform
- * macOS: ⌘, Windows/Linux: Ctrl
- */
-export function getModifierKey(): string {
-  return isMacOS() ? "⌘" : "Ctrl";
-}
-
-/**
- * Get the shift key symbol for the current platform
- * macOS: ⇧, Windows/Linux: Shift
- */
-export function getShiftKey(): string {
-  return isMacOS() ? "⇧" : "Shift+";
 }
