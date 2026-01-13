@@ -11,9 +11,10 @@ mod screenshot;
 mod utils;
 
 use commands::{
-    capture_all_monitors, capture_once, capture_region, get_desktop_directory, get_mouse_position,
-    get_temp_directory, native_capture_fullscreen, native_capture_interactive,
-    native_capture_window, play_screenshot_sound, save_edited_image,
+    capture_all_monitors, capture_once, capture_region, copy_text_to_clipboard,
+    get_desktop_directory, get_mouse_position, get_temp_directory, native_capture_fullscreen,
+    native_capture_interactive, native_capture_window, ocr_capture_region, play_screenshot_sound,
+    save_edited_image,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -53,6 +54,9 @@ pub fn run() {
             let capture_window_item =
                 MenuItemBuilder::with_id("capture_window", "Capture Window").build(app)?;
 
+            let ocr_capture_item =
+                MenuItemBuilder::with_id("ocr_capture", "OCR Capture").build(app)?;
+
             let quit_item = MenuItemBuilder::with_id("quit", "Quit")
                 .accelerator("CommandOrControl+Q")
                 .build(app)?;
@@ -64,6 +68,7 @@ pub fn run() {
                     &capture_region_item,
                     &capture_screen_item,
                     &capture_window_item,
+                    &ocr_capture_item,
                     &PredefinedMenuItem::separator(app)?,
                     &quit_item,
                 ])
@@ -91,6 +96,9 @@ pub fn run() {
                         "capture_window" => {
                             let _ = app.emit("capture-window", ());
                         }
+                        "ocr_capture" => {
+                            let _ = app.emit("ocr-triggered", ());
+                        }
                         "quit" => {
                             app.exit(0);
                         }
@@ -112,7 +120,9 @@ pub fn run() {
             native_capture_fullscreen,
             native_capture_window,
             play_screenshot_sound,
-            get_mouse_position
+            get_mouse_position,
+            ocr_capture_region,
+            copy_text_to_clipboard
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

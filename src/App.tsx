@@ -17,7 +17,8 @@ import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
 import { PreferencesPage } from "./components/preferences/PreferencesPage";
 import { SettingsIcon } from "./components/SettingsIcon";
 import { UpdateDialog } from "./components/UpdateDialog";
-import { AppWindowMac, Crop, Monitor } from "lucide-react";
+import { OcrResultDialog } from "./components/OcrResultDialog";
+import { AppWindowMac, Crop, Monitor, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImageEditor } from "./components/ImageEditor";
@@ -26,6 +27,7 @@ type AppMode = "main" | "editing" | "preferences";
 type CaptureMode = "region" | "fullscreen" | "window";
 
 const DEFAULT_SHORTCUTS: KeyboardShortcut[] = [
+  { id: "ocr", action: "OCR Capture", shortcut: "CommandOrControl+Shift+E", enabled: true },
   { id: "region", action: "Capture Region", shortcut: "CommandOrControl+Shift+2", enabled: true },
   { id: "fullscreen", action: "Capture Screen", shortcut: "CommandOrControl+Shift+F", enabled: false },
   { id: "window", action: "Capture Window", shortcut: "CommandOrControl+Shift+D", enabled: false },
@@ -103,6 +105,8 @@ function App() {
     body?: string;
   } | null>(null);
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+  const [ocrText, setOcrText] = useState<string | null>(null);
+  const [showOcrDialog, setShowOcrDialog] = useState(false);
 
   // Refs to hold current values for use in callbacks that may have stale closures
   const settingsRef = useRef({ autoApplyBackground, saveDir, copyToClipboard, tempDir });
@@ -211,7 +215,12 @@ function App() {
 
         const savedShortcuts = await store.get<KeyboardShortcut[]>("keyboardShortcuts");
         if (savedShortcuts && savedShortcuts.length > 0) {
-          setShortcuts(savedShortcuts);
+          // Merge saved shortcuts with defaults to pick up new shortcuts like OCR
+          const savedIds = new Set(savedShortcuts.map((s) => s.id));
+          const missingDefaults = DEFAULT_SHORTCUTS.filter((d) => !savedIds.has(d.id));
+          const finalShortcuts = [...savedShortcuts, ...missingDefaults];
+          console.log("[Init] Merged shortcuts:", finalShortcuts);
+          setShortcuts(finalShortcuts);
         }
 
         // Migrate legacy background image paths to asset IDs
@@ -417,6 +426,58 @@ function App() {
     }
   }, [isCapturing]);
 
+  const handleOcrCapture = useCallback(async () => {
+    if (isCapturing) return;
+
+    setIsCapturing(true);
+    setError(null);
+
+    const appWindow = getCurrentWindow();
+    const { tempDir: currentTempDir } = settingsRef.current;
+
+    try {
+      await appWindow.hide();
+      await new Promise((resolve) => setTimeout(resolve, 400));
+
+      const extractedText = await invoke<string>("ocr_capture_region", {
+        saveDir: currentTempDir,
+      });
+
+      // Copy to clipboard automatically
+      await invoke("copy_text_to_clipboard", { text: extractedText });
+
+      // Show result dialog
+      setOcrText(extractedText);
+      setShowOcrDialog(true);
+
+      await restoreWindow();
+      toast.success("Text extracted and copied to clipboard", { duration: 3000 });
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      if (errorMessage.includes("cancelled")) {
+        await restoreWindow();
+      } else if (errorMessage.includes("No text found")) {
+        toast.info("No text found in selection", { duration: 3000 });
+        await restoreWindow();
+      } else if (
+        errorMessage.toLowerCase().includes("permission") ||
+        errorMessage.toLowerCase().includes("access") ||
+        errorMessage.toLowerCase().includes("denied")
+      ) {
+        setError(
+          "Screen Recording permission required. Please go to System Settings > Privacy & Security > Screen Recording and enable access for Better Shot, then restart the app."
+        );
+        await restoreWindow();
+      } else {
+        setError(errorMessage);
+        await restoreWindow();
+      }
+    } finally {
+      setIsCapturing(false);
+    }
+  }, [isCapturing]);
+
   // Setup hotkeys whenever settings change
   useEffect(() => {
     const setupHotkeys = async () => {
@@ -437,16 +498,39 @@ function App() {
           "Capture Window": "window",
         };
 
+        console.log("[Shortcuts] Registering shortcuts:", shortcuts);
+
         for (const shortcut of shortcuts) {
-          if (!shortcut.enabled) continue;
-          
+          if (!shortcut.enabled) {
+            console.log(`[Shortcuts] Skipping disabled shortcut: ${shortcut.action}`);
+            continue;
+          }
+
+          // Handle OCR shortcut separately
+          if (shortcut.action === "OCR Capture") {
+            try {
+              console.log(`[Shortcuts] Registering OCR shortcut: ${shortcut.shortcut}`);
+              await register(shortcut.shortcut, () => {
+                console.log("[Shortcuts] OCR shortcut triggered!");
+                handleOcrCapture();
+              });
+              registeredShortcutsRef.current.add(shortcut.shortcut);
+              console.log(`[Shortcuts] Successfully registered OCR shortcut: ${shortcut.shortcut}`);
+            } catch (err) {
+              console.error(`[Shortcuts] Failed to register OCR shortcut ${shortcut.shortcut}:`, err);
+            }
+            continue;
+          }
+
           const action = actionMap[shortcut.action];
           if (action) {
             try {
+              console.log(`[Shortcuts] Registering ${shortcut.action} shortcut: ${shortcut.shortcut}`);
               await register(shortcut.shortcut, () => handleCapture(action));
               registeredShortcutsRef.current.add(shortcut.shortcut);
+              console.log(`[Shortcuts] Successfully registered ${shortcut.action}`);
             } catch (err) {
-              console.error(`Failed to register shortcut ${shortcut.shortcut}:`, err);
+              console.error(`[Shortcuts] Failed to register shortcut ${shortcut.shortcut}:`, err);
             }
           }
         }
@@ -465,18 +549,20 @@ function App() {
       }
       registeredShortcutsRef.current.clear();
     };
-  }, [shortcuts, settingsVersion, handleCapture]);
+  }, [shortcuts, settingsVersion, handleCapture, handleOcrCapture]);
 
   // Setup tray menu event listeners - only once on mount
   useEffect(() => {
     let unlisten1: (() => void) | null = null;
     let unlisten2: (() => void) | null = null;
     let unlisten3: (() => void) | null = null;
+    let unlisten4: (() => void) | null = null;
 
     const setupListeners = async () => {
       unlisten1 = await listen("capture-triggered", () => handleCapture("region"));
       unlisten2 = await listen("capture-fullscreen", () => handleCapture("fullscreen"));
       unlisten3 = await listen("capture-window", () => handleCapture("window"));
+      unlisten4 = await listen("ocr-triggered", () => handleOcrCapture());
     };
 
     setupListeners();
@@ -485,8 +571,9 @@ function App() {
       unlisten1?.();
       unlisten2?.();
       unlisten3?.();
+      unlisten4?.();
     };
-  }, [handleCapture]);
+  }, [handleCapture, handleOcrCapture]);
 
   // Reload settings when coming back from preferences
   const handleSettingsChange = useCallback(async () => {
@@ -597,6 +684,15 @@ function App() {
           onSkip={handleSkipUpdate}
         />
       )}
+      <OcrResultDialog
+        open={showOcrDialog}
+        onOpenChange={setShowOcrDialog}
+        text={ocrText ?? ""}
+        onCopy={(text) => {
+          invoke("copy_text_to_clipboard", { text });
+          toast.success("Copied to clipboard");
+        }}
+      />
       <main className="min-h-dvh flex flex-col items-center justify-center p-8 bg-zinc-950 text-zinc-50">
         <div className="w-full max-w-2xl space-y-6">
         <div className="relative text-center space-y-2">
@@ -616,7 +712,7 @@ function App() {
 
         <Card className="bg-zinc-900 border-zinc-800">
           <CardContent className="p-6 space-y-6">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               <Button
                 onClick={() => handleCapture("region")}
                 disabled={isCapturing}
@@ -640,6 +736,14 @@ function App() {
               >
                 <AppWindowMac className="size-4" aria-hidden="true" />
                 Window
+              </Button>
+              <Button
+                onClick={() => handleOcrCapture()}
+                disabled={isCapturing}
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-50 py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-700 transition-all flex items-center justify-center gap-2"
+              >
+                <FileText className="size-4" aria-hidden="true" />
+                OCR
               </Button>
             </div>
 
@@ -701,6 +805,12 @@ function App() {
                   <span className="text-zinc-400">Window</span>
                   <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">
                     {getShortcutDisplay("window")}
+                  </kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400">OCR</span>
+                  <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">
+                    {getShortcutDisplay("ocr")}
                   </kbd>
                 </div>
                 <div className="flex items-center justify-between">

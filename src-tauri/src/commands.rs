@@ -347,3 +347,112 @@ pub async fn native_capture_window(save_dir: String) -> Result<String, String> {
         Err("Screenshot was cancelled or failed".to_string())
     }
 }
+
+/// Capture a region and extract text using OCR (macOS Vision framework)
+#[tauri::command]
+pub async fn ocr_capture_region(save_dir: String) -> Result<String, String> {
+    let _lock = SCREENCAPTURE_LOCK
+        .lock()
+        .map_err(|e| format!("Failed to acquire lock: {}", e))?;
+
+    if is_screencapture_running() {
+        return Err("Another screenshot capture is already in progress".to_string());
+    }
+
+    check_and_activate_permission().map_err(|e| {
+        format!("Permission check failed: {}. Please ensure Screen Recording permission is granted in System Settings > Privacy & Security > Screen Recording.", e)
+    })?;
+
+    let filename = generate_filename("ocr_capture", "png")?;
+    let save_path = PathBuf::from(&save_dir);
+    let screenshot_path = save_path.join(&filename);
+    let path_str = screenshot_path.to_string_lossy().to_string();
+
+    // Capture the region
+    let child = Command::new("screencapture")
+        .arg("-i")
+        .arg("-x")
+        .arg(&path_str)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to run screencapture: {}", e))?;
+
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("Failed to wait for screencapture: {}", e))?;
+
+    if !output.status.success() {
+        if screenshot_path.exists() {
+            let _ = std::fs::remove_file(&screenshot_path);
+        }
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("permission")
+            || stderr.contains("denied")
+            || stderr.contains("not authorized")
+        {
+            return Err("Screen Recording permission required. Please grant permission in System Settings > Privacy & Security > Screen Recording and restart the app.".to_string());
+        }
+        return Err("Screenshot was cancelled".to_string());
+    }
+
+    if !screenshot_path.exists() {
+        return Err("Screenshot was cancelled".to_string());
+    }
+
+    // Run OCR using the compiled Swift helper binary
+    // CARGO_MANIFEST_DIR is set at compile time to the directory containing Cargo.toml
+    let ocr_helper_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ocr-helper");
+
+    let ocr_output = Command::new(&ocr_helper_path)
+        .arg(&path_str)
+        .output()
+        .map_err(|e| format!("Failed to run OCR helper: {}", e))?;
+
+    // Clean up the screenshot
+    let _ = std::fs::remove_file(&screenshot_path);
+
+    if ocr_output.status.code() == Some(2) {
+        // Exit code 2 means no text found
+        return Err("No text found in selection".to_string());
+    }
+
+    if !ocr_output.status.success() {
+        let stderr = String::from_utf8_lossy(&ocr_output.stderr);
+        return Err(format!("OCR failed: {}", stderr.trim()));
+    }
+
+    let text = String::from_utf8_lossy(&ocr_output.stdout).trim().to_string();
+    if text.is_empty() {
+        return Err("No text found in selection".to_string());
+    }
+
+    Ok(text)
+}
+
+/// Copy plain text to the system clipboard
+#[tauri::command]
+pub async fn copy_text_to_clipboard(text: String) -> Result<(), String> {
+    let mut child = Command::new("pbcopy")
+        .stdin(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn pbcopy: {}", e))?;
+
+    if let Some(stdin) = child.stdin.as_mut() {
+        use std::io::Write;
+        stdin
+            .write_all(text.as_bytes())
+            .map_err(|e| format!("Failed to write to pbcopy: {}", e))?;
+    }
+
+    let status = child
+        .wait()
+        .map_err(|e| format!("Failed to wait for pbcopy: {}", e))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err("Failed to copy text to clipboard".to_string())
+    }
+}
