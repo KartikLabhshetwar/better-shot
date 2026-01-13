@@ -71,12 +71,9 @@ Better Shot is a fast, lightweight screenshot tool built with Tauri and React. I
    - **Apple Silicon** (M1, M2, M3): `bettershot_*_aarch64.dmg`
    - **Intel Mac**: `bettershot_*_x64.dmg`
 3. Open the DMG and drag Better Shot to Applications
-4. **First Launch** (choose one method):
+4. **First Launch**:
    
-   **Option A: Right-Click Method** (Easiest)
-   - Right-click the app → **Open** → Click **Open** in the dialog
-   
-   **Option B: Terminal Method** (One command, no dialogs) (recommended)
+   Terminal Method** (One command, no dialogs) (recommended)
    ```bash
    xattr -d com.apple.quarantine /Applications/bettershot.app
    ```
@@ -117,6 +114,17 @@ On first launch, macOS will request **Screen Recording** permission:
 3. Restart the application if needed
 
 This permission is required for the app to capture screenshots of your screen.
+
+## Star History
+
+<a href="https://www.star-history.com/#KartikLabhshetwar/better-shot&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=KartikLabhshetwar/better-shot&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=KartikLabhshetwar/better-shot&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=KartikLabhshetwar/better-shot&type=date&legend=top-left" />
+ </picture>
+</a>
+
 
 ## Usage
 
