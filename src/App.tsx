@@ -1,23 +1,23 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { getCurrentWindow, LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
-import { availableMonitors } from "@tauri-apps/api/window";
-import { register, unregisterAll } from "@tauri-apps/plugin-global-shortcut";
-import { Store } from "@tauri-apps/plugin-store";
-import { toast } from "sonner";
-import { ImageEditor } from "./components/ImageEditor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
-import { hasCompletedOnboarding } from "@/lib/onboarding";
-import { processScreenshotWithDefaultBackground } from "@/lib/auto-process";
-import { SettingsIcon } from "./components/SettingsIcon";
-import { PreferencesPage } from "./components/preferences/PreferencesPage";
 import { migrateStoredValue, isAssetId, isDataUrl } from "@/lib/asset-registry";
+import { processScreenshotWithDefaultBackground } from "@/lib/auto-process";
+import { hasCompletedOnboarding } from "@/lib/onboarding";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { availableMonitors } from "@tauri-apps/api/window";
+import { getCurrentWindow, LogicalPosition, LogicalSize } from "@tauri-apps/api/window";
+import { register, unregisterAll } from "@tauri-apps/plugin-global-shortcut";
+import { Store } from "@tauri-apps/plugin-store";
 import type { KeyboardShortcut } from "./components/preferences/KeyboardShortcutManager";
-import { Crop, Monitor, AppWindowMac } from "lucide-react";
+import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
+import { PreferencesPage } from "./components/preferences/PreferencesPage";
+import { SettingsIcon } from "./components/SettingsIcon";
+import { AppWindowMac, Crop, Monitor } from "lucide-react";
+import { toast } from "sonner";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ImageEditor } from "./components/ImageEditor";
 
 type AppMode = "main" | "editing" | "preferences";
 type CaptureMode = "region" | "fullscreen" | "window";
@@ -488,8 +488,15 @@ function App() {
           <div className="absolute top-0 right-0">
             <SettingsIcon onClick={() => setMode("preferences")} />
           </div>
-          <h1 className="text-5xl font-bold text-zinc-50 text-balance">Better Shot</h1>
-          <p className="text-zinc-400 text-sm text-pretty">Professional screenshot workflow</p>
+          <div className="flex flex-col items-center gap-1">
+            <div className="flex items-center gap-2">
+              <h1 className="text-5xl font-bold text-zinc-50 text-balance">Better Shot</h1>
+              <span className="rounded-full border border-zinc-800 bg-zinc-900 px-2 py-0.5 text-xs font-medium text-zinc-400 tabular-nums">
+                v{__APP_VERSION__}
+              </span>
+            </div>
+            <p className="text-zinc-400 text-sm text-pretty">Professional screenshot workflow</p>
+          </div>
         </div>
 
         <Card className="bg-zinc-900 border-zinc-800">
