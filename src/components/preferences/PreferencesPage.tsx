@@ -164,8 +164,41 @@ export function PreferencesPage({ onBack, onSettingsChange }: PreferencesPagePro
           <CardHeader className="pb-4">
             <CardTitle className="text-lg font-semibold text-zinc-100">Keyboard Shortcuts</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             <KeyboardShortcutManager onShortcutsChange={handleShortcutsChange} />
+            
+            {/* Editor Shortcuts Reference */}
+            <div className="space-y-3 pt-4 border-t border-zinc-800">
+              <div>
+                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-3">Editor</p>
+                <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-400">Save</span>
+                    <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘S</kbd>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-400">Copy</span>
+                    <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⇧⌘C</kbd>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-400">Undo</span>
+                    <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘Z</kbd>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-400">Redo</span>
+                    <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⇧⌘Z</kbd>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-400">Delete annotation</span>
+                    <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌫</kbd>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-zinc-400">Close editor</span>
+                    <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">Esc</kbd>
+                  </div>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
