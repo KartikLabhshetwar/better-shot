@@ -1,11 +1,13 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Store } from "@tauri-apps/plugin-store";
 import { toast } from "sonner";
-import { Upload, X, Check } from "lucide-react";
+import { Upload, X, Check, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { assetCategories } from "@/hooks/useEditorSettings";
 import { cn } from "@/lib/utils";
 import { 
+  getSystemWallpaperSrc,
+  SYSTEM_WALLPAPER_ID,
   toStorableValue, 
   isDataUrl,
   getAssetIdFromPath 
@@ -19,6 +21,7 @@ export function BackgroundImageSelector({ onImageSelect }: BackgroundImageSelect
   // selectedImage stores the asset ID or data URL (storable value)
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [systemWallpaperSrc, setSystemWallpaperSrc] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Helper to check if an asset is selected (compares by ID)
@@ -57,6 +60,20 @@ export function BackgroundImageSelector({ onImageSelect }: BackgroundImageSelect
     loadSettings();
   }, []);
 
+  useEffect(() => {
+    let isActive = true;
+    const loadSystemWallpaper = async () => {
+      const wallpaperSrc = await getSystemWallpaperSrc();
+      if (isActive) {
+        setSystemWallpaperSrc(wallpaperSrc);
+      }
+    };
+    loadSystemWallpaper();
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
   const handleImageSelect = useCallback(async (imageSrc: string) => {
     // Convert the runtime path to a storable value (asset ID or data URL)
     const storableValue = toStorableValue(imageSrc);
@@ -81,6 +98,26 @@ export function BackgroundImageSelector({ onImageSelect }: BackgroundImageSelect
       toast.error("Failed to save default background");
     }
   }, [onImageSelect]);
+
+  const handleSystemWallpaperSelect = useCallback(async () => {
+    if (!systemWallpaperSrc) {
+      toast.error("Unable to load current wallpaper");
+      return;
+    }
+
+    setSelectedImage(SYSTEM_WALLPAPER_ID);
+    onImageSelect(SYSTEM_WALLPAPER_ID);
+
+    try {
+      const store = await Store.load("settings.json");
+      await store.set("defaultBackgroundImage", SYSTEM_WALLPAPER_ID);
+      await store.save();
+      toast.success("Default background updated");
+    } catch (err) {
+      console.error("Failed to save default background:", err);
+      toast.error("Failed to save default background");
+    }
+  }, [onImageSelect, systemWallpaperSrc]);
 
   const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -160,6 +197,46 @@ export function BackgroundImageSelector({ onImageSelect }: BackgroundImageSelect
       </div>
 
       <div className="space-y-3">
+        <div>
+          <h4 className="text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wide text-balance">System</h4>
+          <div className="grid grid-cols-4 gap-2">
+            <button
+              onClick={handleSystemWallpaperSelect}
+              disabled={!systemWallpaperSrc}
+              aria-label="Use current macOS wallpaper"
+              className={cn(
+                "relative w-full aspect-square rounded-lg overflow-hidden border-2 transition-all disabled:cursor-not-allowed disabled:opacity-60",
+                selectedImage === SYSTEM_WALLPAPER_ID
+                  ? "border-blue-500 ring-2 ring-blue-500/50"
+                  : "border-zinc-700 hover:border-zinc-600"
+              )}
+            >
+              {systemWallpaperSrc ? (
+                <img
+                  src={systemWallpaperSrc}
+                  alt="Current macOS wallpaper"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-zinc-500 text-xs">
+                  <Monitor className="size-4 mr-1" aria-hidden="true" />
+                  Unavailable
+                </div>
+              )}
+              {selectedImage === SYSTEM_WALLPAPER_ID && (
+                <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
+                  <Check className="size-5 text-blue-400" aria-hidden="true" />
+                </div>
+              )}
+              {systemWallpaperSrc && (
+                <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-[10px] text-white px-2 py-1 text-pretty">
+                  Current wallpaper
+                </div>
+              )}
+            </button>
+          </div>
+        </div>
+
         {uploadedImages.length > 0 && (
           <div>
             <h4 className="text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wide">Uploaded Images</h4>

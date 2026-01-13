@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { Store } from "@tauri-apps/plugin-store";
 import { gradientOptions, type GradientOption } from "@/components/editor/BackgroundSelector";
-import { resolveBackgroundPath, getDefaultBackgroundPath } from "@/lib/asset-registry";
+import { resolveBackgroundPathAsync, getDefaultBackgroundPath } from "@/lib/asset-registry";
 import { Annotation } from "@/types/annotations";
 
 export type BackgroundType = "transparent" | "white" | "black" | "gray" | "gradient" | "custom" | "image";
@@ -106,7 +106,7 @@ export function useEditorState(): EditorStateResult {
         const store = await Store.load("settings.json");
         const storedBg = await store.get<string>("defaultBackgroundImage");
         if (storedBg) {
-          const resolvedPath = resolveBackgroundPath(storedBg);
+          const resolvedPath = await resolveBackgroundPathAsync(storedBg);
           setState(prev => ({
             ...prev,
             settings: {

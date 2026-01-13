@@ -1,7 +1,7 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { Store } from "@tauri-apps/plugin-store";
 import { createHighQualityCanvas } from "./canvas-utils";
-import { resolveBackgroundPath, getDefaultBackgroundPath } from "./asset-registry";
+import { resolveBackgroundPathAsync, getDefaultBackgroundPath } from "./asset-registry";
 
 export async function processScreenshotWithDefaultBackground(
   imagePath: string
@@ -9,13 +9,12 @@ export async function processScreenshotWithDefaultBackground(
   return new Promise(async (resolve, reject) => {
     // Get the default background path, resolving from store if available
     let defaultBgImage: string = getDefaultBackgroundPath();
-    
+
     try {
       const store = await Store.load("settings.json");
       const storedDefaultBg = await store.get<string>("defaultBackgroundImage");
       if (storedDefaultBg) {
-        // Resolve the stored value (asset ID or data URL) to actual path
-        defaultBgImage = resolveBackgroundPath(storedDefaultBg);
+        defaultBgImage = await resolveBackgroundPathAsync(storedDefaultBg);
       }
     } catch (err) {
       console.error("Failed to load default background from settings:", err);

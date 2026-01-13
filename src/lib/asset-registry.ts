@@ -10,6 +10,8 @@
  * between development and production builds.
  */
 
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+
 // Import all background images
 import bgImage13 from "@/assets/bg-images/asset-13.jpg";
 import bgImage18 from "@/assets/bg-images/asset-18.jpg";
@@ -79,6 +81,7 @@ export const assetRegistry: Record<string, string> = {
 
 /** Default background asset ID */
 export const DEFAULT_BACKGROUND_ID = "bg-18";
+export const SYSTEM_WALLPAPER_ID = "system-wallpaper";
 
 /** Get the runtime path for an asset by ID */
 export function getAssetPath(assetId: string): string | null {
@@ -98,10 +101,34 @@ export function isAssetId(value: string): boolean {
 }
 
 /**
+ * Check if a value represents the system wallpaper
+ */
+export function isSystemWallpaper(value: string): boolean {
+  return value === SYSTEM_WALLPAPER_ID;
+}
+
+/**
  * Check if a string is a data URL (uploaded image)
  */
 export function isDataUrl(value: string): boolean {
   return value.startsWith("data:");
+}
+
+/**
+ * Resolve the current system wallpaper to a displayable src
+ */
+export async function getSystemWallpaperSrc(): Promise<string | null> {
+  try {
+    const path = await invoke<string>("get_current_wallpaper");
+    const trimmed = path?.trim();
+    if (!trimmed) {
+      return null;
+    }
+    return convertFileSrc(trimmed);
+  } catch (err) {
+    console.error("Failed to get system wallpaper:", err);
+    return null;
+  }
 }
 
 /**
@@ -113,6 +140,11 @@ export function isDataUrl(value: string): boolean {
  */
 export function resolveBackgroundPath(storedValue: string | null): string {
   if (!storedValue) {
+    return getDefaultBackgroundPath();
+  }
+  
+  if (isSystemWallpaper(storedValue)) {
+    console.warn("System wallpaper requires async resolution; using default background instead.");
     return getDefaultBackgroundPath();
   }
   
@@ -153,6 +185,23 @@ export function resolveBackgroundPath(storedValue: string | null): string {
 }
 
 /**
+ * Resolve a stored background value to an actual path (async)
+ * Handles system wallpaper lookups via Tauri.
+ */
+export async function resolveBackgroundPathAsync(storedValue: string | null): Promise<string> {
+  if (!storedValue) {
+    return getDefaultBackgroundPath();
+  }
+
+  if (isSystemWallpaper(storedValue)) {
+    const wallpaperSrc = await getSystemWallpaperSrc();
+    return wallpaperSrc ?? getDefaultBackgroundPath();
+  }
+
+  return resolveBackgroundPath(storedValue);
+}
+
+/**
  * Find the asset ID for a given path (reverse lookup)
  * Used when saving to convert runtime paths back to IDs
  */
@@ -172,6 +221,10 @@ export function getAssetIdFromPath(path: string): string | null {
  * - Otherwise returns null (shouldn't be stored)
  */
 export function toStorableValue(path: string): string | null {
+  if (path === SYSTEM_WALLPAPER_ID) {
+    return SYSTEM_WALLPAPER_ID;
+  }
+
   // Check if it's a registered asset
   const assetId = getAssetIdFromPath(path);
   if (assetId) {
@@ -193,6 +246,10 @@ export function toStorableValue(path: string): string | null {
 export function migrateStoredValue(storedValue: string): string | null {
   // Already a valid asset ID
   if (isAssetId(storedValue)) {
+    return storedValue;
+  }
+
+  if (isSystemWallpaper(storedValue)) {
     return storedValue;
   }
   

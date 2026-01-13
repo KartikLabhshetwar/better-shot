@@ -13,6 +13,7 @@ mod utils;
 use commands::{
     capture_all_monitors, capture_once, capture_region, get_desktop_directory, get_mouse_position,
     get_temp_directory, native_capture_fullscreen, native_capture_interactive,
+    get_current_wallpaper,
     native_capture_window, play_screenshot_sound, save_edited_image,
 };
 
@@ -112,7 +113,8 @@ pub fn run() {
             native_capture_fullscreen,
             native_capture_window,
             play_screenshot_sound,
-            get_mouse_position
+            get_mouse_position,
+            get_current_wallpaper
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

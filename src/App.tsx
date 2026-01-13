@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { migrateStoredValue, isAssetId, isDataUrl } from "@/lib/asset-registry";
+import { migrateStoredValue, isAssetId, isDataUrl, isSystemWallpaper } from "@/lib/asset-registry";
 import { processScreenshotWithDefaultBackground } from "@/lib/auto-process";
 import { hasCompletedOnboarding } from "@/lib/onboarding";
 import { invoke } from "@tauri-apps/api/core";
@@ -216,7 +216,12 @@ function App() {
 
         // Migrate legacy background image paths to asset IDs
         const savedBackgroundImage = await store.get<string>("defaultBackgroundImage");
-        if (savedBackgroundImage && !isAssetId(savedBackgroundImage) && !isDataUrl(savedBackgroundImage)) {
+        if (
+          savedBackgroundImage &&
+          !isAssetId(savedBackgroundImage) &&
+          !isDataUrl(savedBackgroundImage) &&
+          !isSystemWallpaper(savedBackgroundImage)
+        ) {
           // This is a legacy path that needs migration
           const migratedValue = migrateStoredValue(savedBackgroundImage);
           if (migratedValue && migratedValue !== savedBackgroundImage) {

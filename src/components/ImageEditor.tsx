@@ -16,6 +16,7 @@ import { PropertiesPanel } from "./editor/PropertiesPanel";
 import { Annotation, ToolType } from "@/types/annotations";
 import { usePreviewGenerator } from "@/hooks/usePreviewGenerator";
 import { assetCategories } from "@/hooks/useEditorSettings";
+import { getSystemWallpaperSrc } from "@/lib/asset-registry";
 import {
   useSettings,
   useAnnotations,
@@ -43,6 +44,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
   const [screenshotImage, setScreenshotImage] = useState<HTMLImageElement | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [systemWallpaperSrc, setSystemWallpaperSrc] = useState<string | null>(null);
   
   // Save/copy state
   const [isSaving, setIsSaving] = useState(false);
@@ -91,6 +93,20 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
     invoke<string>("get_temp_directory")
       .then((dir) => setTempDir(dir))
       .catch((err) => console.error("Failed to get temp directory:", err));
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+    const loadSystemWallpaper = async () => {
+      const wallpaperSrc = await getSystemWallpaperSrc();
+      if (isActive) {
+        setSystemWallpaperSrc(wallpaperSrc);
+      }
+    };
+    loadSystemWallpaper();
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   // Load main screenshot image
@@ -425,6 +441,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
                 categories={assetCategories}
                 selectedImage={settings.selectedImageSrc}
                 backgroundType={settings.backgroundType}
+                systemWallpaperSrc={systemWallpaperSrc}
                 onImageSelect={actions.handleImageSelect}
               />
 
