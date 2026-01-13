@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "lint:ci": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:rust": "cd src-tauri && cargo test"
   },
   "dependencies": {
@@ -39,6 +41,7 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.8.3",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vitest": "^4.0.17"
   }
 }
