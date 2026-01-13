@@ -3,6 +3,10 @@
 
 # Better Shot
 
+[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/zThjstVs) 
+[![Twitter)](https://img.shields.io/badge/X-%231DA1F2.svg?style=for-the-badge&logo=X&logoColor=white)](https://x.com/code_kartik)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-%23FFDD00.svg?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/code_kartik)
+
 > An open-source alternative to CleanShot X for macOS. Capture, edit, and enhance your screenshots with professional quality.
 
 Better Shot is a fast, lightweight screenshot tool built with Tauri and React. It provides a powerful yet simple interface for capturing screenshots, editing them with beautiful backgrounds and effects, and sharing them instantly.
