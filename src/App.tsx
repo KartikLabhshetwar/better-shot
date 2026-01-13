@@ -28,16 +28,7 @@ const DEFAULT_SHORTCUTS: KeyboardShortcut[] = [
   { id: "window", action: "Capture Window", shortcut: "CommandOrControl+Shift+4", enabled: false },
 ];
 
-function formatShortcut(shortcut: string): string {
-  return shortcut
-    .replace(/CommandOrControl/g, "⌘")
-    .replace(/Command/g, "⌘")
-    .replace(/Control/g, "⌃")
-    .replace(/Shift/g, "⇧")
-    .replace(/Alt/g, "⌥")
-    .replace(/Option/g, "⌥")
-    .replace(/\+/g, "");
-}
+import { formatShortcutForPlatform, isMacOS } from "@/lib/utils";
 
 async function restoreWindowOnScreen(mouseX?: number, mouseY?: number) {
   const appWindow = getCurrentWindow();
@@ -423,11 +414,11 @@ function App() {
   const getShortcutDisplay = (actionId: string): string => {
     const shortcut = shortcuts.find(s => s.id === actionId);
     if (shortcut && shortcut.enabled) {
-      return formatShortcut(shortcut.shortcut);
+      return formatShortcutForPlatform(shortcut.shortcut);
     }
     // Fallback to defaults
     const defaultShortcut = DEFAULT_SHORTCUTS.find(s => s.id === actionId);
-    return defaultShortcut ? formatShortcut(defaultShortcut.shortcut) : "—";
+    return defaultShortcut ? formatShortcutForPlatform(defaultShortcut.shortcut) : "—";
   };
 
   if (mode === "editing" && tempScreenshotPath) {
@@ -551,7 +542,7 @@ function App() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-zinc-400">Save</span>
-                <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘S</kbd>
+                <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">{isMacOS() ? "⌘S" : "Ctrl+S"}</kbd>
               </div>
             </div>
           </CardContent>
