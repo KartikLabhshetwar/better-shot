@@ -3,7 +3,7 @@
 
 # Better Shot
 
-> An open-source alternative to CleanShot X for macOS. Capture, edit, and enhance your screenshots with professional quality.
+> An open-source alternative to CleanShot X for macOS and Windows. Capture, edit, and enhance your screenshots with professional quality.
 
 Better Shot is a fast, lightweight screenshot tool built with Tauri and React. It provides a powerful yet simple interface for capturing screenshots, editing them with beautiful backgrounds and effects, and sharing them instantly.
 
@@ -11,9 +11,9 @@ Better Shot is a fast, lightweight screenshot tool built with Tauri and React. I
 
 ### Capture Modes
 
-- **Region Capture** - Select any area of your screen with pixel-perfect precision (`⌘⇧2`)
-- **Fullscreen Capture** - Capture your entire screen instantly (`⌘⇧3`)
-- **Window Capture** - Capture a specific window with one click (`⌘⇧4`)
+- **Region Capture** - Select any area of your screen with pixel-perfect precision (`Cmd/Ctrl+Shift+2`)
+- **Fullscreen Capture** - Capture your entire screen instantly (`Cmd/Ctrl+Shift+3`)
+- **Window Capture** - Capture a specific window with one click (`Cmd/Ctrl+Shift+4`)
 
 ### Image Editing
 
@@ -41,7 +41,7 @@ Better Shot is a fast, lightweight screenshot tool built with Tauri and React. I
 - **Clipboard Integration** - Automatically copy screenshots to clipboard
 - **Custom Save Directory** - Choose where your screenshots are saved (defaults to Desktop)
 - **Settings Persistence** - All preferences are saved and restored automatically
-- **System Tray Integration** - Access from the menu bar
+- **System Tray Integration** - Access from the menu bar (macOS) or system tray (Windows)
 - **Native Performance** - Built with Rust and Tauri for minimal resource usage
 
 ### Preferences
@@ -53,6 +53,7 @@ Better Shot is a fast, lightweight screenshot tool built with Tauri and React. I
 ### Why Better Shot?
 
 - **100% Free & Open Source** - No subscriptions, no paywalls
+- **Cross-Platform** - Available for macOS and Windows
 - **Lightweight** - Minimal resource usage compared to Electron apps
 - **Beautiful UI** - Modern, dark-themed interface
 - **Privacy First** - All processing happens locally, no cloud uploads
@@ -63,9 +64,12 @@ Better Shot is a fast, lightweight screenshot tool built with Tauri and React. I
 ### Download Pre-built Release
 
 1. Go to [Releases](https://github.com/KartikLabhshetwar/better-shot/releases)
-2. Download the appropriate DMG file:
+2. Download the appropriate installer for your platform:
+
+#### macOS
    - **Apple Silicon** (M1, M2, M3): `bettershot_*_aarch64.dmg`
    - **Intel Mac**: `bettershot_*_x64.dmg`
+
 3. Open the DMG and drag Better Shot to Applications
 4. **First Launch** (choose one method):
    
@@ -80,6 +84,13 @@ Better Shot is a fast, lightweight screenshot tool built with Tauri and React. I
 5. Grant Screen Recording permission when prompted
 
 > **Note**: Better Shot is ad-hoc signed (free indie app). macOS Gatekeeper shows a warning for apps not notarized through Apple's $99/year developer program. The app is safe - you can [view the source code](https://github.com/KartikLabhshetwar/better-shot) and build it yourself.
+
+#### Windows
+   - Download `bettershot_*_x64-setup.msi`
+   - Run the installer and follow the prompts
+   - Launch Better Shot from the Start Menu or Desktop shortcut
+
+> **Note**: Windows may show a SmartScreen warning for unsigned apps. Click "More info" → "Run anyway" to proceed. The app is completely safe and open source.
 
 ### From Source
 
@@ -100,6 +111,7 @@ The installer will be located in `src-tauri/target/release/bundle/`
 ### Requirements
 
 - **macOS**: 10.15 or later
+- **Windows**: Windows 10 or later
 - **Node.js**: 18 or higher
 - **pnpm**: Latest version
 - **Rust**: Latest stable version (for building from source)

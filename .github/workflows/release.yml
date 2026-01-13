@@ -18,9 +18,15 @@ jobs:
           - platform: macos-latest
             args: '--bundles dmg --target aarch64-apple-darwin'
             arch: 'silicon'
+            rust_targets: 'aarch64-apple-darwin'
           - platform: macos-latest
             args: '--bundles dmg --target x86_64-apple-darwin'
             arch: 'intel'
+            rust_targets: 'x86_64-apple-darwin'
+          - platform: windows-latest
+            args: '--bundles msi'
+            arch: 'x64'
+            rust_targets: ''
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -40,7 +46,7 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          targets: ${{ matrix.rust_targets }}
 
       - name: Install frontend dependencies
         run: pnpm install
@@ -59,8 +65,11 @@ jobs:
             |----------|--------------|----------|
             | macOS | Apple Silicon (M1/M2/M3) | `bettershot_*_aarch64.dmg` |
             | macOS | Intel | `bettershot_*_x64.dmg` |
+            | Windows | x64 | `bettershot_*_x64-setup.msi` |
             
             ## Installation
+            
+            ### macOS
             
             1. Download the `.dmg` file for your Mac
                - **Apple Silicon** (M1, M2, M3): Download the `aarch64` version
@@ -79,6 +88,14 @@ jobs:
             4. Grant Screen Recording permission when prompted in System Settings
             
             > **Note**: This is an ad-hoc signed indie app. macOS shows a warning for apps not notarized through Apple's $99/year developer program. The app is completely safe and open source.
+            
+            ### Windows
+            
+            1. Download the `.msi` installer
+            2. Run the installer and follow the prompts
+            3. Launch Better Shot from the Start Menu or Desktop shortcut
+            
+            > **Note**: Windows may show a SmartScreen warning for unsigned apps. Click "More info" → "Run anyway" to proceed. The app is completely safe and open source.
             
             ## What's New
             

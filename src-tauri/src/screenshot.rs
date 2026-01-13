@@ -20,8 +20,7 @@ pub struct MonitorShot {
 
 /// Capture screenshots of all available monitors
 pub fn capture_all_monitors(save_dir: &str) -> AppResult<Vec<MonitorShot>> {
-    let monitors = Monitor::all()
-        .map_err(|e| format!("Failed to get monitors: {}", e))?;
+    let monitors = Monitor::all().map_err(|e| format!("Failed to get monitors: {}", e))?;
 
     if monitors.is_empty() {
         return Err("No monitors available".into());
@@ -42,11 +41,13 @@ pub fn capture_all_monitors(save_dir: &str) -> AppResult<Vec<MonitorShot>> {
 
 /// Capture a single monitor screenshot
 fn capture_single_monitor(monitor: &Monitor, save_path: &PathBuf) -> AppResult<MonitorShot> {
-    let monitor_id = monitor.id()
+    let monitor_id = monitor
+        .id()
         .map_err(|e| format!("Failed to get monitor id: {}", e))?;
 
     // Capture the screenshot
-    let image = monitor.capture_image()
+    let image = monitor
+        .capture_image()
         .map_err(|e| format!("Failed to capture monitor {}: {}", monitor_id, e))?;
 
     // Generate unique filename
@@ -54,19 +55,25 @@ fn capture_single_monitor(monitor: &Monitor, save_path: &PathBuf) -> AppResult<M
     let screenshot_path = save_path.join(&filename);
 
     // Save the image
-    image.save(&screenshot_path)
+    image
+        .save(&screenshot_path)
         .map_err(|e| format!("Failed to save screenshot: {}", e))?;
 
     // Get monitor geometry
-    let x = monitor.x()
+    let x = monitor
+        .x()
         .map_err(|e| format!("Failed to get monitor x: {}", e))?;
-    let y = monitor.y()
+    let y = monitor
+        .y()
         .map_err(|e| format!("Failed to get monitor y: {}", e))?;
-    let width = monitor.width()
+    let width = monitor
+        .width()
         .map_err(|e| format!("Failed to get monitor width: {}", e))?;
-    let height = monitor.height()
+    let height = monitor
+        .height()
         .map_err(|e| format!("Failed to get monitor height: {}", e))?;
-    let scale_factor = monitor.scale_factor()
+    let scale_factor = monitor
+        .scale_factor()
         .map_err(|e| format!("Failed to get monitor scale factor: {}", e))?;
 
     Ok(MonitorShot {
@@ -81,9 +88,7 @@ fn capture_single_monitor(monitor: &Monitor, save_path: &PathBuf) -> AppResult<M
 }
 
 /// Capture primary monitor using the screenshots plugin
-pub async fn capture_primary_monitor(
-    app_handle: tauri::AppHandle,
-) -> AppResult<PathBuf> {
+pub async fn capture_primary_monitor(app_handle: tauri::AppHandle) -> AppResult<PathBuf> {
     use tauri_plugin_screenshots::{get_monitor_screenshot, get_screenshotable_monitors};
 
     let monitors = get_screenshotable_monitors()
@@ -94,8 +99,7 @@ pub async fn capture_primary_monitor(
         return Err("No monitors available".into());
     }
 
-    let primary_monitor = monitors.first()
-        .ok_or("No monitor found")?;
+    let primary_monitor = monitors.first().ok_or("No monitor found")?;
 
     let screenshot_path = get_monitor_screenshot(app_handle, primary_monitor.id)
         .await

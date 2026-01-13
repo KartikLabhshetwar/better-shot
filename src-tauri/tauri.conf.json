@@ -37,7 +37,9 @@
           "$HOME/Pictures/**",
           "$PICTURES/**",
           "$TEMP/**",
-          "$APPDATA/**"
+          "$APPDATA/**",
+          "$LOCALAPPDATA/**",
+          "$DESKTOP/**"
         ]
       }
     },
@@ -55,6 +57,11 @@
     ],
     "macOS": {
       "signingIdentity": "-"
+    },
+    "windows": {
+      "wix": {
+        "language": "en-US"
+      }
     }
   }
 }
