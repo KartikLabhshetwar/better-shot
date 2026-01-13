@@ -8,7 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { availableMonitors } from "@tauri-apps/api/window";
 import { getCurrentWindow, LogicalPosition, LogicalSize } from "@tauri-apps/api/window";
-import { register, unregisterAll } from "@tauri-apps/plugin-global-shortcut";
+import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Store } from "@tauri-apps/plugin-store";
 import type { KeyboardShortcut } from "./components/preferences/KeyboardShortcutManager";
 import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
@@ -24,8 +24,8 @@ type CaptureMode = "region" | "fullscreen" | "window";
 
 const DEFAULT_SHORTCUTS: KeyboardShortcut[] = [
   { id: "region", action: "Capture Region", shortcut: "CommandOrControl+Shift+2", enabled: true },
-  { id: "fullscreen", action: "Capture Screen", shortcut: "CommandOrControl+Shift+3", enabled: false },
-  { id: "window", action: "Capture Window", shortcut: "CommandOrControl+Shift+4", enabled: false },
+  { id: "fullscreen", action: "Capture Screen", shortcut: "CommandOrControl+Shift+F", enabled: false },
+  { id: "window", action: "Capture Window", shortcut: "CommandOrControl+Shift+D", enabled: false },
 ];
 
 function formatShortcut(shortcut: string): string {
@@ -98,6 +98,7 @@ function App() {
 
   // Refs to hold current values for use in callbacks that may have stale closures
   const settingsRef = useRef({ autoApplyBackground, saveDir, copyToClipboard, tempDir });
+  const registeredShortcutsRef = useRef<Set<string>>(new Set());
   
   // Keep ref in sync with state
   useEffect(() => {
@@ -132,19 +133,12 @@ function App() {
 
       const savedShortcuts = await store.get<KeyboardShortcut[]>("keyboardShortcuts");
       if (savedShortcuts && savedShortcuts.length > 0) {
-        const mergedShortcuts = savedShortcuts.map((savedShortcut) => {
-          const defaultShortcut = DEFAULT_SHORTCUTS.find((d) => d.id === savedShortcut.id);
-          if (defaultShortcut) {
-            return { ...savedShortcut, enabled: defaultShortcut.enabled };
-          }
-          return savedShortcut;
-        });
-        const defaultIds = new Set(DEFAULT_SHORTCUTS.map((d) => d.id));
-        const customShortcuts = savedShortcuts.filter((s) => !defaultIds.has(s.id));
-        const finalShortcuts = [...mergedShortcuts, ...customShortcuts];
+        // Merge saved shortcuts with defaults, preserving all saved values
+        // Only add missing default shortcuts that don't exist in saved
+        const savedIds = new Set(savedShortcuts.map((s) => s.id));
+        const missingDefaults = DEFAULT_SHORTCUTS.filter((d) => !savedIds.has(d.id));
+        const finalShortcuts = [...savedShortcuts, ...missingDefaults];
         setShortcuts(finalShortcuts);
-        await store.set("keyboardShortcuts", finalShortcuts);
-        await store.save();
       } else {
         setShortcuts(DEFAULT_SHORTCUTS);
       }
@@ -239,76 +233,7 @@ function App() {
     }
   }, []);
 
-  // Setup hotkeys whenever settings change
-  useEffect(() => {
-    const setupHotkeys = async () => {
-      try {
-        await unregisterAll();
-        
-        const actionMap: Record<string, CaptureMode> = {
-          "Capture Region": "region",
-          "Capture Screen": "fullscreen",
-          "Capture Window": "window",
-        };
-
-        for (const shortcut of shortcuts) {
-          if (!shortcut.enabled) continue;
-          
-          const action = actionMap[shortcut.action];
-          if (action) {
-            try {
-              await register(shortcut.shortcut, () => handleCapture(action));
-            } catch (err) {
-              console.error(`Failed to register shortcut ${shortcut.shortcut}:`, err);
-            }
-          }
-        }
-      } catch (err) {
-        console.error("Failed to setup hotkeys:", err);
-        setError(`Hotkey registration failed: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    };
-
-    setupHotkeys();
-
-    const unlisten1 = listen("capture-triggered", () => handleCapture("region"));
-    const unlisten2 = listen("capture-fullscreen", () => handleCapture("fullscreen"));
-    const unlisten3 = listen("capture-window", () => handleCapture("window"));
-
-    return () => {
-      unlisten1.then((fn) => fn());
-      unlisten2.then((fn) => fn());
-      unlisten3.then((fn) => fn());
-      unregisterAll().catch(console.error);
-    };
-  }, [shortcuts, settingsVersion]);
-
-  // Reload settings when coming back from preferences
-  const handleSettingsChange = useCallback(async () => {
-    await loadSettings();
-    setSettingsVersion(v => v + 1);
-  }, [loadSettings]);
-
-  // Toggle auto-apply from main page
-  const handleAutoApplyToggle = useCallback(async (checked: boolean) => {
-    setAutoApplyBackground(checked);
-    try {
-      const store = await Store.load("settings.json");
-      await store.set("autoApplyBackground", checked);
-      await store.save();
-    } catch (err) {
-      console.error("Failed to save auto-apply setting:", err);
-      toast.error("Failed to save setting");
-    }
-  }, []);
-
-  const handleBackFromPreferences = useCallback(async () => {
-    await loadSettings();
-    setSettingsVersion(v => v + 1);
-    setMode("main");
-  }, [loadSettings]);
-
-  async function handleCapture(captureMode: CaptureMode = "region") {
+  const handleCapture = useCallback(async (captureMode: CaptureMode = "region") => {
     if (isCapturing) return;
     
     setIsCapturing(true);
@@ -414,7 +339,103 @@ function App() {
     } finally {
       setIsCapturing(false);
     }
-  }
+  }, [isCapturing]);
+
+  // Setup hotkeys whenever settings change
+  useEffect(() => {
+    const setupHotkeys = async () => {
+      try {
+        const shortcutsToUnregister = Array.from(registeredShortcutsRef.current);
+        if (shortcutsToUnregister.length > 0) {
+          try {
+            await unregister(shortcutsToUnregister);
+          } catch (err) {
+            console.error("Failed to unregister shortcuts:", err);
+          }
+        }
+        registeredShortcutsRef.current.clear();
+        
+        const actionMap: Record<string, CaptureMode> = {
+          "Capture Region": "region",
+          "Capture Screen": "fullscreen",
+          "Capture Window": "window",
+        };
+
+        for (const shortcut of shortcuts) {
+          if (!shortcut.enabled) continue;
+          
+          const action = actionMap[shortcut.action];
+          if (action) {
+            try {
+              await register(shortcut.shortcut, () => handleCapture(action));
+              registeredShortcutsRef.current.add(shortcut.shortcut);
+            } catch (err) {
+              console.error(`Failed to register shortcut ${shortcut.shortcut}:`, err);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to setup hotkeys:", err);
+        setError(`Hotkey registration failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    };
+
+    setupHotkeys();
+
+    return () => {
+      const shortcutsToUnregister = Array.from(registeredShortcutsRef.current);
+      if (shortcutsToUnregister.length > 0) {
+        unregister(shortcutsToUnregister).catch(console.error);
+      }
+      registeredShortcutsRef.current.clear();
+    };
+  }, [shortcuts, settingsVersion, handleCapture]);
+
+  // Setup tray menu event listeners - only once on mount
+  useEffect(() => {
+    let unlisten1: (() => void) | null = null;
+    let unlisten2: (() => void) | null = null;
+    let unlisten3: (() => void) | null = null;
+
+    const setupListeners = async () => {
+      unlisten1 = await listen("capture-triggered", () => handleCapture("region"));
+      unlisten2 = await listen("capture-fullscreen", () => handleCapture("fullscreen"));
+      unlisten3 = await listen("capture-window", () => handleCapture("window"));
+    };
+
+    setupListeners();
+
+    return () => {
+      unlisten1?.();
+      unlisten2?.();
+      unlisten3?.();
+    };
+  }, [handleCapture]);
+
+  // Reload settings when coming back from preferences
+  const handleSettingsChange = useCallback(async () => {
+    await loadSettings();
+    setSettingsVersion(v => v + 1);
+  }, [loadSettings]);
+
+  // Toggle auto-apply from main page
+  const handleAutoApplyToggle = useCallback(async (checked: boolean) => {
+    setAutoApplyBackground(checked);
+    try {
+      const store = await Store.load("settings.json");
+      await store.set("autoApplyBackground", checked);
+      await store.save();
+    } catch (err) {
+      console.error("Failed to save auto-apply setting:", err);
+      toast.error("Failed to save setting");
+    }
+  }, []);
+
+  const handleBackFromPreferences = useCallback(async () => {
+    await loadSettings();
+    setSettingsVersion(v => v + 1);
+    setMode("main");
+  }, [loadSettings]);
 
   async function handleEditorSave(editedImageData: string) {
     try {

@@ -42,17 +42,14 @@ pub fn run() {
 
             let open_item = MenuItemBuilder::with_id("open", "Open Better Shot").build(app)?;
 
-            let capture_region_item = MenuItemBuilder::with_id("capture_region", "Capture Region")
-                .accelerator("CommandOrControl+Shift+2")
-                .build(app)?;
+            let capture_region_item =
+                MenuItemBuilder::with_id("capture_region", "Capture Region").build(app)?;
 
-            let capture_screen_item = MenuItemBuilder::with_id("capture_screen", "Capture Screen")
-                .accelerator("CommandOrControl+Shift+3")
-                .build(app)?;
+            let capture_screen_item =
+                MenuItemBuilder::with_id("capture_screen", "Capture Screen").build(app)?;
 
-            let capture_window_item = MenuItemBuilder::with_id("capture_window", "Capture Window")
-                .accelerator("CommandOrControl+Shift+4")
-                .build(app)?;
+            let capture_window_item =
+                MenuItemBuilder::with_id("capture_window", "Capture Window").build(app)?;
 
             let quit_item = MenuItemBuilder::with_id("quit", "Quit")
                 .accelerator("CommandOrControl+Q")

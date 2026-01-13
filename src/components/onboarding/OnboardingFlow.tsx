@@ -29,7 +29,7 @@ const ONBOARDING_STEPS = [
   {
     id: "capture-modes",
     title: "Capture Modes",
-    description: "Better Shot offers three ways to capture your screen. Choose the one that fits your needs.",
+    description: "Better Shot offers three ways to capture your screen, each with a handy keyboard shortcut.",
     icon: (
       <svg className="size-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
@@ -47,7 +47,7 @@ const ONBOARDING_STEPS = [
       </svg>
     ),
     content: (
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div className="grid grid-cols-3 gap-3">
           <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
             <div className="flex flex-col items-center gap-2">
@@ -61,7 +61,7 @@ const ONBOARDING_STEPS = [
               </svg>
               <div className="text-center">
                 <div className="text-sm font-medium text-zinc-200">Region</div>
-                <div className="text-xs text-zinc-500 mt-1">Select area</div>
+                <div className="text-xs text-zinc-500 mt-1">Select area · ⌘⇧2</div>
               </div>
             </div>
           </div>
@@ -77,7 +77,7 @@ const ONBOARDING_STEPS = [
               </svg>
               <div className="text-center">
                 <div className="text-sm font-medium text-zinc-200">Fullscreen</div>
-                <div className="text-xs text-zinc-500 mt-1">Entire screen</div>
+                <div className="text-xs text-zinc-500 mt-1">Entire screen · ⌘⇧F</div>
               </div>
             </div>
           </div>
@@ -99,58 +99,41 @@ const ONBOARDING_STEPS = [
               </svg>
               <div className="text-center">
                 <div className="text-sm font-medium text-zinc-200">Window</div>
-                <div className="text-xs text-zinc-500 mt-1">Single window</div>
+                <div className="text-xs text-zinc-500 mt-1">Single window · ⌘⇧D</div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    ),
-  },
-  {
-    id: "shortcuts",
-    title: "Keyboard Shortcuts",
-    description: "Work faster with global hotkeys. They work even when the app is hidden, and you can customize them in Preferences.",
-    icon: (
-      <svg className="size-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={1.5}
-          d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z"
-        />
-      </svg>
-    ),
-    content: (
-      <div className="space-y-3">
-        <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg border border-zinc-700">
-          <span className="text-sm text-zinc-300">Capture Region</span>
-          <kbd className="px-3 py-1 bg-zinc-900 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">
-            ⌘⇧2
-          </kbd>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg border border-zinc-700">
+            <span className="text-sm text-zinc-300">Capture Region</span>
+            <kbd className="px-3 py-1 bg-zinc-900 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">
+              ⌘⇧2
+            </kbd>
+          </div>
+          <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg border border-zinc-700">
+            <span className="text-sm text-zinc-300">Capture Fullscreen</span>
+            <kbd className="px-3 py-1 bg-zinc-900 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">
+              ⌘⇧F
+            </kbd>
+          </div>
+          <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg border border-zinc-700">
+            <span className="text-sm text-zinc-300">Capture Window</span>
+            <kbd className="px-3 py-1 bg-zinc-900 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">
+              ⌘⇧D
+            </kbd>
+          </div>
+          <p className="text-xs text-zinc-500 text-center pt-2">
+            Customize these shortcuts anytime in Preferences
+          </p>
         </div>
-        <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg border border-zinc-700">
-          <span className="text-sm text-zinc-300">Capture Fullscreen</span>
-          <kbd className="px-3 py-1 bg-zinc-900 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">
-            ⌘⇧3
-          </kbd>
-        </div>
-        <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg border border-zinc-700">
-          <span className="text-sm text-zinc-300">Capture Window</span>
-          <kbd className="px-3 py-1 bg-zinc-900 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">
-            ⌘⇧4
-          </kbd>
-        </div>
-        <p className="text-xs text-zinc-500 text-center pt-2">
-          Customize these shortcuts anytime in Preferences
-        </p>
       </div>
     ),
   },
   {
     id: "settings",
     title: "Settings & Preferences",
-    description: "Customize your workflow with powerful settings. Access them anytime via the gear icon.",
+    description: "Fine-tune how captures behave. Access these options anytime from the gear icon.",
     icon: (
       <svg className="size-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
@@ -170,27 +153,27 @@ const ONBOARDING_STEPS = [
     content: (
       <div className="space-y-4">
         <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
-          <div className="text-sm font-medium text-zinc-200 mb-2">Auto-apply Background</div>
+          <div className="text-sm font-medium text-zinc-200 mb-1">Auto-apply background</div>
           <p className="text-xs text-zinc-400 text-pretty">
-            Enable this on the main screen to instantly apply your default background and save - no editor needed. Perfect for quick captures.
+            Instantly apply your default background and save, without opening the editor.
           </p>
         </div>
         <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
-          <div className="text-sm font-medium text-zinc-200 mb-2">Default Background</div>
+          <div className="text-sm font-medium text-zinc-200 mb-1">Default background</div>
           <p className="text-xs text-zinc-400 text-pretty">
-            Set your preferred background in Preferences. It will be used for auto-apply mode and as the default in the editor.
+            Choose the image Better Shot uses for auto-apply and as the starting point in the editor.
           </p>
         </div>
         <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
-          <div className="text-sm font-medium text-zinc-200 mb-2">Save Directory</div>
+          <div className="text-sm font-medium text-zinc-200 mb-1">Save location</div>
           <p className="text-xs text-zinc-400 text-pretty">
-            Screenshots save to your Desktop by default. Change this in Preferences.
+            Pick where screenshots are saved. Desktop is the default.
           </p>
         </div>
         <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
-          <div className="text-sm font-medium text-zinc-200 mb-2">Copy to Clipboard</div>
+          <div className="text-sm font-medium text-zinc-200 mb-1">Copy to clipboard</div>
           <p className="text-xs text-zinc-400 text-pretty">
-            Automatically copy screenshots to your clipboard for quick sharing.
+            Automatically copy saved screenshots so they are ready to paste.
           </p>
         </div>
       </div>
@@ -200,7 +183,7 @@ const ONBOARDING_STEPS = [
     id: "permissions",
     title: "Screen Recording Permission",
     description:
-      "Better Shot needs Screen Recording permission to capture your screen. This is required by macOS for security.",
+      "Better Shot needs Screen Recording permission from macOS before it can capture your screen.",
     icon: (
       <svg className="size-8 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
@@ -228,29 +211,33 @@ const ONBOARDING_STEPS = [
                 d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <div className="flex-1">
-              <div className="text-sm font-medium text-amber-200 mb-1">Important</div>
-              <p className="text-xs text-amber-300/80 text-pretty">
-                When you first try to capture a screenshot, macOS will show a permission dialog. You
-                must grant Screen Recording permission for Better Shot to work.
-              </p>
+            <div className="flex-1 space-y-1">
+              <div className="text-sm font-medium text-amber-200">Required by macOS</div>
+              <ul className="text-xs text-amber-300/80 space-y-1 text-pretty list-disc list-inside">
+                <li>macOS will ask for Screen Recording the first time you capture.</li>
+                <li>Better Shot cannot capture anything until this is granted.</li>
+              </ul>
             </div>
           </div>
         </div>
         <div className="space-y-3">
           <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
             <div className="text-sm font-medium text-zinc-200 mb-2">How to Grant Permission</div>
-            <ol className="text-xs text-zinc-400 space-y-2 list-decimal list-inside text-pretty">
-              <li>Click "Open System Settings" when the permission dialog appears</li>
-              <li>Or go to System Settings → Privacy & Security → Screen Recording</li>
-              <li>Toggle on "bettershot" in the list</li>
-              <li>Restart Better Shot for the permission to take effect</li>
+            <ol className="text-xs text-zinc-400 space-y-1 list-decimal list-inside text-pretty">
+              <li>Click “Open System Settings” in the macOS prompt.</li>
+              <li>Go to Privacy &amp; Security → Screen Recording.</li>
+              <li>Toggle on <span className="text-zinc-300 font-mono">bettershot</span> in the list.</li>
+              <li>Restart Better Shot so the change takes effect.</li>
             </ol>
           </div>
           <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
             <div className="text-sm font-medium text-zinc-200 mb-2">What You'll See</div>
             <p className="text-xs text-zinc-400 text-pretty">
-              A system dialog will appear saying: <span className="text-zinc-300 font-mono">"bettershot" would like to record this computer's screen and audio.</span> Click "Open System Settings" to grant access.
+              macOS shows a dialog like{" "}
+              <span className="text-zinc-300 font-mono">
+                "bettershot" would like to record this computer&apos;s screen and audio.
+              </span>{" "}
+              Click “Open System Settings” to grant access.
             </p>
           </div>
         </div>

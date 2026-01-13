@@ -25,7 +25,7 @@ export function FAQSection() {
     {
       question: "What capture modes are available?",
       answer:
-        "Better Shot supports three capture modes: Region Capture (⌘⇧2) to select any area, Fullscreen Capture (⌘⇧3) for your entire screen, and Window Capture (⌘⇧4) to capture a specific window. All modes work with global hotkeys from anywhere, and you can customize these shortcuts in Preferences.",
+        "Better Shot supports three capture modes: Region Capture (⌘⇧2) to select any area, Fullscreen Capture (⌘⇧F) for your entire screen, and Window Capture (⌘⇧D) to capture a specific window. All modes work with global hotkeys from anywhere, and you can customize these shortcuts in Preferences.",
     },
     {
       question: "What editing features are included?",

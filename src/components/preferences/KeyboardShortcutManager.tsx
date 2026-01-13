@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Store } from "@tauri-apps/plugin-store";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
@@ -19,8 +19,8 @@ interface KeyboardShortcutManagerProps {
 
 const DEFAULT_SHORTCUTS: KeyboardShortcut[] = [
   { id: "region", action: "Capture Region", shortcut: "CommandOrControl+Shift+2", enabled: true },
-  { id: "fullscreen", action: "Capture Screen", shortcut: "CommandOrControl+Shift+3", enabled: false },
-  { id: "window", action: "Capture Window", shortcut: "CommandOrControl+Shift+4", enabled: false },
+  { id: "fullscreen", action: "Capture Screen", shortcut: "CommandOrControl+Shift+F", enabled: false },
+  { id: "window", action: "Capture Window", shortcut: "CommandOrControl+Shift+D", enabled: false },
 ];
 
 function formatShortcut(shortcut: string): string {
@@ -34,20 +34,60 @@ function formatShortcut(shortcut: string): string {
     .replace(/\+/g, "");
 }
 
-function parseShortcutInput(input: string): string {
-  return input
-    .replace(/⌘/g, "CommandOrControl+")
-    .replace(/⌃/g, "Control+")
-    .replace(/⇧/g, "Shift+")
-    .replace(/⌥/g, "Alt+")
-    .replace(/\s+/g, "")
-    .replace(/\+$/, "");
+// Convert a keyboard event to Tauri shortcut format
+function keyEventToShortcut(e: KeyboardEvent): string | null {
+  const parts: string[] = [];
+  
+  // Build modifier string
+  if (e.metaKey || e.ctrlKey) {
+    parts.push("CommandOrControl");
+  }
+  if (e.shiftKey) {
+    parts.push("Shift");
+  }
+  if (e.altKey) {
+    parts.push("Alt");
+  }
+  
+  // Get the key - ignore modifier-only presses
+  const key = e.key;
+  if (["Control", "Shift", "Alt", "Meta", "Command"].includes(key)) {
+    return null; // Still waiting for the main key
+  }
+  
+  // Need at least one modifier for a valid shortcut
+  if (parts.length === 0) {
+    return null;
+  }
+  
+  // Convert key to proper format
+  let keyName = key.toUpperCase();
+  
+  // Handle special keys
+  if (key === " ") keyName = "Space";
+  else if (key === "ArrowUp") keyName = "Up";
+  else if (key === "ArrowDown") keyName = "Down";
+  else if (key === "ArrowLeft") keyName = "Left";
+  else if (key === "ArrowRight") keyName = "Right";
+  else if (key === "Escape") keyName = "Escape";
+  else if (key === "Enter") keyName = "Enter";
+  else if (key === "Tab") keyName = "Tab";
+  else if (key === "Backspace") keyName = "Backspace";
+  else if (key === "Delete") keyName = "Delete";
+  else if (key.length === 1) keyName = key.toUpperCase();
+  else if (key.startsWith("F") && !isNaN(parseInt(key.slice(1)))) keyName = key; // F1-F12
+  
+  parts.push(keyName);
+  
+  return parts.join("+");
 }
 
 export function KeyboardShortcutManager({ onShortcutsChange }: KeyboardShortcutManagerProps) {
   const [shortcuts, setShortcuts] = useState<KeyboardShortcut[]>(DEFAULT_SHORTCUTS);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
+  const [recordedShortcut, setRecordedShortcut] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const recordingRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const loadShortcuts = async () => {
@@ -55,18 +95,12 @@ export function KeyboardShortcutManager({ onShortcutsChange }: KeyboardShortcutM
         const store = await Store.load("settings.json");
         const saved = await store.get<KeyboardShortcut[]>("keyboardShortcuts");
         if (saved && saved.length > 0) {
-          const mergedShortcuts = saved.map((savedShortcut) => {
-            const defaultShortcut = DEFAULT_SHORTCUTS.find((d) => d.id === savedShortcut.id);
-            if (defaultShortcut) {
-              return { ...savedShortcut, enabled: defaultShortcut.enabled };
-            }
-            return savedShortcut;
-          });
-          const defaultIds = new Set(DEFAULT_SHORTCUTS.map((d) => d.id));
-          const customShortcuts = saved.filter((s) => !defaultIds.has(s.id));
-          setShortcuts([...mergedShortcuts, ...customShortcuts]);
-          await store.set("keyboardShortcuts", [...mergedShortcuts, ...customShortcuts]);
-          await store.save();
+          // Merge saved shortcuts with defaults, preserving all saved values
+          // Only add missing default shortcuts that don't exist in saved
+          const savedIds = new Set(saved.map((s) => s.id));
+          const missingDefaults = DEFAULT_SHORTCUTS.filter((d) => !savedIds.has(d.id));
+          const mergedShortcuts = [...saved, ...missingDefaults];
+          setShortcuts(mergedShortcuts);
         } else {
           setShortcuts(DEFAULT_SHORTCUTS);
         }
@@ -77,6 +111,65 @@ export function KeyboardShortcutManager({ onShortcutsChange }: KeyboardShortcutM
     };
     loadShortcuts();
   }, []);
+
+  // Keyboard recording effect
+  useEffect(() => {
+    if (!isRecording || !editingId) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Escape cancels recording
+      if (e.key === "Escape") {
+        setIsRecording(false);
+        setEditingId(null);
+        setRecordedShortcut(null);
+        return;
+      }
+
+      const shortcut = keyEventToShortcut(e);
+      if (shortcut) {
+        setRecordedShortcut(shortcut);
+      }
+    };
+
+    const handleKeyUp = async (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Only save when we have a recorded shortcut and user releases a key
+      if (recordedShortcut && editingId) {
+        const newShortcuts = shortcuts.map((s) =>
+          s.id === editingId ? { ...s, shortcut: recordedShortcut } : s
+        );
+        setShortcuts(newShortcuts);
+        
+        try {
+          const store = await Store.load("settings.json");
+          await store.set("keyboardShortcuts", newShortcuts);
+          await store.save();
+          onShortcutsChange?.(newShortcuts);
+          toast.success("Shortcut updated");
+        } catch (err) {
+          console.error("Failed to save shortcuts:", err);
+          toast.error("Failed to save shortcuts");
+        }
+
+        setIsRecording(false);
+        setEditingId(null);
+        setRecordedShortcut(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    window.addEventListener("keyup", handleKeyUp, true);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown, true);
+      window.removeEventListener("keyup", handleKeyUp, true);
+    };
+  }, [isRecording, editingId, recordedShortcut, shortcuts, onShortcutsChange]);
 
   const saveShortcuts = useCallback(async (newShortcuts: KeyboardShortcut[]) => {
     try {
@@ -90,31 +183,18 @@ export function KeyboardShortcutManager({ onShortcutsChange }: KeyboardShortcutM
     }
   }, [onShortcutsChange]);
 
-  const handleEdit = useCallback((shortcut: KeyboardShortcut) => {
+  const handleStartRecording = useCallback((shortcut: KeyboardShortcut) => {
     setEditingId(shortcut.id);
-    setEditValue(formatShortcut(shortcut.shortcut));
+    setRecordedShortcut(null);
+    setIsRecording(true);
+    // Focus the recording button to capture keyboard events
+    setTimeout(() => recordingRef.current?.focus(), 0);
   }, []);
 
-  const handleSaveEdit = useCallback(async (id: string) => {
-    const parsed = parseShortcutInput(editValue);
-    if (!parsed) {
-      toast.error("Invalid shortcut format");
-      return;
-    }
-
-    const newShortcuts = shortcuts.map((s) =>
-      s.id === id ? { ...s, shortcut: parsed } : s
-    );
-    setShortcuts(newShortcuts);
+  const handleCancelRecording = useCallback(() => {
+    setIsRecording(false);
     setEditingId(null);
-    setEditValue("");
-    await saveShortcuts(newShortcuts);
-    toast.success("Shortcut updated");
-  }, [editValue, shortcuts, saveShortcuts]);
-
-  const handleCancelEdit = useCallback(() => {
-    setEditingId(null);
-    setEditValue("");
+    setRecordedShortcut(null);
   }, []);
 
   const handleToggle = useCallback(async (id: string) => {
@@ -142,10 +222,10 @@ export function KeyboardShortcutManager({ onShortcutsChange }: KeyboardShortcutM
     };
     const newShortcuts = [...shortcuts, newShortcut];
     setShortcuts(newShortcuts);
-    setEditingId(newId);
-    setEditValue(formatShortcut(newShortcut.shortcut));
     saveShortcuts(newShortcuts);
-  }, [shortcuts, saveShortcuts]);
+    // Start recording for the new shortcut
+    setTimeout(() => handleStartRecording(newShortcut), 100);
+  }, [shortcuts, saveShortcuts, handleStartRecording]);
 
   return (
     <div className="space-y-4">
@@ -169,34 +249,19 @@ export function KeyboardShortcutManager({ onShortcutsChange }: KeyboardShortcutM
             <CardContent className="p-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  {editingId === shortcut.id ? (
+                  {editingId === shortcut.id && isRecording ? (
                     <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            handleSaveEdit(shortcut.id);
-                          } else if (e.key === "Escape") {
-                            handleCancelEdit();
-                          }
-                        }}
-                        className="flex-1 px-2 py-1 bg-zinc-900 border border-zinc-600 rounded text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-600"
+                      <button
+                        ref={recordingRef}
+                        className="flex-1 px-2 py-1 bg-zinc-900 border-2 border-blue-500 rounded text-zinc-100 text-sm focus:outline-none animate-pulse text-left"
                         autoFocus
-                      />
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleSaveEdit(shortcut.id)}
-                        className="text-zinc-300 hover:text-zinc-50"
                       >
-                        Save
-                      </Button>
+                        {recordedShortcut ? formatShortcut(recordedShortcut) : "Press shortcut..."}
+                      </button>
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={handleCancelEdit}
+                        onClick={handleCancelRecording}
                         className="text-zinc-300 hover:text-zinc-50"
                       >
                         Cancel
@@ -206,8 +271,9 @@ export function KeyboardShortcutManager({ onShortcutsChange }: KeyboardShortcutM
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-zinc-300 flex-1">{shortcut.action}</span>
                       <button
-                        onClick={() => handleEdit(shortcut)}
+                        onClick={() => handleStartRecording(shortcut)}
                         className="px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums hover:bg-zinc-800 hover:border-zinc-600 transition-colors"
+                        title="Click to record new shortcut"
                       >
                         {formatShortcut(shortcut.shortcut)}
                       </button>

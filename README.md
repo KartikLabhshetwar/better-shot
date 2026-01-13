@@ -12,8 +12,8 @@ Better Shot is a fast, lightweight screenshot tool built with Tauri and React. I
 ### Capture Modes
 
 - **Region Capture** - Select any area of your screen with pixel-perfect precision (`⌘⇧2`)
-- **Fullscreen Capture** - Capture your entire screen instantly (`⌘⇧3`)
-- **Window Capture** - Capture a specific window with one click (`⌘⇧4`)
+- **Fullscreen Capture** - Capture your entire screen instantly (`⌘⇧F`)
+- **Window Capture** - Capture a specific window with one click (`⌘⇧D`)
 
 ### Image Editing
 
@@ -119,7 +119,7 @@ This permission is required for the app to capture screenshots of your screen.
 ### Quick Start
 
 1. **Launch the app** - Open Better Shot from Applications or use the menu bar icon
-2. **Capture** - Use global hotkeys (`⌘⇧2`, `⌘⇧3`, or `⌘⇧4`) or click buttons in the app
+2. **Capture** - Use global hotkeys (`⌘⇧2`, `⌘⇧F`, or `⌘⇧D`) or click buttons in the app
 3. **Select** - For region capture, click and drag to select the area
 4. **Edit** - Add backgrounds, effects, blur, shadows, and adjust border radius
 5. **Annotate** - Use the annotation toolbar to add shapes, arrows, text, and numbered labels
@@ -144,8 +144,8 @@ The homepage displays a comprehensive keyboard shortcuts reference, organized in
 | Action | Default Shortcut |
 | --- | --- |
 | Capture Region | `⌘⇧2` |
-| Capture Fullscreen | `⌘⇧3` |
-| Capture Window | `⌘⇧4` |
+| Capture Fullscreen | `⌘⇧F` |
+| Capture Window | `⌘⇧D` |
 | Cancel Selection | `Esc` |
 
 #### Editor Shortcuts
