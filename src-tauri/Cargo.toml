@@ -25,7 +25,11 @@ serde_json = "1"
 tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-opener = "2"
+tauri-plugin-process = "2"
 tauri-plugin-screenshots = "2"
 tauri-plugin-store = "2"
 xcap = "0.8"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
 

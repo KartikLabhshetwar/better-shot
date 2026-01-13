@@ -46,6 +46,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -55,6 +56,14 @@
     ],
     "macOS": {
       "signingIdentity": "-"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhCOTBFNzVFQzJCMjlBODYKUldTR21yTENYdWVRaTRZbnNhcG5DaGk3eVprZ2k1RUNWSG9ybGlTbkpuR3AySkswdGZkSUExbDYK",
+      "endpoints": [
+        "https://github.com/KartikLabhshetwar/better-shot/releases/latest/download/latest.json"
+      ]
     }
   }
 }

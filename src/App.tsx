@@ -10,10 +10,13 @@ import { availableMonitors } from "@tauri-apps/api/window";
 import { getCurrentWindow, LogicalPosition, LogicalSize } from "@tauri-apps/api/window";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Store } from "@tauri-apps/plugin-store";
+import { check } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import type { KeyboardShortcut } from "./components/preferences/KeyboardShortcutManager";
 import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
 import { PreferencesPage } from "./components/preferences/PreferencesPage";
 import { SettingsIcon } from "./components/SettingsIcon";
+import { UpdateDialog } from "./components/UpdateDialog";
 import { AppWindowMac, Crop, Monitor } from "lucide-react";
 import { toast } from "sonner";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -95,6 +98,11 @@ function App() {
   const [shortcuts, setShortcuts] = useState<KeyboardShortcut[]>(DEFAULT_SHORTCUTS);
   const [settingsVersion, setSettingsVersion] = useState(0);
   const [tempDir, setTempDir] = useState<string>("/tmp");
+  const [updateAvailable, setUpdateAvailable] = useState<{
+    version: string;
+    body?: string;
+  } | null>(null);
+  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
 
   // Refs to hold current values for use in callbacks that may have stale closures
   const settingsRef = useRef({ autoApplyBackground, saveDir, copyToClipboard, tempDir });
@@ -228,9 +236,77 @@ function App() {
 
     initializeApp();
 
-    if (!hasCompletedOnboarding()) {
+    const shouldShowOnboarding = !hasCompletedOnboarding();
+    if (shouldShowOnboarding) {
       setShowOnboarding(true);
+    } else {
+      checkForUpdates();
     }
+  }, []);
+
+  const checkForUpdates = useCallback(async () => {
+    try {
+      const update = await check();
+      if (update?.available) {
+        setUpdateAvailable({
+          version: update.version,
+          body: update.body,
+        });
+        setShowUpdateDialog(true);
+      }
+    } catch (err) {
+      console.error("Failed to check for updates:", err);
+    }
+  }, []);
+
+  const handleUpdate = useCallback(
+    async (onProgress: (progress: number) => void) => {
+      if (!updateAvailable) return;
+
+      try {
+        const update = await check();
+        if (!update?.available) {
+          throw new Error("Update no longer available");
+        }
+
+        let downloaded = 0;
+        let contentLength = 0;
+
+        await update.downloadAndInstall((event) => {
+          switch (event.event) {
+            case "Started":
+              contentLength = event.data.contentLength ?? 0;
+              onProgress(0);
+              break;
+            case "Progress":
+              downloaded += event.data.chunkLength;
+              if (contentLength > 0) {
+                const progress = Math.min(
+                  Math.round((downloaded / contentLength) * 100),
+                  100
+                );
+                onProgress(progress);
+              } else {
+                onProgress(Math.min(downloaded / 1000000, 99));
+              }
+              break;
+            case "Finished":
+              onProgress(100);
+              break;
+          }
+        });
+
+        await relaunch();
+      } catch (err) {
+        console.error("Update failed:", err);
+        throw err;
+      }
+    },
+    [updateAvailable]
+  );
+
+  const handleSkipUpdate = useCallback(() => {
+    setShowUpdateDialog(false);
   }, []);
 
   const handleCapture = useCallback(async (captureMode: CaptureMode = "region") => {
@@ -490,7 +566,14 @@ function App() {
   }
 
   if (showOnboarding) {
-    return <OnboardingFlow onComplete={() => setShowOnboarding(false)} />;
+    return (
+      <OnboardingFlow
+        onComplete={() => {
+          setShowOnboarding(false);
+          checkForUpdates();
+        }}
+      />
+    );
   }
 
   if (mode === "preferences") {
@@ -503,8 +586,19 @@ function App() {
   }
 
   return (
-    <main className="min-h-dvh flex flex-col items-center justify-center p-8 bg-zinc-950 text-zinc-50">
-      <div className="w-full max-w-2xl space-y-6">
+    <>
+      {updateAvailable && (
+        <UpdateDialog
+          open={showUpdateDialog}
+          onOpenChange={setShowUpdateDialog}
+          version={updateAvailable.version}
+          releaseNotes={updateAvailable.body}
+          onUpdate={handleUpdate}
+          onSkip={handleSkipUpdate}
+        />
+      )}
+      <main className="min-h-dvh flex flex-col items-center justify-center p-8 bg-zinc-950 text-zinc-50">
+        <div className="w-full max-w-2xl space-y-6">
         <div className="relative text-center space-y-2">
           <div className="absolute top-0 right-0">
             <SettingsIcon onClick={() => setMode("preferences")} />
@@ -650,6 +744,7 @@ function App() {
         </Card>
       </div>
     </main>
+    </>
   );
 }
 
