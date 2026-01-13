@@ -3,11 +3,11 @@
 import { motion } from "framer-motion"
 import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
-import { Download, ChevronDown, Play } from "lucide-react"
+import { Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { trackDownload } from "@/lib/analytics"
 import { HeroVideoDialog } from "@/components/ui/hero-video-dialog"
+import { DownloadDropdown } from "@/components/download-dropdown"
 
 export default function Hero() {
   const [mounted, setMounted] = useState(false)
@@ -18,11 +18,6 @@ export default function Hero() {
 
   if (!mounted) {
     return null
-  }
-
-  const handleDownload = () => {
-    trackDownload("hero")
-    window.open("https://github.com/KartikLabhshetwar/better-shot/releases/latest", "_blank")
   }
 
   return (
@@ -89,22 +84,10 @@ export default function Hero() {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="flex items-center gap-4 flex-wrap"
             >
-              <Button
-                onClick={handleDownload}
-                size="lg"
-                className={cn(
-                  "rounded-lg bg-gradient-to-b from-primary to-primary/80 text-primary-foreground",
-                  "shadow-[0px_2px_0px_0px_rgba(255,255,255,0.3)_inset]",
-                  "hover:shadow-[0px_4px_0px_0px_rgba(255,255,255,0.3)_inset]",
-                  "transition-all px-6 py-3 text-base font-medium"
-                )}
-              >
-                <ChevronDown className="mr-2 h-5 w-5" />
-                Download for macOS
-              </Button>
+              <DownloadDropdown source="hero" />
               <HeroVideoDialog
-                videoSrc="https://www.youtube.com/embed/Pi5Ag_ZRsEo"
-                thumbnailSrc="https://img.youtube.com/vi/Pi5Ag_ZRsEo/maxresdefault.jpg"
+                videoSrc="https://www.youtube.com/embed/cnI-cgNeRLs"
+                thumbnailSrc="https://img.youtube.com/vi/cnI-cgNeRLs/maxresdefault.jpg"
                 thumbnailAlt="Better Shot Demo Video"
                 animationStyle="from-center"
                 trigger={

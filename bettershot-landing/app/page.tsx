@@ -8,9 +8,10 @@ import { TestimonialsSection } from "@/components/testimonials"
 import { NewReleasePromo } from "@/components/new-release-promo"
 import { FAQSection } from "@/components/faq-section"
 import { StickyFooter } from "@/components/sticky-footer"
-import { trackDownload } from "@/lib/analytics"
+import { InstallationInstructions } from "@/components/installation-instructions"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { DownloadDropdown } from "@/components/download-dropdown"
 
 export default function Home() {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -191,15 +192,7 @@ export default function Home() {
               <p>Star us on GitHub</p>
             </TooltipContent>
           </Tooltip>
-          <a
-            href="https://github.com/KartikLabhshetwar/better-shot/releases/latest"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => trackDownload("navbar")}
-            className="rounded-md font-bold relative cursor-pointer hover:-translate-y-0.5 transition duration-200 inline-block text-center bg-gradient-to-b from-primary to-primary/80 text-primary-foreground shadow-[0px_2px_0px_0px_rgba(255,255,255,0.3)_inset] px-4 py-2 text-sm"
-          >
-            Download
-          </a>
+          <DownloadDropdown source="navbar" size="default" showLabel={false} />
         </div>
       </header>
 
@@ -273,15 +266,9 @@ export default function Home() {
                     <p>Star us on GitHub</p>
                   </TooltipContent>
                 </Tooltip>
-                <a
-                  href="https://github.com/KartikLabhshetwar/better-shot/releases/latest"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => trackDownload("mobile-menu")}
-                  className="px-4 py-3 text-lg font-bold text-center bg-gradient-to-b from-primary to-primary/80 text-primary-foreground rounded-lg shadow-lg hover:-translate-y-0.5 transition-all duration-200"
-                >
-                  Download
-                </a>
+                <div className="px-4">
+                  <DownloadDropdown source="mobile-menu" size="lg" showLabel={false} />
+                </div>
               </div>
             </nav>
           </div>
@@ -302,6 +289,9 @@ export default function Home() {
       </div> */}
 
       <NewReleasePromo />
+
+      {/* Installation Instructions */}
+      <InstallationInstructions />
 
       {/* FAQ Section */}
       <div id="faq">
