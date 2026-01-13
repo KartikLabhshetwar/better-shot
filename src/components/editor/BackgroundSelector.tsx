@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { cn } from "@/lib/utils";
 import mesh1 from "@/assets/mesh/mesh1.webp";
 import mesh2 from "@/assets/mesh/mesh2.webp";
@@ -37,7 +38,7 @@ interface BackgroundSelectorProps {
   onGradientSelect?: (gradient: GradientOption) => void;
 }
 
-export function BackgroundSelector({
+export const BackgroundSelector = memo(function BackgroundSelector({
   backgroundType,
   customColor,
   selectedGradient,
@@ -148,7 +149,7 @@ export function BackgroundSelector({
       </div>
     </div>
   );
-}
+});
 
 export { gradientOptions };
 export type { GradientOption };

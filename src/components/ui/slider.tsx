@@ -4,15 +4,46 @@ import { cn } from "@/lib/utils";
 export interface SliderProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange"> {
   value?: number[];
+  /** Called on every change during drag - use for visual feedback */
   onValueChange?: (value: number[]) => void;
+  /** Called when interaction ends (mouseup/touchend) - use for committing to state/history */
+  onValueCommit?: (value: number[]) => void;
 }
 
 const Slider = React.forwardRef<HTMLInputElement, SliderProps>(
-  ({ className, value = [0], onValueChange, min = 0, max = 100, step = 1, ...props }, ref) => {
+  ({ className, value = [0], onValueChange, onValueCommit, min = 0, max = 100, step = 1, ...props }, ref) => {
+    // Track the value during drag for commit
+    const valueRef = React.useRef(value[0]);
+    const isDraggingRef = React.useRef(false);
+    
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const newValue = [Number(e.target.value)];
-      onValueChange?.(newValue);
+      const newValue = Number(e.target.value);
+      valueRef.current = newValue;
+      onValueChange?.([newValue]);
     };
+
+    const handlePointerDown = () => {
+      isDraggingRef.current = true;
+    };
+
+    const handlePointerUp = () => {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        onValueCommit?.([valueRef.current]);
+      }
+    };
+
+    // Handle keyboard changes - commit immediately
+    const handleKeyUp = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) {
+        onValueCommit?.([valueRef.current]);
+      }
+    };
+
+    // Update ref when controlled value changes
+    React.useEffect(() => {
+      valueRef.current = value[0] ?? 0;
+    }, [value]);
 
     const minNum = Number(min);
     const maxNum = Number(max);
@@ -35,6 +66,10 @@ const Slider = React.forwardRef<HTMLInputElement, SliderProps>(
           ref={ref}
           value={valueNum}
           onChange={handleChange}
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerUp}
+          onKeyUp={handleKeyUp}
           min={minNum}
           max={maxNum}
           step={step}

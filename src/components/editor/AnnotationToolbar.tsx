@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Circle, Square, Minus, ArrowUpRight, Type, Hash, MousePointer2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -20,7 +21,7 @@ const tools: Array<{ type: ToolType; icon: React.ReactNode; label: string }> = [
   { type: "text", icon: <Type className="size-4" />, label: "Text" },
 ];
 
-export function AnnotationToolbar({ selectedTool, onToolSelect, onDelete }: AnnotationToolbarProps) {
+export const AnnotationToolbar = memo(function AnnotationToolbar({ selectedTool, onToolSelect, onDelete }: AnnotationToolbarProps) {
   return (
     <TooltipProvider delayDuration={200}>
       <div className="flex items-center gap-1 px-4 py-2 border-b border-zinc-800 bg-zinc-900">
@@ -70,4 +71,4 @@ export function AnnotationToolbar({ selectedTool, onToolSelect, onDelete }: Anno
       </div>
     </TooltipProvider>
   );
-}
+});

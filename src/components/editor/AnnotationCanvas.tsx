@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, memo } from "react";
 import { Annotation, ToolType, Point } from "@/types/annotations";
 import { drawAnnotationOnCanvas } from "@/lib/annotation-utils";
 import { cn } from "@/lib/utils";
@@ -9,17 +9,21 @@ interface AnnotationCanvasProps {
   selectedTool: ToolType;
   previewUrl: string | null;
   onAnnotationAdd: (annotation: Annotation) => void;
+  /** Called during drag - should NOT commit to history */
+  onAnnotationUpdateTransient?: (annotation: Annotation) => void;
+  /** Called on drag end - should commit to history */
   onAnnotationUpdate: (annotation: Annotation) => void;
   onAnnotationSelect: (annotation: Annotation | null) => void;
   onAnnotationDelete?: (id: string) => void;
 }
 
-export function AnnotationCanvas({
+export const AnnotationCanvas = memo(function AnnotationCanvas({
   annotations,
   selectedAnnotation,
   selectedTool,
   previewUrl,
   onAnnotationAdd,
+  onAnnotationUpdateTransient,
   onAnnotationUpdate,
   onAnnotationSelect,
 }: AnnotationCanvasProps) {
@@ -27,6 +31,8 @@ export function AnnotationCanvas({
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const rafRef = useRef<number | null>(null);
+  
+  // Local state for drag operation - avoids store updates during drag
   const [imageLoaded, setImageLoaded] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPoint, setStartPoint] = useState<Point | null>(null);
@@ -34,6 +40,9 @@ export function AnnotationCanvas({
   const [draggingAnnotation, setDraggingAnnotation] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState<Point | null>(null);
   const [nextNumber, setNextNumber] = useState(1);
+  
+  // Track initial position for drag operations
+  const dragStartAnnotationRef = useRef<Annotation | null>(null);
 
   // Load image once and cache it
   useEffect(() => {
@@ -43,7 +52,6 @@ export function AnnotationCanvas({
       return;
     }
 
-    // Reset imageLoaded when previewUrl changes to trigger redraw after new image loads
     setImageLoaded(false);
 
     const img = new Image();
@@ -295,13 +303,13 @@ export function AnnotationCanvas({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Set canvas internal dimensions to match image (for drawing)
+    // Set canvas internal dimensions to match image
     if (canvas.width !== img.width || canvas.height !== img.height) {
       canvas.width = img.width;
       canvas.height = img.height;
     }
     
-    // Calculate display size to fit container while maintaining aspect ratio
+    // Calculate display size to fit container
     const containerRect = container.getBoundingClientRect();
     const containerWidth = containerRect.width;
     const containerHeight = containerRect.height;
@@ -319,7 +327,6 @@ export function AnnotationCanvas({
       displayWidth = displayHeight * imgAspect;
     }
 
-    // Set CSS size for display (this scales the canvas visually)
     canvas.style.width = `${displayWidth}px`;
     canvas.style.height = `${displayHeight}px`;
     
@@ -343,7 +350,7 @@ export function AnnotationCanvas({
     redraw();
   }, [redraw]);
 
-  // Handle window resize to recalculate canvas display size
+  // Handle window resize
   useEffect(() => {
     const handleResize = () => {
       if (imageLoaded) {
@@ -367,6 +374,8 @@ export function AnnotationCanvas({
           x: point.x - clickedAnnotation.x,
           y: point.y - clickedAnnotation.y,
         });
+        // Store the initial annotation state for undo
+        dragStartAnnotationRef.current = { ...clickedAnnotation };
       } else {
         onAnnotationSelect(null);
       }
@@ -400,13 +409,19 @@ export function AnnotationCanvas({
             (updated as typeof annotation & { endX: number; endY: number }).endX = annotation.endX + dx;
             (updated as typeof annotation & { endX: number; endY: number }).endY = annotation.endY + dy;
           }
-          onAnnotationUpdate(updated as Annotation);
+          // Use transient update if available (no history push)
+          if (onAnnotationUpdateTransient) {
+            onAnnotationUpdateTransient(updated as Annotation);
+          } else {
+            // Fallback - will push to history on every move (bad for perf)
+            onAnnotationUpdate(updated as Annotation);
+          }
         }
       });
     } else if (isDrawing && startPoint) {
       setCurrentPoint(point);
     }
-  }, [getCanvasCoordinates, draggingAnnotation, dragOffset, annotations, isDrawing, startPoint, onAnnotationUpdate]);
+  }, [getCanvasCoordinates, draggingAnnotation, dragOffset, annotations, isDrawing, startPoint, onAnnotationUpdateTransient, onAnnotationUpdate]);
 
   const handleMouseUp = () => {
     if (isDrawing && startPoint && currentPoint && selectedTool && selectedTool !== "select") {
@@ -421,8 +436,18 @@ export function AnnotationCanvas({
       setStartPoint(null);
       setCurrentPoint(null);
     } else if (draggingAnnotation) {
+      // Commit the final position to history
+      const annotation = annotations.find((ann) => ann.id === draggingAnnotation);
+      if (annotation && dragStartAnnotationRef.current) {
+        // Only commit if position actually changed
+        const startAnn = dragStartAnnotationRef.current;
+        if (annotation.x !== startAnn.x || annotation.y !== startAnn.y) {
+          onAnnotationUpdate(annotation);
+        }
+      }
       setDraggingAnnotation(null);
       setDragOffset(null);
+      dragStartAnnotationRef.current = null;
     }
   };
 
@@ -452,4 +477,4 @@ export function AnnotationCanvas({
       />
     </div>
   );
-}
+});

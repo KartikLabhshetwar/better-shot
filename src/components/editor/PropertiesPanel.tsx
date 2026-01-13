@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Annotation, LineType, ArrowType } from "@/types/annotations";
@@ -8,7 +8,7 @@ interface PropertiesPanelProps {
   onUpdate: (annotation: Annotation) => void;
 }
 
-export function PropertiesPanel({ annotation, onUpdate }: PropertiesPanelProps) {
+export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpdate }: PropertiesPanelProps) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["fill", "border"]));
 
   // Auto-expand relevant sections based on annotation type
@@ -339,4 +339,4 @@ export function PropertiesPanel({ annotation, onUpdate }: PropertiesPanelProps) 
       </div>
     </div>
   );
-}
+});

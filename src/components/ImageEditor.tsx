@@ -14,7 +14,15 @@ import { AnnotationToolbar } from "./editor/AnnotationToolbar";
 import { AnnotationCanvas } from "./editor/AnnotationCanvas";
 import { PropertiesPanel } from "./editor/PropertiesPanel";
 import { Annotation, ToolType } from "@/types/annotations";
-import { useEditorState, usePreviewGenerator, assetCategories } from "@/hooks";
+import { usePreviewGenerator } from "@/hooks/usePreviewGenerator";
+import { assetCategories } from "@/hooks/useEditorSettings";
+import {
+  useSettings,
+  useAnnotations,
+  useCanUndo,
+  useCanRedo,
+  editorActions,
+} from "@/stores";
 
 interface ImageEditorProps {
   imagePath: string;
@@ -23,9 +31,13 @@ interface ImageEditorProps {
 }
 
 export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
-  // Use combined editor state hook with undo/redo for both settings and annotations
-  const editorState = useEditorState();
-  const { settings, annotations, canUndo, canRedo, undo, redo } = editorState;
+  // Use Zustand store with selectors for optimized re-renders
+  const settings = useSettings();
+  const annotations = useAnnotations();
+  const canUndo = useCanUndo();
+  const canRedo = useCanRedo();
+  // Use stable actions object (not a hook, doesn't cause re-renders)
+  const actions = editorActions;
   
   // Screenshot image state
   const [screenshotImage, setScreenshotImage] = useState<HTMLImageElement | null>(null);
@@ -53,6 +65,11 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
 
   // Combined error
   const error = loadError || previewError;
+
+  // Initialize store on mount
+  useEffect(() => {
+    editorActions.initialize();
+  }, []);
 
   // Restore window state on mount
   useEffect(() => {
@@ -183,20 +200,25 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
 
   // Annotation handlers
   const handleAnnotationAdd = useCallback((annotation: Annotation) => {
-    editorState.addAnnotation(annotation);
+    actions.addAnnotation(annotation);
     setSelectedAnnotation(annotation);
     setSelectedTool("select");
-  }, [editorState]);
+  }, [actions]);
+
+  const handleAnnotationUpdateTransient = useCallback((annotation: Annotation) => {
+    actions.updateAnnotationTransient(annotation);
+    setSelectedAnnotation(annotation);
+  }, [actions]);
 
   const handleAnnotationUpdate = useCallback((annotation: Annotation) => {
-    editorState.updateAnnotation(annotation);
+    actions.updateAnnotation(annotation);
     setSelectedAnnotation(annotation);
-  }, [editorState]);
+  }, [actions]);
 
   const handleAnnotationDelete = useCallback((id: string) => {
-    editorState.deleteAnnotation(id);
+    actions.deleteAnnotation(id);
     setSelectedAnnotation((prev) => prev?.id === id ? null : prev);
-  }, [editorState]);
+  }, [actions]);
 
   const handleDeleteSelected = useCallback(() => {
     if (selectedAnnotation) {
@@ -206,14 +228,14 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
 
   // Undo/Redo handlers
   const handleUndo = useCallback(() => {
-    undo();
+    actions.undo();
     setSelectedAnnotation(null);
-  }, [undo]);
+  }, [actions]);
 
   const handleRedo = useCallback(() => {
-    redo();
+    actions.redo();
     setSelectedAnnotation(null);
-  }, [redo]);
+  }, [actions]);
 
   // Delete annotation with keyboard
   useEffect(() => {
@@ -394,33 +416,40 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
                 backgroundType={settings.backgroundType as "transparent" | "white" | "black" | "gray" | "gradient" | "custom"}
                 customColor={settings.customColor}
                 selectedGradient={selectedGradientOption.id}
-                onBackgroundTypeChange={editorState.setBackgroundType}
-                onCustomColorChange={editorState.setCustomColor}
-                onGradientSelect={editorState.setGradient}
+                onBackgroundTypeChange={actions.setBackgroundType}
+                onCustomColorChange={actions.setCustomColor}
+                onGradientSelect={actions.setGradient}
               />
 
               <AssetGrid
                 categories={assetCategories}
                 selectedImage={settings.selectedImageSrc}
                 backgroundType={settings.backgroundType}
-                onImageSelect={editorState.handleImageSelect}
+                onImageSelect={actions.handleImageSelect}
               />
 
               <EffectsPanel
                 blurAmount={settings.blurAmount}
                 noiseAmount={settings.noiseAmount}
                 shadow={settings.shadow}
-                onBlurChange={editorState.setBlurAmount}
-                onNoiseChange={editorState.setNoiseAmount}
-                onShadowBlurChange={editorState.setShadowBlur}
-                onShadowOffsetXChange={editorState.setShadowOffsetX}
-                onShadowOffsetYChange={editorState.setShadowOffsetY}
-                onShadowOpacityChange={editorState.setShadowOpacity}
+                onBlurChangeTransient={actions.setBlurAmountTransient}
+                onNoiseChangeTransient={actions.setNoiseAmountTransient}
+                onShadowBlurChangeTransient={actions.setShadowBlurTransient}
+                onShadowOffsetXChangeTransient={actions.setShadowOffsetXTransient}
+                onShadowOffsetYChangeTransient={actions.setShadowOffsetYTransient}
+                onShadowOpacityChangeTransient={actions.setShadowOpacityTransient}
+                onBlurChange={actions.setBlurAmount}
+                onNoiseChange={actions.setNoiseAmount}
+                onShadowBlurChange={actions.setShadowBlur}
+                onShadowOffsetXChange={actions.setShadowOffsetX}
+                onShadowOffsetYChange={actions.setShadowOffsetY}
+                onShadowOpacityChange={actions.setShadowOpacity}
               />
 
               <ImageRoundnessControl
                 borderRadius={settings.borderRadius}
-                onBorderRadiusChange={editorState.setBorderRadius}
+                onBorderRadiusChangeTransient={actions.setBorderRadiusTransient}
+                onBorderRadiusChange={actions.setBorderRadius}
               />
 
               {error && (
@@ -448,6 +477,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
                 selectedTool={selectedTool}
                 previewUrl={previewUrl}
                 onAnnotationAdd={handleAnnotationAdd}
+                onAnnotationUpdateTransient={handleAnnotationUpdateTransient}
                 onAnnotationUpdate={handleAnnotationUpdate}
                 onAnnotationSelect={setSelectedAnnotation}
                 onAnnotationDelete={handleAnnotationDelete}

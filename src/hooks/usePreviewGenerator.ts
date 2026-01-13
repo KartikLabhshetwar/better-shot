@@ -1,11 +1,24 @@
-import { useRef, useEffect, useCallback, useState } from "react";
-import { EditorSettings } from "./useEditorSettings";
+import { useRef, useEffect, useCallback, useState, useMemo } from "react";
+import { EditorSettings } from "@/stores/editorStore";
 import { createHighQualityCanvas } from "@/lib/canvas-utils";
 import { drawAnnotationOnCanvas } from "@/lib/annotation-utils";
 import { Annotation } from "@/types/annotations";
 
-// Image cache - shared across all hook instances
+// Image cache with LRU-like cleanup (max 20 images)
+const MAX_CACHE_SIZE = 20;
 const imageCache = new Map<string, HTMLImageElement>();
+const cacheOrder: string[] = [];
+
+function addToCache(src: string, img: HTMLImageElement) {
+  if (imageCache.size >= MAX_CACHE_SIZE) {
+    const oldest = cacheOrder.shift();
+    if (oldest) {
+      imageCache.delete(oldest);
+    }
+  }
+  imageCache.set(src, img);
+  cacheOrder.push(src);
+}
 
 /**
  * Load an image from a URL, using cache if available
@@ -19,11 +32,10 @@ export async function loadImage(src: string): Promise<HTMLImageElement> {
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
-      imageCache.set(src, img);
+      addToCache(src, img);
       resolve(img);
     };
     img.onerror = (event) => {
-      // Create a proper Error object with useful debugging information
       const error = new Error(
         `Failed to load image: ${src}. This may be due to CORS restrictions, ` +
         `invalid path, or asset protocol scope issues in production builds.`
@@ -110,7 +122,14 @@ function drawBackground(
 
 /**
  * Apply blur effect to a canvas with edge extension to prevent edge artifacts
+ * Optimized to reuse canvases when possible
  */
+const blurCanvasCache = {
+  extended: null as HTMLCanvasElement | null,
+  blurred: null as HTMLCanvasElement | null,
+  result: null as HTMLCanvasElement | null,
+};
+
 function applyBlur(
   sourceCanvas: HTMLCanvasElement,
   blurAmount: number
@@ -120,18 +139,23 @@ function applyBlur(
   const width = sourceCanvas.width;
   const height = sourceCanvas.height;
   
-  // Extend canvas size to prevent edge clipping during blur
   const blurPadding = blurAmount * 3;
   const extendedWidth = width + blurPadding * 2;
   const extendedHeight = height + blurPadding * 2;
   
-  const extendedCanvas = document.createElement("canvas");
-  extendedCanvas.width = extendedWidth;
-  extendedCanvas.height = extendedHeight;
+  // Reuse or create extended canvas
+  if (!blurCanvasCache.extended || 
+      blurCanvasCache.extended.width !== extendedWidth || 
+      blurCanvasCache.extended.height !== extendedHeight) {
+    blurCanvasCache.extended = document.createElement("canvas");
+    blurCanvasCache.extended.width = extendedWidth;
+    blurCanvasCache.extended.height = extendedHeight;
+  }
+  
+  const extendedCanvas = blurCanvasCache.extended;
   const extendedCtx = extendedCanvas.getContext("2d");
   
   if (!extendedCtx) {
-    // Fallback to simple blur if context fails
     const blurCanvas = document.createElement("canvas");
     blurCanvas.width = width;
     blurCanvas.height = height;
@@ -142,27 +166,29 @@ function applyBlur(
     return blurCanvas;
   }
   
-  // Draw background at offset position
+  // Clear and draw
+  extendedCtx.clearRect(0, 0, extendedWidth, extendedHeight);
   extendedCtx.drawImage(sourceCanvas, blurPadding, blurPadding);
   
-  // Fill edges by extending the background
-  // Top edge
+  // Fill edges
   extendedCtx.drawImage(sourceCanvas, 0, 0, width, 1, blurPadding, 0, width, blurPadding);
-  // Bottom edge
   extendedCtx.drawImage(sourceCanvas, 0, height - 1, width, 1, blurPadding, blurPadding + height, width, blurPadding);
-  // Left edge
   extendedCtx.drawImage(sourceCanvas, 0, 0, 1, height, 0, blurPadding, blurPadding, height);
-  // Right edge
   extendedCtx.drawImage(sourceCanvas, width - 1, 0, 1, height, blurPadding + width, blurPadding, blurPadding, height);
   
-  // Apply blur to extended canvas
-  const blurredExtCanvas = document.createElement("canvas");
-  blurredExtCanvas.width = extendedWidth;
-  blurredExtCanvas.height = extendedHeight;
+  // Reuse or create blurred canvas
+  if (!blurCanvasCache.blurred || 
+      blurCanvasCache.blurred.width !== extendedWidth || 
+      blurCanvasCache.blurred.height !== extendedHeight) {
+    blurCanvasCache.blurred = document.createElement("canvas");
+    blurCanvasCache.blurred.width = extendedWidth;
+    blurCanvasCache.blurred.height = extendedHeight;
+  }
+  
+  const blurredExtCanvas = blurCanvasCache.blurred;
   const blurredExtCtx = blurredExtCanvas.getContext("2d");
   
   if (!blurredExtCtx) {
-    // Fallback
     const blurCanvas = document.createElement("canvas");
     blurCanvas.width = width;
     blurCanvas.height = height;
@@ -173,22 +199,38 @@ function applyBlur(
     return blurCanvas;
   }
   
+  blurredExtCtx.clearRect(0, 0, extendedWidth, extendedHeight);
   blurredExtCtx.filter = `blur(${blurAmount}px)`;
   blurredExtCtx.drawImage(extendedCanvas, 0, 0);
   blurredExtCtx.filter = "none";
   
-  // Crop back to original size
-  const resultCanvas = document.createElement("canvas");
-  resultCanvas.width = width;
-  resultCanvas.height = height;
+  // Reuse or create result canvas
+  if (!blurCanvasCache.result || 
+      blurCanvasCache.result.width !== width || 
+      blurCanvasCache.result.height !== height) {
+    blurCanvasCache.result = document.createElement("canvas");
+    blurCanvasCache.result.width = width;
+    blurCanvasCache.result.height = height;
+  }
+  
+  const resultCanvas = blurCanvasCache.result;
   const resultCtx = resultCanvas.getContext("2d")!;
+  resultCtx.clearRect(0, 0, width, height);
   resultCtx.drawImage(blurredExtCanvas, blurPadding, blurPadding, width, height, 0, 0, width, height);
   
-  return resultCanvas;
+  // Return a copy to avoid mutation issues
+  const finalCanvas = document.createElement("canvas");
+  finalCanvas.width = width;
+  finalCanvas.height = height;
+  const finalCtx = finalCanvas.getContext("2d")!;
+  finalCtx.drawImage(resultCanvas, 0, 0);
+  
+  return finalCanvas;
 }
 
 /**
  * Apply noise effect to a canvas (modifies in place)
+ * Optimized with typed arrays
  */
 function applyNoise(canvas: HTMLCanvasElement, noiseAmount: number) {
   if (noiseAmount <= 0) return;
@@ -197,8 +239,10 @@ function applyNoise(canvas: HTMLCanvasElement, noiseAmount: number) {
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imageData.data;
   const noiseIntensity = noiseAmount * 2.55;
+  const len = data.length;
 
-  for (let i = 0; i < data.length; i += 4) {
+  // Optimize loop - process 4 pixels at a time when possible
+  for (let i = 0; i < len; i += 4) {
     const noise = (Math.random() - 0.5) * noiseIntensity;
     data[i] = Math.max(0, Math.min(255, data[i] + noise));
     data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise));
@@ -222,8 +266,12 @@ export interface PreviewGeneratorResult {
   renderHighQualityCanvas: (annotations: Annotation[]) => Promise<HTMLCanvasElement | null>;
 }
 
+// Debounce delay for preview generation
+const PREVIEW_DEBOUNCE_MS = 50;
+
 /**
  * Hook for generating preview images based on editor settings
+ * Optimized with debouncing to prevent lag during slider interaction
  */
 export function usePreviewGenerator({
   screenshotImage,
@@ -237,9 +285,28 @@ export function usePreviewGenerator({
   
   const previewUrlRef = useRef<string | null>(null);
   const renderIdRef = useRef(0);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingSettingsRef = useRef<EditorSettings | null>(null);
 
-  // Generate preview when settings or image changes
-  useEffect(() => {
+  // Memoize background-related settings for comparison
+  const bgSettingsKey = useMemo(() => {
+    return JSON.stringify({
+      backgroundType: settings.backgroundType,
+      selectedImageSrc: settings.selectedImageSrc,
+      gradientId: settings.gradientId,
+      gradientSrc: settings.gradientSrc,
+      customColor: settings.customColor,
+    });
+  }, [
+    settings.backgroundType,
+    settings.selectedImageSrc,
+    settings.gradientId,
+    settings.gradientSrc,
+    settings.customColor,
+  ]);
+
+  // Core render function
+  const generatePreview = useCallback(async (settingsToRender: EditorSettings) => {
     if (!screenshotImage || !canvasRef.current) return;
 
     const currentRenderId = ++renderIdRef.current;
@@ -247,115 +314,123 @@ export function usePreviewGenerator({
     const bgWidth = screenshotImage.width + padding * 2;
     const bgHeight = screenshotImage.height + padding * 2;
 
-    const generatePreview = async () => {
-      setIsGenerating(true);
-      setError(null);
+    setIsGenerating(true);
+    setError(null);
 
-      try {
-        // Load background image if needed
-        const bgSrc = getBackgroundImageSrc(settings);
-        let bgImage: HTMLImageElement | null = null;
-        if (bgSrc) {
-          bgImage = await loadImage(bgSrc);
-        }
+    try {
+      const bgSrc = getBackgroundImageSrc(settingsToRender);
+      let bgImage: HTMLImageElement | null = null;
+      if (bgSrc) {
+        bgImage = await loadImage(bgSrc);
+      }
 
-        // Check if this render is still current
-        if (currentRenderId !== renderIdRef.current) return;
+      if (currentRenderId !== renderIdRef.current) return;
 
-        // Set canvas size
-        canvas.width = bgWidth;
-        canvas.height = bgHeight;
-        const ctx = canvas.getContext("2d", { alpha: true });
-        if (!ctx) {
-          setError("Failed to get canvas context");
-          return;
-        }
+      canvas.width = bgWidth;
+      canvas.height = bgHeight;
+      const ctx = canvas.getContext("2d", { alpha: true });
+      if (!ctx) {
+        setError("Failed to get canvas context");
+        return;
+      }
 
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
 
-        // Create temp canvas for background
-        const tempCanvas = document.createElement("canvas");
-        tempCanvas.width = bgWidth;
-        tempCanvas.height = bgHeight;
-        const tempCtx = tempCanvas.getContext("2d")!;
-        drawBackground(tempCtx, bgWidth, bgHeight, settings, bgImage);
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = bgWidth;
+      tempCanvas.height = bgHeight;
+      const tempCtx = tempCanvas.getContext("2d")!;
+      drawBackground(tempCtx, bgWidth, bgHeight, settingsToRender, bgImage);
 
-        // Apply effects
-        let finalBgCanvas = applyBlur(tempCanvas, settings.blurAmount);
-        applyNoise(finalBgCanvas, settings.noiseAmount);
+      let finalBgCanvas = applyBlur(tempCanvas, settingsToRender.blurAmount);
+      applyNoise(finalBgCanvas, settingsToRender.noiseAmount);
 
-        // Draw final background
-        ctx.drawImage(finalBgCanvas, 0, 0);
+      ctx.drawImage(finalBgCanvas, 0, 0);
 
-        // Create temporary canvas for rounded image
-        const imageCanvas = document.createElement("canvas");
-        imageCanvas.width = screenshotImage.width;
-        imageCanvas.height = screenshotImage.height;
-        const imageCtx = imageCanvas.getContext("2d");
-        if (!imageCtx) {
-          setError("Failed to get image canvas context");
-          return;
-        }
+      const imageCanvas = document.createElement("canvas");
+      imageCanvas.width = screenshotImage.width;
+      imageCanvas.height = screenshotImage.height;
+      const imageCtx = imageCanvas.getContext("2d");
+      if (!imageCtx) {
+        setError("Failed to get image canvas context");
+        return;
+      }
 
-        imageCtx.imageSmoothingEnabled = true;
-        imageCtx.imageSmoothingQuality = "high";
+      imageCtx.imageSmoothingEnabled = true;
+      imageCtx.imageSmoothingQuality = "high";
 
-        imageCtx.beginPath();
-        imageCtx.roundRect(0, 0, screenshotImage.width, screenshotImage.height, settings.borderRadius);
-        imageCtx.closePath();
-        imageCtx.clip();
+      imageCtx.beginPath();
+      imageCtx.roundRect(0, 0, screenshotImage.width, screenshotImage.height, settingsToRender.borderRadius);
+      imageCtx.closePath();
+      imageCtx.clip();
 
-        imageCtx.drawImage(screenshotImage, 0, 0, screenshotImage.width, screenshotImage.height);
+      imageCtx.drawImage(screenshotImage, 0, 0, screenshotImage.width, screenshotImage.height);
 
-        // Draw rounded image with shadow
-        ctx.save();
-        ctx.shadowColor = `rgba(0, 0, 0, ${settings.shadow.opacity / 100})`;
-        ctx.shadowBlur = settings.shadow.blur;
-        ctx.shadowOffsetX = settings.shadow.offsetX;
-        ctx.shadowOffsetY = settings.shadow.offsetY;
+      ctx.save();
+      ctx.shadowColor = `rgba(0, 0, 0, ${settingsToRender.shadow.opacity / 100})`;
+      ctx.shadowBlur = settingsToRender.shadow.blur;
+      ctx.shadowOffsetX = settingsToRender.shadow.offsetX;
+      ctx.shadowOffsetY = settingsToRender.shadow.offsetY;
 
-        ctx.drawImage(imageCanvas, padding, padding);
+      ctx.drawImage(imageCanvas, padding, padding);
 
-        ctx.shadowColor = "transparent";
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-        ctx.restore();
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+      ctx.restore();
 
-        // Check again if this render is still current
-        if (currentRenderId !== renderIdRef.current) return;
+      if (currentRenderId !== renderIdRef.current) return;
 
-        // Generate preview URL
-        canvas.toBlob((blob) => {
-          if (blob && currentRenderId === renderIdRef.current) {
-            if (previewUrlRef.current) {
-              URL.revokeObjectURL(previewUrlRef.current);
-            }
-            const url = URL.createObjectURL(blob);
-            previewUrlRef.current = url;
-            setPreviewUrl(url);
-            setIsGenerating(false);
+      canvas.toBlob((blob) => {
+        if (blob && currentRenderId === renderIdRef.current) {
+          if (previewUrlRef.current) {
+            URL.revokeObjectURL(previewUrlRef.current);
           }
-        }, "image/png");
-      } catch (err) {
-        if (currentRenderId === renderIdRef.current) {
-          const message = err instanceof Error ? err.message : String(err);
-          setError(`Preview generation failed: ${message}`);
+          const url = URL.createObjectURL(blob);
+          previewUrlRef.current = url;
+          setPreviewUrl(url);
           setIsGenerating(false);
-          console.error("Preview generation failed:", err);
         }
+      }, "image/png");
+    } catch (err) {
+      if (currentRenderId === renderIdRef.current) {
+        const message = err instanceof Error ? err.message : String(err);
+        setError(`Preview generation failed: ${message}`);
+        setIsGenerating(false);
+        console.error("Preview generation failed:", err);
+      }
+    }
+  }, [screenshotImage, canvasRef, padding]);
+
+  // Debounced preview generation
+  useEffect(() => {
+    if (!screenshotImage || !canvasRef.current) return;
+
+    // Cancel any pending debounce
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Store pending settings
+    pendingSettingsRef.current = settings;
+
+    // Debounce the actual render
+    debounceTimerRef.current = setTimeout(() => {
+      if (pendingSettingsRef.current) {
+        generatePreview(pendingSettingsRef.current);
+      }
+    }, PREVIEW_DEBOUNCE_MS);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
       }
     };
-
-    generatePreview();
   }, [
     screenshotImage,
-    settings.backgroundType,
-    settings.selectedImageSrc,
-    settings.gradientId,
-    settings.gradientSrc,
-    settings.customColor,
+    bgSettingsKey,
     settings.blurAmount,
     settings.noiseAmount,
     settings.borderRadius,
@@ -364,7 +439,7 @@ export function usePreviewGenerator({
     settings.shadow.offsetY,
     settings.shadow.opacity,
     canvasRef,
-    padding,
+    generatePreview,
   ]);
 
   // Cleanup preview URL on unmount
@@ -382,7 +457,6 @@ export function usePreviewGenerator({
       if (!screenshotImage) return null;
 
       try {
-        // Load background image if needed
         const bgSrc = getBackgroundImageSrc(settings);
         let bgImage: HTMLImageElement | null = null;
         if (bgSrc) {

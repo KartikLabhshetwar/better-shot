@@ -38,7 +38,7 @@ export async function processScreenshotWithDefaultBackground(
               selectedImage: defaultBgImage,
               bgImage: bgImg,
               blurAmount: 0,
-              noiseAmount: 0,
+              noiseAmount: 20,
               borderRadius: 18,
               padding: 100,
               shadow: {

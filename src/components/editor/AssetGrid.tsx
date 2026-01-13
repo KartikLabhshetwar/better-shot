@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { cn } from "@/lib/utils";
 
 export interface Asset {
@@ -19,7 +19,7 @@ interface AssetGridProps {
   onImageSelect: (imageSrc: string) => void;
 }
 
-export function AssetGrid({ categories, selectedImage, backgroundType, onImageSelect }: AssetGridProps) {
+export const AssetGrid = memo(function AssetGrid({ categories, selectedImage, backgroundType, onImageSelect }: AssetGridProps) {
   const [activeCategory, setActiveCategory] = useState(categories[0]?.name || "");
 
   const currentCategory = categories.find((cat) => cat.name === activeCategory);
@@ -82,4 +82,4 @@ export function AssetGrid({ categories, selectedImage, backgroundType, onImageSe
       </div>
     </div>
   );
-}
+});

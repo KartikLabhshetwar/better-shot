@@ -1,10 +1,19 @@
+import { memo } from "react";
 import { Slider } from "@/components/ui/slider";
-import type { ShadowSettings } from "@/hooks/useEditorSettings";
+import type { ShadowSettings } from "@/stores/editorStore";
 
 interface EffectsPanelProps {
   blurAmount: number;
   noiseAmount: number;
   shadow: ShadowSettings;
+  // Transient handlers (during drag) - for visual feedback
+  onBlurChangeTransient?: (value: number) => void;
+  onNoiseChangeTransient?: (value: number) => void;
+  onShadowBlurChangeTransient?: (value: number) => void;
+  onShadowOffsetXChangeTransient?: (value: number) => void;
+  onShadowOffsetYChangeTransient?: (value: number) => void;
+  onShadowOpacityChangeTransient?: (value: number) => void;
+  // Commit handlers (on release) - for state/history
   onBlurChange: (value: number) => void;
   onNoiseChange: (value: number) => void;
   onShadowBlurChange: (value: number) => void;
@@ -13,10 +22,16 @@ interface EffectsPanelProps {
   onShadowOpacityChange: (value: number) => void;
 }
 
-export function EffectsPanel({
+export const EffectsPanel = memo(function EffectsPanel({
   blurAmount,
   noiseAmount,
   shadow,
+  onBlurChangeTransient,
+  onNoiseChangeTransient,
+  onShadowBlurChangeTransient,
+  onShadowOffsetXChangeTransient,
+  onShadowOffsetYChangeTransient,
+  onShadowOpacityChangeTransient,
   onBlurChange,
   onNoiseChange,
   onShadowBlurChange,
@@ -40,7 +55,8 @@ export function EffectsPanel({
             </div>
             <Slider
               value={[blurAmount]}
-              onValueChange={(value) => onBlurChange(value[0])}
+              onValueChange={(value) => onBlurChangeTransient?.(value[0])}
+              onValueCommit={(value) => onBlurChange(value[0])}
               min={0}
               max={100}
               step={1}
@@ -55,7 +71,8 @@ export function EffectsPanel({
             </div>
             <Slider
               value={[noiseAmount]}
-              onValueChange={(value) => onNoiseChange(value[0])}
+              onValueChange={(value) => onNoiseChangeTransient?.(value[0])}
+              onValueCommit={(value) => onNoiseChange(value[0])}
               min={0}
               max={100}
               step={1}
@@ -79,7 +96,8 @@ export function EffectsPanel({
             </div>
             <Slider
               value={[shadow.blur]}
-              onValueChange={(value) => onShadowBlurChange(value[0])}
+              onValueChange={(value) => onShadowBlurChangeTransient?.(value[0])}
+              onValueCommit={(value) => onShadowBlurChange(value[0])}
               min={0}
               max={100}
               step={1}
@@ -94,7 +112,8 @@ export function EffectsPanel({
             </div>
             <Slider
               value={[shadow.offsetX]}
-              onValueChange={(value) => onShadowOffsetXChange(value[0])}
+              onValueChange={(value) => onShadowOffsetXChangeTransient?.(value[0])}
+              onValueCommit={(value) => onShadowOffsetXChange(value[0])}
               min={-50}
               max={50}
               step={1}
@@ -109,7 +128,8 @@ export function EffectsPanel({
             </div>
             <Slider
               value={[shadow.offsetY]}
-              onValueChange={(value) => onShadowOffsetYChange(value[0])}
+              onValueChange={(value) => onShadowOffsetYChangeTransient?.(value[0])}
+              onValueCommit={(value) => onShadowOffsetYChange(value[0])}
               min={-50}
               max={50}
               step={1}
@@ -124,7 +144,8 @@ export function EffectsPanel({
             </div>
             <Slider
               value={[shadow.opacity]}
-              onValueChange={(value) => onShadowOpacityChange(value[0])}
+              onValueChange={(value) => onShadowOpacityChangeTransient?.(value[0])}
+              onValueCommit={(value) => onShadowOpacityChange(value[0])}
               min={0}
               max={100}
               step={1}
@@ -135,4 +156,4 @@ export function EffectsPanel({
       </div>
     </div>
   );
-}
+});

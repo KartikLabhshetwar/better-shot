@@ -1,12 +1,15 @@
+import { memo } from "react";
 import { Slider } from "@/components/ui/slider";
 
 interface ImageRoundnessControlProps {
   borderRadius: number;
+  onBorderRadiusChangeTransient?: (value: number) => void;
   onBorderRadiusChange: (value: number) => void;
 }
 
-export function ImageRoundnessControl({
+export const ImageRoundnessControl = memo(function ImageRoundnessControl({
   borderRadius,
+  onBorderRadiusChangeTransient,
   onBorderRadiusChange,
 }: ImageRoundnessControlProps) {
   return (
@@ -22,7 +25,8 @@ export function ImageRoundnessControl({
         </div>
         <Slider
           value={[borderRadius]}
-          onValueChange={(value) => onBorderRadiusChange(value[0])}
+          onValueChange={(value) => onBorderRadiusChangeTransient?.(value[0])}
+          onValueCommit={(value) => onBorderRadiusChange(value[0])}
           min={0}
           max={50}
           step={1}
@@ -32,4 +36,4 @@ export function ImageRoundnessControl({
       </div>
     </div>
   );
-}
+});
