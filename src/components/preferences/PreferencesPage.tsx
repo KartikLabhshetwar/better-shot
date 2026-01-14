@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Store } from "@tauri-apps/plugin-store";
-import { ArrowLeft, Folder } from "lucide-react";
+import { ArrowLeft, Folder, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import type { KeyboardShortcut } from "./KeyboardShortcutManager";
 interface PreferencesPageProps {
   onBack: () => void;
   onSettingsChange?: () => void;
+  onCheckForUpdates?: () => Promise<boolean>;
 }
 
 interface GeneralSettings {
@@ -19,12 +20,36 @@ interface GeneralSettings {
   copyToClipboard: boolean;
 }
 
-export function PreferencesPage({ onBack, onSettingsChange }: PreferencesPageProps) {
+export function PreferencesPage({ onBack, onSettingsChange, onCheckForUpdates }: PreferencesPageProps) {
   const [settings, setSettings] = useState<GeneralSettings>({
     saveDir: "",
     copyToClipboard: true,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
+
+  const handleCheckForUpdates = useCallback(async () => {
+    if (!onCheckForUpdates) return;
+    
+    setIsCheckingUpdates(true);
+    try {
+      const hasUpdate = await onCheckForUpdates();
+      // Only show "up to date" toast if no update was found
+      if (!hasUpdate) {
+        toast.success("You're up to date!", {
+          description: `Better Shot v${__APP_VERSION__} is the latest version.`,
+          duration: 3000,
+        });
+      }
+    } catch (err) {
+      toast.error("Failed to check for updates", {
+        description: err instanceof Error ? err.message : "Please try again later.",
+        duration: 4000,
+      });
+    } finally {
+      setIsCheckingUpdates(false);
+    }
+  }, [onCheckForUpdates]);
 
   // Load settings on mount
   useEffect(() => {
@@ -198,6 +223,40 @@ export function PreferencesPage({ onBack, onSettingsChange }: PreferencesPagePro
                   </div>
                 </div>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* About */}
+        <Card className="bg-zinc-900 border-zinc-800">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg font-semibold text-zinc-100">About</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-zinc-300">Better Shot</p>
+                <p className="text-xs text-zinc-500">Version {__APP_VERSION__}</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCheckForUpdates}
+                disabled={isCheckingUpdates}
+                className="border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100"
+              >
+                {isCheckingUpdates ? (
+                  <>
+                    <RefreshCw className="mr-2 size-4 animate-spin" aria-hidden="true" />
+                    Checking...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 size-4" aria-hidden="true" />
+                    Check for Updates
+                  </>
+                )}
+              </Button>
             </div>
           </CardContent>
         </Card>

@@ -16,10 +16,10 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
-            args: '--bundles dmg --target aarch64-apple-darwin'
+            args: '--target aarch64-apple-darwin'
             arch: 'silicon'
           - platform: macos-latest
-            args: '--bundles dmg --target x86_64-apple-darwin'
+            args: '--target x86_64-apple-darwin'
             arch: 'intel'
 
     runs-on: ${{ matrix.platform }}
@@ -90,6 +90,7 @@ jobs:
             - Global keyboard shortcuts
           releaseDraft: true
           prerelease: false
+          includeUpdaterJson: true
           args: ${{ matrix.args }}
 
   publish:

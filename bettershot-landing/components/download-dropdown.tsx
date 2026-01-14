@@ -9,13 +9,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { cn } from "@/lib/utils"
 import { trackDownload } from "@/lib/analytics"
-
-const DOWNLOAD_LINKS = {
-  appleSilicon: "https://github.com/KartikLabhshetwar/better-shot/releases/download/v0.1.6/bettershot_0.1.6_aarch64.dmg",
-  intel: "https://github.com/KartikLabhshetwar/better-shot/releases/download/v0.1.6/bettershot_0.1.6_x64.dmg",
-}
+import { downloadLinks } from "@/lib/downloads"
+import { cn } from "@/lib/utils"
 
 interface DownloadDropdownProps {
   source: "navbar" | "hero" | "cta" | "mobile-menu"
@@ -36,7 +32,7 @@ export function DownloadDropdown({
 }: DownloadDropdownProps) {
   const handleDownload = (arch: "appleSilicon" | "intel") => {
     trackDownload(source)
-    window.open(DOWNLOAD_LINKS[arch], "_blank")
+    window.open(downloadLinks[arch], "_blank")
   }
 
   const buttonContent = children || (
