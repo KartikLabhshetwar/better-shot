@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Circle, Square, Minus, ArrowUpRight, Type, Hash, MousePointer2, Trash2 } from "lucide-react";
+import { Circle, Square, Minus, ArrowUpRight, Type, Hash, MousePointer2, Trash2, Scan } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ToolType } from "@/types/annotations";
@@ -19,6 +19,7 @@ const tools: Array<{ type: ToolType; icon: React.ReactNode; label: string }> = [
   { type: "arrow", icon: <ArrowUpRight className="size-4" />, label: "Arrow" },
   { type: "number", icon: <Hash className="size-4" />, label: "Number" },
   { type: "text", icon: <Type className="size-4" />, label: "Text" },
+  { type: "blur", icon: <Scan className="size-4" />, label: "Blur an area" },
 ];
 
 export const AnnotationToolbar = memo(function AnnotationToolbar({ selectedTool, onToolSelect, onDelete }: AnnotationToolbarProps) {
