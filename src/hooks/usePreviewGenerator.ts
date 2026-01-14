@@ -438,6 +438,7 @@ export function usePreviewGenerator({
     settings.shadow.offsetX,
     settings.shadow.offsetY,
     settings.shadow.opacity,
+    padding,
     canvasRef,
     generatePreview,
   ]);
