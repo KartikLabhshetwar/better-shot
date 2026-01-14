@@ -32,8 +32,15 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
     shadow = { blur: 20, offsetX: 0, offsetY: 10, opacity: 30 },
   } = options;
 
-  const bgWidth = image.width + padding * 2;
-  const bgHeight = image.height + padding * 2;
+  // Calculate effective padding: user padding + space needed for shadow
+  const shadowPadding = Math.max(
+    shadow.blur + Math.abs(shadow.offsetX),
+    shadow.blur + Math.abs(shadow.offsetY)
+  );
+  const effectivePadding = padding + shadowPadding;
+
+  const bgWidth = image.width + effectivePadding * 2;
+  const bgHeight = image.height + effectivePadding * 2;
 
   const canvas = document.createElement("canvas");
   canvas.width = bgWidth * scale;
@@ -138,7 +145,7 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
   ctx.shadowOffsetX = shadow.offsetX;
   ctx.shadowOffsetY = shadow.offsetY;
 
-  ctx.drawImage(imageCanvas, padding, padding);
+  ctx.drawImage(imageCanvas, effectivePadding, effectivePadding);
 
   ctx.shadowColor = "transparent";
   ctx.shadowBlur = 0;
