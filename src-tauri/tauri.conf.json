@@ -34,7 +34,11 @@
           "/private/tmp/**",
           "/var/**",
           "/private/var/**",
+          "/Library/Desktop Pictures/**",
+          "/System/Library/Desktop Pictures/**",
           "$HOME/Pictures/**",
+          "$HOME/Library/Application Support/com.apple.mobileAssetDesktop/**",
+          "$HOME/Library/Application Support/com.apple.wallpaper/**",
           "$PICTURES/**",
           "$TEMP/**",
           "$APPDATA/**"

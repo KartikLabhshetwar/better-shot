@@ -293,6 +293,27 @@ pub async fn get_mouse_position() -> Result<(f64, f64), String> {
     Ok((x, y))
 }
 
+/// Get the current macOS wallpaper (desktop picture) path
+#[tauri::command]
+pub async fn get_current_wallpaper() -> Result<String, String> {
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg("tell application \"System Events\" to get picture of desktop 1")
+        .output()
+        .map_err(|e| format!("Failed to get wallpaper: {}", e))?;
+
+    if !output.status.success() {
+        return Err("Failed to get wallpaper".to_string());
+    }
+
+    let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if path.is_empty() {
+        return Err("Wallpaper path is empty".to_string());
+    }
+
+    Ok(path)
+}
+
 /// Capture specific window using macOS native screencapture
 #[tauri::command]
 pub async fn native_capture_window(save_dir: String) -> Result<String, String> {

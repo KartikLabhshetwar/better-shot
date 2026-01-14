@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { Store } from "@tauri-apps/plugin-store";
 import { gradientOptions, type GradientOption } from "@/components/editor/BackgroundSelector";
-import { resolveBackgroundPath, getDefaultBackgroundPath } from "@/lib/asset-registry";
+import { resolveBackgroundPathAsync, getDefaultBackgroundPath } from "@/lib/asset-registry";
 
 // Import all background images
 import bgImage13 from "@/assets/bg-images/asset-13.jpg";
@@ -124,8 +124,7 @@ export function useEditorSettings(): [EditorSettings, EditorSettingsActions] {
         const store = await Store.load("settings.json");
         const storedBg = await store.get<string>("defaultBackgroundImage");
         if (storedBg) {
-          // Resolve stored value (asset ID or data URL) to actual path
-          const resolvedPath = resolveBackgroundPath(storedBg);
+          const resolvedPath = await resolveBackgroundPathAsync(storedBg);
           setSelectedImageSrc(resolvedPath);
         }
       } catch (err) {

@@ -3,7 +3,7 @@ import { subscribeWithSelector } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { Store } from "@tauri-apps/plugin-store";
 import { gradientOptions, type GradientOption } from "@/components/editor/BackgroundSelector";
-import { resolveBackgroundPath, getDefaultBackgroundPath } from "@/lib/asset-registry";
+import { resolveBackgroundPathAsync, getDefaultBackgroundPath } from "@/lib/asset-registry";
 import { Annotation } from "@/types/annotations";
 
 // ============================================================================
@@ -161,7 +161,7 @@ export const useEditorStore = create<EditorStore>()(
           const store = await Store.load("settings.json");
           const storedBg = await store.get<string>("defaultBackgroundImage");
           if (storedBg) {
-            const resolvedPath = resolveBackgroundPath(storedBg);
+            const resolvedPath = await resolveBackgroundPathAsync(storedBg);
             set((state) => {
               state.settings.selectedImageSrc = resolvedPath;
               state._isInitialized = true;

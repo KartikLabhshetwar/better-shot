@@ -16,13 +16,23 @@ interface AssetGridProps {
   categories: AssetCategory[];
   selectedImage: string | null;
   backgroundType: string;
+  systemWallpaperSrc?: string | null;
   onImageSelect: (imageSrc: string) => void;
 }
 
-export const AssetGrid = memo(function AssetGrid({ categories, selectedImage, backgroundType, onImageSelect }: AssetGridProps) {
+export const AssetGrid = memo(function AssetGrid({ categories, selectedImage, backgroundType, systemWallpaperSrc, onImageSelect }: AssetGridProps) {
   const [activeCategory, setActiveCategory] = useState(categories[0]?.name || "");
 
   const currentCategory = categories.find((cat) => cat.name === activeCategory);
+  const showSystemWallpaper = currentCategory?.name === "Wallpapers" && !!systemWallpaperSrc;
+  const assetsToRender = currentCategory
+    ? [
+        ...(showSystemWallpaper
+          ? [{ id: "system-wallpaper", src: systemWallpaperSrc!, name: "Current Wallpaper" }]
+          : []),
+        ...currentCategory.assets,
+      ]
+    : [];
 
   return (
     <div className="space-y-4">
@@ -51,7 +61,7 @@ export const AssetGrid = memo(function AssetGrid({ categories, selectedImage, ba
       )}
 
       <div className="grid grid-cols-4 gap-2 max-h-[400px] overflow-y-auto pr-4 pb-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-zinc-700 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
-        {currentCategory?.assets.map((asset) => (
+        {assetsToRender.map((asset) => (
           <button
             key={asset.id}
             onClick={() => onImageSelect(asset.src)}
@@ -68,6 +78,11 @@ export const AssetGrid = memo(function AssetGrid({ categories, selectedImage, ba
               alt={asset.name}
               className="w-full h-full object-cover transition-transform group-hover:scale-110"
             />
+            {asset.id === "system-wallpaper" && (
+              <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-[10px] text-white px-2 py-1 text-pretty">
+                Current wallpaper
+              </div>
+            )}
             {backgroundType === "image" && selectedImage === asset.src && (
               <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
                 <div className="size-6 rounded-full bg-blue-500 flex items-center justify-center shadow-lg">
