@@ -48,103 +48,112 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
 
-  const tempBgCanvas = document.createElement("canvas");
-  tempBgCanvas.width = bgWidth;
-  tempBgCanvas.height = bgHeight;
-  const tempBgCtx = tempBgCanvas.getContext("2d");
-  if (!tempBgCtx) throw new Error("Failed to get temp canvas context");
+  // When padding is 0, skip background and shadow - just draw the image directly
+  if (padding === 0) {
+    ctx.beginPath();
+    ctx.roundRect(0, 0, image.width, image.height, borderRadius);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(image, 0, 0, image.width, image.height);
+  } else {
+    const tempBgCanvas = document.createElement("canvas");
+    tempBgCanvas.width = bgWidth;
+    tempBgCanvas.height = bgHeight;
+    const tempBgCtx = tempBgCanvas.getContext("2d");
+    if (!tempBgCtx) throw new Error("Failed to get temp canvas context");
 
-  drawBackground(tempBgCtx, bgWidth, bgHeight, backgroundType, customColor, selectedImage, bgImage, gradientImage);
+    drawBackground(tempBgCtx, bgWidth, bgHeight, backgroundType, customColor, selectedImage, bgImage, gradientImage);
 
-  const bgCanvas = document.createElement("canvas");
-  bgCanvas.width = bgWidth;
-  bgCanvas.height = bgHeight;
-  const bgCtx = bgCanvas.getContext("2d");
-  if (!bgCtx) throw new Error("Failed to get bg canvas context");
+    const bgCanvas = document.createElement("canvas");
+    bgCanvas.width = bgWidth;
+    bgCanvas.height = bgHeight;
+    const bgCtx = bgCanvas.getContext("2d");
+    if (!bgCtx) throw new Error("Failed to get bg canvas context");
 
-  if (blurAmount > 0) {
-    // Extend canvas size to prevent edge clipping during blur
-    const blurPadding = blurAmount * 3;
-    const extendedWidth = bgWidth + blurPadding * 2;
-    const extendedHeight = bgHeight + blurPadding * 2;
-    
-    const extendedCanvas = document.createElement("canvas");
-    extendedCanvas.width = extendedWidth;
-    extendedCanvas.height = extendedHeight;
-    const extendedCtx = extendedCanvas.getContext("2d");
-    
-    if (extendedCtx) {
-      // Draw background at offset position
-      extendedCtx.drawImage(tempBgCanvas, blurPadding, blurPadding);
-      
-      // Fill edges by extending the background
-      // Top edge
-      extendedCtx.drawImage(tempBgCanvas, 0, 0, bgWidth, 1, blurPadding, 0, bgWidth, blurPadding);
-      // Bottom edge
-      extendedCtx.drawImage(tempBgCanvas, 0, bgHeight - 1, bgWidth, 1, blurPadding, blurPadding + bgHeight, bgWidth, blurPadding);
-      // Left edge
-      extendedCtx.drawImage(tempBgCanvas, 0, 0, 1, bgHeight, 0, blurPadding, blurPadding, bgHeight);
-      // Right edge
-      extendedCtx.drawImage(tempBgCanvas, bgWidth - 1, 0, 1, bgHeight, blurPadding + bgWidth, blurPadding, blurPadding, bgHeight);
-      
-      // Apply blur to extended canvas
-      const blurredExtCanvas = document.createElement("canvas");
-      blurredExtCanvas.width = extendedWidth;
-      blurredExtCanvas.height = extendedHeight;
-      const blurredExtCtx = blurredExtCanvas.getContext("2d");
-      
-      if (blurredExtCtx) {
-        blurredExtCtx.filter = `blur(${blurAmount}px)`;
-        blurredExtCtx.drawImage(extendedCanvas, 0, 0);
-        blurredExtCtx.filter = "none";
-        
-        // Crop back to original size
-        bgCtx.drawImage(blurredExtCanvas, blurPadding, blurPadding, bgWidth, bgHeight, 0, 0, bgWidth, bgHeight);
+    if (blurAmount > 0) {
+      // Extend canvas size to prevent edge clipping during blur
+      const blurPadding = blurAmount * 3;
+      const extendedWidth = bgWidth + blurPadding * 2;
+      const extendedHeight = bgHeight + blurPadding * 2;
+
+      const extendedCanvas = document.createElement("canvas");
+      extendedCanvas.width = extendedWidth;
+      extendedCanvas.height = extendedHeight;
+      const extendedCtx = extendedCanvas.getContext("2d");
+
+      if (extendedCtx) {
+        // Draw background at offset position
+        extendedCtx.drawImage(tempBgCanvas, blurPadding, blurPadding);
+
+        // Fill edges by extending the background
+        // Top edge
+        extendedCtx.drawImage(tempBgCanvas, 0, 0, bgWidth, 1, blurPadding, 0, bgWidth, blurPadding);
+        // Bottom edge
+        extendedCtx.drawImage(tempBgCanvas, 0, bgHeight - 1, bgWidth, 1, blurPadding, blurPadding + bgHeight, bgWidth, blurPadding);
+        // Left edge
+        extendedCtx.drawImage(tempBgCanvas, 0, 0, 1, bgHeight, 0, blurPadding, blurPadding, bgHeight);
+        // Right edge
+        extendedCtx.drawImage(tempBgCanvas, bgWidth - 1, 0, 1, bgHeight, blurPadding + bgWidth, blurPadding, blurPadding, bgHeight);
+
+        // Apply blur to extended canvas
+        const blurredExtCanvas = document.createElement("canvas");
+        blurredExtCanvas.width = extendedWidth;
+        blurredExtCanvas.height = extendedHeight;
+        const blurredExtCtx = blurredExtCanvas.getContext("2d");
+
+        if (blurredExtCtx) {
+          blurredExtCtx.filter = `blur(${blurAmount}px)`;
+          blurredExtCtx.drawImage(extendedCanvas, 0, 0);
+          blurredExtCtx.filter = "none";
+
+          // Crop back to original size
+          bgCtx.drawImage(blurredExtCanvas, blurPadding, blurPadding, bgWidth, bgHeight, 0, 0, bgWidth, bgHeight);
+        } else {
+          bgCtx.drawImage(tempBgCanvas, 0, 0);
+        }
       } else {
         bgCtx.drawImage(tempBgCanvas, 0, 0);
       }
     } else {
       bgCtx.drawImage(tempBgCanvas, 0, 0);
     }
-  } else {
-    bgCtx.drawImage(tempBgCanvas, 0, 0);
+
+    if (noiseAmount > 0) {
+      applyNoiseToBackground(bgCtx, bgWidth, bgHeight, noiseAmount);
+    }
+
+    ctx.drawImage(bgCanvas, 0, 0);
+
+    const imageCanvas = document.createElement("canvas");
+    imageCanvas.width = image.width;
+    imageCanvas.height = image.height;
+    const imageCtx = imageCanvas.getContext("2d");
+    if (!imageCtx) throw new Error("Failed to get image canvas context");
+
+    imageCtx.imageSmoothingEnabled = true;
+    imageCtx.imageSmoothingQuality = "high";
+
+    imageCtx.beginPath();
+    imageCtx.roundRect(0, 0, image.width, image.height, borderRadius);
+    imageCtx.closePath();
+    imageCtx.clip();
+
+    imageCtx.drawImage(image, 0, 0, image.width, image.height);
+
+    ctx.save();
+    ctx.shadowColor = `rgba(0, 0, 0, ${shadow.opacity / 100})`;
+    ctx.shadowBlur = shadow.blur;
+    ctx.shadowOffsetX = shadow.offsetX;
+    ctx.shadowOffsetY = shadow.offsetY;
+
+    ctx.drawImage(imageCanvas, padding, padding);
+
+    ctx.shadowColor = "transparent";
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+    ctx.restore();
   }
-
-  if (noiseAmount > 0) {
-    applyNoiseToBackground(bgCtx, bgWidth, bgHeight, noiseAmount);
-  }
-
-  ctx.drawImage(bgCanvas, 0, 0);
-
-  const imageCanvas = document.createElement("canvas");
-  imageCanvas.width = image.width;
-  imageCanvas.height = image.height;
-  const imageCtx = imageCanvas.getContext("2d");
-  if (!imageCtx) throw new Error("Failed to get image canvas context");
-
-  imageCtx.imageSmoothingEnabled = true;
-  imageCtx.imageSmoothingQuality = "high";
-
-  imageCtx.beginPath();
-  imageCtx.roundRect(0, 0, image.width, image.height, borderRadius);
-  imageCtx.closePath();
-  imageCtx.clip();
-
-  imageCtx.drawImage(image, 0, 0, image.width, image.height);
-
-  ctx.save();
-  ctx.shadowColor = `rgba(0, 0, 0, ${shadow.opacity / 100})`;
-  ctx.shadowBlur = shadow.blur;
-  ctx.shadowOffsetX = shadow.offsetX;
-  ctx.shadowOffsetY = shadow.offsetY;
-
-  ctx.drawImage(imageCanvas, padding, padding);
-
-  ctx.shadowColor = "transparent";
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 0;
-  ctx.restore();
 
   // Re-apply scale for annotations if needed (restore removed the previous scale)
   if (scale !== 1) {

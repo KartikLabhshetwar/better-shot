@@ -196,6 +196,7 @@ export function usePreviewGenerator({
 
     const currentRenderId = ++renderIdRef.current;
     const canvas = canvasRef.current;
+
     const bgWidth = screenshotImage.width + padding * 2;
     const bgHeight = screenshotImage.height + padding * 2;
 
@@ -222,47 +223,56 @@ export function usePreviewGenerator({
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
 
-      const tempCanvas = document.createElement("canvas");
-      tempCanvas.width = bgWidth;
-      tempCanvas.height = bgHeight;
-      const tempCtx = tempCanvas.getContext("2d")!;
-      drawBackground(tempCtx, bgWidth, bgHeight, settingsToRender, bgImage);
-      applyNoise(tempCanvas, settingsToRender.noiseAmount);
+      // When padding is 0, skip background and shadow - just draw the image directly
+      if (padding === 0) {
+        ctx.beginPath();
+        ctx.roundRect(0, 0, screenshotImage.width, screenshotImage.height, settingsToRender.borderRadius);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(screenshotImage, 0, 0, screenshotImage.width, screenshotImage.height);
+      } else {
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = bgWidth;
+        tempCanvas.height = bgHeight;
+        const tempCtx = tempCanvas.getContext("2d")!;
+        drawBackground(tempCtx, bgWidth, bgHeight, settingsToRender, bgImage);
+        applyNoise(tempCanvas, settingsToRender.noiseAmount);
 
-      ctx.drawImage(tempCanvas, 0, 0);
+        ctx.drawImage(tempCanvas, 0, 0);
 
-      const imageCanvas = document.createElement("canvas");
-      imageCanvas.width = screenshotImage.width;
-      imageCanvas.height = screenshotImage.height;
-      const imageCtx = imageCanvas.getContext("2d");
-      if (!imageCtx) {
-        setError("Failed to get image canvas context");
-        return;
+        const imageCanvas = document.createElement("canvas");
+        imageCanvas.width = screenshotImage.width;
+        imageCanvas.height = screenshotImage.height;
+        const imageCtx = imageCanvas.getContext("2d");
+        if (!imageCtx) {
+          setError("Failed to get image canvas context");
+          return;
+        }
+
+        imageCtx.imageSmoothingEnabled = true;
+        imageCtx.imageSmoothingQuality = "high";
+
+        imageCtx.beginPath();
+        imageCtx.roundRect(0, 0, screenshotImage.width, screenshotImage.height, settingsToRender.borderRadius);
+        imageCtx.closePath();
+        imageCtx.clip();
+
+        imageCtx.drawImage(screenshotImage, 0, 0, screenshotImage.width, screenshotImage.height);
+
+        ctx.save();
+        ctx.shadowColor = `rgba(0, 0, 0, ${settingsToRender.shadow.opacity / 100})`;
+        ctx.shadowBlur = settingsToRender.shadow.blur;
+        ctx.shadowOffsetX = settingsToRender.shadow.offsetX;
+        ctx.shadowOffsetY = settingsToRender.shadow.offsetY;
+
+        ctx.drawImage(imageCanvas, padding, padding);
+
+        ctx.shadowColor = "transparent";
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.restore();
       }
-
-      imageCtx.imageSmoothingEnabled = true;
-      imageCtx.imageSmoothingQuality = "high";
-
-      imageCtx.beginPath();
-      imageCtx.roundRect(0, 0, screenshotImage.width, screenshotImage.height, settingsToRender.borderRadius);
-      imageCtx.closePath();
-      imageCtx.clip();
-
-      imageCtx.drawImage(screenshotImage, 0, 0, screenshotImage.width, screenshotImage.height);
-
-      ctx.save();
-      ctx.shadowColor = `rgba(0, 0, 0, ${settingsToRender.shadow.opacity / 100})`;
-      ctx.shadowBlur = settingsToRender.shadow.blur;
-      ctx.shadowOffsetX = settingsToRender.shadow.offsetX;
-      ctx.shadowOffsetY = settingsToRender.shadow.offsetY;
-
-      ctx.drawImage(imageCanvas, padding, padding);
-
-      ctx.shadowColor = "transparent";
-      ctx.shadowBlur = 0;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 0;
-      ctx.restore();
 
       if (currentRenderId !== renderIdRef.current) return;
 
@@ -320,6 +330,7 @@ export function usePreviewGenerator({
     settings.shadow.offsetX,
     settings.shadow.offsetY,
     settings.shadow.opacity,
+    padding,
     canvasRef,
     generatePreview,
   ]);
