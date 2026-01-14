@@ -2,7 +2,6 @@ export {
   useEditorStore,
   useSettings,
   useBackgroundType,
-  useBlurAmount,
   useNoiseAmount,
   useBorderRadius,
   useShadow,

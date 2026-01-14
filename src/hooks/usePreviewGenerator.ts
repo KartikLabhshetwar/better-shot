@@ -112,113 +112,6 @@ function drawBackground(
   }
 }
 
-/**
- * Apply blur effect to a canvas with edge extension to prevent edge artifacts
- * Optimized to reuse canvases when possible
- */
-const blurCanvasCache = {
-  extended: null as HTMLCanvasElement | null,
-  blurred: null as HTMLCanvasElement | null,
-  result: null as HTMLCanvasElement | null,
-};
-
-function applyBlur(
-  sourceCanvas: HTMLCanvasElement,
-  blurAmount: number
-): HTMLCanvasElement {
-  if (blurAmount <= 0) return sourceCanvas;
-
-  const width = sourceCanvas.width;
-  const height = sourceCanvas.height;
-  
-  const blurPadding = blurAmount * 3;
-  const extendedWidth = width + blurPadding * 2;
-  const extendedHeight = height + blurPadding * 2;
-  
-  // Reuse or create extended canvas
-  if (!blurCanvasCache.extended || 
-      blurCanvasCache.extended.width !== extendedWidth || 
-      blurCanvasCache.extended.height !== extendedHeight) {
-    blurCanvasCache.extended = document.createElement("canvas");
-    blurCanvasCache.extended.width = extendedWidth;
-    blurCanvasCache.extended.height = extendedHeight;
-  }
-  
-  const extendedCanvas = blurCanvasCache.extended;
-  const extendedCtx = extendedCanvas.getContext("2d");
-  
-  if (!extendedCtx) {
-    const blurCanvas = document.createElement("canvas");
-    blurCanvas.width = width;
-    blurCanvas.height = height;
-    const blurCtx = blurCanvas.getContext("2d")!;
-    blurCtx.filter = `blur(${blurAmount}px)`;
-    blurCtx.drawImage(sourceCanvas, 0, 0);
-    blurCtx.filter = "none";
-    return blurCanvas;
-  }
-  
-  // Clear and draw
-  extendedCtx.clearRect(0, 0, extendedWidth, extendedHeight);
-  extendedCtx.drawImage(sourceCanvas, blurPadding, blurPadding);
-  
-  // Fill edges
-  extendedCtx.drawImage(sourceCanvas, 0, 0, width, 1, blurPadding, 0, width, blurPadding);
-  extendedCtx.drawImage(sourceCanvas, 0, height - 1, width, 1, blurPadding, blurPadding + height, width, blurPadding);
-  extendedCtx.drawImage(sourceCanvas, 0, 0, 1, height, 0, blurPadding, blurPadding, height);
-  extendedCtx.drawImage(sourceCanvas, width - 1, 0, 1, height, blurPadding + width, blurPadding, blurPadding, height);
-  
-  // Reuse or create blurred canvas
-  if (!blurCanvasCache.blurred || 
-      blurCanvasCache.blurred.width !== extendedWidth || 
-      blurCanvasCache.blurred.height !== extendedHeight) {
-    blurCanvasCache.blurred = document.createElement("canvas");
-    blurCanvasCache.blurred.width = extendedWidth;
-    blurCanvasCache.blurred.height = extendedHeight;
-  }
-  
-  const blurredExtCanvas = blurCanvasCache.blurred;
-  const blurredExtCtx = blurredExtCanvas.getContext("2d");
-  
-  if (!blurredExtCtx) {
-    const blurCanvas = document.createElement("canvas");
-    blurCanvas.width = width;
-    blurCanvas.height = height;
-    const blurCtx = blurCanvas.getContext("2d")!;
-    blurCtx.filter = `blur(${blurAmount}px)`;
-    blurCtx.drawImage(sourceCanvas, 0, 0);
-    blurCtx.filter = "none";
-    return blurCanvas;
-  }
-  
-  blurredExtCtx.clearRect(0, 0, extendedWidth, extendedHeight);
-  blurredExtCtx.filter = `blur(${blurAmount}px)`;
-  blurredExtCtx.drawImage(extendedCanvas, 0, 0);
-  blurredExtCtx.filter = "none";
-  
-  // Reuse or create result canvas
-  if (!blurCanvasCache.result || 
-      blurCanvasCache.result.width !== width || 
-      blurCanvasCache.result.height !== height) {
-    blurCanvasCache.result = document.createElement("canvas");
-    blurCanvasCache.result.width = width;
-    blurCanvasCache.result.height = height;
-  }
-  
-  const resultCanvas = blurCanvasCache.result;
-  const resultCtx = resultCanvas.getContext("2d")!;
-  resultCtx.clearRect(0, 0, width, height);
-  resultCtx.drawImage(blurredExtCanvas, blurPadding, blurPadding, width, height, 0, 0, width, height);
-  
-  // Return a copy to avoid mutation issues
-  const finalCanvas = document.createElement("canvas");
-  finalCanvas.width = width;
-  finalCanvas.height = height;
-  const finalCtx = finalCanvas.getContext("2d")!;
-  finalCtx.drawImage(resultCanvas, 0, 0);
-  
-  return finalCanvas;
-}
 
 /**
  * Apply noise effect to a canvas (modifies in place)
@@ -334,11 +227,9 @@ export function usePreviewGenerator({
       tempCanvas.height = bgHeight;
       const tempCtx = tempCanvas.getContext("2d")!;
       drawBackground(tempCtx, bgWidth, bgHeight, settingsToRender, bgImage);
+      applyNoise(tempCanvas, settingsToRender.noiseAmount);
 
-      let finalBgCanvas = applyBlur(tempCanvas, settingsToRender.blurAmount);
-      applyNoise(finalBgCanvas, settingsToRender.noiseAmount);
-
-      ctx.drawImage(finalBgCanvas, 0, 0);
+      ctx.drawImage(tempCanvas, 0, 0);
 
       const imageCanvas = document.createElement("canvas");
       imageCanvas.width = screenshotImage.width;
@@ -423,7 +314,6 @@ export function usePreviewGenerator({
   }, [
     screenshotImage,
     bgSettingsKey,
-    settings.blurAmount,
     settings.noiseAmount,
     settings.borderRadius,
     settings.shadow.blur,
@@ -461,7 +351,7 @@ export function usePreviewGenerator({
           customColor: settings.customColor,
           selectedImage: settings.selectedImageSrc,
           bgImage,
-          blurAmount: settings.blurAmount,
+          blurAmount: 0,
           noiseAmount: settings.noiseAmount,
           borderRadius: settings.borderRadius,
           padding,

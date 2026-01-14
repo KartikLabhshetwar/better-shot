@@ -527,6 +527,7 @@ function App() {
         duration: 4000,
       });
 
+      editorActions.reset();
       setMode("main");
       setTempScreenshotPath(null);
     } catch (err) {
@@ -536,6 +537,7 @@ function App() {
         description: errorMessage,
         duration: 5000,
       });
+      editorActions.reset();
       setMode("main");
     }
   }
