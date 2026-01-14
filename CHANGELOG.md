@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Background Border at 0px**: Fixed issue where shadow was clipped when Background Border was set to 0px. The effective padding now automatically accounts for shadow blur and offset, so 0px truly means no visible background border.
+- **Background Border at 0px**: Fixed issue where background was still visible when Background Border was set to 0px. Now 0px means no background border at all - the screenshot edges touch the canvas edges directly.
 
 ### Added
 

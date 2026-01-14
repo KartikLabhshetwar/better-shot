@@ -304,15 +304,8 @@ export function usePreviewGenerator({
     const currentRenderId = ++renderIdRef.current;
     const canvas = canvasRef.current;
 
-    // Calculate effective padding: user padding + space needed for shadow
-    const shadowPadding = Math.max(
-      settingsToRender.shadow.blur + Math.abs(settingsToRender.shadow.offsetX),
-      settingsToRender.shadow.blur + Math.abs(settingsToRender.shadow.offsetY)
-    );
-    const effectivePadding = padding + shadowPadding;
-
-    const bgWidth = screenshotImage.width + effectivePadding * 2;
-    const bgHeight = screenshotImage.height + effectivePadding * 2;
+    const bgWidth = screenshotImage.width + padding * 2;
+    const bgHeight = screenshotImage.height + padding * 2;
 
     setIsGenerating(true);
     setError(null);
@@ -373,7 +366,7 @@ export function usePreviewGenerator({
       ctx.shadowOffsetX = settingsToRender.shadow.offsetX;
       ctx.shadowOffsetY = settingsToRender.shadow.offsetY;
 
-      ctx.drawImage(imageCanvas, effectivePadding, effectivePadding);
+      ctx.drawImage(imageCanvas, padding, padding);
 
       ctx.shadowColor = "transparent";
       ctx.shadowBlur = 0;
