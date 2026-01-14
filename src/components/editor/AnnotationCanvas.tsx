@@ -182,6 +182,20 @@ export const AnnotationCanvas = memo(function AnnotationCanvas({
             alignment: defaultAlignment,
           };
         }
+        case "blur": {
+          return {
+            id: generateId(),
+            type: "blur",
+            x: Math.min(start.x, end.x),
+            y: Math.min(start.y, end.y),
+            width: Math.abs(end.x - start.x),
+            height: Math.abs(end.y - start.y),
+            blurAmount: 20,
+            fill: defaultColor,
+            border: defaultBorder,
+            alignment: defaultAlignment,
+          };
+        }
         default:
           return null;
       }
@@ -238,6 +252,14 @@ export const AnnotationCanvas = memo(function AnnotationCanvas({
         );
         return distance <= annotation.radius;
       }
+      case "blur": {
+        return (
+          point.x >= annotation.x &&
+          point.x <= annotation.x + annotation.width &&
+          point.y >= annotation.y &&
+          point.y <= annotation.y + annotation.height
+        );
+      }
       default:
         return false;
     }
@@ -283,6 +305,10 @@ export const AnnotationCanvas = memo(function AnnotationCanvas({
             ctx.beginPath();
             ctx.arc(annotation.x, annotation.y, annotation.radius + 5, 0, Math.PI * 2);
             ctx.stroke();
+            break;
+          }
+          case "blur": {
+            ctx.strokeRect(annotation.x - 5, annotation.y - 5, annotation.width + 10, annotation.height + 10);
             break;
           }
         }
