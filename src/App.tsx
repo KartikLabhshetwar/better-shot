@@ -254,9 +254,12 @@ function App() {
           body: update.body,
         });
         setShowUpdateDialog(true);
+        return true; // Update available
       }
+      return false; // No update available
     } catch (err) {
       console.error("Failed to check for updates:", err);
+      throw err; // Re-throw so caller can handle
     }
   }, []);
 
@@ -582,10 +585,23 @@ function App() {
 
   if (mode === "preferences") {
     return (
-      <PreferencesPage 
-        onBack={handleBackFromPreferences} 
-        onSettingsChange={handleSettingsChange}
-      />
+      <>
+        {updateAvailable && (
+          <UpdateDialog
+            open={showUpdateDialog}
+            onOpenChange={setShowUpdateDialog}
+            version={updateAvailable.version}
+            releaseNotes={updateAvailable.body}
+            onUpdate={handleUpdate}
+            onSkip={handleSkipUpdate}
+          />
+        )}
+        <PreferencesPage 
+          onBack={handleBackFromPreferences} 
+          onSettingsChange={handleSettingsChange}
+          onCheckForUpdates={checkForUpdates}
+        />
+      </>
     );
   }
 
