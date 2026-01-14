@@ -60,7 +60,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhCOTBFNzVFQzJCMjlBODYKUldTR21yTENYdWVRaTRZbnNhcG5DaGk3eVprZ2k1RUNWSG9ybGlTbkpuR3AySkswdGZkSUExbDYK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRBMTg0RDk3MEIzNDY3QzAKUldUQVp6UUxsMDBZU3RyYzMyVFFwMkFiQVFVbVpmZUNLRkk1bFYrSVVGSTVNK1RuNFlod2RvbVcK",
       "endpoints": [
         "https://github.com/KartikLabhshetwar/better-shot/releases/latest/download/latest.json"
       ]
