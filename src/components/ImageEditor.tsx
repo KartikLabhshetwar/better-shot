@@ -476,6 +476,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
                 selectedAnnotation={selectedAnnotation}
                 selectedTool={selectedTool}
                 previewUrl={previewUrl}
+                showTransparencyGrid={settings.backgroundType === "transparent"}
                 onAnnotationAdd={handleAnnotationAdd}
                 onAnnotationUpdateTransient={handleAnnotationUpdateTransient}
                 onAnnotationUpdate={handleAnnotationUpdate}

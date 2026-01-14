@@ -8,6 +8,7 @@ interface AnnotationCanvasProps {
   selectedAnnotation: Annotation | null;
   selectedTool: ToolType;
   previewUrl: string | null;
+  showTransparencyGrid?: boolean;
   onAnnotationAdd: (annotation: Annotation) => void;
   /** Called during drag - should NOT commit to history */
   onAnnotationUpdateTransient?: (annotation: Annotation) => void;
@@ -22,6 +23,7 @@ export const AnnotationCanvas = memo(function AnnotationCanvas({
   selectedAnnotation,
   selectedTool,
   previewUrl,
+  showTransparencyGrid = false,
   onAnnotationAdd,
   onAnnotationUpdateTransient,
   onAnnotationUpdate,
@@ -472,6 +474,8 @@ export const AnnotationCanvas = memo(function AnnotationCanvas({
         }}
         className={cn(
           "cursor-crosshair rounded-lg shadow-2xl border border-zinc-800",
+          showTransparencyGrid &&
+            "bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImNoZWNrZXJib2FyZCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cmVjdCB3aWR0aD0iNSIgaGVpZ2h0PSI1IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iNSIgd2lkdGg9IjUiIGhlaWdodD0iNSIgZmlsbD0iI2UwZTBlMCIvPjxyZWN0IHk9IjUiIHdpZHRoPSI1IiBoZWlnaHQ9IjUiIGZpbGw9IiNlMGUwZTAiLz48cmVjdCB4PSI1IiB5PSI1IiB3aWR0aD0iNSIgaGVpZ2h0PSI1IiBmaWxsPSIjZmZmIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIGZpbGw9InVybCgjY2hlY2tlcmJvYXJkKSIvPjwvc3ZnPg==')]",
           selectedTool === "select" && "cursor-pointer"
         )}
       />

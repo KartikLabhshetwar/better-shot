@@ -72,14 +72,6 @@ function drawBackground(
 ) {
   switch (settings.backgroundType) {
     case "transparent": {
-      const squareSize = 10;
-      for (let y = 0; y < height; y += squareSize) {
-        for (let x = 0; x < width; x += squareSize) {
-          const isEven = ((x / squareSize) + (y / squareSize)) % 2 === 0;
-          ctx.fillStyle = isEven ? "#ffffff" : "#e0e0e0";
-          ctx.fillRect(x, y, squareSize, squareSize);
-        }
-      }
       break;
     }
     case "white":

@@ -439,7 +439,7 @@ export const useEditorStore = create<EditorStore>()(
       reset: () => {
         set((state) => {
           Object.assign(state, INITIAL_STATE);
-          state._isInitialized = true;
+          state._isInitialized = false;
         });
       },
     }))
