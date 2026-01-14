@@ -60,7 +60,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
     screenshotImage,
     settings,
     canvasRef,
-    padding: 100,
+    padding: settings.padding,
   });
 
   // Combined error
@@ -108,6 +108,11 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
     img.onload = () => {
       setScreenshotImage(img);
       setImageLoaded(true);
+
+      // Calculate smart default padding: 5% of average dimension, capped at 200px
+      const avgDimension = (img.width + img.height) / 2;
+      const defaultPadding = Math.min(Math.round(avgDimension * 0.05), 200);
+      actions.setPaddingTransient(defaultPadding);
     };
     img.onerror = () => {
       setLoadError(`Failed to load image from: ${imagePath}`);
@@ -121,7 +126,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
       img.onload = null;
       img.onerror = null;
     };
-  }, [imagePath]);
+  }, [imagePath, actions]);
 
   // Save handler
   const handleSave = useCallback(async () => {
@@ -430,13 +435,16 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
 
               <EffectsPanel
                 noiseAmount={settings.noiseAmount}
+                padding={settings.padding}
                 shadow={settings.shadow}
                 onNoiseChangeTransient={actions.setNoiseAmountTransient}
+                onPaddingChangeTransient={actions.setPaddingTransient}
                 onShadowBlurChangeTransient={actions.setShadowBlurTransient}
                 onShadowOffsetXChangeTransient={actions.setShadowOffsetXTransient}
                 onShadowOffsetYChangeTransient={actions.setShadowOffsetYTransient}
                 onShadowOpacityChangeTransient={actions.setShadowOpacityTransient}
                 onNoiseChange={actions.setNoiseAmount}
+                onPaddingChange={actions.setPadding}
                 onShadowBlurChange={actions.setShadowBlur}
                 onShadowOffsetXChange={actions.setShadowOffsetX}
                 onShadowOffsetYChange={actions.setShadowOffsetY}

@@ -1,18 +1,22 @@
 import { memo } from "react";
 import { Slider } from "@/components/ui/slider";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ShadowSettings } from "@/stores/editorStore";
 
 interface EffectsPanelProps {
   noiseAmount: number;
+  padding: number;
   shadow: ShadowSettings;
   // Transient handlers (during drag) - for visual feedback
   onNoiseChangeTransient?: (value: number) => void;
+  onPaddingChangeTransient?: (value: number) => void;
   onShadowBlurChangeTransient?: (value: number) => void;
   onShadowOffsetXChangeTransient?: (value: number) => void;
   onShadowOffsetYChangeTransient?: (value: number) => void;
   onShadowOpacityChangeTransient?: (value: number) => void;
   // Commit handlers (on release) - for state/history
   onNoiseChange: (value: number) => void;
+  onPaddingChange: (value: number) => void;
   onShadowBlurChange: (value: number) => void;
   onShadowOffsetXChange: (value: number) => void;
   onShadowOffsetYChange: (value: number) => void;
@@ -21,18 +25,22 @@ interface EffectsPanelProps {
 
 export const EffectsPanel = memo(function EffectsPanel({
   noiseAmount,
+  padding,
   shadow,
   onNoiseChangeTransient,
+  onPaddingChangeTransient,
   onShadowBlurChangeTransient,
   onShadowOffsetXChangeTransient,
   onShadowOffsetYChangeTransient,
   onShadowOpacityChangeTransient,
   onNoiseChange,
+  onPaddingChange,
   onShadowBlurChange,
   onShadowOffsetXChange,
   onShadowOffsetYChange,
   onShadowOpacityChange,
 }: EffectsPanelProps) {
+  const maxPadding = 200;
   return (
     <div className="space-y-6">
       {/* Background Effects */}
@@ -53,6 +61,31 @@ export const EffectsPanel = memo(function EffectsPanel({
               onValueCommit={(value) => onNoiseChange(value[0])}
               min={0}
               max={100}
+              step={1}
+              className="w-full"
+            />
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <label className="text-xs text-zinc-400 font-medium cursor-help">Background Border</label>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-48">
+                    <p className="text-xs text-pretty">Adjust the width of the background border around the captured object.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <span className="text-xs text-zinc-400 font-mono tabular-nums">{padding}px</span>
+            </div>
+            <Slider
+              value={[padding]}
+              onValueChange={(value) => onPaddingChangeTransient?.(value[0])}
+              onValueCommit={(value) => onPaddingChange(value[0])}
+              min={0}
+              max={maxPadding}
               step={1}
               className="w-full"
             />

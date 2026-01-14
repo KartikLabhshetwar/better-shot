@@ -28,6 +28,7 @@ export interface EditorSettings {
   gradientColors: [string, string];
   noiseAmount: number;
   borderRadius: number;
+  padding: number;
   shadow: ShadowSettings;
 }
 
@@ -71,6 +72,7 @@ interface EditorActions {
   // Transient settings (during slider drag)
   setNoiseAmountTransient: (amount: number) => void;
   setBorderRadiusTransient: (radius: number) => void;
+  setPaddingTransient: (padding: number) => void;
   setShadowBlurTransient: (blur: number) => void;
   setShadowOffsetXTransient: (offsetX: number) => void;
   setShadowOffsetYTransient: (offsetY: number) => void;
@@ -79,6 +81,7 @@ interface EditorActions {
   // Commit settings (on slider release)
   setNoiseAmount: (amount: number) => void;
   setBorderRadius: (radius: number) => void;
+  setPadding: (padding: number) => void;
   setShadowBlur: (blur: number) => void;
   setShadowOffsetX: (offsetX: number) => void;
   setShadowOffsetY: (offsetY: number) => void;
@@ -121,6 +124,7 @@ const DEFAULT_SETTINGS: EditorSettings = {
   gradientColors: DEFAULT_GRADIENT.colors,
   noiseAmount: 20,
   borderRadius: 18,
+  padding: 100,
   shadow: {
     blur: 20,
     offsetX: 0,
@@ -240,6 +244,12 @@ export const useEditorStore = create<EditorStore>()(
         });
       },
 
+      setPaddingTransient: (padding) => {
+        set((state) => {
+          state.settings.padding = padding;
+        });
+      },
+
       setShadowBlurTransient: (blur) => {
         set((state) => {
           state.settings.shadow.blur = blur;
@@ -273,6 +283,10 @@ export const useEditorStore = create<EditorStore>()(
 
       setBorderRadius: (radius) => {
         get().updateSettings({ borderRadius: radius });
+      },
+
+      setPadding: (padding) => {
+        get().updateSettings({ padding });
       },
 
       setShadowBlur: (blur) => {
@@ -441,6 +455,7 @@ export const useSettings = () => useEditorStore((state) => state.settings);
 export const useBackgroundType = () => useEditorStore((state) => state.settings.backgroundType);
 export const useNoiseAmount = () => useEditorStore((state) => state.settings.noiseAmount);
 export const useBorderRadius = () => useEditorStore((state) => state.settings.borderRadius);
+export const usePadding = () => useEditorStore((state) => state.settings.padding);
 export const useShadow = () => useEditorStore((state) => state.settings.shadow);
 export const useSelectedImageSrc = () => useEditorStore((state) => state.settings.selectedImageSrc);
 export const useGradientId = () => useEditorStore((state) => state.settings.gradientId);
@@ -465,6 +480,8 @@ export const editorActions = {
   get setNoiseAmountTransient() { return useEditorStore.getState().setNoiseAmountTransient; },
   get setBorderRadius() { return useEditorStore.getState().setBorderRadius; },
   get setBorderRadiusTransient() { return useEditorStore.getState().setBorderRadiusTransient; },
+  get setPadding() { return useEditorStore.getState().setPadding; },
+  get setPaddingTransient() { return useEditorStore.getState().setPaddingTransient; },
   get setShadowBlur() { return useEditorStore.getState().setShadowBlur; },
   get setShadowBlurTransient() { return useEditorStore.getState().setShadowBlurTransient; },
   get setShadowOffsetX() { return useEditorStore.getState().setShadowOffsetX; },

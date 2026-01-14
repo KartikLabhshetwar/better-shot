@@ -243,6 +243,10 @@ function App() {
     } else {
       checkForUpdates();
     }
+
+    // DEV ONLY: Uncomment to test editor with any image file
+    // setTempScreenshotPath("/Users/montimage/Desktop/bettershot_1768263844426.png");
+    // setMode("editing");
   }, []);
 
   const checkForUpdates = useCallback(async () => {

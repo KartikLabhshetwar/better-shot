@@ -37,3 +37,60 @@ pub fn generate_filename_with_id(prefix: &str, id: u32, extension: &str) -> AppR
     let timestamp = get_timestamp()?;
     Ok(format!("{}_{}_{}.{}", prefix, id, timestamp, extension))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_timestamp_returns_valid_value() {
+        let result = get_timestamp();
+        assert!(result.is_ok());
+
+        let timestamp = result.unwrap();
+        assert!(timestamp > 0);
+    }
+
+    #[test]
+    fn test_generate_filename_format() {
+        let result = generate_filename("screenshot", "png");
+        assert!(result.is_ok());
+
+        let filename = result.unwrap();
+        assert!(filename.starts_with("screenshot_"));
+        assert!(filename.ends_with(".png"));
+    }
+
+    #[test]
+    fn test_generate_filename_with_id_format() {
+        let result = generate_filename_with_id("monitor", 1, "png");
+        assert!(result.is_ok());
+
+        let filename = result.unwrap();
+        assert!(filename.starts_with("monitor_1_"));
+        assert!(filename.ends_with(".png"));
+    }
+
+    #[test]
+    fn test_generate_filename_uniqueness() {
+        let filename1 = generate_filename("test", "png").unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(1));
+        let filename2 = generate_filename("test", "png").unwrap();
+
+        // Filenames should be different due to timestamp
+        assert_ne!(filename1, filename2);
+    }
+
+    #[test]
+    fn test_ensure_dir_creates_nested_directories() {
+        let temp_dir = std::env::temp_dir();
+        let test_path = temp_dir.join("bettershot_test").join("nested").join("dir");
+
+        let result = ensure_dir(&test_path);
+        assert!(result.is_ok());
+        assert!(test_path.exists());
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(temp_dir.join("bettershot_test"));
+    }
+}
