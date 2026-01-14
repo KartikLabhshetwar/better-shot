@@ -115,9 +115,93 @@ export function drawAnnotationOnCanvas(ctx: CanvasRenderingContext2D, annotation
       ctx.fillText(annotation.number.toString(), annotation.x, annotation.y);
       break;
     }
+    case "blur": {
+      // Apply blur effect to the specified region
+      const x = Math.max(0, Math.floor(annotation.x));
+      const y = Math.max(0, Math.floor(annotation.y));
+      const width = Math.min(Math.ceil(annotation.width), ctx.canvas.width - x);
+      const height = Math.min(Math.ceil(annotation.height), ctx.canvas.height - y);
+      
+      if (width > 0 && height > 0) {
+        // Get the current image data for this region
+        const imageData = ctx.getImageData(x, y, width, height);
+        
+        // Apply box blur algorithm
+        const blurAmount = annotation.blurAmount || 20;
+        const blurredData = applyBoxBlur(imageData, blurAmount);
+        
+        // Put the blurred data back
+        ctx.putImageData(blurredData, x, y);
+        
+        // Draw a subtle border to indicate blur region
+        ctx.strokeStyle = "rgba(100, 100, 255, 0.3)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(x, y, width, height);
+        ctx.setLineDash([]);
+      }
+      break;
+    }
   }
 
   ctx.restore();
+}
+
+// Box blur algorithm for performance
+function applyBoxBlur(imageData: ImageData, radius: number): ImageData {
+  const width = imageData.width;
+  const height = imageData.height;
+  const data = new Uint8ClampedArray(imageData.data);
+  const output = new Uint8ClampedArray(imageData.data);
+  
+  // Horizontal pass
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let r = 0, g = 0, b = 0, a = 0, count = 0;
+      
+      for (let kx = -radius; kx <= radius; kx++) {
+        const px = Math.min(Math.max(x + kx, 0), width - 1);
+        const offset = (y * width + px) * 4;
+        r += data[offset];
+        g += data[offset + 1];
+        b += data[offset + 2];
+        a += data[offset + 3];
+        count++;
+      }
+      
+      const offset = (y * width + x) * 4;
+      output[offset] = r / count;
+      output[offset + 1] = g / count;
+      output[offset + 2] = b / count;
+      output[offset + 3] = a / count;
+    }
+  }
+  
+  // Vertical pass
+  const temp = new Uint8ClampedArray(output);
+  for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y++) {
+      let r = 0, g = 0, b = 0, a = 0, count = 0;
+      
+      for (let ky = -radius; ky <= radius; ky++) {
+        const py = Math.min(Math.max(y + ky, 0), height - 1);
+        const offset = (py * width + x) * 4;
+        r += temp[offset];
+        g += temp[offset + 1];
+        b += temp[offset + 2];
+        a += temp[offset + 3];
+        count++;
+      }
+      
+      const offset = (y * width + x) * 4;
+      output[offset] = r / count;
+      output[offset + 1] = g / count;
+      output[offset + 2] = b / count;
+      output[offset + 3] = a / count;
+    }
+  }
+  
+  return new ImageData(output, width, height);
 }
 
 function hexToRgba(hex: string, alpha: number): string {

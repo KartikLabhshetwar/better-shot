@@ -1,4 +1,4 @@
-export type ToolType = "circle" | "rectangle" | "line" | "arrow" | "text" | "number" | "select" | null;
+export type ToolType = "circle" | "rectangle" | "line" | "arrow" | "text" | "number" | "blur" | "select" | null;
 
 export type LineType = "straight" | "curved";
 
@@ -76,10 +76,18 @@ export interface NumberAnnotation extends BaseAnnotation {
   radius: number;
 }
 
+export interface BlurAnnotation extends BaseAnnotation {
+  type: "blur";
+  width: number;
+  height: number;
+  blurAmount: number;
+}
+
 export type Annotation =
   | CircleAnnotation
   | RectangleAnnotation
   | LineAnnotation
   | ArrowAnnotation
   | TextAnnotation
-  | NumberAnnotation;
+  | NumberAnnotation
+  | BlurAnnotation;

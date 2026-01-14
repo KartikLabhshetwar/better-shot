@@ -26,6 +26,12 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
     if (annotation.type === "number") {
       newExpanded.add("number");
     }
+    if (annotation.type === "blur") {
+      newExpanded.add("blur");
+      // Don't show fill/border for blur
+      newExpanded.delete("fill");
+      newExpanded.delete("border");
+    }
     
     setExpandedSections(newExpanded);
   }, [annotation?.type, annotation?.id]);
@@ -70,6 +76,45 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
 
   return (
     <div className="px-4 py-3 space-y-2">
+      {/* Blur Section - Only for blur annotations */}
+      {annotation.type === "blur" && (
+        <div className="space-y-1.5">
+          <button
+            onClick={() => toggleSection("blur")}
+            className="w-full flex items-center justify-between text-xs font-medium text-zinc-300 hover:text-zinc-50"
+          >
+            <span>Blur</span>
+            {expandedSections.has("blur") ? (
+              <ChevronUp className="size-3" />
+            ) : (
+              <ChevronDown className="size-3" />
+            )}
+          </button>
+          {expandedSections.has("blur") && (
+            <div className="space-y-2 pl-2">
+              <div>
+                <div className="text-xs text-zinc-500 mb-1.5">Intensity</div>
+                <div className="flex items-center gap-2">
+                  <Slider
+                    value={[annotation.blurAmount]}
+                    onValueChange={([value]) => updateAnnotation({ blurAmount: value })}
+                    min={1}
+                    max={50}
+                    step={1}
+                  />
+                  <input
+                    type="text"
+                    value={annotation.blurAmount}
+                    onChange={(e) => updateAnnotation({ blurAmount: Number(e.target.value) || 20 })}
+                    className="w-14 px-1.5 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-100"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Text Section - Only for text annotations */}
       {annotation.type === "text" && (
         <div className="space-y-1.5">
@@ -216,19 +261,20 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
         </div>
       )}
 
-      {/* Fill Section */}
-      <div className="space-y-1.5">
-        <button
-          onClick={() => toggleSection("fill")}
-          className="w-full flex items-center justify-between text-xs font-medium text-zinc-300 hover:text-zinc-50"
-        >
-          <span>Fill</span>
-          {expandedSections.has("fill") ? (
-            <ChevronUp className="size-3" />
-          ) : (
-            <ChevronDown className="size-3" />
-          )}
-        </button>
+      {/* Fill Section - Hide for blur */}
+      {annotation.type !== "blur" && (
+        <div className="space-y-1.5">
+          <button
+            onClick={() => toggleSection("fill")}
+            className="w-full flex items-center justify-between text-xs font-medium text-zinc-300 hover:text-zinc-50"
+          >
+            <span>Fill</span>
+            {expandedSections.has("fill") ? (
+              <ChevronUp className="size-3" />
+            ) : (
+              <ChevronDown className="size-3" />
+            )}
+          </button>
         {expandedSections.has("fill") && (
           <div className="space-y-2 pl-2">
             <div>
@@ -265,21 +311,23 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
             </div>
           </div>
         )}
-      </div>
+        </div>
+      )}
 
-      {/* Border Section */}
-      <div className="space-y-1.5">
-        <button
-          onClick={() => toggleSection("border")}
-          className="w-full flex items-center justify-between text-xs font-medium text-zinc-300 hover:text-zinc-50"
-        >
-          <span>Border</span>
-          {expandedSections.has("border") ? (
-            <ChevronUp className="size-3" />
-          ) : (
-            <ChevronDown className="size-3" />
-          )}
-        </button>
+      {/* Border Section - Hide for blur */}
+      {annotation.type !== "blur" && (
+        <div className="space-y-1.5">
+          <button
+            onClick={() => toggleSection("border")}
+            className="w-full flex items-center justify-between text-xs font-medium text-zinc-300 hover:text-zinc-50"
+          >
+            <span>Border</span>
+            {expandedSections.has("border") ? (
+              <ChevronUp className="size-3" />
+            ) : (
+              <ChevronDown className="size-3" />
+            )}
+          </button>
         {expandedSections.has("border") && (
           <div className="space-y-2 pl-2">
             <div>
@@ -336,7 +384,8 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
             </div>
           </div>
         )}
-      </div>
+        </div>
+      )}
     </div>
   );
 });

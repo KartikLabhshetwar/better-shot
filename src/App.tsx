@@ -21,6 +21,7 @@ import { AppWindowMac, Crop, Monitor } from "lucide-react";
 import { toast } from "sonner";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImageEditor } from "./components/ImageEditor";
+import { editorActions } from "@/stores/editorStore";
 
 type AppMode = "main" | "editing" | "preferences";
 type CaptureMode = "region" | "fullscreen" | "window";
@@ -544,6 +545,7 @@ function App() {
   }
 
   async function handleEditorCancel() {
+    editorActions.reset();
     setMode("main");
     setTempScreenshotPath(null);
   }
