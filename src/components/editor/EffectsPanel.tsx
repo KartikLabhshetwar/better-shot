@@ -4,12 +4,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { ShadowSettings } from "@/stores/editorStore";
 
 interface EffectsPanelProps {
-  blurAmount: number;
   noiseAmount: number;
   padding: number;
   shadow: ShadowSettings;
   // Transient handlers (during drag) - for visual feedback
-  onBlurChangeTransient?: (value: number) => void;
   onNoiseChangeTransient?: (value: number) => void;
   onPaddingChangeTransient?: (value: number) => void;
   onShadowBlurChangeTransient?: (value: number) => void;
@@ -17,7 +15,6 @@ interface EffectsPanelProps {
   onShadowOffsetYChangeTransient?: (value: number) => void;
   onShadowOpacityChangeTransient?: (value: number) => void;
   // Commit handlers (on release) - for state/history
-  onBlurChange: (value: number) => void;
   onNoiseChange: (value: number) => void;
   onPaddingChange: (value: number) => void;
   onShadowBlurChange: (value: number) => void;
@@ -27,18 +24,15 @@ interface EffectsPanelProps {
 }
 
 export const EffectsPanel = memo(function EffectsPanel({
-  blurAmount,
   noiseAmount,
   padding,
   shadow,
-  onBlurChangeTransient,
   onNoiseChangeTransient,
   onPaddingChangeTransient,
   onShadowBlurChangeTransient,
   onShadowOffsetXChangeTransient,
   onShadowOffsetYChangeTransient,
   onShadowOpacityChangeTransient,
-  onBlurChange,
   onNoiseChange,
   onPaddingChange,
   onShadowBlurChange,
@@ -54,24 +48,8 @@ export const EffectsPanel = memo(function EffectsPanel({
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-medium text-zinc-200 font-mono text-balance">Background Effects</h3>
         </div>
-        
-        <div className="space-y-6">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-xs text-zinc-400 font-medium">Blur</label>
-              <span className="text-xs text-zinc-400 font-mono tabular-nums">{blurAmount}px</span>
-            </div>
-            <Slider
-              value={[blurAmount]}
-              onValueChange={(value) => onBlurChangeTransient?.(value[0])}
-              onValueCommit={(value) => onBlurChange(value[0])}
-              min={0}
-              max={100}
-              step={1}
-              className="w-full"
-            />
-          </div>
 
+        <div className="space-y-6">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-xs text-zinc-400 font-medium">Noise</label>
