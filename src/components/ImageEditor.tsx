@@ -429,16 +429,13 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
               />
 
               <EffectsPanel
-                blurAmount={settings.blurAmount}
                 noiseAmount={settings.noiseAmount}
                 shadow={settings.shadow}
-                onBlurChangeTransient={actions.setBlurAmountTransient}
                 onNoiseChangeTransient={actions.setNoiseAmountTransient}
                 onShadowBlurChangeTransient={actions.setShadowBlurTransient}
                 onShadowOffsetXChangeTransient={actions.setShadowOffsetXTransient}
                 onShadowOffsetYChangeTransient={actions.setShadowOffsetYTransient}
                 onShadowOpacityChangeTransient={actions.setShadowOpacityTransient}
-                onBlurChange={actions.setBlurAmount}
                 onNoiseChange={actions.setNoiseAmount}
                 onShadowBlurChange={actions.setShadowBlur}
                 onShadowOffsetXChange={actions.setShadowOffsetX}
