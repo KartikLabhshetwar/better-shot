@@ -189,7 +189,6 @@ describe("editorStore - padding feature", () => {
 
   describe("padding with other settings", () => {
     it("should not affect other settings when changing padding", () => {
-      const initialBlur = useEditorStore.getState().settings.blurAmount;
       const initialNoise = useEditorStore.getState().settings.noiseAmount;
       const initialBorderRadius = useEditorStore.getState().settings.borderRadius;
 
@@ -198,7 +197,6 @@ describe("editorStore - padding feature", () => {
       });
 
       const state = useEditorStore.getState();
-      expect(state.settings.blurAmount).toBe(initialBlur);
       expect(state.settings.noiseAmount).toBe(initialNoise);
       expect(state.settings.borderRadius).toBe(initialBorderRadius);
     });
@@ -206,10 +204,10 @@ describe("editorStore - padding feature", () => {
     it("should be included in history snapshots with other settings", () => {
       act(() => {
         editorActions.setPadding(50);
-        editorActions.setBlurAmount(25);
+        editorActions.setNoiseAmount(50);
       });
 
-      // Undo blur change
+      // Undo noise change
       act(() => {
         editorActions.undo();
       });
@@ -217,7 +215,7 @@ describe("editorStore - padding feature", () => {
       // Padding should still be 50 (from previous snapshot)
       const state = useEditorStore.getState();
       expect(state.settings.padding).toBe(50);
-      expect(state.settings.blurAmount).toBe(0); // Reset to default
+      expect(state.settings.noiseAmount).toBe(20); // Reset to default
     });
   });
 });
