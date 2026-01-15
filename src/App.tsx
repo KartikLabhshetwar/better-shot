@@ -13,18 +13,35 @@ import { Store } from "@tauri-apps/plugin-store";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import type { KeyboardShortcut } from "./components/preferences/KeyboardShortcutManager";
-import { OnboardingFlow } from "./components/onboarding/OnboardingFlow";
-import { PreferencesPage } from "./components/preferences/PreferencesPage";
 import { SettingsIcon } from "./components/SettingsIcon";
-import { UpdateDialog } from "./components/UpdateDialog";
 import { AppWindowMac, Crop, Monitor } from "lucide-react";
 import { toast } from "sonner";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ImageEditor } from "./components/ImageEditor";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { editorActions } from "@/stores/editorStore";
+
+// Lazy load heavy components
+const ImageEditor = lazy(() => import("./components/ImageEditor").then(m => ({ default: m.ImageEditor })));
+const OnboardingFlow = lazy(() => import("./components/onboarding/OnboardingFlow").then(m => ({ default: m.OnboardingFlow })));
+const PreferencesPage = lazy(() => import("./components/preferences/PreferencesPage").then(m => ({ default: m.PreferencesPage })));
+const UpdateDialog = lazy(() => import("./components/UpdateDialog").then(m => ({ default: m.UpdateDialog })));
 
 type AppMode = "main" | "editing" | "preferences";
 type CaptureMode = "region" | "fullscreen" | "window";
+
+// Loading fallback for lazy loaded components
+function LoadingFallback() {
+  return (
+    <div className="min-h-dvh flex items-center justify-center bg-background">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <svg className="animate-spin size-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>Loading...</span>
+      </div>
+    </div>
+  );
+}
 
 const DEFAULT_SHORTCUTS: KeyboardShortcut[] = [
   { id: "region", action: "Capture Region", shortcut: "CommandOrControl+Shift+2", enabled: true },
@@ -568,28 +585,32 @@ function App() {
 
   if (mode === "editing" && tempScreenshotPath) {
     return (
-      <ImageEditor
-        imagePath={tempScreenshotPath}
-        onSave={handleEditorSave}
-        onCancel={handleEditorCancel}
-      />
+      <Suspense fallback={<LoadingFallback />}>
+        <ImageEditor
+          imagePath={tempScreenshotPath}
+          onSave={handleEditorSave}
+          onCancel={handleEditorCancel}
+        />
+      </Suspense>
     );
   }
 
   if (showOnboarding) {
     return (
-      <OnboardingFlow
-        onComplete={() => {
-          setShowOnboarding(false);
-          checkForUpdates();
-        }}
-      />
+      <Suspense fallback={<LoadingFallback />}>
+        <OnboardingFlow
+          onComplete={() => {
+            setShowOnboarding(false);
+            checkForUpdates();
+          }}
+        />
+      </Suspense>
     );
   }
 
   if (mode === "preferences") {
     return (
-      <>
+      <Suspense fallback={<LoadingFallback />}>
         {updateAvailable && (
           <UpdateDialog
             open={showUpdateDialog}
@@ -605,21 +626,23 @@ function App() {
           onSettingsChange={handleSettingsChange}
           onCheckForUpdates={checkForUpdates}
         />
-      </>
+      </Suspense>
     );
   }
 
   return (
     <>
       {updateAvailable && (
-        <UpdateDialog
-          open={showUpdateDialog}
-          onOpenChange={setShowUpdateDialog}
-          version={updateAvailable.version}
-          releaseNotes={updateAvailable.body}
-          onUpdate={handleUpdate}
-          onSkip={handleSkipUpdate}
-        />
+        <Suspense fallback={null}>
+          <UpdateDialog
+            open={showUpdateDialog}
+            onOpenChange={setShowUpdateDialog}
+            version={updateAvailable.version}
+            releaseNotes={updateAvailable.body}
+            onUpdate={handleUpdate}
+            onSkip={handleSkipUpdate}
+          />
+        </Suspense>
       )}
       <main className="min-h-dvh flex flex-col items-center justify-center p-8 bg-background text-foreground">
         <div className="w-full max-w-2xl space-y-6">

@@ -1,8 +1,15 @@
-import { createWorker, Worker, PSM } from "tesseract.js";
+import type { Worker } from "tesseract.js";
 
 let workerInstance: Worker | null = null;
 let workerInitializing = false;
 let workerInitPromise: Promise<Worker> | null = null;
+
+// Get base URL for local tesseract files
+function getLocalTesseractPath(): string {
+  // In production (Tauri), use relative path from the app bundle
+  // In development, Vite serves from public folder
+  return "/tesseract";
+}
 
 async function getWorker(): Promise<Worker> {
   if (workerInstance) {
@@ -14,7 +21,16 @@ async function getWorker(): Promise<Worker> {
   }
 
   workerInitializing = true;
+  
+  // Dynamically import tesseract.js only when needed
+  const { createWorker, PSM } = await import("tesseract.js");
+  
+  const basePath = getLocalTesseractPath();
+  
   workerInitPromise = createWorker("eng", 1, {
+    workerPath: `${basePath}/worker.min.js`,
+    corePath: `${basePath}`,
+    langPath: `${basePath}`,
     logger: (m: { status?: string; progress?: number }) => {
       if (m.status === "recognizing text" && m.progress !== undefined) {
         console.log(`OCR progress: ${Math.round(m.progress * 100)}%`);

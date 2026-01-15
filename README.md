@@ -74,6 +74,7 @@ Clean screenshot workflows usually need three things: capture fast, polish fast 
 - **Copy to clipboard**: Easily copy extracted text for use elsewhere
 - **Automatic preprocessing**: Image enhancement (grayscale, contrast, brightness) for better accuracy
 - **Auto-rotation**: Automatically detects and corrects rotated text
+- **Offline support**: OCR works fully offline with bundled Tesseract.js and language data
 
 ### Workflow
 

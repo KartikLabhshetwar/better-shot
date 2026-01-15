@@ -16,6 +16,30 @@ export default defineConfig(async () => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // React core
+          "vendor-react": ["react", "react-dom"],
+          // UI primitives
+          "vendor-ui": [
+            "@radix-ui/react-dialog",
+            "@radix-ui/react-dropdown-menu",
+            "@radix-ui/react-switch",
+            "@radix-ui/react-tooltip",
+            "lucide-react",
+          ],
+          // Animation library
+          "vendor-motion": ["motion"],
+          // State management
+          "vendor-state": ["zustand", "immer"],
+          // OCR engine (heavy, loaded on demand)
+          "vendor-ocr": ["tesseract.js"],
+        },
+      },
+    },
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

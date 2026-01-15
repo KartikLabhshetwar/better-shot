@@ -121,6 +121,12 @@ bettershot/
 │   ├── types/              # TypeScript type definitions
 │   │   └── annotations.ts  # Annotation type definitions
 │   └── assets/             # Static assets (images, etc.)
+├── public/                 # Static files copied to dist
+│   └── tesseract/          # Bundled Tesseract.js files for offline OCR
+│       ├── worker.min.js           # Tesseract.js web worker
+│       ├── tesseract-core*.wasm    # WASM binaries
+│       ├── tesseract-core*.wasm.js # WASM JS loaders
+│       └── eng.traineddata.gz      # English language data
 ├── src-tauri/              # Rust backend (Tauri)
 │   ├── src/
 │   │   ├── commands.rs     # Tauri command handlers
@@ -401,6 +407,33 @@ When creating a PR, include:
 2. Default shortcuts are defined in `src/App.tsx` as `DEFAULT_SHORTCUTS`
 3. Shortcuts are registered using `@tauri-apps/plugin-global-shortcut`
 4. Changes trigger re-registration via `settingsVersion` state
+
+### Updating Tesseract.js (OCR)
+
+OCR files are bundled locally in `public/tesseract/` for offline support. To update:
+
+1. **Update the npm package:**
+   ```bash
+   pnpm update tesseract.js
+   ```
+
+2. **Copy new worker file:**
+   ```bash
+   cp node_modules/tesseract.js/dist/worker.min.js public/tesseract/
+   ```
+
+3. **Copy new WASM core files:**
+   ```bash
+   cp node_modules/.pnpm/tesseract.js-core@*/node_modules/tesseract.js-core/tesseract-core*.wasm public/tesseract/
+   cp node_modules/.pnpm/tesseract.js-core@*/node_modules/tesseract.js-core/tesseract-core*.wasm.js public/tesseract/
+   ```
+
+4. **Update language data (if needed):**
+   ```bash
+   curl -L -o public/tesseract/eng.traineddata.gz "https://tessdata.projectnaptha.com/4.0.0/eng.traineddata.gz"
+   ```
+
+5. **Test OCR functionality** in both development and production builds
 
 ### Updating the Homepage Keyboard Shortcuts Display
 
