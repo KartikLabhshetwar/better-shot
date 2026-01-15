@@ -388,7 +388,6 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
               <TooltipTrigger asChild>
                 <Button
                   variant="cta"
-                  size="lg"
                   onClick={handleOCRFullImage}
                   disabled={!imageLoaded || isOCRProcessing || isSaving || isCopying}
                   className="disabled:opacity-50"
@@ -408,7 +407,6 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
           </TooltipProvider>
           <Button 
             variant="cta"
-            size="lg"
             onClick={onCancel}
           >
             Cancel
@@ -420,7 +418,6 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
                   variant="cta"
                   onClick={handleCopy} 
                   disabled={!imageLoaded || isSaving || isCopying}
-                  size="lg"
                   className="disabled:opacity-50"
                 >
                   {isCopying ? (
@@ -441,7 +438,6 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
                   variant="cta"
                   onClick={handleSave} 
                   disabled={!imageLoaded || isSaving || isCopying}
-                  size="lg"
                   className="disabled:opacity-50"
                 >
                   {isSaving ? (
