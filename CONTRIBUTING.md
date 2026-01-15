@@ -96,7 +96,8 @@ bettershot/
 │   │   │   ├── BackgroundSelector.tsx  # Background selection UI
 │   │   │   ├── AssetGrid.tsx           # Asset library grid
 │   │   │   ├── EffectsPanel.tsx        # Blur and noise controls
-│   │   │   └── ImageRoundnessControl.tsx # Border radius control
+│   │   │   ├── ImageRoundnessControl.tsx # Border radius control
+│   │   │   └── OCRResultsDialog.tsx    # Dialog for displaying OCR results
 │   │   ├── preferences/    # Settings and preferences
 │   │   │   ├── PreferencesPage.tsx         # Main preferences page
 │   │   │   ├── BackgroundImageSelector.tsx # Default background picker
@@ -112,8 +113,9 @@ bettershot/
 │   │   └── usePreviewGenerator.ts  # Canvas preview generation
 │   ├── lib/                # Utility functions
 │   │   ├── annotation-utils.ts  # Annotation rendering utilities
-│   │   ├── canvas-utils.ts      # Canvas manipulation utilities
 │   │   ├── auto-process.ts      # Auto-apply background logic
+│   │   ├── canvas-utils.ts      # Canvas manipulation utilities
+│   │   ├── ocr.ts               # OCR text extraction using Tesseract.js
 │   │   ├── onboarding.ts        # Onboarding state management
 │   │   └── utils.ts             # General utilities
 │   ├── types/              # TypeScript type definitions
@@ -251,6 +253,7 @@ Write tests for **critical paths only**:
 - Image processing operations (blur, shadow, background effects)
 - Clipboard operations
 - Annotation rendering and manipulation
+- OCR text extraction and preprocessing
 - Error handling in critical flows
 
 ### Test Structure
@@ -326,6 +329,7 @@ When creating a PR, include:
 - **Vite 7**: Build tool and dev server
 - **Tailwind CSS 4**: Styling
 - **Sonner**: Toast notifications
+- **Tesseract.js**: OCR text extraction
 
 ### Backend
 - **Rust**: System programming language

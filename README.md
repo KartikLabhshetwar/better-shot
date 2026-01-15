@@ -19,6 +19,7 @@ Better Shot is a fast, lightweight screenshot tool built with Tauri + React. It 
     - [Capture Modes](#capture-modes)
     - [Image Editing](#image-editing)
     - [Annotation Tools](#annotation-tools)
+    - [OCR (Optical Character Recognition)](#ocr-optical-character-recognition)
     - [Workflow](#workflow)
   - [Install](#install)
     - [Download a release (recommended)](#download-a-release-recommended)
@@ -65,6 +66,14 @@ Clean screenshot workflows usually need three things: capture fast, polish fast 
 - **Numbered labels**: Auto-incrementing badges for step-by-step callouts
 - **Editability**: Select, move, and delete annotations
 - **Styling**: Colors, opacity, borders, alignment
+
+### OCR (Optical Character Recognition)
+
+- **Text extraction**: Extract text from screenshots using OCR
+- **Full image processing**: Recognizes text from the entire edited image including annotations
+- **Copy to clipboard**: Easily copy extracted text for use elsewhere
+- **Automatic preprocessing**: Image enhancement (grayscale, contrast, brightness) for better accuracy
+- **Auto-rotation**: Automatically detects and corrects rotated text
 
 ### Workflow
 
@@ -133,7 +142,8 @@ This permission is required for the app to capture screenshots of your screen.
    - Optional (enable in Preferences): `⌘⇧F` (fullscreen), `⌘⇧D` (window)
 3. Edit (background/effects/shadow/roundness)
 4. Annotate (shapes, arrows, text, numbered labels)
-5. Export: `⌘S` to save, `⇧⌘C` to copy to clipboard
+5. Extract text: Use the "Extract Text" button to run OCR on your screenshot
+6. Export: `⌘S` to save, `⇧⌘C` to copy to clipboard
 
 ### Auto-apply workflow
 

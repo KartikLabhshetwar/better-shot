@@ -1,6 +1,6 @@
 [package]
 name = "bettershot"
-version = "0.2.0"
+version = "0.2.1"
 description = "A Better Shot App"
 authors = ["kartik labhshetwar"]
 edition = "2021"
