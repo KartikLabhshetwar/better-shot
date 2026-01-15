@@ -137,7 +137,7 @@ export function BackgroundImageSelector({ onImageSelect }: BackgroundImageSelect
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-zinc-200">Default Background Image</label>
+        <label className="text-sm font-medium text-foreground">Default Background Image</label>
         <div>
           <input
             ref={fileInputRef}
@@ -150,7 +150,7 @@ export function BackgroundImageSelector({ onImageSelect }: BackgroundImageSelect
             type="button"
             variant="outline"
             size="sm"
-            className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-50"
+            className="border-border text-foreground hover:bg-secondary hover:text-foreground"
             onClick={() => fileInputRef.current?.click()}
           >
             <Upload className="size-3 mr-1" aria-hidden="true" />
@@ -162,7 +162,7 @@ export function BackgroundImageSelector({ onImageSelect }: BackgroundImageSelect
       <div className="space-y-3">
         {uploadedImages.length > 0 && (
           <div>
-            <h4 className="text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wide">Uploaded Images</h4>
+            <h4 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Uploaded Images</h4>
             <div className="grid grid-cols-4 gap-2">
               {uploadedImages.map((img, index) => (
                 <div key={index} className="relative group">
@@ -172,7 +172,7 @@ export function BackgroundImageSelector({ onImageSelect }: BackgroundImageSelect
                       "relative w-full aspect-square rounded-lg overflow-hidden border-2 transition-all",
                       isSelected(img)
                         ? "border-blue-500 ring-2 ring-blue-500/50"
-                        : "border-zinc-700 hover:border-zinc-600"
+                        : "border-border hover:border-ring"
                     )}
                   >
                     <img
@@ -201,7 +201,7 @@ export function BackgroundImageSelector({ onImageSelect }: BackgroundImageSelect
 
         {assetCategories.map((category) => (
           <div key={category.name}>
-            <h4 className="text-xs font-medium text-zinc-400 mb-2 uppercase tracking-wide">{category.name}</h4>
+            <h4 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">{category.name}</h4>
             <div className="grid grid-cols-4 gap-2">
               {category.assets.map((asset) => (
                 <button
@@ -211,7 +211,7 @@ export function BackgroundImageSelector({ onImageSelect }: BackgroundImageSelect
                     "relative w-full aspect-square rounded-lg overflow-hidden border-2 transition-all",
                     isSelected(asset.src)
                       ? "border-blue-500 ring-2 ring-blue-500/50"
-                      : "border-zinc-700 hover:border-zinc-600"
+                      : "border-border hover:border-ring"
                   )}
                 >
                   <img

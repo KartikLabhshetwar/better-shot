@@ -15,13 +15,13 @@ export const ImageRoundnessControl = memo(function ImageRoundnessControl({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-zinc-200 font-mono text-balance">Image Roundness</h3>
+        <h3 className="text-sm font-medium text-foreground font-mono text-balance">Image Roundness</h3>
       </div>
       
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <label className="text-xs text-zinc-400 font-medium">Corner Radius</label>
-          <span className="text-xs text-zinc-400 font-mono tabular-nums">{borderRadius}px</span>
+          <label className="text-xs text-muted-foreground font-medium">Corner Radius</label>
+          <span className="text-xs text-muted-foreground font-mono tabular-nums">{borderRadius}px</span>
         </div>
         <Slider
           value={[borderRadius]}
@@ -32,7 +32,7 @@ export const ImageRoundnessControl = memo(function ImageRoundnessControl({
           step={1}
           className="w-full"
         />
-        <p className="text-xs text-zinc-500 text-pretty">Adjust corner roundness of the image</p>
+        <p className="text-xs text-foreground0 text-pretty">Adjust corner roundness of the image</p>
       </div>
     </div>
   );

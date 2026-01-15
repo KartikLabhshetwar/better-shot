@@ -230,13 +230,13 @@ export function KeyboardShortcutManager({ onShortcutsChange }: KeyboardShortcutM
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-zinc-200">Keyboard Shortcuts</label>
+        <label className="text-sm font-medium text-foreground">Keyboard Shortcuts</label>
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={handleAdd}
-          className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-50"
+          className="border-border text-foreground hover:bg-secondary hover:text-foreground"
         >
           <Plus className="size-3 mr-1" aria-hidden="true" />
           Add
@@ -245,7 +245,7 @@ export function KeyboardShortcutManager({ onShortcutsChange }: KeyboardShortcutM
 
       <div className="space-y-2">
         {shortcuts.map((shortcut) => (
-          <Card key={shortcut.id} className="bg-zinc-800 border-zinc-700">
+          <Card key={shortcut.id} className="bg-secondary border-border">
             <CardContent className="p-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
@@ -253,7 +253,7 @@ export function KeyboardShortcutManager({ onShortcutsChange }: KeyboardShortcutM
                     <div className="flex items-center gap-2">
                       <button
                         ref={recordingRef}
-                        className="flex-1 px-2 py-1 bg-zinc-900 border-2 border-blue-500 rounded text-zinc-100 text-sm focus:outline-none animate-pulse text-left"
+                        className="flex-1 px-2 py-1 bg-card border-2 border-blue-500 rounded text-card-foreground text-sm focus:outline-none animate-pulse text-left"
                         autoFocus
                       >
                         {recordedShortcut ? formatShortcut(recordedShortcut) : "Press shortcut..."}
@@ -262,17 +262,17 @@ export function KeyboardShortcutManager({ onShortcutsChange }: KeyboardShortcutM
                         size="sm"
                         variant="ghost"
                         onClick={handleCancelRecording}
-                        className="text-zinc-300 hover:text-zinc-50"
+                        className="text-foreground hover:text-foreground"
                       >
                         Cancel
                       </Button>
                     </div>
                   ) : (
                     <div className="flex items-center gap-3">
-                      <span className="text-sm text-zinc-300 flex-1">{shortcut.action}</span>
+                      <span className="text-sm text-foreground flex-1">{shortcut.action}</span>
                       <button
                         onClick={() => handleStartRecording(shortcut)}
-                        className="px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums hover:bg-zinc-800 hover:border-zinc-600 transition-colors"
+                        className="px-2 py-1 bg-card border border-border rounded text-foreground font-mono text-xs tabular-nums hover:bg-secondary hover:border-ring transition-colors"
                         title="Click to record new shortcut"
                       >
                         {formatShortcut(shortcut.shortcut)}
@@ -289,7 +289,7 @@ export function KeyboardShortcutManager({ onShortcutsChange }: KeyboardShortcutM
                       "text-xs",
                       shortcut.enabled
                         ? "text-green-400 hover:text-green-300"
-                        : "text-zinc-500 hover:text-zinc-400"
+                        : "text-foreground0 hover:text-muted-foreground"
                     )}
                   >
                     {shortcut.enabled ? "Enabled" : "Disabled"}

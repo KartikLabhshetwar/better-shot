@@ -306,10 +306,10 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
   const selectedGradientOption = gradientOptions.find(g => g.id === settings.gradientId) || gradientOptions[0];
 
   return (
-    <div className="flex flex-col h-dvh bg-zinc-950 text-zinc-50">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900">
+    <div className="flex flex-col h-dvh bg-background text-foreground">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card">
         <div className="flex items-center gap-4">
-          <h2 className="text-xl font-semibold text-zinc-50 text-balance">Edit Screenshot</h2>
+          <h2 className="text-xl font-semibold text-foreground text-balance">Edit Screenshot</h2>
           <TooltipProvider>
             <div className="flex gap-1">
               <Tooltip>
@@ -319,7 +319,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
                     size="icon"
                     onClick={handleUndo}
                     disabled={!canUndo}
-                    className="text-zinc-400 hover:text-zinc-50 hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed"
                     aria-label="Undo"
                   >
                     <Undo2 className="size-4" aria-hidden="true" />
@@ -336,7 +336,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
                     size="icon"
                     onClick={handleRedo}
                     disabled={!canRedo}
-                    className="text-zinc-400 hover:text-zinc-50 hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed"
                     aria-label="Redo"
                   >
                     <Redo2 className="size-4" aria-hidden="true" />
@@ -353,7 +353,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
           <Button 
             variant="outline" 
             onClick={onCancel}
-            className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-50"
+            className="border-border text-foreground hover:bg-secondary hover:text-foreground"
           >
             Cancel
           </Button>
@@ -365,7 +365,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
                   onClick={handleCopy} 
                   disabled={!imageLoaded || isSaving || isCopying}
                   size="icon"
-                  className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-50 disabled:opacity-50"
+                  className="border-border text-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
                 >
                   {isCopying ? (
                     <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -386,7 +386,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
                   onClick={handleSave} 
                   disabled={!imageLoaded || isSaving || isCopying}
                   size="icon"
-                  className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-50 disabled:opacity-50"
+                  className="border-border text-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
                 >
                   {isSaving ? (
                     <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -411,8 +411,8 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
       />
 
       <div className="flex flex-1 overflow-hidden">
-        <div className="w-72 shrink-0 border-r border-zinc-800 bg-zinc-900 flex flex-col overflow-hidden">
-          <div className="shrink-0 border-b border-zinc-800">
+        <div className="w-72 shrink-0 border-r border-border bg-card flex flex-col overflow-hidden">
+          <div className="shrink-0 border-b border-border">
             <PropertiesPanel annotation={selectedAnnotation} onUpdate={handleAnnotationUpdate} />
           </div>
           <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
@@ -464,7 +464,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
                       <strong className="block mb-1 text-red-300">Error:</strong>
                       {error}
                       <br />
-                      <small className="text-zinc-500 break-all mt-2 block text-pretty">Path: {imagePath}</small>
+                      <small className="text-foreground0 break-all mt-2 block text-pretty">Path: {imagePath}</small>
                     </div>
                   </CardContent>
                 </Card>
@@ -473,7 +473,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
           </div>
         </div>
 
-        <div className="flex-1 flex items-center justify-center p-6 bg-zinc-950 overflow-hidden min-w-0 min-h-0">
+        <div className="flex-1 flex items-center justify-center p-6 bg-background overflow-hidden min-w-0 min-h-0">
           <div className="w-full h-full flex items-center justify-center min-w-0 min-h-0">
             {previewUrl ? (
               <AnnotationCanvas
@@ -489,14 +489,14 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
                 onAnnotationDelete={handleAnnotationDelete}
               />
             ) : imageLoaded ? (
-              <div className="text-zinc-400 text-base text-pretty">Generating preview...</div>
+              <div className="text-muted-foreground text-base text-pretty">Generating preview...</div>
             ) : error ? (
               <div className="text-center text-red-400 p-5">
                 <p className="mb-2 text-base font-medium text-balance">Could not load image</p>
-                <small className="text-zinc-500 text-xs text-pretty">{error}</small>
+                <small className="text-foreground0 text-xs text-pretty">{error}</small>
               </div>
             ) : (
-              <div className="text-zinc-400 text-base text-pretty">Loading image...</div>
+              <div className="text-muted-foreground text-base text-pretty">Loading image...</div>
             )}
             <canvas ref={canvasRef} style={{ display: "none" }} />
           </div>

@@ -21,11 +21,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         ),
       }}
       toastOptions={{
-        className: "font-sans bg-zinc-950 text-white shadow-lg rounded-full px-4 py-2",
-        style: {
-          background: "rgb(9 9 11)",
-          color: "white",
-        },
+        className: "font-sans bg-card text-card-foreground shadow-lg rounded-full px-4 py-2 border border-border",
       }}
     />
   </React.StrictMode>,

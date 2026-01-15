@@ -94,7 +94,7 @@ export function UpdateDialog({
               className="space-y-3"
             >
               {releaseNotes && (
-                <p className="text-sm text-zinc-400 text-pretty">
+                <p className="text-sm text-muted-foreground text-pretty">
                   {releaseNotes}
                 </p>
               )}
@@ -112,16 +112,16 @@ export function UpdateDialog({
             >
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-zinc-400">
+                  <span className="text-muted-foreground">
                     {state === "downloading" ? "Downloading..." : "Installing..."}
                   </span>
                   {state === "downloading" && (
-                    <span className="text-zinc-500 tabular-nums">{progress}%</span>
+                    <span className="text-foreground0 tabular-nums">{progress}%</span>
                   )}
                 </div>
-                <div className="h-1 w-full overflow-hidden rounded-full bg-zinc-800">
+                <div className="h-1 w-full overflow-hidden rounded-full bg-secondary">
                   <motion.div
-                    className="h-full bg-zinc-400"
+                    className="h-full bg-muted-foreground"
                     initial={{ width: "0%" }}
                     animate={{
                       width: state === "installing" ? "100%" : `${progress}%`,
@@ -140,12 +140,12 @@ export function UpdateDialog({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
-              className="flex items-center gap-3 rounded-lg bg-zinc-800/50 p-3"
+              className="flex items-center gap-3 rounded-lg bg-secondary/50 p-3"
             >
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-700">
-                <Check className="size-4 text-zinc-200" />
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                <Check className="size-4 text-foreground" />
               </div>
-              <p className="text-sm text-zinc-300 text-pretty">
+              <p className="text-sm text-foreground text-pretty">
                 Update installed. The app will restart now.
               </p>
             </motion.div>

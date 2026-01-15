@@ -46,14 +46,14 @@ export const EffectsPanel = memo(function EffectsPanel({
       {/* Background Effects */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-zinc-200 font-mono text-balance">Background Effects</h3>
+          <h3 className="text-sm font-medium text-foreground font-mono text-balance">Background Effects</h3>
         </div>
 
         <div className="space-y-6">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-xs text-zinc-400 font-medium">Noise</label>
-              <span className="text-xs text-zinc-400 font-mono tabular-nums">{noiseAmount}%</span>
+              <label className="text-xs text-muted-foreground font-medium">Noise</label>
+              <span className="text-xs text-muted-foreground font-mono tabular-nums">{noiseAmount}%</span>
             </div>
             <Slider
               value={[noiseAmount]}
@@ -71,14 +71,14 @@ export const EffectsPanel = memo(function EffectsPanel({
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <label className="text-xs text-zinc-400 font-medium cursor-help">Background Border</label>
+                    <label className="text-xs text-muted-foreground font-medium cursor-help">Background Border</label>
                   </TooltipTrigger>
                   <TooltipContent side="right" className="max-w-48">
                     <p className="text-xs text-pretty">Adjust the width of the background border around the captured object.</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              <span className="text-xs text-zinc-400 font-mono tabular-nums">{padding}px</span>
+              <span className="text-xs text-muted-foreground font-mono tabular-nums">{padding}px</span>
             </div>
             <Slider
               value={[padding]}
@@ -96,14 +96,14 @@ export const EffectsPanel = memo(function EffectsPanel({
       {/* Shadow Effects */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-zinc-200 font-mono text-balance">Shadow</h3>
+          <h3 className="text-sm font-medium text-foreground font-mono text-balance">Shadow</h3>
         </div>
         
         <div className="space-y-6">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-xs text-zinc-400 font-medium">Blur</label>
-              <span className="text-xs text-zinc-400 font-mono tabular-nums">{shadow.blur}px</span>
+              <label className="text-xs text-muted-foreground font-medium">Blur</label>
+              <span className="text-xs text-muted-foreground font-mono tabular-nums">{shadow.blur}px</span>
             </div>
             <Slider
               value={[shadow.blur]}
@@ -118,8 +118,8 @@ export const EffectsPanel = memo(function EffectsPanel({
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-xs text-zinc-400 font-medium">Offset X</label>
-              <span className="text-xs text-zinc-400 font-mono tabular-nums">{shadow.offsetX}px</span>
+              <label className="text-xs text-muted-foreground font-medium">Offset X</label>
+              <span className="text-xs text-muted-foreground font-mono tabular-nums">{shadow.offsetX}px</span>
             </div>
             <Slider
               value={[shadow.offsetX]}
@@ -134,8 +134,8 @@ export const EffectsPanel = memo(function EffectsPanel({
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-xs text-zinc-400 font-medium">Offset Y</label>
-              <span className="text-xs text-zinc-400 font-mono tabular-nums">{shadow.offsetY}px</span>
+              <label className="text-xs text-muted-foreground font-medium">Offset Y</label>
+              <span className="text-xs text-muted-foreground font-mono tabular-nums">{shadow.offsetY}px</span>
             </div>
             <Slider
               value={[shadow.offsetY]}
@@ -150,8 +150,8 @@ export const EffectsPanel = memo(function EffectsPanel({
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="text-xs text-zinc-400 font-medium">Opacity</label>
-              <span className="text-xs text-zinc-400 font-mono tabular-nums">{shadow.opacity}%</span>
+              <label className="text-xs text-muted-foreground font-medium">Opacity</label>
+              <span className="text-xs text-muted-foreground font-mono tabular-nums">{shadow.opacity}%</span>
             </div>
             <Slider
               value={[shadow.opacity]}

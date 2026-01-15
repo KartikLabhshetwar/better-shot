@@ -49,7 +49,7 @@ const ONBOARDING_STEPS = [
     content: (
       <div className="space-y-6">
         <div className="grid grid-cols-3 gap-3">
-          <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
+          <div className="p-4 bg-secondary rounded-lg border border-border">
             <div className="flex flex-col items-center gap-2">
               <svg className="size-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
@@ -60,12 +60,12 @@ const ONBOARDING_STEPS = [
                 />
               </svg>
               <div className="text-center">
-                <div className="text-sm font-medium text-zinc-200">Region</div>
-                <div className="text-xs text-zinc-500 mt-1">Select area · ⌘⇧2</div>
+                <div className="text-sm font-medium text-foreground">Region</div>
+                <div className="text-xs text-foreground0 mt-1">Select area · ⌘⇧2</div>
               </div>
             </div>
           </div>
-          <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
+          <div className="p-4 bg-secondary rounded-lg border border-border">
             <div className="flex flex-col items-center gap-2">
               <svg className="size-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
@@ -76,12 +76,12 @@ const ONBOARDING_STEPS = [
                 />
               </svg>
               <div className="text-center">
-                <div className="text-sm font-medium text-zinc-200">Fullscreen</div>
-                <div className="text-xs text-zinc-500 mt-1">Entire screen · ⌘⇧F</div>
+                <div className="text-sm font-medium text-foreground">Fullscreen</div>
+                <div className="text-xs text-foreground0 mt-1">Entire screen · ⌘⇧F</div>
               </div>
             </div>
           </div>
-          <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
+          <div className="p-4 bg-secondary rounded-lg border border-border">
             <div className="flex flex-col items-center gap-2">
               <svg className="size-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
@@ -98,32 +98,32 @@ const ONBOARDING_STEPS = [
                 />
               </svg>
               <div className="text-center">
-                <div className="text-sm font-medium text-zinc-200">Window</div>
-                <div className="text-xs text-zinc-500 mt-1">Single window · ⌘⇧D</div>
+                <div className="text-sm font-medium text-foreground">Window</div>
+                <div className="text-xs text-foreground0 mt-1">Single window · ⌘⇧D</div>
               </div>
             </div>
           </div>
         </div>
         <div className="space-y-3">
-          <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg border border-zinc-700">
-            <span className="text-sm text-zinc-300">Capture Region</span>
-            <kbd className="px-3 py-1 bg-zinc-900 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">
+          <div className="flex items-center justify-between p-3 bg-secondary rounded-lg border border-border">
+            <span className="text-sm text-foreground">Capture Region</span>
+            <kbd className="px-3 py-1 bg-card border border-border rounded text-foreground font-mono text-xs tabular-nums">
               ⌘⇧2
             </kbd>
           </div>
-          <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg border border-zinc-700">
-            <span className="text-sm text-zinc-300">Capture Fullscreen</span>
-            <kbd className="px-3 py-1 bg-zinc-900 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">
+          <div className="flex items-center justify-between p-3 bg-secondary rounded-lg border border-border">
+            <span className="text-sm text-foreground">Capture Fullscreen</span>
+            <kbd className="px-3 py-1 bg-card border border-border rounded text-foreground font-mono text-xs tabular-nums">
               ⌘⇧F
             </kbd>
           </div>
-          <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg border border-zinc-700">
-            <span className="text-sm text-zinc-300">Capture Window</span>
-            <kbd className="px-3 py-1 bg-zinc-900 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">
+          <div className="flex items-center justify-between p-3 bg-secondary rounded-lg border border-border">
+            <span className="text-sm text-foreground">Capture Window</span>
+            <kbd className="px-3 py-1 bg-card border border-border rounded text-foreground font-mono text-xs tabular-nums">
               ⌘⇧D
             </kbd>
           </div>
-          <p className="text-xs text-zinc-500 text-center pt-2">
+          <p className="text-xs text-foreground0 text-center pt-2">
             Customize these shortcuts anytime in Preferences
           </p>
         </div>
@@ -152,27 +152,27 @@ const ONBOARDING_STEPS = [
     ),
     content: (
       <div className="space-y-4">
-        <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
-          <div className="text-sm font-medium text-zinc-200 mb-1">Auto-apply background</div>
-          <p className="text-xs text-zinc-400 text-pretty">
+        <div className="p-4 bg-secondary rounded-lg border border-border">
+          <div className="text-sm font-medium text-foreground mb-1">Auto-apply background</div>
+          <p className="text-xs text-muted-foreground text-pretty">
             Instantly apply your default background and save, without opening the editor.
           </p>
         </div>
-        <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
-          <div className="text-sm font-medium text-zinc-200 mb-1">Default background</div>
-          <p className="text-xs text-zinc-400 text-pretty">
+        <div className="p-4 bg-secondary rounded-lg border border-border">
+          <div className="text-sm font-medium text-foreground mb-1">Default background</div>
+          <p className="text-xs text-muted-foreground text-pretty">
             Choose the image Better Shot uses for auto-apply and as the starting point in the editor.
           </p>
         </div>
-        <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
-          <div className="text-sm font-medium text-zinc-200 mb-1">Save location</div>
-          <p className="text-xs text-zinc-400 text-pretty">
+        <div className="p-4 bg-secondary rounded-lg border border-border">
+          <div className="text-sm font-medium text-foreground mb-1">Save location</div>
+          <p className="text-xs text-muted-foreground text-pretty">
             Pick where screenshots are saved. Desktop is the default.
           </p>
         </div>
-        <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
-          <div className="text-sm font-medium text-zinc-200 mb-1">Copy to clipboard</div>
-          <p className="text-xs text-zinc-400 text-pretty">
+        <div className="p-4 bg-secondary rounded-lg border border-border">
+          <div className="text-sm font-medium text-foreground mb-1">Copy to clipboard</div>
+          <p className="text-xs text-muted-foreground text-pretty">
             Automatically copy saved screenshots so they are ready to paste.
           </p>
         </div>
@@ -221,20 +221,20 @@ const ONBOARDING_STEPS = [
           </div>
         </div>
         <div className="space-y-3">
-          <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
-            <div className="text-sm font-medium text-zinc-200 mb-2">How to Grant Permission</div>
-            <ol className="text-xs text-zinc-400 space-y-1 list-decimal list-inside text-pretty">
+          <div className="p-4 bg-secondary rounded-lg border border-border">
+            <div className="text-sm font-medium text-foreground mb-2">How to Grant Permission</div>
+            <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside text-pretty">
               <li>Click “Open System Settings” in the macOS prompt.</li>
               <li>Go to Privacy &amp; Security → Screen Recording.</li>
-              <li>Toggle on <span className="text-zinc-300 font-mono">bettershot</span> in the list.</li>
+              <li>Toggle on <span className="text-foreground font-mono">bettershot</span> in the list.</li>
               <li>Restart Better Shot so the change takes effect.</li>
             </ol>
           </div>
-          <div className="p-4 bg-zinc-800 rounded-lg border border-zinc-700">
-            <div className="text-sm font-medium text-zinc-200 mb-2">What You'll See</div>
-            <p className="text-xs text-zinc-400 text-pretty">
+          <div className="p-4 bg-secondary rounded-lg border border-border">
+            <div className="text-sm font-medium text-foreground mb-2">What You'll See</div>
+            <p className="text-xs text-muted-foreground text-pretty">
               macOS shows a dialog like{" "}
-              <span className="text-zinc-300 font-mono">
+              <span className="text-foreground font-mono">
                 "bettershot" would like to record this computer&apos;s screen and audio.
               </span>{" "}
               Click “Open System Settings” to grant access.
@@ -260,12 +260,12 @@ const ONBOARDING_STEPS = [
     ),
     content: (
       <div className="space-y-4 text-center">
-        <p className="text-sm text-zinc-400 text-pretty">
-          Press <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘⇧2</kbd> to capture a region, or use the buttons on the main screen.
+        <p className="text-sm text-muted-foreground text-pretty">
+          Press <kbd className="px-2 py-1 bg-secondary border border-border rounded text-foreground font-mono text-xs tabular-nums">⌘⇧2</kbd> to capture a region, or use the buttons on the main screen.
         </p>
-        <div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
-          <p className="text-xs text-zinc-500 text-pretty">
-            <span className="text-zinc-400 font-medium">Pro tip:</span> Enable "Auto-apply background" on the main screen for instant captures with your default background - no editing required.
+        <div className="p-4 bg-secondary/50 rounded-lg border border-border/50">
+          <p className="text-xs text-foreground0 text-pretty">
+            <span className="text-muted-foreground font-medium">Pro tip:</span> Enable "Auto-apply background" on the main screen for instant captures with your default background - no editing required.
           </p>
         </div>
       </div>
@@ -301,10 +301,10 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   const isLastStep = currentStep === ONBOARDING_STEPS.length - 1;
 
   return (
-    <div className="fixed inset-0 z-50 bg-zinc-950/95 backdrop-blur-sm flex items-center justify-center p-8">
+    <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex items-center justify-center p-8">
       <div className="w-full max-w-2xl">
         <OnboardingProgress currentStep={currentStep + 1} totalSteps={ONBOARDING_STEPS.length} />
-        <Card className="bg-zinc-900 border-zinc-800">
+        <Card className="bg-card border-border">
           <CardContent className="p-8">
             <OnboardingStep
               title={step.title}
@@ -313,13 +313,13 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
             >
               {step.content}
             </OnboardingStep>
-            <div className="flex items-center justify-between mt-8 pt-6 border-t border-zinc-800">
+            <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
               <div>
                 {!isFirstStep && (
                   <Button
                     variant="outline"
                     onClick={handlePrevious}
-                    className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                    className="border-border text-foreground hover:bg-secondary"
                   >
                     Previous
                   </Button>
@@ -329,7 +329,7 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 <Button
                   variant="ghost"
                   onClick={handleSkip}
-                  className="text-zinc-400 hover:text-zinc-300"
+                  className="text-muted-foreground hover:text-foreground"
                 >
                   Skip
                 </Button>

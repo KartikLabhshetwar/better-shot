@@ -108,41 +108,41 @@ export function PreferencesPage({ onBack, onSettingsChange, onCheckForUpdates }:
 
   if (isLoading) {
     return (
-      <main className="min-h-dvh flex items-center justify-center bg-zinc-950">
-        <div className="text-zinc-400">Loading settings...</div>
+      <main className="min-h-dvh flex items-center justify-center bg-background">
+        <div className="text-muted-foreground">Loading settings...</div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-dvh bg-zinc-950 text-zinc-50">
+    <main className="min-h-dvh bg-background text-foreground">
       <div className="max-w-4xl mx-auto p-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-4 pb-2 border-b border-zinc-800">
+        <div className="flex items-center gap-4 pb-2 border-b border-border">
           <Button
             variant="ghost"
             size="icon"
             onClick={onBack}
-            className="text-zinc-400 hover:text-zinc-50 hover:bg-zinc-800"
+            className="text-muted-foreground hover:text-foreground hover:bg-secondary"
             aria-label="Back to main"
           >
             <ArrowLeft className="size-5" aria-hidden="true" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-zinc-50">Preferences</h1>
-            <p className="text-zinc-500 text-sm">Configure your app settings</p>
+            <h1 className="text-2xl font-bold text-foreground">Preferences</h1>
+            <p className="text-foreground0 text-sm">Configure your app settings</p>
           </div>
         </div>
 
         {/* General Settings */}
-        <Card className="bg-zinc-900 border-zinc-800">
+        <Card className="bg-card border-border">
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold text-zinc-100">General</CardTitle>
+            <CardTitle className="text-lg font-semibold text-card-foreground">General</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
             {/* Save Directory */}
             <div className="space-y-2">
-              <label htmlFor="save-dir" className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+              <label htmlFor="save-dir" className="text-sm font-medium text-foreground flex items-center gap-2">
                 <Folder className="size-4" aria-hidden="true" />
                 Save Directory
               </label>
@@ -152,18 +152,18 @@ export function PreferencesPage({ onBack, onSettingsChange, onCheckForUpdates }:
                 value={settings.saveDir}
                 onChange={(e) => updateSetting("saveDir", e.target.value)}
                 placeholder="Enter save directory path (e.g., ~/Desktop)"
-                className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all font-mono text-sm"
+                className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-card-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all font-mono text-sm"
               />
-              <p className="text-xs text-zinc-500">Screenshots will be saved to this directory</p>
+              <p className="text-xs text-foreground0">Screenshots will be saved to this directory</p>
             </div>
 
             {/* Copy to Clipboard */}
             <div className="flex items-center justify-between py-2">
               <div>
-                <label htmlFor="copy-clipboard" className="text-sm font-medium text-zinc-300 cursor-pointer block">
+                <label htmlFor="copy-clipboard" className="text-sm font-medium text-foreground cursor-pointer block">
                   Copy to clipboard
                 </label>
-                <p className="text-xs text-zinc-500">Automatically copy screenshots to clipboard after saving</p>
+                <p className="text-xs text-foreground0">Automatically copy screenshots to clipboard after saving</p>
               </div>
               <Switch
                 id="copy-clipboard"
@@ -175,9 +175,9 @@ export function PreferencesPage({ onBack, onSettingsChange, onCheckForUpdates }:
         </Card>
 
         {/* Default Background */}
-        <Card className="bg-zinc-900 border-zinc-800">
+        <Card className="bg-card border-border">
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold text-zinc-100">Default Background</CardTitle>
+            <CardTitle className="text-lg font-semibold text-card-foreground">Default Background</CardTitle>
           </CardHeader>
           <CardContent>
             <BackgroundImageSelector onImageSelect={handleImageSelect} />
@@ -185,41 +185,41 @@ export function PreferencesPage({ onBack, onSettingsChange, onCheckForUpdates }:
         </Card>
 
         {/* Keyboard Shortcuts */}
-        <Card className="bg-zinc-900 border-zinc-800">
+        <Card className="bg-card border-border">
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold text-zinc-100">Keyboard Shortcuts</CardTitle>
+            <CardTitle className="text-lg font-semibold text-card-foreground">Keyboard Shortcuts</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <KeyboardShortcutManager onShortcutsChange={handleShortcutsChange} />
             
             {/* Editor Shortcuts Reference */}
-            <div className="space-y-3 pt-4 border-t border-zinc-800">
+            <div className="space-y-3 pt-4 border-t border-border">
               <div>
-                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-3">Editor</p>
+                <p className="text-xs text-foreground0 uppercase tracking-wide mb-3">Editor</p>
                 <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-zinc-400">Save</span>
-                    <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘S</kbd>
+                    <span className="text-muted-foreground">Save</span>
+                    <kbd className="px-2 py-1 bg-secondary border border-border rounded text-foreground font-mono text-xs tabular-nums">⌘S</kbd>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-zinc-400">Copy</span>
-                    <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⇧⌘C</kbd>
+                    <span className="text-muted-foreground">Copy</span>
+                    <kbd className="px-2 py-1 bg-secondary border border-border rounded text-foreground font-mono text-xs tabular-nums">⇧⌘C</kbd>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-zinc-400">Undo</span>
-                    <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌘Z</kbd>
+                    <span className="text-muted-foreground">Undo</span>
+                    <kbd className="px-2 py-1 bg-secondary border border-border rounded text-foreground font-mono text-xs tabular-nums">⌘Z</kbd>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-zinc-400">Redo</span>
-                    <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⇧⌘Z</kbd>
+                    <span className="text-muted-foreground">Redo</span>
+                    <kbd className="px-2 py-1 bg-secondary border border-border rounded text-foreground font-mono text-xs tabular-nums">⇧⌘Z</kbd>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-zinc-400">Delete annotation</span>
-                    <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">⌫</kbd>
+                    <span className="text-muted-foreground">Delete annotation</span>
+                    <kbd className="px-2 py-1 bg-secondary border border-border rounded text-foreground font-mono text-xs tabular-nums">⌫</kbd>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-zinc-400">Close editor</span>
-                    <kbd className="px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-zinc-300 font-mono text-xs tabular-nums">Esc</kbd>
+                    <span className="text-muted-foreground">Close editor</span>
+                    <kbd className="px-2 py-1 bg-secondary border border-border rounded text-foreground font-mono text-xs tabular-nums">Esc</kbd>
                   </div>
                 </div>
               </div>
@@ -228,22 +228,22 @@ export function PreferencesPage({ onBack, onSettingsChange, onCheckForUpdates }:
         </Card>
 
         {/* About */}
-        <Card className="bg-zinc-900 border-zinc-800">
+        <Card className="bg-card border-border">
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold text-zinc-100">About</CardTitle>
+            <CardTitle className="text-lg font-semibold text-card-foreground">About</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-zinc-300">Better Shot</p>
-                <p className="text-xs text-zinc-500">Version {__APP_VERSION__}</p>
+                <p className="text-sm font-medium text-foreground">Better Shot</p>
+                <p className="text-xs text-foreground0">Version {__APP_VERSION__}</p>
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleCheckForUpdates}
                 disabled={isCheckingUpdates}
-                className="border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100"
+                className="border-border bg-secondary text-foreground hover:bg-muted hover:text-card-foreground"
               >
                 {isCheckingUpdates ? (
                   <>

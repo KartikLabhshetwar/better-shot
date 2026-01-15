@@ -112,10 +112,10 @@ export function useEditorSettings(): [EditorSettings, EditorSettingsActions] {
   const [borderRadius, setBorderRadius] = useState(18);
   
   // Shadow state
-  const [shadowBlur, setShadowBlur] = useState(20);
-  const [shadowOffsetX, setShadowOffsetX] = useState(0);
-  const [shadowOffsetY, setShadowOffsetY] = useState(10);
-  const [shadowOpacity, setShadowOpacity] = useState(30);
+  const [shadowBlur, setShadowBlur] = useState(33);
+  const [shadowOffsetX, setShadowOffsetX] = useState(18);
+  const [shadowOffsetY, setShadowOffsetY] = useState(23);
+  const [shadowOpacity, setShadowOpacity] = useState(39);
 
   // Load default background from store on mount
   useEffect(() => {

@@ -25,7 +25,7 @@ const tools: Array<{ type: ToolType; icon: React.ReactNode; label: string }> = [
 export const AnnotationToolbar = memo(function AnnotationToolbar({ selectedTool, onToolSelect, onDelete }: AnnotationToolbarProps) {
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="flex items-center gap-1 px-4 py-2 border-b border-zinc-800 bg-zinc-900">
+      <div className="flex items-center gap-1 px-4 py-2 border-b border-border bg-card">
         {tools.map((tool) => (
           <Tooltip key={tool.type}>
             <TooltipTrigger asChild>
@@ -36,8 +36,8 @@ export const AnnotationToolbar = memo(function AnnotationToolbar({ selectedTool,
                 className={cn(
                   "size-8 rounded-md",
                   selectedTool === tool.type
-                    ? "bg-zinc-700 text-zinc-50"
-                    : "text-zinc-400 hover:text-zinc-50 hover:bg-zinc-800"
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                 )}
                 aria-label={tool.label}
               >

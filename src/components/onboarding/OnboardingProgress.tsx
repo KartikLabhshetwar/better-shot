@@ -21,7 +21,7 @@ export function OnboardingProgress({ currentStep, totalSteps }: OnboardingProgre
                     ? "bg-blue-600 text-white scale-110"
                     : isCompleted
                       ? "bg-blue-600/50 text-blue-300"
-                      : "bg-zinc-800 text-zinc-500 border border-zinc-700"
+                      : "bg-secondary text-foreground0 border border-border"
                 }
               `}
             >
@@ -47,7 +47,7 @@ export function OnboardingProgress({ currentStep, totalSteps }: OnboardingProgre
             {index < totalSteps - 1 && (
               <div
                 className={`h-0.5 w-8 transition-colors ${
-                  isCompleted ? "bg-blue-600" : "bg-zinc-800"
+                  isCompleted ? "bg-blue-600" : "bg-secondary"
                 }`}
               />
             )}

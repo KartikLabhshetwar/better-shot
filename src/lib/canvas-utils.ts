@@ -29,7 +29,7 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
     // Use scale = 1 to match preview exactly - the image is already at full resolution
     scale = 1,
     gradientImage = null,
-    shadow = { blur: 20, offsetX: 0, offsetY: 10, opacity: 30 },
+    shadow = { blur: 33, offsetX: 18, offsetY: 23, opacity: 39 },
   } = options;
 
   const bgWidth = image.width + padding * 2;

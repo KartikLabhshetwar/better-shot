@@ -56,12 +56,12 @@ export const BackgroundSelector = memo(function BackgroundSelector({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-zinc-200 font-mono text-balance">Background</h3>
+        <h3 className="text-sm font-medium text-foreground font-mono text-balance">Background</h3>
       </div>
       
       {/* Solid Colors */}
       <div className="space-y-2">
-        <span className="text-xs text-zinc-500">Solid</span>
+        <span className="text-xs text-foreground0">Solid</span>
         <div className="flex gap-2">
           {solidColors.map(({ type, color }) => (
             <button
@@ -72,8 +72,8 @@ export const BackgroundSelector = memo(function BackgroundSelector({
                 "size-10 rounded-lg transition-all",
                 type === "transparent" && "bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImNoZWNrZXJib2FyZCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cmVjdCB3aWR0aD0iNSIgaGVpZ2h0PSI1IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iNSIgd2lkdGg9IjUiIGhlaWdodD0iNSIgZmlsbD0iI2UwZTBlMCIvPjxyZWN0IHk9IjUiIHdpZHRoPSI1IiBoZWlnaHQ9IjUiIGZpbGw9IiNlMGUwZTAiLz48cmVjdCB4PSI1IiB5PSI1IiB3aWR0aD0iNSIgaGVpZ2h0PSI1IiBmaWxsPSIjZmZmIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIGZpbGw9InVybCgjY2hlY2tlcmJvYXJkKSIvPjwvc3ZnPg==')]",
                 backgroundType === type
-                  ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-zinc-900"
-                  : "ring-1 ring-zinc-700 hover:ring-zinc-500"
+                  ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-card"
+                  : "ring-1 ring-border hover:ring-ring"
               )}
               style={type !== "transparent" ? { backgroundColor: color } : undefined}
               title={type.charAt(0).toUpperCase() + type.slice(1)}
@@ -87,8 +87,8 @@ export const BackgroundSelector = memo(function BackgroundSelector({
               className={cn(
                 "size-10 rounded-lg transition-all",
                 backgroundType === "custom"
-                  ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-zinc-900"
-                  : "ring-1 ring-zinc-700 hover:ring-zinc-500"
+                  ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-card"
+                  : "ring-1 ring-border hover:ring-ring"
               )}
               style={{ backgroundColor: customColor }}
               title="Custom color"
@@ -108,7 +108,7 @@ export const BackgroundSelector = memo(function BackgroundSelector({
 
       {/* Gradients */}
       <div className="space-y-2">
-        <span className="text-xs text-zinc-500">Gradients</span>
+        <span className="text-xs text-foreground0">Gradients</span>
         <div className="grid grid-cols-4 gap-2">
           {gradientOptions.map((gradient) => {
             const isSelected = backgroundType === "gradient" && selectedGradient === gradient.id;
@@ -123,8 +123,8 @@ export const BackgroundSelector = memo(function BackgroundSelector({
                 className={cn(
                   "relative w-full aspect-square rounded-lg transition-all overflow-hidden",
                   isSelected
-                    ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-zinc-900"
-                    : "ring-1 ring-zinc-700 hover:ring-zinc-500"
+                    ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-card"
+                    : "ring-1 ring-border hover:ring-ring"
                 )}
                 title={gradient.name}
               >

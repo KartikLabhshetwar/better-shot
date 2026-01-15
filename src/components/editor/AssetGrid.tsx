@@ -27,11 +27,11 @@ export const AssetGrid = memo(function AssetGrid({ categories, selectedImage, ba
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-zinc-200 font-mono text-balance">Wallpapers</h3>
+        <h3 className="text-sm font-medium text-foreground font-mono text-balance">Wallpapers</h3>
       </div>
       
       {categories.length > 1 && (
-        <div className="flex p-1 bg-zinc-800/50 rounded-lg border border-zinc-700/50">
+        <div className="flex p-1 bg-secondary/50 rounded-lg border border-border/50">
           {categories.map((category) => (
             <button
               key={category.name}
@@ -40,8 +40,8 @@ export const AssetGrid = memo(function AssetGrid({ categories, selectedImage, ba
               className={cn(
                 "flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all",
                 activeCategory === category.name
-                  ? "bg-zinc-700 text-white shadow-sm"
-                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/30"
+                  ? "bg-muted text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
               )}
             >
               {category.name === "Wallpapers" ? "Wallpapers" : category.name === "Mac Assets" ? "Mac" : category.name}
@@ -50,7 +50,7 @@ export const AssetGrid = memo(function AssetGrid({ categories, selectedImage, ba
         </div>
       )}
 
-      <div className="grid grid-cols-4 gap-2 max-h-[400px] overflow-y-auto pr-4 pb-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-zinc-700 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
+      <div className="grid grid-cols-4 gap-2 max-h-[400px] overflow-y-auto pr-4 pb-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
         {currentCategory?.assets.map((asset) => (
           <button
             key={asset.id}
@@ -59,8 +59,8 @@ export const AssetGrid = memo(function AssetGrid({ categories, selectedImage, ba
             className={cn(
               "group relative w-full aspect-square rounded-lg overflow-hidden transition-all",
               backgroundType === "image" && selectedImage === asset.src
-                ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-zinc-900"
-                : "ring-1 ring-zinc-700 hover:ring-zinc-500"
+                ? "ring-2 ring-primary ring-offset-2 ring-offset-card"
+                : "ring-1 ring-border hover:ring-ring"
             )}
           >
             <img

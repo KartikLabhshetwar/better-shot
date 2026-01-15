@@ -81,10 +81,10 @@ const DEFAULT_SETTINGS: EditorSettings = {
   noiseAmount: 0,
   borderRadius: 18,
   shadow: {
-    blur: 20,
-    offsetX: 0,
-    offsetY: 10,
-    opacity: 30,
+    blur: 33,
+    offsetX: 18,
+    offsetY: 23,
+    opacity: 39,
   },
 };
 

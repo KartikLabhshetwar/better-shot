@@ -15,7 +15,7 @@ export function SettingsIcon({ onClick, className, size = "default" }: SettingsI
       size="icon"
       onClick={onClick}
       className={cn(
-        "text-zinc-400 hover:text-zinc-50 hover:bg-zinc-800",
+        "text-muted-foreground hover:text-foreground hover:bg-secondary",
         {
           "size-8": size === "sm",
           "size-10": size === "default",
