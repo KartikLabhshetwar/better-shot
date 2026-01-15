@@ -26,6 +26,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -44,6 +46,23 @@ jobs:
 
       - name: Install frontend dependencies
         run: pnpm install
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          PREV_TAG=$(git tag --sort=-v:refname | sed -n '2p')
+          if [ -z "$PREV_TAG" ]; then
+            COMMITS=$(git log --oneline --pretty=format:"- %s" --reverse)
+          else
+            COMMITS=$(git log "$PREV_TAG".."$TAG_NAME" --oneline --pretty=format:"- %s" --reverse)
+          fi
+          if [ -z "$COMMITS" ]; then
+            COMMITS="- No changes documented"
+          fi
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -84,10 +103,7 @@ jobs:
             
             ## What's New
             
-            - Initial release of Better Shot
-            - Region, fullscreen, and window capture modes
-            - Image editor with backgrounds and effects
-            - Global keyboard shortcuts
+            ${{ steps.release_notes.outputs.notes }}
           releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
