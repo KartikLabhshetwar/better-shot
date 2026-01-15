@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { toast } from "sonner";
-import { Copy, Loader2, Undo2, Redo2, ImageDown } from "lucide-react";
+import { Copy, ImageDown, Loader2, Redo2, Scan, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -13,9 +13,11 @@ import { ImageRoundnessControl } from "./editor/ImageRoundnessControl";
 import { AnnotationToolbar } from "./editor/AnnotationToolbar";
 import { AnnotationCanvas } from "./editor/AnnotationCanvas";
 import { PropertiesPanel } from "./editor/PropertiesPanel";
+import { OCRResultsDialog } from "./editor/OCRResultsDialog";
 import { Annotation, ToolType } from "@/types/annotations";
 import { usePreviewGenerator } from "@/hooks/usePreviewGenerator";
 import { assetCategories } from "@/hooks/useEditorSettings";
+import { recognizeTextFromCanvas } from "@/lib/ocr";
 import {
   useSettings,
   useAnnotations,
@@ -48,6 +50,11 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
   const [tempDir, setTempDir] = useState<string>("/private/tmp");
+  
+  // OCR state
+  const [isOCRProcessing, setIsOCRProcessing] = useState(false);
+  const [ocrResults, setOcrResults] = useState<string>("");
+  const [showOCRDialog, setShowOCRDialog] = useState(false);
   
   // Annotation UI state (not part of undo/redo)
   const [selectedTool, setSelectedTool] = useState<ToolType>("select");
@@ -203,6 +210,32 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
     }
   }, [screenshotImage, annotations, renderHighQualityCanvas, isSaving, isCopying, tempDir]);
 
+  const handleOCRFullImage = useCallback(async () => {
+    if (!screenshotImage || isOCRProcessing || isSaving || isCopying) return;
+
+    setIsOCRProcessing(true);
+    try {
+      const highQualityCanvas = await renderHighQualityCanvas(annotations);
+      
+      if (!highQualityCanvas) {
+        setIsOCRProcessing(false);
+        return;
+      }
+
+      const text = await recognizeTextFromCanvas(highQualityCanvas);
+      setOcrResults(text);
+      setShowOCRDialog(true);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      toast.error("OCR failed", {
+        description: errorMessage,
+        duration: 5000,
+      });
+    } finally {
+      setIsOCRProcessing(false);
+    }
+  }, [screenshotImage, annotations, renderHighQualityCanvas, isOCRProcessing, isSaving, isCopying]);
+
   // Annotation handlers
   const handleAnnotationAdd = useCallback((annotation: Annotation) => {
     actions.addAnnotation(annotation);
@@ -350,6 +383,29 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
           </TooltipProvider>
         </div>
         <div className="flex gap-3">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="cta"
+                  size="lg"
+                  onClick={handleOCRFullImage}
+                  disabled={!imageLoaded || isOCRProcessing || isSaving || isCopying}
+                  className="disabled:opacity-50"
+                >
+                  {isOCRProcessing ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Scan className="size-4" aria-hidden="true" />
+                  )}
+                  <span>Extract Text</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Extract text using OCR</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <Button 
             variant="cta"
             size="lg"
@@ -502,6 +558,11 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
           </div>
         </div>
       </div>
+      <OCRResultsDialog
+        open={showOCRDialog}
+        onOpenChange={setShowOCRDialog}
+        text={ocrResults}
+      />
     </div>
   );
 }
