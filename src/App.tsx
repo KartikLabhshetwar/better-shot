@@ -634,7 +634,7 @@ function App() {
                 v{__APP_VERSION__}
               </span>
             </div>
-            <p className="text-muted-foreground text-sm text-pretty">Professional screenshot workflow</p>
+            <p className="text-muted-foreground text-sm text-pretty">Capture, edit, and enhance your screenshots with professional quality.</p>
           </div>
         </div>
 
@@ -644,7 +644,9 @@ function App() {
               <Button
                 onClick={() => handleCapture("region")}
                 disabled={isCapturing}
-                className="bg-secondary hover:bg-muted text-foreground py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed border border-border transition-all flex items-center justify-center gap-2"
+                variant="cta"
+                size="lg"
+                className="py-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Crop className="size-4" aria-hidden="true" />
                 Region
@@ -652,7 +654,9 @@ function App() {
               <Button
                 onClick={() => handleCapture("fullscreen")}
                 disabled={isCapturing}
-                className="bg-secondary hover:bg-muted text-foreground py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed border border-border transition-all flex items-center justify-center gap-2"
+                variant="cta"
+                size="lg"
+                className="py-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Monitor className="size-4" aria-hidden="true" />
                 Screen
@@ -660,7 +664,9 @@ function App() {
               <Button
                 onClick={() => handleCapture("window")}
                 disabled={isCapturing}
-                className="bg-secondary hover:bg-muted text-foreground py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed border border-border transition-all flex items-center justify-center gap-2"
+                variant="cta"
+                size="lg"
+                className="py-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <AppWindowMac className="size-4" aria-hidden="true" />
                 Window

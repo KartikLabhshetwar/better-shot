@@ -239,11 +239,11 @@ export function PreferencesPage({ onBack, onSettingsChange, onCheckForUpdates }:
                 <p className="text-xs text-foreground0">Version {__APP_VERSION__}</p>
               </div>
               <Button
-                variant="outline"
-                size="sm"
+                variant="cta"
+                size="lg"
                 onClick={handleCheckForUpdates}
                 disabled={isCheckingUpdates}
-                className="border-border bg-secondary text-foreground hover:bg-muted hover:text-card-foreground"
+                className="disabled:opacity-50"
               >
                 {isCheckingUpdates ? (
                   <>

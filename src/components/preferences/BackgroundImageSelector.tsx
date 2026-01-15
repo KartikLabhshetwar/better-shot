@@ -148,9 +148,8 @@ export function BackgroundImageSelector({ onImageSelect }: BackgroundImageSelect
           />
           <Button
             type="button"
-            variant="outline"
-            size="sm"
-            className="border-border text-foreground hover:bg-secondary hover:text-foreground"
+            variant="cta"
+            size="lg"
             onClick={() => fileInputRef.current?.click()}
           >
             <Upload className="size-3 mr-1" aria-hidden="true" />

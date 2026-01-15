@@ -327,7 +327,6 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
               </div>
               <div className="flex items-center gap-3">
                 <Button
-                  variant="ghost"
                   onClick={handleSkip}
                   className="text-muted-foreground hover:text-foreground"
                 >
@@ -335,7 +334,8 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                 </Button>
                 <Button
                   onClick={handleNext}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  variant="cta"
+                  size="lg"
                 >
                   {isLastStep ? "Get Started" : "Next"}
                 </Button>

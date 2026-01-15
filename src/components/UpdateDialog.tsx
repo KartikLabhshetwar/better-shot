@@ -176,7 +176,7 @@ export function UpdateDialog({
               <Button variant="ghost" onClick={handleSkip}>
                 Later
               </Button>
-              <Button onClick={handleUpdate}>
+              <Button variant="cta" size="lg" onClick={handleUpdate}>
                 <Download className="mr-2 size-4" />
                 Update
               </Button>
@@ -193,7 +193,7 @@ export function UpdateDialog({
               <Button variant="ghost" onClick={handleSkip}>
                 Close
               </Button>
-              <Button onClick={handleUpdate}>Try Again</Button>
+              <Button variant="cta" size="lg" onClick={handleUpdate}>Try Again</Button>
             </>
           )}
         </DialogFooter>

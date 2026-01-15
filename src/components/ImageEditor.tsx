@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { toast } from "sonner";
-import { Copy, Save, Loader2, Undo2, Redo2 } from "lucide-react";
+import { Copy, Loader2, Undo2, Redo2, ImageDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -351,9 +351,9 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
         </div>
         <div className="flex gap-3">
           <Button 
-            variant="outline" 
+            variant="cta"
+            size="lg"
             onClick={onCancel}
-            className="border-border text-foreground hover:bg-secondary hover:text-foreground"
           >
             Cancel
           </Button>
@@ -361,18 +361,18 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button 
-                  variant="outline" 
+                  variant="cta"
                   onClick={handleCopy} 
                   disabled={!imageLoaded || isSaving || isCopying}
-                  size="icon"
-                  className="border-border text-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                  size="lg"
+                  className="disabled:opacity-50"
                 >
                   {isCopying ? (
                     <Loader2 className="size-4 animate-spin" aria-hidden="true" />
                   ) : (
                     <Copy className="size-4" aria-hidden="true" />
                   )}
-                  <span className="sr-only">Copy to clipboard</span>
+                  <span>Copy</span>
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -382,18 +382,18 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button 
-                  variant="outline" 
+                  variant="cta"
                   onClick={handleSave} 
                   disabled={!imageLoaded || isSaving || isCopying}
-                  size="icon"
-                  className="border-border text-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                  size="lg"
+                  className="disabled:opacity-50"
                 >
                   {isSaving ? (
                     <Loader2 className="size-4 animate-spin" aria-hidden="true" />
                   ) : (
-                    <Save className="size-4" aria-hidden="true" />
+                    <ImageDown className="size-4" aria-hidden="true" />
                   )}
-                  <span className="sr-only">Save image</span>
+                  <span>Export</span>
                 </Button>
               </TooltipTrigger>
               <TooltipContent>

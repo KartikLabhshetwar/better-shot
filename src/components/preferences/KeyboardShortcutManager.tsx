@@ -233,10 +233,9 @@ export function KeyboardShortcutManager({ onShortcutsChange }: KeyboardShortcutM
         <label className="text-sm font-medium text-foreground">Keyboard Shortcuts</label>
         <Button
           type="button"
-          variant="outline"
-          size="sm"
+          variant="cta"
+          size="lg"
           onClick={handleAdd}
-          className="border-border text-foreground hover:bg-secondary hover:text-foreground"
         >
           <Plus className="size-3 mr-1" aria-hidden="true" />
           Add
@@ -259,10 +258,9 @@ export function KeyboardShortcutManager({ onShortcutsChange }: KeyboardShortcutM
                         {recordedShortcut ? formatShortcut(recordedShortcut) : "Press shortcut..."}
                       </button>
                       <Button
-                        size="sm"
-                        variant="ghost"
+                        variant="cta"
+                        size="lg"
                         onClick={handleCancelRecording}
-                        className="text-foreground hover:text-foreground"
                       >
                         Cancel
                       </Button>
@@ -296,10 +294,9 @@ export function KeyboardShortcutManager({ onShortcutsChange }: KeyboardShortcutM
                   </Button>
                   {shortcut.id.startsWith("custom-") && (
                     <Button
-                      size="sm"
-                      variant="ghost"
+                      variant="cta"
+                      size="lg"
                       onClick={() => handleDelete(shortcut.id)}
-                      className="text-red-400 hover:text-red-300"
                       aria-label="Delete shortcut"
                     >
                       <Trash2 className="size-3" aria-hidden="true" />
