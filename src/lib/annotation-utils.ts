@@ -45,18 +45,32 @@ export function drawAnnotationOnCanvas(ctx: CanvasRenderingContext2D, annotation
     case "arrow": {
       const lineWidth = borderWidth || 5;
       
-      // Calculate arrow properties based on line width
-      const arrowHeadLength = annotation.arrowType === "thick" ? lineWidth * 4 : lineWidth * 3;
+      let angle: number;
+      let lineEndX: number;
+      let lineEndY: number;
       
-      // Calculate the angle of the line
-      const angle = Math.atan2(annotation.endY - annotation.y, annotation.endX - annotation.x);
+      if (annotation.lineType === "curved" && annotation.controlPoints && annotation.controlPoints.length > 0) {
+        const cp = annotation.controlPoints[0];
+        const dx = annotation.endX - cp.x;
+        const dy = annotation.endY - cp.y;
+        angle = Math.atan2(dy, dx);
+      } else {
+        angle = Math.atan2(annotation.endY - annotation.y, annotation.endX - annotation.x);
+      }
       
-      // Shorten the line so it doesn't overlap with the arrowhead
+      let arrowHeadLength: number;
+      if (annotation.arrowType === "thick") {
+        arrowHeadLength = Math.max(lineWidth * 6, 20);
+      } else if (annotation.arrowType === "thin") {
+        arrowHeadLength = Math.max(lineWidth * 3, 12);
+      } else {
+        arrowHeadLength = 0;
+      }
+      
       const shortenBy = annotation.arrowType !== "none" ? arrowHeadLength * 0.7 : 0;
-      const lineEndX = annotation.endX - shortenBy * Math.cos(angle);
-      const lineEndY = annotation.endY - shortenBy * Math.sin(angle);
+      lineEndX = annotation.endX - shortenBy * Math.cos(angle);
+      lineEndY = annotation.endY - shortenBy * Math.sin(angle);
       
-      // Draw the line
       ctx.beginPath();
       ctx.moveTo(annotation.x, annotation.y);
       if (annotation.lineType === "curved" && annotation.controlPoints && annotation.controlPoints.length > 0) {
@@ -70,21 +84,20 @@ export function drawAnnotationOnCanvas(ctx: CanvasRenderingContext2D, annotation
       ctx.lineCap = "round";
       ctx.stroke();
 
-      // Draw the arrowhead
-      if (annotation.arrowType !== "none") {
+      if (annotation.arrowType !== "none" && arrowHeadLength > 0) {
         ctx.beginPath();
         ctx.moveTo(annotation.endX, annotation.endY);
         ctx.lineTo(
-          annotation.endX - arrowHeadLength * Math.cos(angle - Math.PI / 7),
-          annotation.endY - arrowHeadLength * Math.sin(angle - Math.PI / 7)
+          annotation.endX - arrowHeadLength * Math.cos(angle - Math.PI / 6),
+          annotation.endY - arrowHeadLength * Math.sin(angle - Math.PI / 6)
         );
         ctx.lineTo(
           annotation.endX - arrowHeadLength * 0.6 * Math.cos(angle),
           annotation.endY - arrowHeadLength * 0.6 * Math.sin(angle)
         );
         ctx.lineTo(
-          annotation.endX - arrowHeadLength * Math.cos(angle + Math.PI / 7),
-          annotation.endY - arrowHeadLength * Math.sin(angle + Math.PI / 7)
+          annotation.endX - arrowHeadLength * Math.cos(angle + Math.PI / 6),
+          annotation.endY - arrowHeadLength * Math.sin(angle + Math.PI / 6)
         );
         ctx.closePath();
         ctx.fillStyle = fillRgba;

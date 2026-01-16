@@ -3,6 +3,11 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Annotation, LineType, ArrowType } from "@/types/annotations";
 
+// Stop keyboard events from propagating to parent handlers (e.g., delete annotation shortcut)
+const stopPropagation = (e: React.KeyboardEvent) => {
+  e.stopPropagation();
+};
+
 interface PropertiesPanelProps {
   annotation: Annotation | null;
   onUpdate: (annotation: Annotation) => void;
@@ -106,6 +111,7 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
                     type="text"
                     value={annotation.blurAmount}
                     onChange={(e) => updateAnnotation({ blurAmount: Number(e.target.value) || 20 })}
+                    onKeyDown={stopPropagation}
                     className="w-14 px-1.5 py-1 bg-secondary border border-border rounded text-xs text-card-foreground"
                   />
                 </div>
@@ -137,6 +143,7 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
                   value={annotation.text}
                   onChange={(e) => updateAnnotation({ text: e.target.value })}
                   onFocus={(e) => e.target.select()}
+                  onKeyDown={stopPropagation}
                   className="w-full px-2 py-1.5 bg-secondary border border-border rounded text-sm text-card-foreground resize-none focus:outline-none focus:ring-1 focus:ring-ring"
                   rows={2}
                   placeholder="Enter text..."
@@ -157,6 +164,7 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
                     type="text"
                     value={annotation.fontSize}
                     onChange={(e) => updateAnnotation({ fontSize: Number(e.target.value) || 24 })}
+                    onKeyDown={stopPropagation}
                     className="w-14 px-1.5 py-1 bg-secondary border border-border rounded text-xs text-card-foreground"
                   />
                 </div>
@@ -186,7 +194,29 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
                 <div className="text-xs text-foreground0 mb-1.5">Style</div>
                 <select
                   value={annotation.lineType}
-                  onChange={(e) => updateAnnotation({ lineType: e.target.value as LineType })}
+                  onChange={(e) => {
+                    const newLineType = e.target.value as LineType;
+                    if (newLineType === "curved" && (annotation.type === "line" || annotation.type === "arrow")) {
+                      const midX = (annotation.x + annotation.endX) / 2;
+                      const midY = (annotation.y + annotation.endY) / 2;
+                      const dx = annotation.endX - annotation.x;
+                      const dy = annotation.endY - annotation.y;
+                      const perpX = -dy;
+                      const perpY = dx;
+                      const length = Math.sqrt(perpX * perpX + perpY * perpY);
+                      const offset = length * 0.3;
+                      const controlPoint = {
+                        x: midX + (perpX / length) * offset,
+                        y: midY + (perpY / length) * offset,
+                      };
+                      updateAnnotation({ 
+                        lineType: newLineType,
+                        controlPoints: [controlPoint]
+                      });
+                    } else {
+                      updateAnnotation({ lineType: newLineType });
+                    }
+                  }}
                   className="w-full px-2 py-1 bg-secondary border border-border rounded text-xs text-card-foreground"
                 >
                   <option value="straight">Straight</option>
@@ -234,6 +264,7 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
                   type="number"
                   value={annotation.number}
                   onChange={(e) => updateAnnotation({ number: Number(e.target.value) || 1 })}
+                  onKeyDown={stopPropagation}
                   className="w-full px-2 py-1 bg-secondary border border-border rounded text-xs text-card-foreground"
                   min={1}
                 />
@@ -252,6 +283,7 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
                     type="text"
                     value={annotation.radius}
                     onChange={(e) => updateAnnotation({ radius: Number(e.target.value) || 20 })}
+                    onKeyDown={stopPropagation}
                     className="w-14 px-1.5 py-1 bg-secondary border border-border rounded text-xs text-card-foreground"
                   />
                 </div>
@@ -290,6 +322,7 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
                   type="text"
                   value={annotation.fill.hex.toUpperCase()}
                   onChange={(e) => handleColorChange("fill", e.target.value)}
+                  onKeyDown={stopPropagation}
                   className="flex-1 px-2 py-1 bg-secondary border border-border rounded text-xs text-card-foreground"
                 />
                 <input
@@ -346,6 +379,7 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
                   onChange={(e) =>
                     updateAnnotation({ border: { ...annotation.border, width: Number(e.target.value) || 0 } })
                   }
+                  onKeyDown={stopPropagation}
                   className="w-14 px-1.5 py-1 bg-secondary border border-border rounded text-xs text-card-foreground"
                 />
               </div>
@@ -363,6 +397,7 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
                   type="text"
                   value={annotation.border.color.hex.toUpperCase()}
                   onChange={(e) => handleColorChange("border", e.target.value)}
+                  onKeyDown={stopPropagation}
                   className="flex-1 px-2 py-1 bg-secondary border border-border rounded text-xs text-card-foreground"
                 />
                 <input
