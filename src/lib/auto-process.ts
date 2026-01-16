@@ -3,18 +3,30 @@ import { Store } from "@tauri-apps/plugin-store";
 import { createHighQualityCanvas } from "./canvas-utils";
 import { resolveBackgroundPath, getDefaultBackgroundPath } from "./asset-registry";
 
+type BackgroundType = "transparent" | "white" | "black" | "gray" | "custom" | "image";
+
 export async function processScreenshotWithDefaultBackground(
   imagePath: string
 ): Promise<string> {
   return new Promise(async (resolve, reject) => {
-    // Get the default background path, resolving from store if available
+    let backgroundType: BackgroundType = "image";
+    let customColor = "#667eea";
     let defaultBgImage: string = getDefaultBackgroundPath();
+    let bgImage: HTMLImageElement | null = null;
     
     try {
       const store = await Store.load("settings.json");
+      const storedBgType = await store.get<BackgroundType>("defaultBackgroundType");
+      const storedCustomColor = await store.get<string>("defaultCustomColor");
       const storedDefaultBg = await store.get<string>("defaultBackgroundImage");
-      if (storedDefaultBg) {
-        // Resolve the stored value (asset ID or data URL) to actual path
+      
+      if (storedBgType) {
+        backgroundType = storedBgType;
+      }
+      if (storedCustomColor) {
+        customColor = storedCustomColor;
+      }
+      if (storedDefaultBg && backgroundType === "image") {
         defaultBgImage = resolveBackgroundPath(storedDefaultBg);
       }
     } catch (err) {
@@ -26,22 +38,78 @@ export async function processScreenshotWithDefaultBackground(
     
     img.onload = async () => {
       try {
-        const bgImg = new Image();
-        bgImg.crossOrigin = "anonymous";
-        
-        bgImg.onload = () => {
+        if (backgroundType === "image") {
+          bgImage = new Image();
+          bgImage.crossOrigin = "anonymous";
+          
+          bgImage.onload = () => {
+            try {
+              const canvas = createHighQualityCanvas({
+                image: img,
+                backgroundType,
+                customColor,
+                selectedImage: defaultBgImage,
+                bgImage,
+                blurAmount: 0,
+                noiseAmount: 20,
+                borderRadius: 18,
+                padding: 100,
+                shadow: {
+                  blur: 33,
+                  offsetX: 18,
+                  offsetY: 23,
+                  opacity: 39,
+                },
+              });
+
+              canvas.toBlob(
+                (blob) => {
+                  if (blob) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      resolve(reader.result as string);
+                    };
+                    reader.onerror = () => {
+                      reject(new Error("Failed to read processed image"));
+                    };
+                    reader.readAsDataURL(blob);
+                  } else {
+                    reject(new Error("Failed to create blob from canvas"));
+                  }
+                },
+                "image/png",
+                1.0
+              );
+            } catch (err) {
+              reject(err);
+            }
+          };
+          
+          bgImage.onerror = () => {
+            reject(new Error("Failed to load background image"));
+          };
+          
+          bgImage.src = defaultBgImage;
+        } else {
           try {
+            const isTransparent = backgroundType === "transparent";
             const canvas = createHighQualityCanvas({
               image: img,
-              backgroundType: "image",
-              customColor: "#667eea",
-              selectedImage: defaultBgImage,
-              bgImage: bgImg,
+              backgroundType,
+              customColor,
+              selectedImage: null,
+              bgImage: null,
+              gradientImage: null,
               blurAmount: 0,
               noiseAmount: 20,
               borderRadius: 18,
-              padding: 100,
-              shadow: {
+              padding: isTransparent ? 0 : 100,
+              shadow: isTransparent ? {
+                blur: 0,
+                offsetX: 0,
+                offsetY: 0,
+                opacity: 0,
+              } : {
                 blur: 33,
                 offsetX: 18,
                 offsetY: 23,
@@ -70,13 +138,7 @@ export async function processScreenshotWithDefaultBackground(
           } catch (err) {
             reject(err);
           }
-        };
-        
-        bgImg.onerror = () => {
-          reject(new Error("Failed to load background image"));
-        };
-        
-        bgImg.src = defaultBgImage;
+        }
       } catch (err) {
         reject(err);
       }
