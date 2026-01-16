@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Store } from "@tauri-apps/plugin-store";
-import { ArrowLeft, Folder, RefreshCw } from "lucide-react";
+import { ArrowLeft, Folder } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +12,6 @@ import type { KeyboardShortcut } from "./KeyboardShortcutManager";
 interface PreferencesPageProps {
   onBack: () => void;
   onSettingsChange?: () => void;
-  onCheckForUpdates?: () => Promise<boolean>;
 }
 
 interface GeneralSettings {
@@ -20,36 +19,12 @@ interface GeneralSettings {
   copyToClipboard: boolean;
 }
 
-export function PreferencesPage({ onBack, onSettingsChange, onCheckForUpdates }: PreferencesPageProps) {
+export function PreferencesPage({ onBack, onSettingsChange }: PreferencesPageProps) {
   const [settings, setSettings] = useState<GeneralSettings>({
     saveDir: "",
     copyToClipboard: true,
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
-
-  const handleCheckForUpdates = useCallback(async () => {
-    if (!onCheckForUpdates) return;
-    
-    setIsCheckingUpdates(true);
-    try {
-      const hasUpdate = await onCheckForUpdates();
-      // Only show "up to date" toast if no update was found
-      if (!hasUpdate) {
-        toast.success("You're up to date!", {
-          description: `Better Shot v${__APP_VERSION__} is the latest version.`,
-          duration: 3000,
-        });
-      }
-    } catch (err) {
-      toast.error("Failed to check for updates", {
-        description: err instanceof Error ? err.message : "Please try again later.",
-        duration: 4000,
-      });
-    } finally {
-      setIsCheckingUpdates(false);
-    }
-  }, [onCheckForUpdates]);
 
   // Load settings on mount
   useEffect(() => {
@@ -233,30 +208,9 @@ export function PreferencesPage({ onBack, onSettingsChange, onCheckForUpdates }:
             <CardTitle className="text-lg font-semibold text-card-foreground">About</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-foreground">Better Shot</p>
-                <p className="text-xs text-foreground0">Version {__APP_VERSION__}</p>
-              </div>
-              <Button
-                variant="cta"
-                size="lg"
-                onClick={handleCheckForUpdates}
-                disabled={isCheckingUpdates}
-                className="disabled:opacity-50"
-              >
-                {isCheckingUpdates ? (
-                  <>
-                    <RefreshCw className="mr-2 size-4 animate-spin" aria-hidden="true" />
-                    Checking...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="mr-2 size-4" aria-hidden="true" />
-                    Check for Updates
-                  </>
-                )}
-              </Button>
+            <div>
+              <p className="text-sm font-medium text-foreground">Better Shot</p>
+              <p className="text-xs text-foreground0">Version {__APP_VERSION__}</p>
             </div>
           </CardContent>
         </Card>

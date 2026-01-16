@@ -159,18 +159,23 @@ export const useEditorStore = create<EditorStore>()(
         
         try {
           const store = await Store.load("settings.json");
+          const storedBgType = await store.get<BackgroundType>("defaultBackgroundType");
+          const storedCustomColor = await store.get<string>("defaultCustomColor");
           const storedBg = await store.get<string>("defaultBackgroundImage");
-          if (storedBg) {
-            const resolvedPath = resolveBackgroundPath(storedBg);
-            set((state) => {
+          
+          set((state) => {
+            if (storedBgType) {
+              state.settings.backgroundType = storedBgType;
+            }
+            if (storedCustomColor) {
+              state.settings.customColor = storedCustomColor;
+            }
+            if (storedBg && storedBgType === "image") {
+              const resolvedPath = resolveBackgroundPath(storedBg);
               state.settings.selectedImageSrc = resolvedPath;
-              state._isInitialized = true;
-            });
-          } else {
-            set((state) => {
-              state._isInitialized = true;
-            });
-          }
+            }
+            state._isInitialized = true;
+          });
         } catch (err) {
           console.error("Failed to load default background from store:", err);
           set((state) => {

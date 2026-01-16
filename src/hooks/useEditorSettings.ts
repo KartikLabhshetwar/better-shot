@@ -122,9 +122,17 @@ export function useEditorSettings(): [EditorSettings, EditorSettingsActions] {
     const loadDefaultBackground = async () => {
       try {
         const store = await Store.load("settings.json");
+        const storedBgType = await store.get<BackgroundType>("defaultBackgroundType");
+        const storedCustomColor = await store.get<string>("defaultCustomColor");
         const storedBg = await store.get<string>("defaultBackgroundImage");
-        if (storedBg) {
-          // Resolve stored value (asset ID or data URL) to actual path
+        
+        if (storedBgType) {
+          setBackgroundType(storedBgType);
+        }
+        if (storedCustomColor) {
+          setCustomColor(storedCustomColor);
+        }
+        if (storedBg && storedBgType === "image") {
           const resolvedPath = resolveBackgroundPath(storedBg);
           setSelectedImageSrc(resolvedPath);
         }

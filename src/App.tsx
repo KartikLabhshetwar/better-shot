@@ -10,8 +10,6 @@ import { availableMonitors } from "@tauri-apps/api/window";
 import { getCurrentWindow, LogicalPosition, LogicalSize } from "@tauri-apps/api/window";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Store } from "@tauri-apps/plugin-store";
-import { check } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
 import type { KeyboardShortcut } from "./components/preferences/KeyboardShortcutManager";
 import { SettingsIcon } from "./components/SettingsIcon";
 import { AppWindowMac, Crop, Monitor } from "lucide-react";
@@ -23,7 +21,6 @@ import { editorActions } from "@/stores/editorStore";
 const ImageEditor = lazy(() => import("./components/ImageEditor").then(m => ({ default: m.ImageEditor })));
 const OnboardingFlow = lazy(() => import("./components/onboarding/OnboardingFlow").then(m => ({ default: m.OnboardingFlow })));
 const PreferencesPage = lazy(() => import("./components/preferences/PreferencesPage").then(m => ({ default: m.PreferencesPage })));
-const UpdateDialog = lazy(() => import("./components/UpdateDialog").then(m => ({ default: m.UpdateDialog })));
 
 type AppMode = "main" | "editing" | "preferences";
 type CaptureMode = "region" | "fullscreen" | "window";
@@ -116,11 +113,6 @@ function App() {
   const [shortcuts, setShortcuts] = useState<KeyboardShortcut[]>(DEFAULT_SHORTCUTS);
   const [settingsVersion, setSettingsVersion] = useState(0);
   const [tempDir, setTempDir] = useState<string>("/tmp");
-  const [updateAvailable, setUpdateAvailable] = useState<{
-    version: string;
-    body?: string;
-  } | null>(null);
-  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
 
   // Refs to hold current values for use in callbacks that may have stale closures
   const settingsRef = useRef({ autoApplyBackground, saveDir, copyToClipboard, tempDir });
@@ -257,8 +249,6 @@ function App() {
     const shouldShowOnboarding = !hasCompletedOnboarding();
     if (shouldShowOnboarding) {
       setShowOnboarding(true);
-    } else {
-      checkForUpdates();
     }
 
     // DEV ONLY: Uncomment to test editor with any image file
@@ -266,73 +256,6 @@ function App() {
     // setMode("editing");
   }, []);
 
-  const checkForUpdates = useCallback(async () => {
-    try {
-      const update = await check();
-      if (update?.available) {
-        setUpdateAvailable({
-          version: update.version,
-          body: update.body,
-        });
-        setShowUpdateDialog(true);
-        return true; // Update available
-      }
-      return false; // No update available
-    } catch (err) {
-      console.error("Failed to check for updates:", err);
-      throw err; // Re-throw so caller can handle
-    }
-  }, []);
-
-  const handleUpdate = useCallback(
-    async (onProgress: (progress: number) => void) => {
-      if (!updateAvailable) return;
-
-      try {
-        const update = await check();
-        if (!update?.available) {
-          throw new Error("Update no longer available");
-        }
-
-        let downloaded = 0;
-        let contentLength = 0;
-
-        await update.downloadAndInstall((event) => {
-          switch (event.event) {
-            case "Started":
-              contentLength = event.data.contentLength ?? 0;
-              onProgress(0);
-              break;
-            case "Progress":
-              downloaded += event.data.chunkLength;
-              if (contentLength > 0) {
-                const progress = Math.min(
-                  Math.round((downloaded / contentLength) * 100),
-                  100
-                );
-                onProgress(progress);
-              } else {
-                onProgress(Math.min(downloaded / 1000000, 99));
-              }
-              break;
-            case "Finished":
-              onProgress(100);
-              break;
-          }
-        });
-
-        await relaunch();
-      } catch (err) {
-        console.error("Update failed:", err);
-        throw err;
-      }
-    },
-    [updateAvailable]
-  );
-
-  const handleSkipUpdate = useCallback(() => {
-    setShowUpdateDialog(false);
-  }, []);
 
   const handleCapture = useCallback(async (captureMode: CaptureMode = "region") => {
     if (isCapturing) return;
@@ -601,7 +524,6 @@ function App() {
         <OnboardingFlow
           onComplete={() => {
             setShowOnboarding(false);
-            checkForUpdates();
           }}
         />
       </Suspense>
@@ -611,20 +533,9 @@ function App() {
   if (mode === "preferences") {
     return (
       <Suspense fallback={<LoadingFallback />}>
-        {updateAvailable && (
-          <UpdateDialog
-            open={showUpdateDialog}
-            onOpenChange={setShowUpdateDialog}
-            version={updateAvailable.version}
-            releaseNotes={updateAvailable.body}
-            onUpdate={handleUpdate}
-            onSkip={handleSkipUpdate}
-          />
-        )}
         <PreferencesPage 
           onBack={handleBackFromPreferences} 
           onSettingsChange={handleSettingsChange}
-          onCheckForUpdates={checkForUpdates}
         />
       </Suspense>
     );
@@ -632,18 +543,6 @@ function App() {
 
   return (
     <>
-      {updateAvailable && (
-        <Suspense fallback={null}>
-          <UpdateDialog
-            open={showUpdateDialog}
-            onOpenChange={setShowUpdateDialog}
-            version={updateAvailable.version}
-            releaseNotes={updateAvailable.body}
-            onUpdate={handleUpdate}
-            onSkip={handleSkipUpdate}
-          />
-        </Suspense>
-      )}
       <main className="min-h-dvh flex flex-col items-center justify-center p-8 bg-background text-foreground">
         <div className="w-full max-w-2xl space-y-6">
         <div className="relative text-center space-y-2">
