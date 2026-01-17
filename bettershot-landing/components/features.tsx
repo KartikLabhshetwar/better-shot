@@ -4,68 +4,37 @@ import { motion, useInView } from "framer-motion"
 import { useRef } from "react"
 import { geist } from "@/lib/fonts"
 import { cn } from "@/lib/utils"
-import { Camera, Image, Zap, Lock, Palette, Download, Settings, Keyboard, Upload } from "lucide-react"
 
 const features = [
   {
-    title: "Multiple Capture Modes",
-    description: "Capture regions, fullscreen, or specific windows with pixel-perfect precision. Global hotkeys work from anywhere.",
-    icon: Camera,
-    color: "from-blue-500 to-cyan-500",
+    title: "How to Install Better Shot",
+    description: "Follow these simple steps to install Better Shot on your Mac.",
+    demoVideo: "GnQRUWiFx9Y",
   },
   {
-    title: "Powerful Image Editor",
-    description: "Add beautiful backgrounds, gradients, blur effects, customizable shadows, and adjust border radius. Make your screenshots stand out.",
-    icon: Image,
-    color: "from-purple-500 to-pink-500",
+    title: "Best Way to Use Better Shot",
+    description: "Learn tips and tricks to get the most out of Better Shot.",
+    demoVideo: "4I7TxGSNPT4",
   },
-  {
-    title: "Annotation Tools",
-    description: "Add shapes, arrows, text, and numbered labels. Customize colors, opacity, borders, and alignment for professional annotations.",
-    icon: Palette,
-    color: "from-rose-500 to-red-500",
-  },
-  {
-    title: "Customizable Preferences",
-    description: "Set default backgrounds, upload your own images, customize keyboard shortcuts, and configure all settings to match your workflow.",
-    icon: Settings,
-    color: "from-violet-500 to-purple-500",
-  },
-  {
-    title: "Keyboard Shortcut Management",
-    description: "Customize your keyboard shortcuts, enable or disable them, and add new shortcuts. Full control over your capture workflow.",
-    icon: Keyboard,
-    color: "from-orange-500 to-red-500",
-  },
-  {
-    title: "Upload Custom Backgrounds",
-    description: "Upload your own background images and set them as default. Choose from built-in wallpapers or use your own custom images.",
-    icon: Upload,
-    color: "from-teal-500 to-cyan-500",
-  },
-  {
-    title: "Lightning Fast",
-    description: "Built with Rust and Tauri for native performance. Minimal resource usage compared to Electron apps.",
-    icon: Zap,
-    color: "from-yellow-500 to-orange-500",
-  },
-  {
-    title: "Privacy First",
-    description: "All processing happens locally on your machine. No cloud uploads, no data collection. Your screenshots stay yours.",
-    icon: Lock,
-    color: "from-green-500 to-emerald-500",
-  },
-  {
-    title: "Easy Export",
-    description: "Save to your chosen directory or copy directly to clipboard. High-quality export for presentations and documentation.",
-    icon: Download,
-    color: "from-indigo-500 to-blue-500",
-  },
+  // {
+  //   title: "Annotation Tools",
+  //   description: "Add shapes, arrows, text, and numbered labels. Customize colors, opacity, borders, and alignment for professional annotations.",
+  //   demoVideo: "cnI-cgNeRLs",
+  // },
+  // {
+  //   title: "Customizable Preferences",
+  //   description: "Set default backgrounds, upload your own images, customize keyboard shortcuts, and configure all settings to match your workflow.",
+  //   demoVideo: "GnQRUWiFx9Y",
+  // },
 ]
 
 export default function Features() {
   const ref = useRef(null)
   const isInView = useInView(ref, { once: true, amount: 0.2 })
+
+  const getEmbedUrl = (videoId: string) => {
+    return `https://www.youtube.com/embed/${videoId}?autoplay=1&loop=1&mute=1&playlist=${videoId}&controls=0&modestbranding=1&rel=0`
+  }
 
   return (
     <section id="features" className="text-foreground relative overflow-hidden py-12 sm:py-24 md:py-32">
@@ -76,41 +45,91 @@ export default function Features() {
         initial={{ opacity: 0, y: 50 }}
         animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 50 }}
         transition={{ duration: 0.5, delay: 0 }}
-        className="container mx-auto flex flex-col items-center gap-6 sm:gap-12"
+        className="container mx-auto px-4 sm:px-6 lg:px-8"
       >
-        <h2
-          className={cn(
-            "via-foreground mb-8 bg-gradient-to-b from-zinc-800 to-zinc-700 bg-clip-text text-center text-4xl font-semibold tracking-tighter text-transparent md:text-[54px] md:leading-[60px]",
-            geist.className,
-          )}
-        >
-          Powerful Features
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-6xl">
+        <div className="space-y-24 sm:space-y-32">
           {features.map((feature, index) => {
-            const Icon = feature.icon
+            const isEven = index % 2 === 0
+            
             return (
               <motion.div
                 key={feature.title}
                 initial={{ opacity: 0, y: 50 }}
                 animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 50 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                whileHover={{ y: -5 }}
-                className="group relative rounded-xl border border-white/10 bg-gradient-to-b from-white/5 to-white/[0.02] p-6 shadow-[0px_2px_0px_0px_rgba(255,255,255,0.1)_inset] hover:border-white/20 transition-all duration-300"
+                transition={{ duration: 0.5, delay: index * 0.2 }}
+                className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center max-w-6xl mx-auto"
               >
-                <div className={`absolute -top-5 -left-5 -z-10 h-20 w-20 rounded-full bg-gradient-to-br ${feature.color} opacity-20 blur-xl group-hover:opacity-30 transition-opacity`}></div>
-                
-                <div className={`inline-flex items-center justify-center w-12 h-12 rounded-lg bg-gradient-to-br ${feature.color} mb-4`}>
-                  <Icon className="h-6 w-6 text-white" />
-                </div>
-                
-                <h3 className="text-xl font-semibold mb-2 text-white">{feature.title}</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">{feature.description}</p>
+                {isEven ? (
+                  <>
+                    <motion.div
+                      initial={{ opacity: 0, x: -50 }}
+                      animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: -50 }}
+                      transition={{ duration: 0.5, delay: index * 0.2 + 0.1 }}
+                      className="relative"
+                    >
+                      <div className="relative rounded-2xl border border-white/20 bg-white/5 p-1.5 shadow-lg shadow-black/20">
+                        <div className="relative w-full aspect-video overflow-hidden rounded-xl bg-black">
+                          <iframe
+                            src={getEmbedUrl(feature.demoVideo)}
+                            title={feature.title}
+                            className="absolute inset-0 w-full h-full"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            allowFullScreen
+                          />
+                        </div>
+                      </div>
+                    </motion.div>
+
+                    <motion.div
+                      initial={{ opacity: 0, x: 50 }}
+                      animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: 50 }}
+                      transition={{ duration: 0.5, delay: index * 0.2 + 0.2 }}
+                      className="space-y-4"
+                    >
+                      <h3 className="text-3xl sm:text-4xl font-semibold text-white mb-4">{feature.title}</h3>
+                      <p className="text-muted-foreground text-lg leading-relaxed">
+                        {feature.description}
+                      </p>
+                    </motion.div>
+                  </>
+                ) : (
+                  <>
+                    <motion.div
+                      initial={{ opacity: 0, x: -50 }}
+                      animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: -50 }}
+                      transition={{ duration: 0.5, delay: index * 0.2 + 0.1 }}
+                      className="space-y-4"
+                    >
+                      <h3 className="text-3xl sm:text-4xl font-semibold text-white mb-4">{feature.title}</h3>
+                      <p className="text-muted-foreground text-lg leading-relaxed">
+                        {feature.description}
+                      </p>
+                    </motion.div>
+
+                    <motion.div
+                      initial={{ opacity: 0, x: 50 }}
+                      animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: 50 }}
+                      transition={{ duration: 0.5, delay: index * 0.2 + 0.2 }}
+                      className="relative"
+                    >
+                      <div className="relative rounded-2xl border border-white/20 bg-white/5 p-1.5 shadow-lg shadow-black/20">
+                        <div className="relative w-full aspect-video overflow-hidden rounded-xl bg-black">
+                          <iframe
+                            src={getEmbedUrl(feature.demoVideo)}
+                            title={feature.title}
+                            className="absolute inset-0 w-full h-full"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            allowFullScreen
+                          />
+                        </div>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
               </motion.div>
             )
           })}
-          </div>
+        </div>
       </motion.div>
     </section>
   )
