@@ -5,7 +5,7 @@ import { ChevronDown } from "lucide-react"
 
 export function NewReleasePromo() {
   return (
-    <section className="mt-12 w-full">
+    <section className="py-12 sm:py-24 md:py-32 w-full">
       <div className="mx-auto max-w-4xl rounded-[40px] border border-black/5 dark:border-white/20 p-2 shadow-sm">
         <div className="relative mx-auto h-[400px] max-w-4xl overflow-hidden rounded-[38px] border border-black/5 dark:border-white/20 bg-primary p-2 shadow-sm">
           {/* Subtle radial glow from center */}

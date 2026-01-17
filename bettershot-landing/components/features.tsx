@@ -7,25 +7,25 @@ import { cn } from "@/lib/utils"
 
 const features = [
   {
-    title: "How to Install Better Shot",
-    description: "Follow these simple steps to install Better Shot on your Mac.",
-    demoVideo: "GnQRUWiFx9Y",
+    title: "Multiple Capture Modes",
+    description: "Capture regions, fullscreen, or specific windows with pixel-perfect precision. Global hotkeys work from anywhere, even when the app is hidden.",
+    demoVideo: "zdqpEacK0p8",
   },
   {
-    title: "Best Way to Use Better Shot",
-    description: "Learn tips and tricks to get the most out of Better Shot.",
-    demoVideo: "4I7TxGSNPT4",
+    title: "Auto-apply Background",
+    description: "Apply default background and save instantly. No need to open the editor. Perfect for quick captures with consistent styling.",
+    demoVideo: "MhfqtSFpfxw",
   },
-  // {
-  //   title: "Annotation Tools",
-  //   description: "Add shapes, arrows, text, and numbered labels. Customize colors, opacity, borders, and alignment for professional annotations.",
-  //   demoVideo: "cnI-cgNeRLs",
-  // },
-  // {
-  //   title: "Customizable Preferences",
-  //   description: "Set default backgrounds, upload your own images, customize keyboard shortcuts, and configure all settings to match your workflow.",
-  //   demoVideo: "GnQRUWiFx9Y",
-  // },
+  {
+    title: "Annotation Tools",
+    description: "Add shapes, arrows, text, and numbered labels. Customize colors, opacity, borders, and alignment for professional annotations.",
+    demoVideo: "sgPoOHVTaS0",
+  },
+  {
+    title: "Customizable Preferences",
+    description: "Set default backgrounds, upload your own images, customize keyboard shortcuts, and configure all settings to match your workflow.",
+    demoVideo: "JNDegIxdYOc",
+  },
 ]
 
 export default function Features() {
