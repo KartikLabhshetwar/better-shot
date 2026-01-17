@@ -91,18 +91,11 @@ Clean screenshot workflows usually need three things: capture fast, polish fast 
 
 1. Go to [Releases](https://github.com/KartikLabhshetwar/better-shot/releases)
 2. Download the appropriate DMG file:
-   - **Apple Silicon** (M1/M2/M3): `bettershot_*_aarch64.dmg`
+   - **Apple Silicon** (M1/M2/M3/M4/M5): `bettershot_*_aarch64.dmg`
    - **Intel**: `bettershot_*_x64.dmg`
 3. Open the DMG and drag Better Shot to Applications
-4. First launch (recommended):
-
-```bash
-xattr -d com.apple.quarantine /Applications/bettershot.app
-```
-
-5. Grant Screen Recording permission when prompted
-
-> Note: Better Shot is ad-hoc signed. macOS Gatekeeper may warn for apps that aren’t notarized. You can inspect the source and build it yourself.
+4. Launch Better Shot from Applications
+5. Grant Screen Recording permission when prompted in System Settings
 
 ### Build from source
 

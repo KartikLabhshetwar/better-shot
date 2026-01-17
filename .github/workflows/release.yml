@@ -80,22 +80,11 @@ jobs:
             ## Installation
             
             1. Download the `.dmg` file for your Mac
-               - **Apple Silicon** (M1, M2, M3): Download the `aarch64` version
+               - **Apple Silicon** (M1, M2, M3, M4, M5): Download the `aarch64` version
                - **Intel Mac**: Download the `x64` version
             2. Open the DMG and drag Better Shot to Applications
-            3. **First Launch** - Choose one method (recommended):
-            
-               **Option A: Right-Click Method** (Easiest)
-               - Right-click the app → **Open** → Click **Open** in the dialog
-               
-               **Option B: Terminal Method** (One command, no dialogs) (recommended)
-               ```bash
-               xattr -d com.apple.quarantine /Applications/bettershot.app
-               ```
-               
+            3. Launch Better Shot from Applications
             4. Grant Screen Recording permission when prompted in System Settings
-            
-            > **Note**: This is an ad-hoc signed indie app. macOS shows a warning for apps not notarized through Apple's $99/year developer program. The app is completely safe and open source.
             
             ## What's New
             

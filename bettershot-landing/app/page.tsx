@@ -8,7 +8,6 @@ import { TestimonialsSection } from "@/components/testimonials"
 import { NewReleasePromo } from "@/components/new-release-promo"
 import { FAQSection } from "@/components/faq-section"
 import { StickyFooter } from "@/components/sticky-footer"
-import { InstallationInstructions } from "@/components/installation-instructions"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { DownloadDropdown } from "@/components/download-dropdown"
@@ -289,10 +288,9 @@ export default function Home() {
       </div> */}
 
       <NewReleasePromo />
-
-      {/* Installation Instructions */}
-      <InstallationInstructions />
-
+      
+      <TestimonialsSection />
+      
       {/* FAQ Section */}
       <div id="faq">
         <FAQSection />

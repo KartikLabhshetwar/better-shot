@@ -2,58 +2,58 @@ import { Marquee } from "@/components/magicui/marquee"
 
 const testimonials = [
   {
-    name: "Alex Chen",
-    username: "@alexdev",
-    body: "Better Shot replaced CleanShot X for me. It's free, fast, and has everything I need for professional screenshots.",
-    img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+    name: "karisayswen",
+    username: "@karisaysw",
+    body: "starred and downloaded. works perfectly for me! 💜 thank you for saving me the subscription fee for cleanshotx or other pay-to-use tools",
+    img: "https://pbs.twimg.com/profile_images/2009375060021084160/Q_MzyhjI_400x400.jpg",
   },
   {
-    name: "Sarah Kim",
-    username: "@sarahcodes",
-    body: "The editing features are amazing. The background library and effects make my documentation screenshots look professional.",
-    img: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&h=150&fit=crop&crop=face",
+    name: "Luong NGUYEN",
+    username: "@luongnv89",
+    body: "wow, look so cool. installing it now! thanks for sharing.",
+    img: "https://pbs.twimg.com/profile_images/1930379993705558016/ng7NjIwJ_400x400.jpg",
   },
   {
-    name: "Mike Johnson",
-    username: "@mikebuilds",
-    body: "Lightweight and fast. Uses way less resources than other screenshot tools. Perfect for my workflow.",
-    img: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face",
+    name: "Sebastian Buzdugan",
+    username: "@sebuzdugan",
+    body: "open source wins again honestly",
+    img: "https://pbs.twimg.com/profile_images/1803494807530004480/MpfF5Rpp_400x400.jpg",
   },
   {
-    name: "Emma Davis",
-    username: "@emmadev",
-    body: "Love that it's open source! I can see the code and even contribute. Privacy-first approach is exactly what I needed.",
-    img: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face",
+    name: "Amrit",
+    username: "@amritwt",
+    body: "these tools generate good stuff \n\nlooks minor but does alot if you think about marketing",
+    img: "https://pbs.twimg.com/profile_images/1941458464624214020/xSpt4E77_400x400.jpg",
   },
   {
-    name: "David Lee",
-    username: "@davidtech",
-    body: "The global hotkeys work perfectly. I can capture screenshots instantly from anywhere, even when the app is hidden.",
-    img: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
+    name: "Philipp Krenn",
+    username: "@xeraa",
+    body: "free and OSS alternative to CleanShot X:\n\n@bettershotsite\n\nbecause not everything needs 100 features and a cloud service.",
+    img: "https://media.licdn.com/dms/image/v2/C4E03AQGjEcUTWv9uaw/profile-displayphoto-shrink_800_800/profile-displayphoto-shrink_800_800/0/1517750712975?e=1770249600&v=beta&t=bL5WF-BgL3A8LndSSOahU5YKFD7u1Z48yq9g_iqAq4k",
   },
   {
-    name: "Lisa Wang",
-    username: "@lisadesigns",
-    body: "Beautiful UI and smooth experience. The border radius and blur effects make my screenshots look polished.",
-    img: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&h=150&fit=crop&crop=face",
+    name: "Harshith Ashvi",
+    username: "@HarshithAshvi",
+    body: "Don't build products, build an ecosystem of products.\n\n@stageeart\n - Browser based editor for creating visual design\n@bettershotsite\n - Mac app for screenshot and make it look good at same time\n\nAmazing work at great speed!",
+    img: "https://pbs.twimg.com/profile_images/1953863730392862720/tGihM77m_400x400.jpg",
   },
   {
-    name: "Tom Wilson",
-    username: "@tomdev",
-    body: "Best free alternative to CleanShot X. All the features I need without the subscription cost. Highly recommend!",
-    img: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face",
+    name: "Fusion",
+    username: "@fusion_ap",
+    body: "love to see it! 🤌🤌🤌",
+    img: "https://pbs.twimg.com/profile_images/2001652035729395713/I5anZIN2_400x400.jpg",
   },
   {
-    name: "Rachel Brown",
-    username: "@racheltech",
-    body: "The clipboard integration is seamless. Capture, edit, and paste directly into my documents. Saves so much time.",
-    img: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face",
+    name: "Rituraj",
+    username: "@RituWithAI",
+    body: "The subscription isn't the understatement of the year. We reached peak saturation when we started paying monthly rent for basic utilities like clipboards and screenshots. There is a massive market gap right now for 'Buy Once (or Free) / Keep Forever' software. You aren't just competing on features; you are competing on ideology. And you are winning.",
+    img: "https://pbs.twimg.com/profile_images/1978096652964511744/CINo9gYa_400x400.jpg",
   },
   {
-    name: "Chris Martinez",
-    username: "@chrisbuilds",
-    body: "Rust + Tauri = blazing fast performance. This app feels native and uses minimal resources. Exactly what I wanted.",
-    img: "https://images.unsplash.com/photo-1507591064344-4c6ce005b128?w=150&h=150&fit=crop&crop=face",
+    name: "Gurbinder",
+    username: "@legionsdev",
+    body: "amazing tool",
+    img: "https://pbs.twimg.com/profile_images/1924504051728670720/mqyGd02m_400x400.jpg",
   },
 ]
 
@@ -91,7 +91,7 @@ const TestimonialCard = ({
 
 export function TestimonialsSection() {
   return (
-    <section id="testimonials" className="mb-24">
+    <section id="testimonials" className="py-12 sm:py-24 md:py-32">
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-[540px]">
           <div className="flex justify-center">
