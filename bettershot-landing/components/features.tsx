@@ -47,6 +47,16 @@ export default function Features() {
         transition={{ duration: 0.5, delay: 0 }}
         className="container mx-auto px-4 sm:px-6 lg:px-8"
       >
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="text-center mb-16 sm:mb-24"
+        >
+          <h2 className="from-foreground/60 via-foreground to-foreground/60 dark:from-muted-foreground/55 dark:via-foreground dark:to-muted-foreground/55 bg-gradient-to-r bg-clip-text text-4xl font-semibold tracking-tighter text-transparent md:text-[54px] md:leading-[60px]">
+            Powerful Features
+          </h2>
+        </motion.div>
         <div className="space-y-24 sm:space-y-32">
           {features.map((feature, index) => {
             const isEven = index % 2 === 0
@@ -86,7 +96,7 @@ export default function Features() {
                       transition={{ duration: 0.5, delay: index * 0.2 + 0.2 }}
                       className="space-y-4"
                     >
-                      <h3 className="text-3xl sm:text-4xl font-semibold text-white mb-4">{feature.title}</h3>
+                      <h3 className="from-foreground/60 via-foreground to-foreground/60 dark:from-muted-foreground/55 dark:via-foreground dark:to-muted-foreground/55 bg-gradient-to-r bg-clip-text text-3xl sm:text-4xl font-semibold tracking-tighter text-transparent mb-4">{feature.title}</h3>
                       <p className="text-muted-foreground text-lg leading-relaxed">
                         {feature.description}
                       </p>
@@ -100,7 +110,7 @@ export default function Features() {
                       transition={{ duration: 0.5, delay: index * 0.2 + 0.1 }}
                       className="space-y-4"
                     >
-                      <h3 className="text-3xl sm:text-4xl font-semibold text-white mb-4">{feature.title}</h3>
+                      <h3 className="from-foreground/60 via-foreground to-foreground/60 dark:from-muted-foreground/55 dark:via-foreground dark:to-muted-foreground/55 bg-gradient-to-r bg-clip-text text-3xl sm:text-4xl font-semibold tracking-tighter text-transparent mb-4">{feature.title}</h3>
                       <p className="text-muted-foreground text-lg leading-relaxed">
                         {feature.description}
                       </p>

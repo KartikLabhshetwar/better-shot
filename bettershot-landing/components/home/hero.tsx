@@ -71,7 +71,7 @@ export default function Hero() {
               <h1
                 className={cn(
                   "text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight",
-                  "text-foreground"
+                  "from-foreground/60 via-foreground to-foreground/60 dark:from-muted-foreground/55 dark:via-foreground dark:to-muted-foreground/55 bg-linear-to-r bg-clip-text text-transparent" 
                 )}
               >
                 Capture beautiful screenshots effortlessly
