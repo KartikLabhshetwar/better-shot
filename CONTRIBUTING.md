@@ -37,6 +37,18 @@ Be respectful, constructive, and professional in all interactions. Focus on the 
    - Ensure you have Node.js 18+ and pnpm installed
    - On macOS, grant Screen Recording permission when prompted
 
+### Installing Better Shot for Testing
+
+If you want to test the production build, you can install Better Shot via Homebrew:
+
+```bash
+brew install --cask bettershot
+```
+
+**Requirements**: macOS >= 10.15
+
+Alternatively, download the latest release from [GitHub Releases](https://github.com/KartikLabhshetwar/better-shot/releases).
+
 ## Development Setup
 
 ### Prerequisites

@@ -23,6 +23,7 @@ Better Shot is a fast, lightweight screenshot tool built with Tauri + React. It 
     - [Workflow](#workflow)
   - [Install](#install)
     - [Download a release (recommended)](#download-a-release-recommended)
+    - [Homebrew (macOS)](#homebrew-macos)
     - [Build from source](#build-from-source)
       - [Requirements](#requirements)
       - [Required permissions](#required-permissions)
@@ -96,6 +97,16 @@ Clean screenshot workflows usually need three things: capture fast, polish fast 
 3. Open the DMG and drag Better Shot to Applications
 4. Launch Better Shot from Applications
 5. Grant Screen Recording permission when prompted in System Settings
+
+### Homebrew (macOS)
+
+Install via Homebrew:
+
+```bash
+brew install --cask bettershot
+```
+
+**Requirements**: macOS >= 10.15
 
 ### Build from source
 

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ChevronDown, Download } from "lucide-react"
+import { ChevronDown, Download, Terminal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -33,6 +33,11 @@ export function DownloadDropdown({
   const handleDownload = (arch: "appleSilicon" | "intel") => {
     trackDownload(source)
     window.open(downloadLinks[arch], "_blank")
+  }
+
+  const handleHomebrew = () => {
+    trackDownload(source)
+    window.open("https://formulae.brew.sh/cask/bettershot", "_blank")
   }
 
   const buttonContent = children || (
@@ -80,6 +85,16 @@ export function DownloadDropdown({
               <span className="text-xs text-muted-foreground">x64</span>
             </div>
           </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={handleHomebrew}
+            className="cursor-pointer"
+          >
+            <Terminal className="mr-2 h-4 w-4" />
+            <div className="flex flex-col">
+              <span className="font-medium">Homebrew</span>
+              <span className="text-xs text-muted-foreground">brew install --cask bettershot</span>
+            </div>
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     )
@@ -115,6 +130,16 @@ export function DownloadDropdown({
           <div className="flex flex-col">
             <span className="font-medium">Intel Mac</span>
             <span className="text-xs text-muted-foreground">x64</span>
+          </div>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={handleHomebrew}
+          className="cursor-pointer"
+        >
+          <Terminal className="mr-2 h-4 w-4" />
+          <div className="flex flex-col">
+            <span className="font-medium">Homebrew</span>
+            <span className="text-xs text-muted-foreground">brew install --cask bettershot</span>
           </div>
         </DropdownMenuItem>
       </DropdownMenuContent>
