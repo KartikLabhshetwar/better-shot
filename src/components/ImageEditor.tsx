@@ -78,6 +78,12 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
     editorActions.initialize();
   }, []);
 
+  // Reset and initialize when image changes
+  useEffect(() => {
+    editorActions.reset();
+    editorActions.initialize();
+  }, [imagePath]);
+
   // Restore window state on mount
   useEffect(() => {
     const restoreWindowState = async () => {
@@ -240,7 +246,9 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
   const handleAnnotationAdd = useCallback((annotation: Annotation) => {
     actions.addAnnotation(annotation);
     setSelectedAnnotation(annotation);
-    setSelectedTool("select");
+    if (annotation.type !== "number") {
+      setSelectedTool("select");
+    }
   }, [actions]);
 
   const handleAnnotationUpdateTransient = useCallback((annotation: Annotation) => {

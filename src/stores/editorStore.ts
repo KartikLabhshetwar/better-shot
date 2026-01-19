@@ -441,12 +441,14 @@ export const useEditorStore = create<EditorStore>()(
       // ========================================
       // Reset
       // ========================================
-      reset: () => {
-        set((state) => {
-          Object.assign(state, INITIAL_STATE);
-          state._isInitialized = false;
-        });
-      },
+       reset: () => {
+         set((state) => {
+           state.annotations = [];
+           state.past = [];
+           state.future = [];
+           state._isInitialized = false;
+         });
+       },
     }))
   )
 );

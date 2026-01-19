@@ -18,6 +18,7 @@
     "core:window:allow-is-visible",
     "core:window:allow-is-fullscreen",
     "core:window:allow-available-monitors",
+    "core:window:allow-create",
     "opener:default",
     "global-shortcut:default",
     "global-shortcut:allow-register",
@@ -39,6 +40,10 @@
     "store:allow-length",
     "store:allow-reload",
     "store:allow-reset",
-    "store:allow-get-store"
+    "store:allow-get-store",
+    "autostart:default",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled"
   ]
 }

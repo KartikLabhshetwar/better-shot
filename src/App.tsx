@@ -7,7 +7,7 @@ import { hasCompletedOnboarding } from "@/lib/onboarding";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { availableMonitors } from "@tauri-apps/api/window";
-import { getCurrentWindow, LogicalPosition, LogicalSize } from "@tauri-apps/api/window";
+import { getCurrentWindow, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Store } from "@tauri-apps/plugin-store";
 import type { KeyboardShortcut } from "./components/preferences/KeyboardShortcutManager";
@@ -59,8 +59,9 @@ function formatShortcut(shortcut: string): string {
 
 async function restoreWindowOnScreen(mouseX?: number, mouseY?: number) {
   const appWindow = getCurrentWindow();
-  await appWindow.setSize(new LogicalSize(1200, 800));
-
+  const windowWidth = 1200;
+  const windowHeight = 800;
+  await appWindow.setSize(new LogicalSize(windowWidth, windowHeight));
   if (mouseX !== undefined && mouseY !== undefined) {
     try {
       const monitors = await availableMonitors();
@@ -77,12 +78,13 @@ async function restoreWindowOnScreen(mouseX?: number, mouseY?: number) {
       });
 
       if (targetMonitor) {
-        const windowWidth = 1200;
-        const windowHeight = 800;
-        const centerX = targetMonitor.position.x + (targetMonitor.size.width - windowWidth) / 2;
-        const centerY = targetMonitor.position.y + (targetMonitor.size.height - windowHeight) / 2;
+        const scaleFactor = targetMonitor.scaleFactor;
+        const physicalWindowWidth = windowWidth * scaleFactor;
+        const physicalWindowHeight = windowHeight * scaleFactor;
+        const centerX = targetMonitor.position.x + (targetMonitor.size.width - physicalWindowWidth) / 2;
+        const centerY = targetMonitor.position.y + (targetMonitor.size.height - physicalWindowHeight) / 2;
         
-        await appWindow.setPosition(new LogicalPosition(centerX, centerY));
+        await appWindow.setPosition(new PhysicalPosition(centerX, centerY));
       } else {
         await appWindow.center();
       }
@@ -331,6 +333,10 @@ function App() {
 
       setTempScreenshotPath(screenshotPath);
       setMode("editing");
+      try {
+        await invoke("move_window_to_active_space");
+      } catch {
+      }
       await restoreWindowOnScreen(mouseX, mouseY);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -416,25 +422,40 @@ function App() {
   }, [shortcuts, settingsVersion, handleCapture]);
 
   // Setup tray menu event listeners - only once on mount
+  // Use a ref to hold the latest handleCapture to avoid re-registering listeners
+  const handleCaptureRef = useRef(handleCapture);
+  useEffect(() => {
+    handleCaptureRef.current = handleCapture;
+  }, [handleCapture]);
+
   useEffect(() => {
     let unlisten1: (() => void) | null = null;
     let unlisten2: (() => void) | null = null;
     let unlisten3: (() => void) | null = null;
+    let mounted = true;
 
     const setupListeners = async () => {
-      unlisten1 = await listen("capture-triggered", () => handleCapture("region"));
-      unlisten2 = await listen("capture-fullscreen", () => handleCapture("fullscreen"));
-      unlisten3 = await listen("capture-window", () => handleCapture("window"));
+      // Use refs to always call the latest handler without re-registering
+      unlisten1 = await listen("capture-triggered", () => {
+        if (mounted) handleCaptureRef.current("region");
+      });
+      unlisten2 = await listen("capture-fullscreen", () => {
+        if (mounted) handleCaptureRef.current("fullscreen");
+      });
+      unlisten3 = await listen("capture-window", () => {
+        if (mounted) handleCaptureRef.current("window");
+      });
     };
 
     setupListeners();
 
     return () => {
+      mounted = false;
       unlisten1?.();
       unlisten2?.();
       unlisten3?.();
     };
-  }, [handleCapture]);
+  }, []); // Empty dependency array - only run once on mount
 
   // Reload settings when coming back from preferences
   const handleSettingsChange = useCallback(async () => {

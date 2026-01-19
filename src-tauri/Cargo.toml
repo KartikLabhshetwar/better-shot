@@ -1,6 +1,6 @@
 [package]
 name = "bettershot"
-version = "0.2.4"
+version = "0.2.5"
 description = "A Better Shot App"
 authors = ["kartik labhshetwar"]
 edition = "2021"
@@ -27,6 +27,11 @@ tauri-plugin-global-shortcut = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-screenshots = "2"
 tauri-plugin-store = "2"
+tauri-plugin-autostart = "2"
 xcap = "0.8"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = "0.3"
 
 

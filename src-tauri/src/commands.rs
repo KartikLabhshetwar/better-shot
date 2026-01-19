@@ -3,7 +3,11 @@
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
+
+#[cfg(target_os = "macos")]
+use objc2::msg_send;
+use objc2_app_kit::NSWindow;
 
 use crate::clipboard::copy_image_to_clipboard;
 use crate::image::{copy_screenshot_to_dir, crop_image, save_base64_image, CropRegion};
@@ -13,6 +17,32 @@ use crate::screenshot::{
 use crate::utils::{generate_filename, get_desktop_path};
 
 static SCREENCAPTURE_LOCK: Mutex<()> = Mutex::new(());
+
+#[tauri::command]
+pub async fn move_window_to_active_space(app_handle: AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let window = app_handle
+            .get_webview_window("main")
+            .ok_or("Main window not found")?;
+
+        window
+            .with_webview(|webview| {
+                let ns_window = webview.ns_window();
+                if ns_window.is_null() {
+                    return;
+                }
+                let ns_window = unsafe { &*ns_window.cast::<NSWindow>() };
+                let current: usize = unsafe { msg_send![ns_window, collectionBehavior] };
+                let move_to_active_space: usize = 1 << 1;
+                let new_behavior = current | move_to_active_space;
+                let _: () = unsafe { msg_send![ns_window, setCollectionBehavior: new_behavior] };
+                let _: () = unsafe { msg_send![ns_window, orderFrontRegardless] };
+            })
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
 
 /// Quick capture of primary monitor
 #[tauri::command]
