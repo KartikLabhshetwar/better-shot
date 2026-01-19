@@ -132,8 +132,8 @@ const ONBOARDING_STEPS = [
   },
   {
     id: "editor",
-    title: "Image Editor & OCR",
-    description: "Edit your screenshots with backgrounds, effects, and extract text using OCR.",
+    title: "Image Editor",
+    description: "Edit your screenshots with backgrounds, effects, and annotations.",
     icon: (
       <svg className="size-8 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
@@ -156,12 +156,6 @@ const ONBOARDING_STEPS = [
           <div className="text-sm font-medium text-foreground mb-1">Annotation Tools</div>
           <p className="text-xs text-muted-foreground text-pretty">
             Add shapes, arrows, text, and numbered labels. Customize colors, opacity, borders, and alignment.
-          </p>
-        </div>
-        <div className="p-4 bg-secondary rounded-lg border border-border">
-          <div className="text-sm font-medium text-foreground mb-1">OCR Text Extraction</div>
-          <p className="text-xs text-muted-foreground text-pretty">
-            Extract text from your screenshots using OCR. Click "Extract Text" in the editor to recognize and copy text from images.
           </p>
         </div>
       </div>

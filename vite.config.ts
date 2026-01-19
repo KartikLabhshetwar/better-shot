@@ -34,8 +34,6 @@ export default defineConfig(async () => ({
           "vendor-motion": ["motion"],
           // State management
           "vendor-state": ["zustand", "immer"],
-          // OCR engine (heavy, loaded on demand)
-          "vendor-ocr": ["tesseract.js"],
         },
       },
     },
