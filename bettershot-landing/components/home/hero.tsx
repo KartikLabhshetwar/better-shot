@@ -31,20 +31,6 @@ export default function Hero() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full pt-28 sm:pt-36 lg:pt-55">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
           <div className="flex flex-col">
-            <div className="mb-6">
-            <a
-          href="https://peerlist.io/code_kartik/project/better-shot--free-screenshot-tool-for-macos"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-block"
-        >
-          <img
-            src="https://peerlist.io/api/v1/projects/embed/PRJHLKL6L8JN6LDL8CEAJQOLAOMDMK?showUpvote=true&theme=dark"
-            alt="Better Shot - Free Screenshot Tool for macOS"
-            style={{ width: "auto", height: "72px" }}
-          />
-        </a>
-            </div>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
