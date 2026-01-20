@@ -62,9 +62,6 @@ importers:
       tauri-plugin-screenshots-api:
         specifier: ^2.2.0
         version: 2.2.0
-      tesseract.js:
-        specifier: ^5.1.1
-        version: 5.1.1
       zustand:
         specifier: ^5.0.10
         version: 5.0.10(@types/react@19.2.8)(immer@11.1.3)(react@19.2.3)
@@ -1241,9 +1238,6 @@ packages:
   bidi-js@1.0.3:
     resolution: {integrity: sha512-RKshQI1R3YQ+n9YJz2QQ147P66ELpa1FQEg20Dk8oW9t2KgLbpDLLp9aGZ7y8WHSshDknG0bknqGw5/tyCs5tw==}
 
-  bmp-js@0.1.0:
-    resolution: {integrity: sha512-vHdS19CnY3hwiNdkaqk93DvjVLfbEcI8mys4UjuWrlX1haDmroo8o4xCzh4wD6DGV6HxRCyauwhHRqMTfERtjw==}
-
   browserslist@4.28.1:
     resolution: {integrity: sha512-ZC5Bd0LgJXgwGqUknZY/vkUQ04r8NXnJZ3yYi4vDmSiZmC/pdSN0NbNRPxZpbtO4uAfDUAFffO8IZoM3Gj8IkA==}
     engines: {node: ^6 || ^7 || ^8 || ^9 || ^10 || ^11 || ^12 || >=13.7}
@@ -1404,9 +1398,6 @@ packages:
     resolution: {integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==}
     engines: {node: '>= 14'}
 
-  idb-keyval@6.2.2:
-    resolution: {integrity: sha512-yjD9nARJ/jb1g+CvD0tlhUHOrJ9Sy0P8T9MF3YaLlHnSRpwPfpTX0XIvpmw3gAJUmEu3FiICLBDPXVwyEvrleg==}
-
   immer@11.1.3:
     resolution: {integrity: sha512-6jQTc5z0KJFtr1UgFpIL3N9XSC3saRaI9PwWtzM2pSqkNGtiNkYY2OSwkOGDK2XcTRcLb1pi/aNkKZz0nxVH4Q==}
 
@@ -1414,14 +1405,8 @@ packages:
     resolution: {integrity: sha512-EdDDZu4A2OyIK7Lr/2zG+w5jmbuk1DVBnEwREQvBzspBJkCEbRa8GxU1lghYcaGJCnRWibjDXlq779X1/y5xwg==}
     engines: {node: '>=8'}
 
-  is-electron@2.2.2:
-    resolution: {integrity: sha512-FO/Rhvz5tuw4MCWkpMzHFKWD2LsfHzIb7i6MdPYZ/KW7AlxawyLkqdy+jPZP1WubqEADE3O4FUENlJHDfQASRg==}
-
   is-potential-custom-element-name@1.0.1:
     resolution: {integrity: sha512-bCYeRA2rVibKZd+s2625gGnGF/t7DSqDs4dP7CrLA1m7jKWz6pps0LpYLJN8Q64HtmPKJ1hrN3nzPNKFEKOUiQ==}
-
-  is-url@1.2.4:
-    resolution: {integrity: sha512-ITvGim8FhRiYe4IQ5uHSkj7pVaPDrCTkNd3yq3cV7iZAcJdHTUMPMEHcqSOy9xZ9qFenQCvi+2wjH9a1nXqHww==}
 
   istanbul-lib-coverage@3.2.2:
     resolution: {integrity: sha512-O8dpsF+r0WV/8MNRKfnmrtCWhuKjxrq2w+jpzBL5UZKTi2LeVWnWOmWRxFlesJONmc+wLAGvKQZEOanko0LFTg==}
@@ -1595,24 +1580,11 @@ packages:
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
-  node-fetch@2.7.0:
-    resolution: {integrity: sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A==}
-    engines: {node: 4.x || >=6.0.0}
-    peerDependencies:
-      encoding: ^0.1.0
-    peerDependenciesMeta:
-      encoding:
-        optional: true
-
   node-releases@2.0.27:
     resolution: {integrity: sha512-nmh3lCkYZ3grZvqcCH+fjmQ7X+H0OeZgP40OierEaAptX4XofMh5kwNbWh7lBduUzCcV/8kZ+NDLCwm2iorIlA==}
 
   obug@2.1.1:
     resolution: {integrity: sha512-uTqF9MuPraAQ+IsnPf366RG4cP9RtUi7MLO1N3KEc+wb0a6yKpeL0lmk2IB1jY5KHPAlTc6T/JRdC/YqxHNwkQ==}
-
-  opencollective-postinstall@2.0.3:
-    resolution: {integrity: sha512-8AV/sCtuzUeTo8gQK5qDZzARrulB3egtLzFgteqB2tcT4Mw7B8Kt7JcDHmltjz6FOAHsvTevk70gZEbhM4ZS9Q==}
-    hasBin: true
 
   parse5@8.0.0:
     resolution: {integrity: sha512-9m4m5GSgXjL4AjumKzq1Fgfp3Z8rsvjRNbnkVwfu2ImRqE5D0LnY2QfDen18FSY9C573YU5XxSapdHZTZ2WolA==}
@@ -1692,9 +1664,6 @@ packages:
     resolution: {integrity: sha512-6tDA8g98We0zd0GvVeMT9arEOnTw9qM03L9cJXaCjrip1OO764RDBLBfrB4cwzNGDj5OA5ioymC9GkizgWJDUg==}
     engines: {node: '>=8'}
 
-  regenerator-runtime@0.13.11:
-    resolution: {integrity: sha512-kY1AZVr2Ra+t+piVaJ4gxaFaReZVH40AKNo7UCX6W+dEwBo/2oZJzqfuN1qLq1oL45o56cPaTXELwrTh8Fpggg==}
-
   require-from-string@2.0.2:
     resolution: {integrity: sha512-Xf0nWe6RseziFMu+Ap9biiUbmplq6S9/p+7w7YXP/JBHhrUDDUhwa+vANyubuqfZWTveU//DYVGsDG7RKL/vEw==}
     engines: {node: '>=0.10.0'}
@@ -1763,12 +1732,6 @@ packages:
   tauri-plugin-screenshots-api@2.2.0:
     resolution: {integrity: sha512-xNG5yH6kl+Mk/969tFimIxZa6y6eVgarbsEVAJIpERYBlYoNfWCDdI3nW111UOQjWi6zG/RkGjUMLlVy12a3Sg==}
 
-  tesseract.js-core@5.1.1:
-    resolution: {integrity: sha512-KX3bYSU5iGcO1XJa+QGPbi+Zjo2qq6eBhNjSGR5E5q0JtzkoipJKOUQD7ph8kFyteCEfEQ0maWLu8MCXtvX5uQ==}
-
-  tesseract.js@5.1.1:
-    resolution: {integrity: sha512-lzVl/Ar3P3zhpUT31NjqeCo1f+D5+YfpZ5J62eo2S14QNVOmHBTtbchHm/YAbOOOzCegFnKf4B3Qih9LuldcYQ==}
-
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
 
@@ -1794,9 +1757,6 @@ packages:
   tough-cookie@6.0.0:
     resolution: {integrity: sha512-kXuRi1mtaKMrsLUxz3sQYvVl37B0Ns6MzfrtV5DvJceE9bPyspOqk9xxv7XbZWcfLWbFmm997vl83qUWVJA64w==}
     engines: {node: '>=16'}
-
-  tr46@0.0.3:
-    resolution: {integrity: sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==}
 
   tr46@6.0.0:
     resolution: {integrity: sha512-bLVMLPtstlZ4iMQHpFHTR7GAGj2jxi8Dg0s2h2MafAE4uSWF98FC/3MomU51iQAMf8/qDUbKWf5GxuvvVcXEhw==}
@@ -1917,12 +1877,6 @@ packages:
     resolution: {integrity: sha512-o8qghlI8NZHU1lLPrpi2+Uq7abh4GGPpYANlalzWxyWteJOCsr/P+oPBA49TOLu5FTZO4d3F9MnWJfiMo4BkmA==}
     engines: {node: '>=18'}
 
-  wasm-feature-detect@1.8.0:
-    resolution: {integrity: sha512-zksaLKM2fVlnB5jQQDqKXXwYHLQUVH9es+5TOOHwGOVJOCeRBCiPjwSg+3tN2AdTCzjgli4jijCH290kXb/zWQ==}
-
-  webidl-conversions@3.0.1:
-    resolution: {integrity: sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ==}
-
   webidl-conversions@8.0.1:
     resolution: {integrity: sha512-BMhLD/Sw+GbJC21C/UgyaZX41nPt8bUTg+jWyDeg7e7YN4xOM05YPSIXceACnXVtqyEw/LMClUQMtMZ+PGGpqQ==}
     engines: {node: '>=20'}
@@ -1934,9 +1888,6 @@ packages:
   whatwg-url@15.1.0:
     resolution: {integrity: sha512-2ytDk0kiEj/yu90JOAp44PVPUkO9+jVhyf+SybKlRHSDlvOOZhdPIrr7xTH64l4WixO2cP+wQIcgujkGBPPz6g==}
     engines: {node: '>=20'}
-
-  whatwg-url@5.0.0:
-    resolution: {integrity: sha512-saE57nupxk6v3HY35+jzBwYa0rKSy0XR8JSxZPwgLr7ys0IBzhGviA1/TUGJLmSVqs8pb9AnvICXEuOHLprYTw==}
 
   why-is-node-running@2.3.0:
     resolution: {integrity: sha512-hUrmaWBdVDcxvYqnyh09zunKzROWjbZTiNy8dBEjkS7ehEDQibXJ7XvlmtbwuTclUiIyN+CyXQD4Vmko8fNm8w==}
@@ -1964,9 +1915,6 @@ packages:
 
   yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
-
-  zlibjs@0.3.1:
-    resolution: {integrity: sha512-+J9RrgTKOmlxFSDHo0pI1xM6BLVUv+o0ZT9ANtCxGkjIVCCUdx9alUF8Gm+dGLKbkkkidWIHFDZHDMpfITt4+w==}
 
   zustand@5.0.10:
     resolution: {integrity: sha512-U1AiltS1O9hSy3rul+Ub82ut2fqIAefiSuwECWt6jlMVUGejvf+5omLcRBSzqbRagSM3hQZbtzdeRc6QVScXTg==}
@@ -2972,8 +2920,6 @@ snapshots:
     dependencies:
       require-from-string: 2.0.2
 
-  bmp-js@0.1.0: {}
-
   browserslist@4.28.1:
     dependencies:
       baseline-browser-mapping: 2.9.14
@@ -3127,17 +3073,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  idb-keyval@6.2.2: {}
-
   immer@11.1.3: {}
 
   indent-string@4.0.0: {}
 
-  is-electron@2.2.2: {}
-
   is-potential-custom-element-name@1.0.1: {}
-
-  is-url@1.2.4: {}
 
   istanbul-lib-coverage@3.2.2: {}
 
@@ -3287,15 +3227,9 @@ snapshots:
 
   nanoid@3.3.11: {}
 
-  node-fetch@2.7.0:
-    dependencies:
-      whatwg-url: 5.0.0
-
   node-releases@2.0.27: {}
 
   obug@2.1.1: {}
-
-  opencollective-postinstall@2.0.3: {}
 
   parse5@8.0.0:
     dependencies:
@@ -3365,8 +3299,6 @@ snapshots:
     dependencies:
       indent-string: 4.0.0
       strip-indent: 3.0.0
-
-  regenerator-runtime@0.13.11: {}
 
   require-from-string@2.0.2: {}
 
@@ -3444,23 +3376,6 @@ snapshots:
     dependencies:
       '@tauri-apps/api': 2.9.1
 
-  tesseract.js-core@5.1.1: {}
-
-  tesseract.js@5.1.1:
-    dependencies:
-      bmp-js: 0.1.0
-      idb-keyval: 6.2.2
-      is-electron: 2.2.2
-      is-url: 1.2.4
-      node-fetch: 2.7.0
-      opencollective-postinstall: 2.0.3
-      regenerator-runtime: 0.13.11
-      tesseract.js-core: 5.1.1
-      wasm-feature-detect: 1.8.0
-      zlibjs: 0.3.1
-    transitivePeerDependencies:
-      - encoding
-
   tinybench@2.9.0: {}
 
   tinyexec@1.0.2: {}
@@ -3481,8 +3396,6 @@ snapshots:
   tough-cookie@6.0.0:
     dependencies:
       tldts: 7.0.19
-
-  tr46@0.0.3: {}
 
   tr46@6.0.0:
     dependencies:
@@ -3571,10 +3484,6 @@ snapshots:
     dependencies:
       xml-name-validator: 5.0.0
 
-  wasm-feature-detect@1.8.0: {}
-
-  webidl-conversions@3.0.1: {}
-
   webidl-conversions@8.0.1: {}
 
   whatwg-mimetype@4.0.0: {}
@@ -3583,11 +3492,6 @@ snapshots:
     dependencies:
       tr46: 6.0.0
       webidl-conversions: 8.0.1
-
-  whatwg-url@5.0.0:
-    dependencies:
-      tr46: 0.0.3
-      webidl-conversions: 3.0.1
 
   why-is-node-running@2.3.0:
     dependencies:
@@ -3601,8 +3505,6 @@ snapshots:
   xmlchars@2.2.0: {}
 
   yallist@3.1.1: {}
-
-  zlibjs@0.3.1: {}
 
   zustand@5.0.10(@types/react@19.2.8)(immer@11.1.3)(react@19.2.3):
     optionalDependencies:

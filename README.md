@@ -50,6 +50,7 @@ Clean screenshot workflows usually need three things: capture fast, polish fast 
 - **Region capture**: Select any area of your screen (`⌘⇧2`, enabled by default)
 - **Fullscreen capture**: Capture your entire screen (`⌘⇧F`, enable in Preferences)
 - **Window capture**: Capture a specific window (`⌘⇧D`, enable in Preferences)
+- **OCR Region**: Extract text from a selected region using macOS Vision framework - automatically copies recognized text to clipboard (`⌘⇧O`, enable in Preferences)
 
 ### Image Editing
 
@@ -71,6 +72,7 @@ Clean screenshot workflows usually need three things: capture fast, polish fast 
 
 - **Global shortcuts**: Capture from anywhere, even when hidden
 - **Auto-apply**: Apply default background and save without opening the editor
+- **OCR text extraction**: Extract and copy text from screenshots using native macOS Vision framework
 - **Clipboard**: Copy to clipboard after capture/export
 - **Preferences**: Save directory, defaults, and shortcut settings persist
 - **Menu bar**: Accessible from the menu bar
@@ -159,6 +161,7 @@ Capture shortcuts are customizable in Preferences.
 | Capture Region | `⌘⇧2` |
 | Capture Fullscreen | `⌘⇧F` (disabled by default) |
 | Capture Window | `⌘⇧D` (disabled by default) |
+| OCR Region | `⌘⇧O` (disabled by default) |
 | Cancel Selection | `Esc` |
 
 #### Editor Shortcuts

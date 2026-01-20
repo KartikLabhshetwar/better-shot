@@ -9,8 +9,9 @@ use tauri::{AppHandle, Manager};
 use objc2::msg_send;
 use objc2_app_kit::NSWindow;
 
-use crate::clipboard::copy_image_to_clipboard;
+use crate::clipboard::{copy_image_to_clipboard, copy_text_to_clipboard};
 use crate::image::{copy_screenshot_to_dir, crop_image, save_base64_image, CropRegion};
+use crate::ocr::recognize_text_from_image;
 use crate::screenshot::{
     capture_all_monitors as capture_monitors, capture_primary_monitor, MonitorShot,
 };
@@ -274,22 +275,75 @@ pub async fn native_capture_fullscreen(save_dir: String) -> Result<String, Strin
     }
 }
 
-/// Play the macOS screenshot sound
+/// Play the macOS screenshot sound using CoreAudio
+/// This uses AudioServicesPlaySystemSound which is non-blocking and works
+/// even when other audio/video is playing. Falls back to osascript if CoreAudio fails.
 #[tauri::command]
 pub async fn play_screenshot_sound() -> Result<(), String> {
-    // macOS system screenshot sound path
-    let sound_path = "/System/Library/Components/CoreAudio.component/Contents/SharedSupport/SystemSounds/system/Screen Capture.aif";
+    #[cfg(target_os = "macos")]
+    {
+        use objc2_audio_toolbox::{
+            AudioServicesCreateSystemSoundID, AudioServicesDisposeSystemSoundID,
+            AudioServicesPlaySystemSound, SystemSoundID,
+        };
+        use objc2_core_foundation::{CFString, CFURL, CFURLPathStyle};
+        use std::ptr::NonNull;
 
-    // Use afplay to play the sound asynchronously (non-blocking)
-    std::thread::spawn(move || {
-        let _ = Command::new("afplay")
-            .arg(sound_path)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn();
-    });
+        let sound_path = "/System/Library/Components/CoreAudio.component/Contents/SharedSupport/SystemSounds/system/Screen Capture.aif";
+
+        std::thread::spawn(move || {
+            let cfstr = CFString::from_str(sound_path);
+            let url = match CFURL::with_file_system_path(None, Some(&cfstr), CFURLPathStyle::CFURLPOSIXPathStyle, false) {
+                Some(url) => url,
+                None => {
+                    fallback_sound_playback();
+                    return;
+                }
+            };
+
+            let mut sound_id: SystemSoundID = 0;
+            let status = unsafe {
+                AudioServicesCreateSystemSoundID(
+                    &url,
+                    NonNull::new(&mut sound_id).unwrap(),
+                )
+            };
+
+            if status != 0 {
+                fallback_sound_playback();
+                return;
+            }
+
+            unsafe {
+                AudioServicesPlaySystemSound(sound_id);
+            }
+
+            std::thread::sleep(std::time::Duration::from_millis(1000));
+
+            unsafe {
+                AudioServicesDisposeSystemSoundID(sound_id);
+            }
+        });
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        eprintln!("play_screenshot_sound is only supported on macOS");
+    }
 
     Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn fallback_sound_playback() {
+    let sound_path = "/System/Library/Components/CoreAudio.component/Contents/SharedSupport/SystemSounds/system/Screen Capture.aif";
+    
+    let _ = Command::new("osascript")
+        .arg("-e")
+        .arg(format!("do shell script \"afplay '{}' &\"", sound_path))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn();
 }
 
 /// Get the current mouse cursor position (for determining which screen to open editor on)
@@ -376,4 +430,71 @@ pub async fn native_capture_window(save_dir: String) -> Result<String, String> {
     } else {
         Err("Screenshot was cancelled or failed".to_string())
     }
+}
+
+/// Capture region and perform OCR, copying text to clipboard
+#[tauri::command]
+pub async fn native_capture_ocr_region(save_dir: String) -> Result<String, String> {
+    {
+        let _lock = SCREENCAPTURE_LOCK
+            .lock()
+            .map_err(|e| format!("Failed to acquire lock: {}", e))?;
+
+        if is_screencapture_running() {
+            return Err("Another screenshot capture is already in progress".to_string());
+        }
+
+        check_and_activate_permission().map_err(|e| {
+            format!("Permission check failed: {}. Please ensure Screen Recording permission is granted in System Settings > Privacy & Security > Screen Recording.", e)
+        })?;
+    }
+
+    let filename = generate_filename("ocr_temp", "png")?;
+    let save_path = PathBuf::from(&save_dir);
+    let screenshot_path = save_path.join(&filename);
+    let path_str = screenshot_path.to_string_lossy().to_string();
+
+    let child = Command::new("screencapture")
+        .arg("-i")
+        .arg("-x")
+        .arg(&path_str)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to run screencapture: {}", e))?;
+
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("Failed to wait for screencapture: {}", e))?;
+
+    if !output.status.success() {
+        if screenshot_path.exists() {
+            let _ = std::fs::remove_file(&screenshot_path);
+        }
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("permission")
+            || stderr.contains("denied")
+            || stderr.contains("not authorized")
+        {
+            return Err("Screen Recording permission required. Please grant permission in System Settings > Privacy & Security > Screen Recording and restart the app.".to_string());
+        }
+        return Err("Screenshot was cancelled or failed".to_string());
+    }
+
+    if !screenshot_path.exists() {
+        return Err("Screenshot was cancelled or failed".to_string());
+    }
+
+    play_screenshot_sound().await.ok();
+
+    let recognized_text = recognize_text_from_image(&path_str)
+        .map_err(|e| format!("OCR failed: {}", e))?;
+
+    copy_text_to_clipboard(&recognized_text)
+        .map_err(|e| format!("Failed to copy text to clipboard: {}", e))?;
+
+    let _ = std::fs::remove_file(&screenshot_path);
+
+    Ok(recognized_text)
 }

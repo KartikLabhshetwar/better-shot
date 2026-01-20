@@ -7,13 +7,15 @@
 mod clipboard;
 mod commands;
 mod image;
+mod ocr;
 mod screenshot;
 mod utils;
 
 use commands::{
     capture_all_monitors, capture_once, capture_region, get_desktop_directory, get_mouse_position,
     get_temp_directory, move_window_to_active_space, native_capture_fullscreen,
-    native_capture_interactive, native_capture_window, play_screenshot_sound, save_edited_image,
+    native_capture_interactive, native_capture_window, native_capture_ocr_region,
+    play_screenshot_sound, save_edited_image,
 };
 
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -73,7 +75,7 @@ pub fn run() {
             Some(vec!["--hidden"]),
         ))
         .setup(|app| {
-            use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem};
+            use tauri::menu::{ MenuBuilder, MenuItemBuilder, PredefinedMenuItem};
 
             // Set accessory mode on macOS to hide Dock icon and Cmd+Tab entry
             #[cfg(target_os = "macos")]
@@ -124,6 +126,14 @@ pub fn run() {
             let capture_window_item =
                 MenuItemBuilder::with_id("capture_window", "Capture Window").build(app)?;
 
+            let capture_ocr_item =
+                MenuItemBuilder::with_id("capture_ocr", "OCR Region").build(app)?;
+
+            let preferences_item =
+                MenuItemBuilder::with_id("preferences", "Preferences...")
+                    .accelerator("CommandOrControl+,")
+                    .build(app)?;
+
             let quit_item = MenuItemBuilder::with_id("quit", "Quit")
                 .accelerator("CommandOrControl+Q")
                 .build(app)?;
@@ -135,11 +145,13 @@ pub fn run() {
                     &capture_region_item,
                     &capture_screen_item,
                     &capture_window_item,
+                    &capture_ocr_item,
+                    &PredefinedMenuItem::separator(app)?,
+                    &preferences_item,
                     &PredefinedMenuItem::separator(app)?,
                     &quit_item,
                 ])
                 .build()?;
-
             let _tray = tauri::tray::TrayIconBuilder::new()
                 .menu(&menu)
                 .icon(app.default_window_icon().unwrap().clone())
@@ -159,6 +171,16 @@ pub fn run() {
                         }
                         "capture_window" => {
                             let _ = app.emit("capture-window", ());
+                        }
+                        "capture_ocr" => {
+                            let _ = app.emit("capture-ocr", ());
+                        }
+                        "preferences" => {
+                            if let Err(e) = show_main_window(app) {
+                                eprintln!("Failed to show window: {}", e);
+                            } else {
+                                let _ = app.emit("open-preferences", ());
+                            }
                         }
                         "quit" => {
                             app.exit(0);
@@ -180,6 +202,7 @@ pub fn run() {
             native_capture_interactive,
             native_capture_fullscreen,
             native_capture_window,
+            native_capture_ocr_region,
             play_screenshot_sound,
             get_mouse_position,
             move_window_to_active_space

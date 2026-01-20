@@ -137,6 +137,7 @@ bettershot/
 │   │   ├── commands.rs     # Tauri command handlers
 │   │   ├── clipboard.rs    # Clipboard operations (native macOS)
 │   │   ├── image.rs        # Image processing
+│   │   ├── ocr.rs          # OCR text recognition (macOS Vision framework)
 │   │   ├── screenshot.rs   # Screenshot capture
 │   │   ├── utils.rs        # Utility functions
 │   │   └── lib.rs          # Application entry point
@@ -262,6 +263,7 @@ Write tests for **critical paths only**:
 
 - Core screenshot capture functionality
 - Image processing operations (blur, shadow, background effects)
+- OCR text recognition (macOS Vision framework integration)
 - Clipboard operations
 - Annotation rendering and manipulation
 - Error handling in critical flows
@@ -345,6 +347,7 @@ When creating a PR, include:
 - **Tauri 2**: Desktop app framework
 - **xcap**: Screenshot capture library
 - **image**: Image processing
+- **objc2-vision**: macOS Vision framework bindings for OCR text recognition
 
 ### Plugins
 - **@tauri-apps/plugin-store**: Settings persistence
@@ -395,6 +398,17 @@ When creating a PR, include:
 5. Update `annotation-utils.ts` for rendering logic
 6. Test drawing, selection, movement, and deletion
 
+### Adding a New Capture Mode
+
+1. Add the capture mode type to `CaptureMode` in `src/App.tsx`
+2. Add default shortcut configuration in `DEFAULT_SHORTCUTS` (usually disabled by default)
+3. Implement the Rust command handler in `src-tauri/src/commands.rs`
+4. Add the command to Tauri's command list in `src-tauri/src/lib.rs`
+5. Handle the capture mode in `handleCapture` function in `src/App.tsx`
+6. Add UI button/trigger in the main app interface
+7. Update keyboard shortcut manager to support the new mode
+8. For OCR-like features, create a separate module (e.g., `ocr.rs`) if it requires platform-specific APIs
+
 ### Adding a New Setting
 
 1. Add the setting key to the store in `src/components/preferences/PreferencesPage.tsx`
@@ -410,6 +424,7 @@ When creating a PR, include:
 2. Default shortcuts are defined in `src/App.tsx` as `DEFAULT_SHORTCUTS`
 3. Shortcuts are registered using `@tauri-apps/plugin-global-shortcut`
 4. Changes trigger re-registration via `settingsVersion` state
+5. OCR shortcut (`⌘⇧O`) is available but disabled by default - users can enable it in Preferences
 
 ### Updating the Homepage Keyboard Shortcuts Display
 

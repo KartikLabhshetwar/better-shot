@@ -12,7 +12,7 @@ import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Store } from "@tauri-apps/plugin-store";
 import type { KeyboardShortcut } from "./components/preferences/KeyboardShortcutManager";
 import { SettingsIcon } from "./components/SettingsIcon";
-import { AppWindowMac, Crop, Monitor } from "lucide-react";
+import { AppWindowMac, Crop, Monitor, ScanText } from "lucide-react";
 import { toast } from "sonner";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { editorActions } from "@/stores/editorStore";
@@ -23,7 +23,7 @@ const OnboardingFlow = lazy(() => import("./components/onboarding/OnboardingFlow
 const PreferencesPage = lazy(() => import("./components/preferences/PreferencesPage").then(m => ({ default: m.PreferencesPage })));
 
 type AppMode = "main" | "editing" | "preferences";
-type CaptureMode = "region" | "fullscreen" | "window";
+type CaptureMode = "region" | "fullscreen" | "window" | "ocr";
 
 // Loading fallback for lazy loaded components
 function LoadingFallback() {
@@ -44,6 +44,7 @@ const DEFAULT_SHORTCUTS: KeyboardShortcut[] = [
   { id: "region", action: "Capture Region", shortcut: "CommandOrControl+Shift+2", enabled: true },
   { id: "fullscreen", action: "Capture Screen", shortcut: "CommandOrControl+Shift+F", enabled: false },
   { id: "window", action: "Capture Window", shortcut: "CommandOrControl+Shift+D", enabled: false },
+  { id: "ocr", action: "OCR Region", shortcut: "CommandOrControl+Shift+O", enabled: false },
 ];
 
 function formatShortcut(shortcut: string): string {
@@ -274,7 +275,49 @@ function App() {
       await appWindow.hide();
       await new Promise((resolve) => setTimeout(resolve, 400));
 
-      const commandMap: Record<CaptureMode, string> = {
+      if (captureMode === "ocr") {
+        try {
+          const recognizedText = await invoke<string>("native_capture_ocr_region", {
+            saveDir: currentTempDir,
+          });
+
+          toast.success("Text copied to clipboard!", {
+            description: recognizedText.length > 50 ? `${recognizedText.substring(0, 50)}...` : recognizedText,
+            duration: 3000,
+          });
+
+          await appWindow.hide();
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          if (errorMessage.includes("cancelled") || errorMessage.includes("was cancelled")) {
+            await appWindow.hide();
+          } else if (errorMessage.includes("already in progress")) {
+            setError("Please wait for the current screenshot to complete");
+            await appWindow.hide();
+          } else if (
+            errorMessage.toLowerCase().includes("permission") ||
+            errorMessage.toLowerCase().includes("access") ||
+            errorMessage.toLowerCase().includes("denied")
+          ) {
+            setError(
+              "Screen Recording permission required. Please go to System Settings > Privacy & Security > Screen Recording and enable access for Better Shot, then restart the app."
+            );
+            await restoreWindow();
+          } else {
+            setError(errorMessage);
+            toast.error("OCR failed", {
+              description: errorMessage,
+              duration: 5000,
+            });
+            await appWindow.hide();
+          }
+        } finally {
+          setIsCapturing(false);
+        }
+        return;
+      }
+
+      const commandMap: Record<Exclude<CaptureMode, "ocr">, string> = {
         region: "native_capture_interactive",
         fullscreen: "native_capture_fullscreen",
         window: "native_capture_window",
@@ -303,15 +346,10 @@ function App() {
         try {
           const processedImageData = await processScreenshotWithDefaultBackground(screenshotPath);
           
-          const savedPath = await invoke<string>("save_edited_image", {
+          await invoke<string>("save_edited_image", {
             imageData: processedImageData,
             saveDir: currentSaveDir,
             copyToClip: shouldCopyToClipboard,
-          });
-
-          toast.success("Screenshot processed and saved", {
-            description: savedPath,
-            duration: 3000,
           });
           
           // Ensure window stays hidden after auto-apply
@@ -319,10 +357,6 @@ function App() {
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : String(err);
           setError(`Failed to process screenshot: ${errorMessage}`);
-          toast.error("Failed to process screenshot", {
-            description: errorMessage,
-            duration: 5000,
-          });
           // Even on error, keep window hidden in auto-apply mode
           await appWindow.hide();
         } finally {
@@ -389,6 +423,7 @@ function App() {
           "Capture Region": "region",
           "Capture Screen": "fullscreen",
           "Capture Window": "window",
+          "OCR Region": "ocr",
         };
 
         for (const shortcut of shortcuts) {
@@ -432,6 +467,9 @@ function App() {
     let unlisten1: (() => void) | null = null;
     let unlisten2: (() => void) | null = null;
     let unlisten3: (() => void) | null = null;
+    let unlisten4: (() => void) | null = null;
+    let unlisten5: (() => void) | null = null;
+    let unlisten6: (() => void) | null = null;
     let mounted = true;
 
     const setupListeners = async () => {
@@ -445,6 +483,17 @@ function App() {
       unlisten3 = await listen("capture-window", () => {
         if (mounted) handleCaptureRef.current("window");
       });
+      unlisten4 = await listen("capture-ocr", () => {
+        if (mounted) handleCaptureRef.current("ocr");
+      });
+      unlisten5 = await listen("open-preferences", () => {
+        if (mounted) setMode("preferences");
+      });
+      unlisten6 = await listen("auto-apply-changed", (event: { payload: boolean }) => {
+        if (mounted) {
+          setAutoApplyBackground(event.payload);
+        }
+      });
     };
 
     setupListeners();
@@ -454,6 +503,9 @@ function App() {
       unlisten1?.();
       unlisten2?.();
       unlisten3?.();
+      unlisten4?.();
+      unlisten5?.();
+      unlisten6?.();
     };
   }, []); // Empty dependency array - only run once on mount
 
@@ -583,7 +635,7 @@ function App() {
 
         <Card className="bg-card border-border">
           <CardContent className="p-6 space-y-6">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <Button
                 onClick={() => handleCapture("region")}
                 disabled={isCapturing}
@@ -593,6 +645,16 @@ function App() {
               >
                 <Crop className="size-4" aria-hidden="true" />
                 Region
+              </Button>
+              <Button
+                onClick={() => handleCapture("ocr")}
+                disabled={isCapturing}
+                variant="cta"
+                size="lg"
+                className="py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ScanText className="size-4" aria-hidden="true" />
+                OCR Region
               </Button>
               <Button
                 onClick={() => handleCapture("fullscreen")}
@@ -662,6 +724,12 @@ function App() {
                   <span className="text-muted-foreground">Region</span>
                   <kbd className="px-2 py-1 bg-secondary border border-border rounded text-foreground font-mono text-xs tabular-nums">
                     {getShortcutDisplay("region")}
+                  </kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">OCR Region</span>
+                  <kbd className="px-2 py-1 bg-secondary border border-border rounded text-foreground font-mono text-xs tabular-nums">
+                    {getShortcutDisplay("ocr")}
                   </kbd>
                 </div>
                 <div className="flex items-center justify-between">
