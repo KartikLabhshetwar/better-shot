@@ -61,6 +61,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
     settings,
     canvasRef,
     padding: settings.padding,
+    imagePath,
   });
 
   // Combined error
@@ -140,7 +141,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
     
     setIsSaving(true);
     try {
-      const highQualityCanvas = await renderHighQualityCanvas(annotations);
+      const highQualityCanvas = await renderHighQualityCanvas(annotations, imagePath);
       
       if (!highQualityCanvas) {
         setIsSaving(false);
@@ -171,7 +172,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
       setLoadError(`Failed to save: ${err instanceof Error ? err.message : String(err)}`);
       setIsSaving(false);
     }
-  }, [screenshotImage, annotations, renderHighQualityCanvas, onSave, isSaving, isCopying]);
+  }, [screenshotImage, annotations, renderHighQualityCanvas, onSave, isSaving, isCopying, imagePath]);
 
   // Copy handler
   const handleCopy = useCallback(async () => {
@@ -179,7 +180,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
     
     setIsCopying(true);
     try {
-      const highQualityCanvas = await renderHighQualityCanvas(annotations);
+      const highQualityCanvas = await renderHighQualityCanvas(annotations, imagePath);
       
       if (!highQualityCanvas) {
         setIsCopying(false);
@@ -207,7 +208,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
     } finally {
       setIsCopying(false);
     }
-  }, [screenshotImage, annotations, renderHighQualityCanvas, isSaving, isCopying, tempDir]);
+  }, [screenshotImage, annotations, renderHighQualityCanvas, isSaving, isCopying, tempDir, imagePath]);
 
   // Annotation handlers
   const handleAnnotationAdd = useCallback((annotation: Annotation) => {
@@ -439,15 +440,18 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
               />
 
               <EffectsPanel
+                blurAmount={settings.blurAmount}
                 noiseAmount={settings.noiseAmount}
                 padding={settings.padding}
                 shadow={settings.shadow}
+                onBlurAmountChangeTransient={actions.setBlurAmountTransient}
                 onNoiseChangeTransient={actions.setNoiseAmountTransient}
                 onPaddingChangeTransient={actions.setPaddingTransient}
                 onShadowBlurChangeTransient={actions.setShadowBlurTransient}
                 onShadowOffsetXChangeTransient={actions.setShadowOffsetXTransient}
                 onShadowOffsetYChangeTransient={actions.setShadowOffsetYTransient}
                 onShadowOpacityChangeTransient={actions.setShadowOpacityTransient}
+                onBlurAmountChange={actions.setBlurAmount}
                 onNoiseChange={actions.setNoiseAmount}
                 onPaddingChange={actions.setPadding}
                 onShadowBlurChange={actions.setShadowBlur}

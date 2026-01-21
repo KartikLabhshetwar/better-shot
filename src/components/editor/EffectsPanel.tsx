@@ -4,10 +4,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import type { ShadowSettings } from "@/stores/editorStore";
 
 interface EffectsPanelProps {
+  blurAmount: number;
   noiseAmount: number;
   padding: number;
   shadow: ShadowSettings;
   // Transient handlers (during drag) - for visual feedback
+  onBlurAmountChangeTransient?: (value: number) => void;
   onNoiseChangeTransient?: (value: number) => void;
   onPaddingChangeTransient?: (value: number) => void;
   onShadowBlurChangeTransient?: (value: number) => void;
@@ -15,6 +17,7 @@ interface EffectsPanelProps {
   onShadowOffsetYChangeTransient?: (value: number) => void;
   onShadowOpacityChangeTransient?: (value: number) => void;
   // Commit handlers (on release) - for state/history
+  onBlurAmountChange: (value: number) => void;
   onNoiseChange: (value: number) => void;
   onPaddingChange: (value: number) => void;
   onShadowBlurChange: (value: number) => void;
@@ -24,15 +27,18 @@ interface EffectsPanelProps {
 }
 
 export const EffectsPanel = memo(function EffectsPanel({
+  blurAmount,
   noiseAmount,
   padding,
   shadow,
+  onBlurAmountChangeTransient,
   onNoiseChangeTransient,
   onPaddingChangeTransient,
   onShadowBlurChangeTransient,
   onShadowOffsetXChangeTransient,
   onShadowOffsetYChangeTransient,
   onShadowOpacityChangeTransient,
+  onBlurAmountChange,
   onNoiseChange,
   onPaddingChange,
   onShadowBlurChange,
@@ -50,6 +56,31 @@ export const EffectsPanel = memo(function EffectsPanel({
         </div>
 
         <div className="space-y-6">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <label className="text-xs text-muted-foreground font-medium cursor-help">Gaussian Blur</label>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-48">
+                    <p className="text-xs text-pretty">Apply Gaussian blur to the background behind the captured image.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <span className="text-xs text-muted-foreground font-mono tabular-nums">{blurAmount}px</span>
+            </div>
+            <Slider
+              value={[blurAmount]}
+              onValueChange={(value) => onBlurAmountChangeTransient?.(value[0])}
+              onValueCommit={(value) => onBlurAmountChange(value[0])}
+              min={0}
+              max={100}
+              step={1}
+              className="w-full"
+            />
+          </div>
+
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-xs text-muted-foreground font-medium">Noise</label>

@@ -64,65 +64,15 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
 
     drawBackground(tempBgCtx, bgWidth, bgHeight, backgroundType, customColor, selectedImage, bgImage, gradientImage);
 
-    const bgCanvas = document.createElement("canvas");
-    bgCanvas.width = bgWidth;
-    bgCanvas.height = bgHeight;
-    const bgCtx = bgCanvas.getContext("2d");
-    if (!bgCtx) throw new Error("Failed to get bg canvas context");
-
     if (blurAmount > 0) {
-      // Extend canvas size to prevent edge clipping during blur
-      const blurPadding = blurAmount * 3;
-      const extendedWidth = bgWidth + blurPadding * 2;
-      const extendedHeight = bgHeight + blurPadding * 2;
-
-      const extendedCanvas = document.createElement("canvas");
-      extendedCanvas.width = extendedWidth;
-      extendedCanvas.height = extendedHeight;
-      const extendedCtx = extendedCanvas.getContext("2d");
-
-      if (extendedCtx) {
-        // Draw background at offset position
-        extendedCtx.drawImage(tempBgCanvas, blurPadding, blurPadding);
-
-        // Fill edges by extending the background
-        // Top edge
-        extendedCtx.drawImage(tempBgCanvas, 0, 0, bgWidth, 1, blurPadding, 0, bgWidth, blurPadding);
-        // Bottom edge
-        extendedCtx.drawImage(tempBgCanvas, 0, bgHeight - 1, bgWidth, 1, blurPadding, blurPadding + bgHeight, bgWidth, blurPadding);
-        // Left edge
-        extendedCtx.drawImage(tempBgCanvas, 0, 0, 1, bgHeight, 0, blurPadding, blurPadding, bgHeight);
-        // Right edge
-        extendedCtx.drawImage(tempBgCanvas, bgWidth - 1, 0, 1, bgHeight, blurPadding + bgWidth, blurPadding, blurPadding, bgHeight);
-
-        // Apply blur to extended canvas
-        const blurredExtCanvas = document.createElement("canvas");
-        blurredExtCanvas.width = extendedWidth;
-        blurredExtCanvas.height = extendedHeight;
-        const blurredExtCtx = blurredExtCanvas.getContext("2d");
-
-        if (blurredExtCtx) {
-          blurredExtCtx.filter = `blur(${blurAmount}px)`;
-          blurredExtCtx.drawImage(extendedCanvas, 0, 0);
-          blurredExtCtx.filter = "none";
-
-          // Crop back to original size
-          bgCtx.drawImage(blurredExtCanvas, blurPadding, blurPadding, bgWidth, bgHeight, 0, 0, bgWidth, bgHeight);
-        } else {
-          bgCtx.drawImage(tempBgCanvas, 0, 0);
-        }
-      } else {
-        bgCtx.drawImage(tempBgCanvas, 0, 0);
-      }
-    } else {
-      bgCtx.drawImage(tempBgCanvas, 0, 0);
+      applyGaussianBlurToCanvas(tempBgCanvas, blurAmount);
     }
 
     if (noiseAmount > 0) {
-      applyNoiseToBackground(bgCtx, bgWidth, bgHeight, noiseAmount);
+      applyNoiseToBackground(tempBgCtx, bgWidth, bgHeight, noiseAmount);
     }
 
-    ctx.drawImage(bgCanvas, 0, 0);
+    ctx.drawImage(tempBgCanvas, 0, 0);
 
     const imageCanvas = document.createElement("canvas");
     imageCanvas.width = image.width;
@@ -211,6 +161,100 @@ function drawBackground(
         ctx.fillRect(0, 0, width, height);
       }
       break;
+  }
+}
+
+/**
+ * Fast box blur for high-quality render (faster than Gaussian, good quality)
+ * Uses multiple passes of box blur to approximate Gaussian blur
+ */
+function applyGaussianBlurToCanvas(canvas: HTMLCanvasElement, radius: number) {
+  if (radius <= 0) return;
+  
+  const passes = Math.min(Math.ceil(radius / 12) + 1, 4);
+  const boxRadius = Math.floor(radius / passes);
+  
+  if (boxRadius <= 0) return;
+  
+  const ctx = canvas.getContext("2d")!;
+  const width = canvas.width;
+  const height = canvas.height;
+  const kernelSize = boxRadius * 2 + 1;
+  
+  for (let pass = 0; pass < passes; pass++) {
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    const tempData = new Uint8ClampedArray(data);
+    
+    for (let y = 0; y < height; y++) {
+      let rSum = 0, gSum = 0, bSum = 0, aSum = 0;
+      
+      for (let x = 0; x < width; x++) {
+        if (x === 0) {
+          for (let kx = -boxRadius; kx <= boxRadius; kx++) {
+            const px = Math.max(0, Math.min(width - 1, kx));
+            const idx = (y * width + px) * 4;
+            rSum += data[idx];
+            gSum += data[idx + 1];
+            bSum += data[idx + 2];
+            aSum += data[idx + 3];
+          }
+        } else {
+          const removeX = Math.max(0, Math.min(width - 1, x - boxRadius - 1));
+          const addX = Math.max(0, Math.min(width - 1, x + boxRadius));
+          const removeIdx = (y * width + removeX) * 4;
+          const addIdx = (y * width + addX) * 4;
+          
+          rSum = rSum - data[removeIdx] + data[addIdx];
+          gSum = gSum - data[removeIdx + 1] + data[addIdx + 1];
+          bSum = bSum - data[removeIdx + 2] + data[addIdx + 2];
+          aSum = aSum - data[removeIdx + 3] + data[addIdx + 3];
+        }
+        
+        const idx = (y * width + x) * 4;
+        tempData[idx] = Math.round(rSum / kernelSize);
+        tempData[idx + 1] = Math.round(gSum / kernelSize);
+        tempData[idx + 2] = Math.round(bSum / kernelSize);
+        tempData[idx + 3] = Math.round(aSum / kernelSize);
+      }
+    }
+    
+    const finalData = new Uint8ClampedArray(tempData);
+    
+    for (let x = 0; x < width; x++) {
+      let rSum = 0, gSum = 0, bSum = 0, aSum = 0;
+      
+      for (let y = 0; y < height; y++) {
+        if (y === 0) {
+          for (let ky = -boxRadius; ky <= boxRadius; ky++) {
+            const py = Math.max(0, Math.min(height - 1, ky));
+            const idx = (py * width + x) * 4;
+            rSum += tempData[idx];
+            gSum += tempData[idx + 1];
+            bSum += tempData[idx + 2];
+            aSum += tempData[idx + 3];
+          }
+        } else {
+          const removeY = Math.max(0, Math.min(height - 1, y - boxRadius - 1));
+          const addY = Math.max(0, Math.min(height - 1, y + boxRadius));
+          const removeIdx = (removeY * width + x) * 4;
+          const addIdx = (addY * width + x) * 4;
+          
+          rSum = rSum - tempData[removeIdx] + tempData[addIdx];
+          gSum = gSum - tempData[removeIdx + 1] + tempData[addIdx + 1];
+          bSum = bSum - tempData[removeIdx + 2] + tempData[addIdx + 2];
+          aSum = aSum - tempData[removeIdx + 3] + tempData[addIdx + 3];
+        }
+        
+        const idx = (y * width + x) * 4;
+        finalData[idx] = Math.round(rSum / kernelSize);
+        finalData[idx + 1] = Math.round(gSum / kernelSize);
+        finalData[idx + 2] = Math.round(bSum / kernelSize);
+        finalData[idx + 3] = Math.round(aSum / kernelSize);
+      }
+    }
+    
+    ctx.putImageData(new ImageData(finalData, width, height), 0, 0);
   }
 }
 

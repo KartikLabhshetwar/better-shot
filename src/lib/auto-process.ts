@@ -1,4 +1,4 @@
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { convertFileSrc} from "@tauri-apps/api/core";
 import { Store } from "@tauri-apps/plugin-store";
 import { createHighQualityCanvas } from "./canvas-utils";
 import { resolveBackgroundPath, getDefaultBackgroundPath } from "./asset-registry";
@@ -38,6 +38,9 @@ export async function processScreenshotWithDefaultBackground(
     
     img.onload = async () => {
       try {
+        const avgDimension = (img.width + img.height) / 2;
+        const padding = Math.min(Math.round(avgDimension * 0.1), 400);
+
         if (backgroundType === "image" || backgroundType === "gradient") {
           bgImage = new Image();
           bgImage.crossOrigin = "anonymous";
@@ -54,7 +57,7 @@ export async function processScreenshotWithDefaultBackground(
                 blurAmount: 0,
                 noiseAmount: 20,
                 borderRadius: 18,
-                padding: 100,
+                padding,
                 gradientImage: isGradient ? bgImage : null,
                 shadow: {
                   blur: 33,
@@ -95,6 +98,9 @@ export async function processScreenshotWithDefaultBackground(
         } else {
           try {
             const isTransparent = backgroundType === "transparent";
+            const blurAmount = 0;
+            const finalPadding = isTransparent ? 0 : padding;
+
             const canvas = createHighQualityCanvas({
               image: img,
               backgroundType,
@@ -102,10 +108,10 @@ export async function processScreenshotWithDefaultBackground(
               selectedImage: null,
               bgImage: null,
               gradientImage: null,
-              blurAmount: 0,
+              blurAmount,
               noiseAmount: 20,
               borderRadius: 18,
-              padding: isTransparent ? 0 : 100,
+              padding: finalPadding,
               shadow: isTransparent ? {
                 blur: 0,
                 offsetX: 0,

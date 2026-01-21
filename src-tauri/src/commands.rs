@@ -10,7 +10,7 @@ use objc2::msg_send;
 use objc2_app_kit::NSWindow;
 
 use crate::clipboard::{copy_image_to_clipboard, copy_text_to_clipboard};
-use crate::image::{copy_screenshot_to_dir, crop_image, save_base64_image, CropRegion};
+use crate::image::{copy_screenshot_to_dir, crop_image, render_image_with_effects, save_base64_image, CropRegion, RenderSettings};
 use crate::ocr::recognize_text_from_image;
 use crate::screenshot::{
     capture_all_monitors as capture_monitors, capture_primary_monitor, MonitorShot,
@@ -95,6 +95,15 @@ pub async fn capture_region(
         height,
     };
     crop_image(&screenshot_path, region, &save_dir)
+}
+
+/// Render image with effects using Rust (optimized for blur)
+#[tauri::command]
+pub async fn render_image_with_effects_rust(
+    image_path: String,
+    settings: RenderSettings,
+) -> Result<String, String> {
+    render_image_with_effects(&image_path, settings)
 }
 
 /// Save an edited image from base64 data

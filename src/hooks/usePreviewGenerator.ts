@@ -114,6 +114,101 @@ function drawBackground(
 
 
 /**
+ * Fast box blur approximation for preview (much faster than Gaussian)
+ * Uses multiple passes of box blur to approximate Gaussian blur
+ * Optimized with sliding window algorithm for O(n) performance
+ */
+function applyFastBoxBlur(canvas: HTMLCanvasElement, radius: number) {
+  if (radius <= 0) return;
+  
+  const passes = Math.min(Math.ceil(radius / 15) + 1, 3);
+  const boxRadius = Math.floor(radius / passes);
+  
+  if (boxRadius <= 0) return;
+  
+  const ctx = canvas.getContext("2d")!;
+  const width = canvas.width;
+  const height = canvas.height;
+  const kernelSize = boxRadius * 2 + 1;
+  
+  for (let pass = 0; pass < passes; pass++) {
+    const imageData = ctx.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    const tempData = new Uint8ClampedArray(data);
+    
+    for (let y = 0; y < height; y++) {
+      let rSum = 0, gSum = 0, bSum = 0, aSum = 0;
+      
+      for (let x = 0; x < width; x++) {
+        if (x === 0) {
+          for (let kx = -boxRadius; kx <= boxRadius; kx++) {
+            const px = Math.max(0, Math.min(width - 1, kx));
+            const idx = (y * width + px) * 4;
+            rSum += data[idx];
+            gSum += data[idx + 1];
+            bSum += data[idx + 2];
+            aSum += data[idx + 3];
+          }
+        } else {
+          const removeX = Math.max(0, Math.min(width - 1, x - boxRadius - 1));
+          const addX = Math.max(0, Math.min(width - 1, x + boxRadius));
+          const removeIdx = (y * width + removeX) * 4;
+          const addIdx = (y * width + addX) * 4;
+          
+          rSum = rSum - data[removeIdx] + data[addIdx];
+          gSum = gSum - data[removeIdx + 1] + data[addIdx + 1];
+          bSum = bSum - data[removeIdx + 2] + data[addIdx + 2];
+          aSum = aSum - data[removeIdx + 3] + data[addIdx + 3];
+        }
+        
+        const idx = (y * width + x) * 4;
+        tempData[idx] = Math.round(rSum / kernelSize);
+        tempData[idx + 1] = Math.round(gSum / kernelSize);
+        tempData[idx + 2] = Math.round(bSum / kernelSize);
+        tempData[idx + 3] = Math.round(aSum / kernelSize);
+      }
+    }
+    
+    const finalData = new Uint8ClampedArray(tempData);
+    
+    for (let x = 0; x < width; x++) {
+      let rSum = 0, gSum = 0, bSum = 0, aSum = 0;
+      
+      for (let y = 0; y < height; y++) {
+        if (y === 0) {
+          for (let ky = -boxRadius; ky <= boxRadius; ky++) {
+            const py = Math.max(0, Math.min(height - 1, ky));
+            const idx = (py * width + x) * 4;
+            rSum += tempData[idx];
+            gSum += tempData[idx + 1];
+            bSum += tempData[idx + 2];
+            aSum += tempData[idx + 3];
+          }
+        } else {
+          const removeY = Math.max(0, Math.min(height - 1, y - boxRadius - 1));
+          const addY = Math.max(0, Math.min(height - 1, y + boxRadius));
+          const removeIdx = (removeY * width + x) * 4;
+          const addIdx = (addY * width + x) * 4;
+          
+          rSum = rSum - tempData[removeIdx] + tempData[addIdx];
+          gSum = gSum - tempData[removeIdx + 1] + tempData[addIdx + 1];
+          bSum = bSum - tempData[removeIdx + 2] + tempData[addIdx + 2];
+          aSum = aSum - tempData[removeIdx + 3] + tempData[addIdx + 3];
+        }
+        
+        const idx = (y * width + x) * 4;
+        finalData[idx] = Math.round(rSum / kernelSize);
+        finalData[idx + 1] = Math.round(gSum / kernelSize);
+        finalData[idx + 2] = Math.round(bSum / kernelSize);
+        finalData[idx + 3] = Math.round(aSum / kernelSize);
+      }
+    }
+    
+    ctx.putImageData(new ImageData(finalData, width, height), 0, 0);
+  }
+}
+
+/**
  * Apply noise effect to a canvas (modifies in place)
  * Optimized with typed arrays
  */
@@ -126,7 +221,6 @@ function applyNoise(canvas: HTMLCanvasElement, noiseAmount: number) {
   const noiseIntensity = noiseAmount * 2.55;
   const len = data.length;
 
-  // Optimize loop - process 4 pixels at a time when possible
   for (let i = 0; i < len; i += 4) {
     const noise = (Math.random() - 0.5) * noiseIntensity;
     data[i] = Math.max(0, Math.min(255, data[i] + noise));
@@ -142,17 +236,18 @@ export interface PreviewGeneratorOptions {
   settings: EditorSettings;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   padding?: number;
+  imagePath?: string;
 }
 
 export interface PreviewGeneratorResult {
   previewUrl: string | null;
   isGenerating: boolean;
   error: string | null;
-  renderHighQualityCanvas: (annotations: Annotation[]) => Promise<HTMLCanvasElement | null>;
+  renderHighQualityCanvas: (annotations: Annotation[], imagePath?: string) => Promise<HTMLCanvasElement | null>;
 }
 
-// Debounce delay for preview generation
 const PREVIEW_DEBOUNCE_MS = 50;
+const BLUR_DEBOUNCE_MS = 150;
 
 /**
  * Hook for generating preview images based on editor settings
@@ -163,6 +258,7 @@ export function usePreviewGenerator({
   settings,
   canvasRef,
   padding = 100,
+  imagePath,
 }: PreviewGeneratorOptions): PreviewGeneratorResult {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -236,6 +332,11 @@ export function usePreviewGenerator({
         tempCanvas.height = bgHeight;
         const tempCtx = tempCanvas.getContext("2d")!;
         drawBackground(tempCtx, bgWidth, bgHeight, settingsToRender, bgImage);
+        
+        if (settingsToRender.blurAmount > 0) {
+          applyFastBoxBlur(tempCanvas, settingsToRender.blurAmount);
+        }
+
         applyNoise(tempCanvas, settingsToRender.noiseAmount);
 
         ctx.drawImage(tempCanvas, 0, 0);
@@ -309,12 +410,15 @@ export function usePreviewGenerator({
     // Store pending settings
     pendingSettingsRef.current = settings;
 
+    // Use longer debounce for blur to improve performance
+    const debounceDelay = settings.blurAmount > 0 ? BLUR_DEBOUNCE_MS : PREVIEW_DEBOUNCE_MS;
+
     // Debounce the actual render
     debounceTimerRef.current = setTimeout(() => {
       if (pendingSettingsRef.current) {
         generatePreview(pendingSettingsRef.current);
       }
-    }, PREVIEW_DEBOUNCE_MS);
+    }, debounceDelay);
 
     return () => {
       if (debounceTimerRef.current) {
@@ -324,6 +428,7 @@ export function usePreviewGenerator({
   }, [
     screenshotImage,
     bgSettingsKey,
+    settings.blurAmount,
     settings.noiseAmount,
     settings.borderRadius,
     settings.shadow.blur,
@@ -346,10 +451,56 @@ export function usePreviewGenerator({
 
   // High quality canvas render for save/copy
   const renderHighQualityCanvas = useCallback(
-    async (annotations: Annotation[]): Promise<HTMLCanvasElement | null> => {
+    async (annotations: Annotation[], imagePath?: string): Promise<HTMLCanvasElement | null> => {
       if (!screenshotImage) return null;
 
       try {
+        if (settings.blurAmount > 0 && imagePath && (settings.backgroundType === "transparent" || settings.backgroundType === "white" || settings.backgroundType === "black" || settings.backgroundType === "gray" || settings.backgroundType === "custom")) {
+          try {
+            const { invoke } = await import("@tauri-apps/api/core");
+            const rustRendered = await invoke<string>("render_image_with_effects_rust", {
+              imagePath,
+              settings: {
+                background_type: settings.backgroundType,
+                custom_color: settings.customColor,
+                blur_amount: settings.blurAmount,
+                noise_amount: settings.noiseAmount,
+                border_radius: settings.borderRadius,
+                padding,
+                shadow_blur: settings.shadow.blur,
+                shadow_offset_x: settings.shadow.offsetX,
+                shadow_offset_y: settings.shadow.offsetY,
+                shadow_opacity: settings.shadow.opacity,
+              },
+            });
+
+            const img = new Image();
+            await new Promise<void>((resolve, reject) => {
+              img.onload = () => resolve();
+              img.onerror = () => reject(new Error("Failed to load Rust-rendered image"));
+              img.src = rustRendered;
+            });
+
+            const canvas = document.createElement("canvas");
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) throw new Error("Failed to get canvas context");
+
+            ctx.drawImage(img, 0, 0);
+
+            if (annotations.length > 0) {
+              annotations.forEach((annotation) => {
+                drawAnnotationOnCanvas(ctx, annotation);
+              });
+            }
+
+            return canvas;
+          } catch (rustErr) {
+            console.warn("Rust rendering failed, falling back to JS:", rustErr);
+          }
+        }
+
         const bgSrc = getBackgroundImageSrc(settings);
         let bgImage: HTMLImageElement | null = null;
         if (bgSrc) {
@@ -362,7 +513,7 @@ export function usePreviewGenerator({
           customColor: settings.customColor,
           selectedImage: settings.selectedImageSrc,
           bgImage,
-          blurAmount: 0,
+          blurAmount: settings.blurAmount,
           noiseAmount: settings.noiseAmount,
           borderRadius: settings.borderRadius,
           padding,
@@ -386,7 +537,7 @@ export function usePreviewGenerator({
         return null;
       }
     },
-    [screenshotImage, settings, padding]
+    [screenshotImage, settings, padding, imagePath]
   );
 
   return {

@@ -26,6 +26,7 @@ export interface EditorSettings {
   gradientId: string;
   gradientSrc: string;
   gradientColors: [string, string];
+  blurAmount: number;
   noiseAmount: number;
   borderRadius: number;
   padding: number;
@@ -70,6 +71,7 @@ interface EditorActions {
   handleImageSelect: (imageSrc: string) => void;
   
   // Transient settings (during slider drag)
+  setBlurAmountTransient: (amount: number) => void;
   setNoiseAmountTransient: (amount: number) => void;
   setBorderRadiusTransient: (radius: number) => void;
   setPaddingTransient: (padding: number) => void;
@@ -79,6 +81,7 @@ interface EditorActions {
   setShadowOpacityTransient: (opacity: number) => void;
   
   // Commit settings (on slider release)
+  setBlurAmount: (amount: number) => void;
   setNoiseAmount: (amount: number) => void;
   setBorderRadius: (radius: number) => void;
   setPadding: (padding: number) => void;
@@ -122,6 +125,7 @@ const DEFAULT_SETTINGS: EditorSettings = {
   gradientId: DEFAULT_GRADIENT.id,
   gradientSrc: DEFAULT_GRADIENT.src,
   gradientColors: DEFAULT_GRADIENT.colors,
+  blurAmount: 0,
   noiseAmount: 20,
   borderRadius: 18,
   padding: 100,
@@ -252,6 +256,12 @@ export const useEditorStore = create<EditorStore>()(
       // ========================================
       // Slider Settings - Transient (during drag)
       // ========================================
+      setBlurAmountTransient: (amount) => {
+        set((state) => {
+          state.settings.blurAmount = amount;
+        });
+      },
+
       setNoiseAmountTransient: (amount) => {
         set((state) => {
           state.settings.noiseAmount = amount;
@@ -297,6 +307,10 @@ export const useEditorStore = create<EditorStore>()(
       // ========================================
       // Slider Settings - Commit (on release)
       // ========================================
+      setBlurAmount: (amount) => {
+        get().updateSettings({ blurAmount: amount });
+      },
+
       setNoiseAmount: (amount) => {
         get().updateSettings({ noiseAmount: amount });
       },
@@ -498,6 +512,8 @@ export const editorActions = {
   get setSelectedImage() { return useEditorStore.getState().setSelectedImage; },
   get setGradient() { return useEditorStore.getState().setGradient; },
   get handleImageSelect() { return useEditorStore.getState().handleImageSelect; },
+  get setBlurAmount() { return useEditorStore.getState().setBlurAmount; },
+  get setBlurAmountTransient() { return useEditorStore.getState().setBlurAmountTransient; },
   get setNoiseAmount() { return useEditorStore.getState().setNoiseAmount; },
   get setNoiseAmountTransient() { return useEditorStore.getState().setNoiseAmountTransient; },
   get setBorderRadius() { return useEditorStore.getState().setBorderRadius; },
