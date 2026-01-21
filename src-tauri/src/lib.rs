@@ -12,10 +12,10 @@ mod screenshot;
 mod utils;
 
 use commands::{
-    capture_all_monitors, capture_once, capture_region, get_desktop_directory, get_mouse_position,
-    get_temp_directory, move_window_to_active_space, native_capture_fullscreen,
-    native_capture_interactive, native_capture_window, native_capture_ocr_region,
-    play_screenshot_sound, save_edited_image,
+    capture_all_monitors, capture_once, capture_region, copy_image_file_to_clipboard,
+    get_desktop_directory, get_mouse_position, get_temp_directory, move_window_to_active_space,
+    native_capture_fullscreen, native_capture_interactive, native_capture_window,
+    native_capture_ocr_region, play_screenshot_sound, save_edited_image,
 };
 
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -94,15 +94,16 @@ pub fn run() {
 
             // Create the main window but keep it hidden initially
             // This allows the React frontend to run and set up event listeners
-            let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                .title("Better Shot")
-                .inner_size(1200.0, 800.0)
-                .min_inner_size(800.0, 600.0)
-                .center()
-                .resizable(true)
-                .decorations(true)
-                .visible(false) // Start hidden
-                .build()?;
+            let window =
+                WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+                    .title("Better Shot")
+                    .inner_size(1200.0, 800.0)
+                    .min_inner_size(800.0, 600.0)
+                    .center()
+                    .resizable(true)
+                    .decorations(true)
+                    .visible(false) // Start hidden
+                    .build()?;
 
             // Handle close request - hide instead of quit
             let window_clone = window.clone();
@@ -114,6 +115,54 @@ pub fn run() {
                     api.prevent_close();
                 }
             });
+
+            let overlay = WebviewWindowBuilder::new(
+                app,
+                "quick-overlay",
+                WebviewUrl::App("index.html?overlay=1".into()),
+            )
+            .title("Better Shot – Quick Overlay")
+            .inner_size(360.0, 240.0)
+            .resizable(true)
+            .decorations(true)
+            .visible(false)
+            .build()?;
+
+            let overlay_clone = overlay.clone();
+            overlay.on_window_event(move |event| {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    if let Err(e) = overlay_clone.hide() {
+                        eprintln!("Failed to hide overlay window: {}", e);
+                    }
+                    api.prevent_close();
+                }
+            });
+
+            #[cfg(target_os = "macos")]
+            {
+                use objc2::msg_send;
+                use objc2_app_kit::NSWindow;
+
+                overlay
+                    .with_webview(|webview| {
+                        let ns_window = webview.ns_window();
+                        if ns_window.is_null() {
+                            return;
+                        }
+                        let ns_window = unsafe { &*ns_window.cast::<NSWindow>() };
+
+                        unsafe {
+                            let collection_behavior: usize = 1 << 7;
+                            let current: usize = msg_send![ns_window, collectionBehavior];
+                            let new_behavior = current | collection_behavior;
+                            let _: () = msg_send![ns_window, setCollectionBehavior: new_behavior];
+
+                            let _: () = msg_send![ns_window, setHidesOnDeactivate: false];
+                            let _: () = msg_send![ns_window, setCanHide: false];
+                        }
+                    })
+                    .ok();
+            }
 
             let open_item = MenuItemBuilder::with_id("open", "Open Better Shot").build(app)?;
 
@@ -205,7 +254,8 @@ pub fn run() {
             native_capture_ocr_region,
             play_screenshot_sound,
             get_mouse_position,
-            move_window_to_active_space
+            move_window_to_active_space,
+            copy_image_file_to_clipboard
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

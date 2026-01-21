@@ -109,6 +109,8 @@ bettershot/
 │   │   │   ├── AssetGrid.tsx           # Asset library grid
 │   │   │   ├── EffectsPanel.tsx        # Blur and noise controls
 │   │   │   └── ImageRoundnessControl.tsx # Border radius control
+│   │   │   ├── overlay/         # Quick overlay components
+│   │   │   │   └── QuickOverlay.tsx        # Floating preview overlay with auto-fade
 │   │   ├── preferences/    # Settings and preferences
 │   │   │   ├── PreferencesPage.tsx         # Main preferences page
 │   │   │   ├── BackgroundImageSelector.tsx # Default background picker
@@ -408,6 +410,20 @@ When creating a PR, include:
 6. Add UI button/trigger in the main app interface
 7. Update keyboard shortcut manager to support the new mode
 8. For OCR-like features, create a separate module (e.g., `ocr.rs`) if it requires platform-specific APIs
+
+### Modifying Quick Overlay
+
+The Quick Overlay (`src/components/overlay/QuickOverlay.tsx`) is a floating window that shows capture previews:
+
+1. **Auto-fade behavior**: The overlay automatically fades out after 5 seconds and hides completely
+2. **Window management**: The overlay window is created in `src-tauri/src/lib.rs` and shown via `showQuickOverlay()` in `src/App.tsx`
+3. **Event-driven**: The overlay listens for `overlay-show-capture` events to display new captures
+4. **State persistence**: Last capture path is stored in the settings store for persistence across app restarts
+5. **Positioning**: The overlay is positioned near the bottom-right of the monitor where the capture occurred
+
+To modify the fade timing or behavior:
+- Edit the `fadeDelayMs` and `fadeDurationMs` constants in `QuickOverlay.tsx`
+- The window is hidden using `getCurrentWindow().hide()` after the fade completes
 
 ### Adding a New Setting
 

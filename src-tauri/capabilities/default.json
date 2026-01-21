@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
-  "windows": ["main"],
+  "description": "Capabilities for Better Shot windows",
+  "windows": ["main", "quick-overlay"],
   "permissions": [
     "core:default",
     "core:window:default",

@@ -45,6 +45,11 @@ pub async fn move_window_to_active_space(app_handle: AppHandle) -> Result<(), St
     Ok(())
 }
 
+#[tauri::command]
+pub async fn copy_image_file_to_clipboard(path: String) -> Result<(), String> {
+    copy_image_to_clipboard(&path).map_err(|e| e.to_string())
+}
+
 /// Quick capture of primary monitor
 #[tauri::command]
 pub async fn capture_once(

@@ -19,7 +19,9 @@
           "$TEMP/**",
           "$PICTURES/**",
           "$HOME/Pictures/**",
-          "$APPDATA/**"
+          "$APPDATA/**",
+          "$DESKTOP/**",
+          "$HOME/Desktop/**"
         ]
       }
     },

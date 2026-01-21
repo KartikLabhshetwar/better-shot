@@ -1,21 +1,25 @@
+import { editorActions } from "@/stores/editorStore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { migrateStoredValue, isAssetId, isDataUrl } from "@/lib/asset-registry";
+import { isAssetId, isDataUrl, migrateStoredValue } from "@/lib/asset-registry";
 import { processScreenshotWithDefaultBackground } from "@/lib/auto-process";
 import { hasCompletedOnboarding } from "@/lib/onboarding";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
-import { availableMonitors } from "@tauri-apps/api/window";
-import { getCurrentWindow, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
+import { emitTo, listen } from "@tauri-apps/api/event";
+import {
+  availableMonitors,
+  getCurrentWindow,
+  LogicalSize,
+  PhysicalPosition,
+} from "@tauri-apps/api/window";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Store } from "@tauri-apps/plugin-store";
-import type { KeyboardShortcut } from "./components/preferences/KeyboardShortcutManager";
-import { SettingsIcon } from "./components/SettingsIcon";
 import { AppWindowMac, Crop, Monitor, ScanText } from "lucide-react";
 import { toast } from "sonner";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { editorActions } from "@/stores/editorStore";
+import type { KeyboardShortcut } from "./components/preferences/KeyboardShortcutManager";
+import { SettingsIcon } from "./components/SettingsIcon";
 
 // Lazy load heavy components
 const ImageEditor = lazy(() => import("./components/ImageEditor").then(m => ({ default: m.ImageEditor })));
@@ -104,6 +108,108 @@ async function restoreWindow() {
   await restoreWindowOnScreen();
 }
 
+async function showQuickOverlay(
+  screenshotPath: string,
+  mouseX?: number,
+  mouseY?: number,
+) {
+  try {
+    const store = await Store.load("settings.json", {
+      defaults: {},
+      autoSave: true,
+    });
+    await store.set("lastCapturePath", screenshotPath);
+    await store.save();
+  } catch (error) {
+    console.error("Failed to persist last capture path:", error);
+  }
+
+  try {
+    await emitTo("quick-overlay", "overlay-show-capture", {
+      path: screenshotPath,
+    });
+  } catch (error) {
+    console.error("Failed to emit overlay event:", error);
+  }
+
+  try {
+    const { getAllWebviewWindows } = await import(
+      "@tauri-apps/api/webviewWindow"
+    );
+    const allWindows = await getAllWebviewWindows();
+    const overlay = allWindows.find((win) => win.label === "quick-overlay");
+
+    if (!overlay) {
+      console.error("Quick overlay window not found");
+      return;
+    }
+
+    const overlayWidth = 360;
+    const overlayHeight = 240;
+    const margin = 16;
+
+    let targetX: number;
+    let targetY: number;
+
+    try {
+      const monitors = await availableMonitors();
+      let targetMonitor = monitors[0];
+
+      if (mouseX !== undefined && mouseY !== undefined) {
+        const foundMonitor = monitors.find((monitor) => {
+          const pos = monitor.position;
+          const size = monitor.size;
+          return (
+            mouseX >= pos.x &&
+            mouseX < pos.x + size.width &&
+            mouseY >= pos.y &&
+            mouseY < pos.y + size.height
+          );
+        });
+        if (foundMonitor) {
+          targetMonitor = foundMonitor;
+        }
+      }
+
+      const scaleFactor = targetMonitor.scaleFactor;
+      const physicalWidth = overlayWidth * scaleFactor;
+      const physicalHeight = overlayHeight * scaleFactor;
+      const physicalMargin = margin * scaleFactor;
+
+      targetX =
+        targetMonitor.position.x +
+        targetMonitor.size.width -
+        physicalWidth -
+        physicalMargin;
+
+      targetY =
+        targetMonitor.position.y +
+        targetMonitor.size.height -
+        physicalHeight -
+        physicalMargin;
+    } catch (error) {
+      console.error("Failed to position overlay using monitors:", error);
+      const appWindow = getCurrentWindow();
+      const size = await appWindow.outerSize();
+      const scaleFactor = await appWindow.scaleFactor();
+      const physicalWidth = overlayWidth * scaleFactor;
+      const physicalHeight = overlayHeight * scaleFactor;
+      const physicalMargin = margin * scaleFactor;
+      const position = await appWindow.outerPosition();
+      targetX = position.x + size.width - physicalWidth - physicalMargin;
+      targetY = position.y + size.height - physicalHeight - physicalMargin;
+    }
+
+    await overlay.setSize(new LogicalSize(overlayWidth, overlayHeight));
+    await overlay.setPosition(new PhysicalPosition(targetX, targetY));
+    await overlay.setAlwaysOnTop(true);
+    await overlay.show();
+    await overlay.setFocus();
+  } catch (error) {
+    console.error("Failed to show quick overlay:", error);
+  }
+}
+
 function App() {
   const [mode, setMode] = useState<AppMode>("main");
   const [saveDir, setSaveDir] = useState<string>("");
@@ -120,6 +226,7 @@ function App() {
   // Refs to hold current values for use in callbacks that may have stale closures
   const settingsRef = useRef({ autoApplyBackground, saveDir, copyToClipboard, tempDir });
   const registeredShortcutsRef = useRef<Set<string>>(new Set());
+  const lastCaptureTimeRef = useRef(0);
   
   // Keep ref in sync with state
   useEffect(() => {
@@ -261,6 +368,12 @@ function App() {
 
 
   const handleCapture = useCallback(async (captureMode: CaptureMode = "region") => {
+    const now = Date.now();
+    if (now - lastCaptureTimeRef.current < 600) {
+      return;
+    }
+    lastCaptureTimeRef.current = now;
+
     if (isCapturing) return;
     
     setIsCapturing(true);
@@ -342,23 +455,22 @@ function App() {
       invoke("play_screenshot_sound").catch(console.error);
 
       if (shouldAutoApply) {
-        
         try {
-          const processedImageData = await processScreenshotWithDefaultBackground(screenshotPath);
-          
-          await invoke<string>("save_edited_image", {
+          const processedImageData =
+            await processScreenshotWithDefaultBackground(screenshotPath);
+
+          const savedPath = await invoke<string>("save_edited_image", {
             imageData: processedImageData,
             saveDir: currentSaveDir,
             copyToClip: shouldCopyToClipboard,
           });
-          
-          // Ensure window stays hidden after auto-apply
+
           await appWindow.hide();
+          await showQuickOverlay(savedPath, mouseX, mouseY);
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : String(err);
           setError(`Failed to process screenshot: ${errorMessage}`);
-          // Even on error, keep window hidden in auto-apply mode
-          await appWindow.hide();
+          await restoreWindow();
         } finally {
           setIsCapturing(false);
         }
@@ -470,6 +582,8 @@ function App() {
     let unlisten4: (() => void) | null = null;
     let unlisten5: (() => void) | null = null;
     let unlisten6: (() => void) | null = null;
+    let unlisten7: (() => void) | null = null;
+    let unlisten8: (() => void) | null = null;
     let mounted = true;
 
     const setupListeners = async () => {
@@ -494,6 +608,29 @@ function App() {
           setAutoApplyBackground(event.payload);
         }
       });
+      unlisten7 = await listen<{ path: string }>("open-editor-for-path", async (event) => {
+        if (!mounted) return;
+        const { path } = event.payload;
+        setTempScreenshotPath(path);
+        setMode("editing");
+        try {
+          await invoke("move_window_to_active_space");
+        } catch {
+        }
+        await restoreWindow();
+      });
+      unlisten8 = await listen("show-last-capture-overlay", async () => {
+        if (!mounted) return;
+        try {
+          const store = await Store.load("settings.json");
+          const lastPath = await store.get<string>("lastCapturePath");
+          if (lastPath) {
+            await showQuickOverlay(lastPath);
+          }
+        } catch (error) {
+          console.error("Failed to show last capture overlay:", error);
+        }
+      });
     };
 
     setupListeners();
@@ -506,6 +643,8 @@ function App() {
       unlisten4?.();
       unlisten5?.();
       unlisten6?.();
+      unlisten7?.();
+      unlisten8?.();
     };
   }, []); // Empty dependency array - only run once on mount
 

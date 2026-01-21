@@ -72,6 +72,7 @@ Clean screenshot workflows usually need three things: capture fast, polish fast 
 
 - **Global shortcuts**: Capture from anywhere, even when hidden
 - **Auto-apply**: Apply default background and save without opening the editor
+- **Quick Overlay**: Preview captures in a floating overlay that automatically fades and hides after 5 seconds
 - **OCR text extraction**: Extract and copy text from screenshots using native macOS Vision framework
 - **Clipboard**: Copy to clipboard after capture/export
 - **Preferences**: Save directory, defaults, and shortcut settings persist
@@ -148,7 +149,9 @@ For faster workflows, enable **Auto-apply background** on the main screen:
 1. Toggle on "Auto-apply background" on the main page
 2. Set your preferred default background in Preferences
 3. Capture a screenshot - it will automatically apply the background and save instantly
-4. No editor needed - perfect for quick captures with consistent styling
+4. A Quick Overlay window appears showing the capture preview
+5. The overlay automatically fades out and hides after 5 seconds
+6. No editor needed - perfect for quick captures with consistent styling
 
 ### Keyboard Shortcuts
 
