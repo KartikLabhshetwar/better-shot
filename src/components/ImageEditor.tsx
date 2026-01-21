@@ -115,9 +115,9 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
       setScreenshotImage(img);
       setImageLoaded(true);
 
-      // Calculate smart default padding: 5% of average dimension, capped at 200px
+      // Calculate smart default padding: 10% of average dimension, capped at 400px
       const avgDimension = (img.width + img.height) / 2;
-      const defaultPadding = Math.min(Math.round(avgDimension * 0.05), 200);
+      const defaultPadding = Math.min(Math.round(avgDimension * 0.1), 400);
       actions.setPaddingTransient(defaultPadding);
     };
     img.onerror = () => {

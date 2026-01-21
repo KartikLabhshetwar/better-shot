@@ -8,6 +8,15 @@ import mesh5 from "@/assets/mesh/mesh5.webp";
 import mesh6 from "@/assets/mesh/mesh6.webp";
 import mesh7 from "@/assets/mesh/mesh7.webp";
 import mesh8 from "@/assets/mesh/mesh8.webp";
+import mesh9 from "@/assets/mesh/mesh9.webp";
+import mesh10 from "@/assets/mesh/mesh10.webp";
+import mesh11 from "@/assets/mesh/mesh11.webp";
+import mesh12 from "@/assets/mesh/mesh12.webp";
+import mesh13 from "@/assets/mesh/mesh13.webp";
+import mesh14 from "@/assets/mesh/mesh14.webp";
+import mesh15 from "@/assets/mesh/mesh15.webp";
+import mesh16 from "@/assets/mesh/mesh16.webp";
+import mesh17 from "@/assets/mesh/mesh17.webp";
 
 type BackgroundType = "transparent" | "white" | "black" | "gray" | "gradient" | "custom";
 
@@ -27,6 +36,15 @@ const gradientOptions: GradientOption[] = [
   { id: "mesh-6", name: "Mesh 6", src: mesh6, colors: ["#2E3192", "#1BFFFF"] },
   { id: "mesh-7", name: "Mesh 7", src: mesh7, colors: ["#ffecd2", "#fcb69f"] },
   { id: "mesh-8", name: "Mesh 8", src: mesh8, colors: ["#0f0c29", "#24243e"] },
+  { id: "mesh-9", name: "Mesh 9", src: mesh9, colors: ["#1a1f2b", "#3f4c6b"] },
+  { id: "mesh-10", name: "Mesh 10", src: mesh10, colors: ["#0d324d", "#7f5a83"] },
+  { id: "mesh-11", name: "Mesh 11", src: mesh11, colors: ["#2c3e50", "#4ca1af"] },
+  { id: "mesh-12", name: "Mesh 12", src: mesh12, colors: ["#1d2b64", "#f8cdda"] },
+  { id: "mesh-13", name: "Mesh 13", src: mesh13, colors: ["#42275a", "#734b6d"] },
+  { id: "mesh-14", name: "Mesh 14", src: mesh14, colors: ["#16222a", "#3a6073"] },
+  { id: "mesh-15", name: "Mesh 15", src: mesh15, colors: ["#0b8793", "#360033"] },
+  { id: "mesh-16", name: "Mesh 16", src: mesh16, colors: ["#232526", "#414345"] },
+  { id: "mesh-17", name: "Mesh 17", src: mesh17, colors: ["#000000", "#ffffff"] },
 ];
 
 interface BackgroundSelectorProps {
