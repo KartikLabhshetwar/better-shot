@@ -40,7 +40,7 @@ export const EffectsPanel = memo(function EffectsPanel({
   onShadowOffsetYChange,
   onShadowOpacityChange,
 }: EffectsPanelProps) {
-  const maxPadding = 200;
+  const maxPadding = 400;
   return (
     <div className="space-y-6">
       {/* Background Effects */}

@@ -3,7 +3,7 @@ import { Store } from "@tauri-apps/plugin-store";
 import { createHighQualityCanvas } from "./canvas-utils";
 import { resolveBackgroundPath, getDefaultBackgroundPath } from "./asset-registry";
 
-type BackgroundType = "transparent" | "white" | "black" | "gray" | "custom" | "image";
+type BackgroundType = "transparent" | "white" | "black" | "gray" | "custom" | "image" | "gradient";
 
 export async function processScreenshotWithDefaultBackground(
   imagePath: string
@@ -26,7 +26,7 @@ export async function processScreenshotWithDefaultBackground(
       if (storedCustomColor) {
         customColor = storedCustomColor;
       }
-      if (storedDefaultBg && backgroundType === "image") {
+      if (storedDefaultBg && (backgroundType === "image" || backgroundType === "gradient")) {
         defaultBgImage = resolveBackgroundPath(storedDefaultBg);
       }
     } catch (err) {
@@ -38,22 +38,24 @@ export async function processScreenshotWithDefaultBackground(
     
     img.onload = async () => {
       try {
-        if (backgroundType === "image") {
+        if (backgroundType === "image" || backgroundType === "gradient") {
           bgImage = new Image();
           bgImage.crossOrigin = "anonymous";
           
           bgImage.onload = () => {
             try {
+              const isGradient = backgroundType === "gradient";
               const canvas = createHighQualityCanvas({
                 image: img,
                 backgroundType,
                 customColor,
-                selectedImage: defaultBgImage,
-                bgImage,
+                selectedImage: isGradient ? null : defaultBgImage,
+                bgImage: isGradient ? null : bgImage,
                 blurAmount: 0,
                 noiseAmount: 20,
                 borderRadius: 18,
                 padding: 100,
+                gradientImage: isGradient ? bgImage : null,
                 shadow: {
                   blur: 33,
                   offsetX: 18,

@@ -39,6 +39,15 @@ import gradient5 from "@/assets/mesh/mesh5.webp";
 import gradient6 from "@/assets/mesh/mesh6.webp";
 import gradient7 from "@/assets/mesh/mesh7.webp";
 import gradient8 from "@/assets/mesh/mesh8.webp";
+import gradient9 from "@/assets/mesh/mesh9.webp";
+import gradient10 from "@/assets/mesh/mesh10.webp";
+import gradient11 from "@/assets/mesh/mesh11.webp";
+import gradient12 from "@/assets/mesh/mesh12.webp";
+import gradient13 from "@/assets/mesh/mesh13.webp";
+import gradient14 from "@/assets/mesh/mesh14.webp";
+import gradient15 from "@/assets/mesh/mesh15.webp";
+import gradient16 from "@/assets/mesh/mesh16.webp";
+import gradient17 from "@/assets/mesh/mesh17.webp";
 
 /**
  * Map of asset IDs to their runtime-resolved paths
@@ -75,6 +84,15 @@ export const assetRegistry: Record<string, string> = {
   "gradient-6": gradient6,
   "gradient-7": gradient7,
   "gradient-8": gradient8,
+  "gradient-9": gradient9,
+  "gradient-10": gradient10,
+  "gradient-11": gradient11,
+  "gradient-12": gradient12,
+  "gradient-13": gradient13,
+  "gradient-14": gradient14,
+  "gradient-15": gradient15,
+  "gradient-16": gradient16,
+  "gradient-17": gradient17,
 };
 
 /** Default background asset ID */

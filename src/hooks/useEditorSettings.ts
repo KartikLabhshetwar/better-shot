@@ -132,9 +132,22 @@ export function useEditorSettings(): [EditorSettings, EditorSettingsActions] {
         if (storedCustomColor) {
           setCustomColor(storedCustomColor);
         }
-        if (storedBg && storedBgType === "image") {
-          const resolvedPath = resolveBackgroundPath(storedBg);
-          setSelectedImageSrc(resolvedPath);
+        if (storedBg) {
+          if (storedBgType === "image") {
+            const resolvedPath = resolveBackgroundPath(storedBg);
+            setSelectedImageSrc(resolvedPath);
+          }
+
+          if (storedBg.startsWith("gradient-")) {
+            const gradientIndex = storedBg.replace("gradient-", "");
+            const gradient = gradientOptions.find(
+              (option) => option.id === `mesh-${gradientIndex}`
+            );
+
+            if (gradient) {
+              setGradient(gradient);
+            }
+          }
         }
       } catch (err) {
         console.error("Failed to load default background from store:", err);

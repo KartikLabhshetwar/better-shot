@@ -170,9 +170,24 @@ export const useEditorStore = create<EditorStore>()(
             if (storedCustomColor) {
               state.settings.customColor = storedCustomColor;
             }
-            if (storedBg && storedBgType === "image") {
-              const resolvedPath = resolveBackgroundPath(storedBg);
-              state.settings.selectedImageSrc = resolvedPath;
+            if (storedBg) {
+              if (storedBgType === "image") {
+                const resolvedPath = resolveBackgroundPath(storedBg);
+                state.settings.selectedImageSrc = resolvedPath;
+              }
+
+              if (storedBg.startsWith("gradient-")) {
+                const gradientIndex = storedBg.replace("gradient-", "");
+                const gradient = gradientOptions.find(
+                  (option) => option.id === `mesh-${gradientIndex}`
+                );
+
+                if (gradient) {
+                  state.settings.gradientId = gradient.id;
+                  state.settings.gradientSrc = gradient.src;
+                  state.settings.gradientColors = gradient.colors;
+                }
+              }
             }
             state._isInitialized = true;
           });

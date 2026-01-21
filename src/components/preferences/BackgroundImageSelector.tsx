@@ -2,16 +2,18 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { Store } from "@tauri-apps/plugin-store";
 import { toast } from "sonner";
 import { Upload, X, Check } from "lucide-react";
+import { gradientOptions } from "@/components/editor/BackgroundSelector";
 import { Button } from "@/components/ui/button";
 import { assetCategories } from "@/hooks/useEditorSettings";
 import { cn } from "@/lib/utils";
-import { 
-  toStorableValue, 
+import {
+  getAssetIdFromPath,
+  getAssetPath,
   isDataUrl,
-  getAssetIdFromPath 
+  toStorableValue,
 } from "@/lib/asset-registry";
 
-type BackgroundType = "transparent" | "white" | "black" | "gray" | "custom" | "image";
+type BackgroundType = "transparent" | "white" | "black" | "gray" | "custom" | "image" | "gradient";
 
 interface BackgroundImageSelectorProps {
   onImageSelect: (imageSrc: string) => void;
@@ -265,6 +267,59 @@ export function BackgroundImageSelector({ onImageSelect }: BackgroundImageSelect
               )}
               title="Transparent"
             />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <span className="text-xs text-muted-foreground uppercase tracking-wide">Gradients</span>
+          <div className="grid grid-cols-7 gap-2">
+            {gradientOptions.map((gradient) => {
+              const gradientId = gradient.id.replace("mesh-", "gradient-");
+              const isGradientSelected = selectedImage === gradientId;
+
+              return (
+                <button
+                  key={gradient.id}
+                  onClick={async () => {
+                    const assetPath = getAssetPath(gradientId) ?? gradient.src;
+
+                    setBackgroundType("gradient");
+                    setSelectedImage(gradientId);
+                    onImageSelect(assetPath);
+
+                    try {
+                      const store = await Store.load("settings.json");
+                      await store.set("defaultBackgroundType", "gradient");
+                      await store.set("defaultBackgroundImage", gradientId);
+                      await store.save();
+                      toast.success("Default background updated");
+                    } catch (err) {
+                      console.error("Failed to save default background:", err);
+                      toast.error("Failed to save default background");
+                    }
+                  }}
+                  aria-label={`Select ${gradient.name} background`}
+                  className={cn(
+                    "relative w-full aspect-square rounded-lg overflow-hidden border-2 transition-all",
+                    backgroundType === "gradient" && isGradientSelected
+                      ? "border-blue-500 ring-2 ring-blue-500/50"
+                      : "border-border hover:border-ring"
+                  )}
+                  title={gradient.name}
+                >
+                  <img
+                    src={gradient.src}
+                    alt={gradient.name}
+                    className="w-full h-full object-cover"
+                  />
+                  {backgroundType === "gradient" && isGradientSelected && (
+                    <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
+                      <Check className="size-5 text-blue-400" aria-hidden="true" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
