@@ -48,7 +48,7 @@ export function NewReleasePromo() {
                     source="cta"
                     className="border-0 bg-transparent shadow-none hover:shadow-none p-0 h-auto hover:bg-transparent"
                   >
-                    <div className="border-border bg-primary flex h-[43px] items-center justify-center rounded-full border">
+                    <div className="bg-primary flex h-[43px] items-center justify-center rounded-full">
                       <p className="mr-3 ml-2 flex items-center justify-center gap-2 font-medium tracking-tight text-white">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"

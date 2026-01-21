@@ -67,7 +67,7 @@ export default function Features() {
                 initial={{ opacity: 0, y: 50 }}
                 animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 50 }}
                 transition={{ duration: 0.5, delay: index * 0.2 }}
-                className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center max-w-6xl mx-auto"
+                className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center max-w-9xl mx-auto"
               >
                 {isEven ? (
                   <>
