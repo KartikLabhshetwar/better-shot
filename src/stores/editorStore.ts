@@ -3,7 +3,7 @@ import { subscribeWithSelector } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { Store } from "@tauri-apps/plugin-store";
 import { gradientOptions, type GradientOption } from "@/components/editor/BackgroundSelector";
-import { resolveBackgroundPath, getDefaultBackgroundPath } from "@/lib/asset-registry";
+import { resolveBackgroundPath } from "@/lib/asset-registry";
 import { Annotation } from "@/types/annotations";
 
 // ============================================================================
@@ -119,12 +119,11 @@ export type EditorStore = EditorState & EditorActions;
 
 const MAX_HISTORY_SIZE = 50;
 const DEFAULT_GRADIENT = gradientOptions[0];
-const DEFAULT_IMAGE = getDefaultBackgroundPath();
 
 const DEFAULT_SETTINGS: EditorSettings = {
-  backgroundType: "image",
+  backgroundType: "white",
   customColor: "#667eea",
-  selectedImageSrc: DEFAULT_IMAGE,
+  selectedImageSrc: null,
   gradientId: DEFAULT_GRADIENT.id,
   gradientSrc: DEFAULT_GRADIENT.src,
   gradientColors: DEFAULT_GRADIENT.colors,
@@ -176,11 +175,10 @@ export const useEditorStore = create<EditorStore>()(
           const storedBlurAmount = await store.get<number>("defaultBlurAmount");
           const storedNoiseAmount = await store.get<number>("defaultNoiseAmount");
           const storedBorderRadius = await store.get<number>("defaultBorderRadius");
-          const storedPadding = await store.get<number>("defaultPadding");
           const storedShadow = await store.get<ShadowSettings>("defaultShadow");
 
           set((state) => {
-            // Apply background settings
+            // Apply background settings from preferences only
             if (storedBgType) {
               state.settings.backgroundType = storedBgType;
             }
@@ -205,9 +203,14 @@ export const useEditorStore = create<EditorStore>()(
                   state.settings.gradientColors = gradient.colors;
                 }
               }
+            } else if (storedBgType) {
+              // If background type is set but no image, ensure selectedImageSrc is null
+              if (storedBgType !== "image" && storedBgType !== "gradient") {
+                state.settings.selectedImageSrc = null;
+              }
             }
 
-            // Apply effect settings
+            // Apply effect settings (padding is calculated dynamically, not loaded from defaults)
             if (storedBlurAmount !== null && storedBlurAmount !== undefined) {
               state.settings.blurAmount = storedBlurAmount;
             }
@@ -216,9 +219,6 @@ export const useEditorStore = create<EditorStore>()(
             }
             if (storedBorderRadius !== null && storedBorderRadius !== undefined) {
               state.settings.borderRadius = storedBorderRadius;
-            }
-            if (storedPadding !== null && storedPadding !== undefined) {
-              state.settings.padding = storedPadding;
             }
             if (storedShadow) {
               state.settings.shadow = storedShadow;
@@ -396,7 +396,6 @@ export const useEditorStore = create<EditorStore>()(
           await store.set("defaultBlurAmount", state.settings.blurAmount);
           await store.set("defaultNoiseAmount", state.settings.noiseAmount);
           await store.set("defaultBorderRadius", state.settings.borderRadius);
-          await store.set("defaultPadding", state.settings.padding);
           await store.set("defaultShadow", state.settings.shadow);
           await store.save();
         } catch (err) {
