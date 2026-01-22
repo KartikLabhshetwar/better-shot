@@ -1,5 +1,8 @@
-import { memo } from "react";
+import { memo, useState } from "react";
+import { toast } from "sonner";
+import { Check, Bookmark } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
+import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ShadowSettings } from "@/stores/editorStore";
 
@@ -24,6 +27,8 @@ interface EffectsPanelProps {
   onShadowOffsetXChange: (value: number) => void;
   onShadowOffsetYChange: (value: number) => void;
   onShadowOpacityChange: (value: number) => void;
+  // Persist settings as defaults
+  onSaveAsDefaults?: () => Promise<void>;
 }
 
 export const EffectsPanel = memo(function EffectsPanel({
@@ -45,8 +50,27 @@ export const EffectsPanel = memo(function EffectsPanel({
   onShadowOffsetXChange,
   onShadowOffsetYChange,
   onShadowOpacityChange,
+  onSaveAsDefaults,
 }: EffectsPanelProps) {
   const maxPadding = 400;
+  const [isSaving, setIsSaving] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
+
+  const handleSaveAsDefaults = async () => {
+    if (!onSaveAsDefaults || isSaving) return;
+
+    setIsSaving(true);
+    try {
+      await onSaveAsDefaults();
+      setJustSaved(true);
+      toast.success("Effect settings saved as defaults");
+      setTimeout(() => setJustSaved(false), 2000);
+    } catch {
+      toast.error("Failed to save defaults");
+    } finally {
+      setIsSaving(false);
+    }
+  };
   return (
     <div className="space-y-6">
       {/* Background Effects */}
@@ -196,6 +220,35 @@ export const EffectsPanel = memo(function EffectsPanel({
           </div>
         </div>
       </div>
+
+      {/* Save as Defaults */}
+      {onSaveAsDefaults && (
+        <div className="pt-2 border-t border-border">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSaveAsDefaults}
+                  disabled={isSaving}
+                  className="w-full text-muted-foreground hover:text-foreground"
+                >
+                  {justSaved ? (
+                    <Check className="size-3.5 mr-1.5 text-green-500" aria-hidden="true" />
+                  ) : (
+                    <Bookmark className="size-3.5 mr-1.5" aria-hidden="true" />
+                  )}
+                  {justSaved ? "Saved" : "Set as Default"}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p className="text-xs text-pretty">Save current effect settings as defaults for new screenshots</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      )}
     </div>
   );
 });
