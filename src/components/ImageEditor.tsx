@@ -60,7 +60,12 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
     screenshotImage,
     settings,
     canvasRef,
-    padding: settings.padding,
+    padding: {
+      top: settings.padding.top,
+      right: settings.padding.right,
+      bottom: settings.padding.bottom,
+      left: settings.padding.left,
+    },
     imagePath,
   });
 
@@ -119,7 +124,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
       // Calculate smart default padding: 10% of average dimension, capped at 400px
       const avgDimension = (img.width + img.height) / 2;
       const defaultPadding = Math.min(Math.round(avgDimension * 0.1), 400);
-      actions.setPaddingTransient(defaultPadding);
+      actions.setPaddingUniformTransient(defaultPadding);
     };
     img.onerror = () => {
       setLoadError(`Failed to load image from: ${imagePath}`);
@@ -446,14 +451,24 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
                 shadow={settings.shadow}
                 onBlurAmountChangeTransient={actions.setBlurAmountTransient}
                 onNoiseChangeTransient={actions.setNoiseAmountTransient}
-                onPaddingChangeTransient={actions.setPaddingTransient}
+                onPaddingUniformChangeTransient={actions.setPaddingUniformTransient}
+                onPaddingTopChangeTransient={actions.setPaddingTopTransient}
+                onPaddingRightChangeTransient={actions.setPaddingRightTransient}
+                onPaddingBottomChangeTransient={actions.setPaddingBottomTransient}
+                onPaddingLeftChangeTransient={actions.setPaddingLeftTransient}
+                onPaddingModeChangeTransient={actions.setPaddingModeTransient}
                 onShadowBlurChangeTransient={actions.setShadowBlurTransient}
                 onShadowOffsetXChangeTransient={actions.setShadowOffsetXTransient}
                 onShadowOffsetYChangeTransient={actions.setShadowOffsetYTransient}
                 onShadowOpacityChangeTransient={actions.setShadowOpacityTransient}
                 onBlurAmountChange={actions.setBlurAmount}
                 onNoiseChange={actions.setNoiseAmount}
-                onPaddingChange={actions.setPadding}
+                onPaddingUniformChange={actions.setPaddingUniform}
+                onPaddingTopChange={actions.setPaddingTop}
+                onPaddingRightChange={actions.setPaddingRight}
+                onPaddingBottomChange={actions.setPaddingBottom}
+                onPaddingLeftChange={actions.setPaddingLeft}
+                onPaddingModeChange={actions.setPaddingMode}
                 onShadowBlurChange={actions.setShadowBlur}
                 onShadowOffsetXChange={actions.setShadowOffsetX}
                 onShadowOffsetYChange={actions.setShadowOffsetY}

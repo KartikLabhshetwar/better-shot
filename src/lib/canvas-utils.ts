@@ -1,5 +1,12 @@
 import type { ShadowSettings } from "@/hooks/useEditorSettings";
 
+export interface PaddingValues {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 export interface RenderOptions {
   image: HTMLImageElement;
   backgroundType: "transparent" | "white" | "black" | "gray" | "gradient" | "custom" | "image";
@@ -9,7 +16,7 @@ export interface RenderOptions {
   blurAmount: number;
   noiseAmount: number;
   borderRadius: number;
-  padding: number;
+  padding: PaddingValues;
   scale?: number;
   gradientImage?: HTMLImageElement | null;
   shadow?: ShadowSettings;
@@ -32,8 +39,12 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
     shadow = { blur: 33, offsetX: 18, offsetY: 23, opacity: 39 },
   } = options;
 
-  const bgWidth = image.width + padding * 2;
-  const bgHeight = image.height + padding * 2;
+  const { top: paddingTop, right: paddingRight, bottom: paddingBottom, left: paddingLeft } = padding;
+  const totalHorizontalPadding = paddingLeft + paddingRight;
+  const totalVerticalPadding = paddingTop + paddingBottom;
+
+  const bgWidth = image.width + totalHorizontalPadding;
+  const bgHeight = image.height + totalVerticalPadding;
 
   const canvas = document.createElement("canvas");
   canvas.width = bgWidth * scale;
@@ -48,8 +59,9 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
 
-  // When padding is 0, skip background and shadow - just draw the image directly
-  if (padding === 0) {
+  // When all padding values are 0, skip background and shadow - just draw the image directly
+  const hasNoPadding = totalHorizontalPadding === 0 && totalVerticalPadding === 0;
+  if (hasNoPadding) {
     ctx.beginPath();
     ctx.roundRect(0, 0, image.width, image.height, borderRadius);
     ctx.closePath();
@@ -96,7 +108,7 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
     ctx.shadowOffsetX = shadow.offsetX;
     ctx.shadowOffsetY = shadow.offsetY;
 
-    ctx.drawImage(imageCanvas, padding, padding);
+    ctx.drawImage(imageCanvas, paddingLeft, paddingTop);
 
     ctx.shadowColor = "transparent";
     ctx.shadowBlur = 0;

@@ -136,7 +136,10 @@ pub struct RenderSettings {
     pub blur_amount: f32,
     pub noise_amount: f32,
     pub border_radius: f32,
-    pub padding: u32,
+    pub padding_top: u32,
+    pub padding_right: u32,
+    pub padding_bottom: u32,
+    pub padding_left: u32,
     pub shadow_blur: f32,
     pub shadow_offset_x: f32,
     pub shadow_offset_y: f32,
@@ -228,11 +231,13 @@ pub fn render_image_with_effects(
 ) -> AppResult<String> {
     let img = image::open(image_path)
         .map_err(|e| format!("Failed to open image: {}", e))?;
-    
+
     let img_width = img.width();
     let img_height = img.height();
-    let bg_width = img_width + settings.padding * 2;
-    let bg_height = img_height + settings.padding * 2;
+    let horizontal_padding = settings.padding_left + settings.padding_right;
+    let vertical_padding = settings.padding_top + settings.padding_bottom;
+    let bg_width = img_width + horizontal_padding;
+    let bg_height = img_height + vertical_padding;
     
     let mut background = create_background(
         bg_width,
@@ -254,13 +259,13 @@ pub fn render_image_with_effects(
     
     for y in 0..bg_height {
         for x in 0..bg_width {
-            if x >= settings.padding
-                && x < settings.padding + img_width
-                && y >= settings.padding
-                && y < settings.padding + img_height
+            if x >= settings.padding_left
+                && x < settings.padding_left + img_width
+                && y >= settings.padding_top
+                && y < settings.padding_top + img_height
             {
-                let img_x = x - settings.padding;
-                let img_y = y - settings.padding;
+                let img_x = x - settings.padding_left;
+                let img_y = y - settings.padding_top;
                 
                 let corner_x = if img_x < settings.border_radius as u32 {
                     img_x

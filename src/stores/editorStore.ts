@@ -19,6 +19,17 @@ export interface ShadowSettings {
   opacity: number;
 }
 
+export type PaddingMode = "uniform" | "individual";
+
+export interface PaddingSettings {
+  mode: PaddingMode;
+  uniform: number;
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 export interface EditorSettings {
   backgroundType: BackgroundType;
   customColor: string;
@@ -29,7 +40,7 @@ export interface EditorSettings {
   blurAmount: number;
   noiseAmount: number;
   borderRadius: number;
-  padding: number;
+  padding: PaddingSettings;
   shadow: ShadowSettings;
 }
 
@@ -74,7 +85,12 @@ interface EditorActions {
   setBlurAmountTransient: (amount: number) => void;
   setNoiseAmountTransient: (amount: number) => void;
   setBorderRadiusTransient: (radius: number) => void;
-  setPaddingTransient: (padding: number) => void;
+  setPaddingUniformTransient: (padding: number) => void;
+  setPaddingTopTransient: (padding: number) => void;
+  setPaddingRightTransient: (padding: number) => void;
+  setPaddingBottomTransient: (padding: number) => void;
+  setPaddingLeftTransient: (padding: number) => void;
+  setPaddingModeTransient: (mode: PaddingMode) => void;
   setShadowBlurTransient: (blur: number) => void;
   setShadowOffsetXTransient: (offsetX: number) => void;
   setShadowOffsetYTransient: (offsetY: number) => void;
@@ -84,7 +100,12 @@ interface EditorActions {
   setBlurAmount: (amount: number) => void;
   setNoiseAmount: (amount: number) => void;
   setBorderRadius: (radius: number) => void;
-  setPadding: (padding: number) => void;
+  setPaddingUniform: (padding: number) => void;
+  setPaddingTop: (padding: number) => void;
+  setPaddingRight: (padding: number) => void;
+  setPaddingBottom: (padding: number) => void;
+  setPaddingLeft: (padding: number) => void;
+  setPaddingMode: (mode: PaddingMode) => void;
   setShadowBlur: (blur: number) => void;
   setShadowOffsetX: (offsetX: number) => void;
   setShadowOffsetY: (offsetY: number) => void;
@@ -131,7 +152,14 @@ const DEFAULT_SETTINGS: EditorSettings = {
   blurAmount: 0,
   noiseAmount: 20,
   borderRadius: 18,
-  padding: 100,
+  padding: {
+    mode: "uniform",
+    uniform: 100,
+    top: 100,
+    right: 100,
+    bottom: 100,
+    left: 100,
+  },
   shadow: {
     blur: 33,
     offsetX: 18,
@@ -176,7 +204,7 @@ export const useEditorStore = create<EditorStore>()(
           const storedBlurAmount = await store.get<number>("defaultBlurAmount");
           const storedNoiseAmount = await store.get<number>("defaultNoiseAmount");
           const storedBorderRadius = await store.get<number>("defaultBorderRadius");
-          const storedPadding = await store.get<number>("defaultPadding");
+          const storedPadding = await store.get<PaddingSettings>("defaultPadding");
           const storedShadow = await store.get<ShadowSettings>("defaultShadow");
 
           set((state) => {
@@ -217,7 +245,7 @@ export const useEditorStore = create<EditorStore>()(
             if (storedBorderRadius !== null && storedBorderRadius !== undefined) {
               state.settings.borderRadius = storedBorderRadius;
             }
-            if (storedPadding !== null && storedPadding !== undefined) {
+            if (storedPadding) {
               state.settings.padding = storedPadding;
             }
             if (storedShadow) {
@@ -305,9 +333,54 @@ export const useEditorStore = create<EditorStore>()(
         });
       },
 
-      setPaddingTransient: (padding) => {
+      setPaddingUniformTransient: (padding) => {
         set((state) => {
-          state.settings.padding = padding;
+          state.settings.padding.uniform = padding;
+          // Sync individual values when in uniform mode
+          if (state.settings.padding.mode === "uniform") {
+            state.settings.padding.top = padding;
+            state.settings.padding.right = padding;
+            state.settings.padding.bottom = padding;
+            state.settings.padding.left = padding;
+          }
+        });
+      },
+
+      setPaddingTopTransient: (padding) => {
+        set((state) => {
+          state.settings.padding.top = padding;
+        });
+      },
+
+      setPaddingRightTransient: (padding) => {
+        set((state) => {
+          state.settings.padding.right = padding;
+        });
+      },
+
+      setPaddingBottomTransient: (padding) => {
+        set((state) => {
+          state.settings.padding.bottom = padding;
+        });
+      },
+
+      setPaddingLeftTransient: (padding) => {
+        set((state) => {
+          state.settings.padding.left = padding;
+        });
+      },
+
+      setPaddingModeTransient: (mode) => {
+        set((state) => {
+          state.settings.padding.mode = mode;
+          // When switching to uniform, sync all values to the uniform value
+          if (mode === "uniform") {
+            const uniformValue = state.settings.padding.uniform;
+            state.settings.padding.top = uniformValue;
+            state.settings.padding.right = uniformValue;
+            state.settings.padding.bottom = uniformValue;
+            state.settings.padding.left = uniformValue;
+          }
         });
       },
 
@@ -350,8 +423,59 @@ export const useEditorStore = create<EditorStore>()(
         get().updateSettings({ borderRadius: radius });
       },
 
-      setPadding: (padding) => {
-        get().updateSettings({ padding });
+      setPaddingUniform: (padding) => {
+        const currentMode = get().settings.padding.mode;
+        const newPadding: PaddingSettings = {
+          mode: currentMode,
+          uniform: padding,
+          top: currentMode === "uniform" ? padding : get().settings.padding.top,
+          right: currentMode === "uniform" ? padding : get().settings.padding.right,
+          bottom: currentMode === "uniform" ? padding : get().settings.padding.bottom,
+          left: currentMode === "uniform" ? padding : get().settings.padding.left,
+        };
+        get().updateSettings({ padding: newPadding });
+      },
+
+      setPaddingTop: (padding) => {
+        const current = get().settings.padding;
+        get().updateSettings({
+          padding: { ...current, top: padding },
+        });
+      },
+
+      setPaddingRight: (padding) => {
+        const current = get().settings.padding;
+        get().updateSettings({
+          padding: { ...current, right: padding },
+        });
+      },
+
+      setPaddingBottom: (padding) => {
+        const current = get().settings.padding;
+        get().updateSettings({
+          padding: { ...current, bottom: padding },
+        });
+      },
+
+      setPaddingLeft: (padding) => {
+        const current = get().settings.padding;
+        get().updateSettings({
+          padding: { ...current, left: padding },
+        });
+      },
+
+      setPaddingMode: (mode) => {
+        const current = get().settings.padding;
+        const newPadding: PaddingSettings = {
+          ...current,
+          mode,
+          // Sync values when switching to uniform
+          top: mode === "uniform" ? current.uniform : current.top,
+          right: mode === "uniform" ? current.uniform : current.right,
+          bottom: mode === "uniform" ? current.uniform : current.bottom,
+          left: mode === "uniform" ? current.uniform : current.left,
+        };
+        get().updateSettings({ padding: newPadding });
       },
 
       setShadowBlur: (blur) => {
@@ -569,8 +693,18 @@ export const editorActions = {
   get setNoiseAmountTransient() { return useEditorStore.getState().setNoiseAmountTransient; },
   get setBorderRadius() { return useEditorStore.getState().setBorderRadius; },
   get setBorderRadiusTransient() { return useEditorStore.getState().setBorderRadiusTransient; },
-  get setPadding() { return useEditorStore.getState().setPadding; },
-  get setPaddingTransient() { return useEditorStore.getState().setPaddingTransient; },
+  get setPaddingUniform() { return useEditorStore.getState().setPaddingUniform; },
+  get setPaddingUniformTransient() { return useEditorStore.getState().setPaddingUniformTransient; },
+  get setPaddingTop() { return useEditorStore.getState().setPaddingTop; },
+  get setPaddingTopTransient() { return useEditorStore.getState().setPaddingTopTransient; },
+  get setPaddingRight() { return useEditorStore.getState().setPaddingRight; },
+  get setPaddingRightTransient() { return useEditorStore.getState().setPaddingRightTransient; },
+  get setPaddingBottom() { return useEditorStore.getState().setPaddingBottom; },
+  get setPaddingBottomTransient() { return useEditorStore.getState().setPaddingBottomTransient; },
+  get setPaddingLeft() { return useEditorStore.getState().setPaddingLeft; },
+  get setPaddingLeftTransient() { return useEditorStore.getState().setPaddingLeftTransient; },
+  get setPaddingMode() { return useEditorStore.getState().setPaddingMode; },
+  get setPaddingModeTransient() { return useEditorStore.getState().setPaddingModeTransient; },
   get setShadowBlur() { return useEditorStore.getState().setShadowBlur; },
   get setShadowBlurTransient() { return useEditorStore.getState().setShadowBlurTransient; },
   get setShadowOffsetX() { return useEditorStore.getState().setShadowOffsetX; },

@@ -57,7 +57,12 @@ export async function processScreenshotWithDefaultBackground(
                 blurAmount: 0,
                 noiseAmount: 20,
                 borderRadius: 18,
-                padding,
+                padding: {
+                  top: padding,
+                  right: padding,
+                  bottom: padding,
+                  left: padding,
+                },
                 gradientImage: isGradient ? bgImage : null,
                 shadow: {
                   blur: 33,
@@ -111,7 +116,12 @@ export async function processScreenshotWithDefaultBackground(
               blurAmount,
               noiseAmount: 20,
               borderRadius: 18,
-              padding: finalPadding,
+              padding: {
+                top: finalPadding,
+                right: finalPadding,
+                bottom: finalPadding,
+                left: finalPadding,
+              },
               shadow: isTransparent ? {
                 blur: 0,
                 offsetX: 0,
