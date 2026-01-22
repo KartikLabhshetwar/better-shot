@@ -458,6 +458,7 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
                 onShadowOffsetXChange={actions.setShadowOffsetX}
                 onShadowOffsetYChange={actions.setShadowOffsetY}
                 onShadowOpacityChange={actions.setShadowOpacity}
+                onSaveAsDefaults={actions.saveEffectSettingsAsDefaults}
               />
 
               <ImageRoundnessControl
