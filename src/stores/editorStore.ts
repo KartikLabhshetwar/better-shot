@@ -58,10 +58,10 @@ interface EditorState {
 interface EditorActions {
   // Initialization
   initialize: () => Promise<void>;
-  
+
   // Settings actions - immediate updates (no history push)
   updateSettingsTransient: (updates: Partial<EditorSettings>) => void;
-  
+
   // Settings actions - commit to history
   updateSettings: (updates: Partial<EditorSettings>) => void;
   setBackgroundType: (type: BackgroundType) => void;
@@ -69,7 +69,7 @@ interface EditorActions {
   setSelectedImage: (src: string) => void;
   setGradient: (gradient: GradientOption) => void;
   handleImageSelect: (imageSrc: string) => void;
-  
+
   // Transient settings (during slider drag)
   setBlurAmountTransient: (amount: number) => void;
   setNoiseAmountTransient: (amount: number) => void;
@@ -79,7 +79,7 @@ interface EditorActions {
   setShadowOffsetXTransient: (offsetX: number) => void;
   setShadowOffsetYTransient: (offsetY: number) => void;
   setShadowOpacityTransient: (opacity: number) => void;
-  
+
   // Commit settings (on slider release)
   setBlurAmount: (amount: number) => void;
   setNoiseAmount: (amount: number) => void;
@@ -89,21 +89,24 @@ interface EditorActions {
   setShadowOffsetX: (offsetX: number) => void;
   setShadowOffsetY: (offsetY: number) => void;
   setShadowOpacity: (opacity: number) => void;
-  
+
+  // Persist effect settings as defaults
+  saveEffectSettingsAsDefaults: () => Promise<void>;
+
   // Annotation actions
   addAnnotation: (annotation: Annotation) => void;
   updateAnnotationTransient: (annotation: Annotation) => void;
   updateAnnotation: (annotation: Annotation) => void;
   deleteAnnotation: (id: string) => void;
   setAnnotations: (annotations: Annotation[]) => void;
-  
+
   // History actions
   undo: () => void;
   redo: () => void;
   pushHistory: () => void;
   pauseHistory: () => void;
   resumeHistory: () => void;
-  
+
   // Reset
   reset: () => void;
 }
@@ -160,14 +163,24 @@ export const useEditorStore = create<EditorStore>()(
       // ========================================
       initialize: async () => {
         if (get()._isInitialized) return;
-        
+
         try {
           const store = await Store.load("settings.json");
+
+          // Load background settings
           const storedBgType = await store.get<BackgroundType>("defaultBackgroundType");
           const storedCustomColor = await store.get<string>("defaultCustomColor");
           const storedBg = await store.get<string>("defaultBackgroundImage");
-          
+
+          // Load effect settings
+          const storedBlurAmount = await store.get<number>("defaultBlurAmount");
+          const storedNoiseAmount = await store.get<number>("defaultNoiseAmount");
+          const storedBorderRadius = await store.get<number>("defaultBorderRadius");
+          const storedPadding = await store.get<number>("defaultPadding");
+          const storedShadow = await store.get<ShadowSettings>("defaultShadow");
+
           set((state) => {
+            // Apply background settings
             if (storedBgType) {
               state.settings.backgroundType = storedBgType;
             }
@@ -193,10 +206,28 @@ export const useEditorStore = create<EditorStore>()(
                 }
               }
             }
+
+            // Apply effect settings
+            if (storedBlurAmount !== null && storedBlurAmount !== undefined) {
+              state.settings.blurAmount = storedBlurAmount;
+            }
+            if (storedNoiseAmount !== null && storedNoiseAmount !== undefined) {
+              state.settings.noiseAmount = storedNoiseAmount;
+            }
+            if (storedBorderRadius !== null && storedBorderRadius !== undefined) {
+              state.settings.borderRadius = storedBorderRadius;
+            }
+            if (storedPadding !== null && storedPadding !== undefined) {
+              state.settings.padding = storedPadding;
+            }
+            if (storedShadow) {
+              state.settings.shadow = storedShadow;
+            }
+
             state._isInitialized = true;
           });
         } catch (err) {
-          console.error("Failed to load default background from store:", err);
+          console.error("Failed to load default settings from store:", err);
           set((state) => {
             state._isInitialized = true;
           });
@@ -356,6 +387,25 @@ export const useEditorStore = create<EditorStore>()(
       },
 
       // ========================================
+      // Persist Effect Settings
+      // ========================================
+      saveEffectSettingsAsDefaults: async () => {
+        const state = get();
+        try {
+          const store = await Store.load("settings.json");
+          await store.set("defaultBlurAmount", state.settings.blurAmount);
+          await store.set("defaultNoiseAmount", state.settings.noiseAmount);
+          await store.set("defaultBorderRadius", state.settings.borderRadius);
+          await store.set("defaultPadding", state.settings.padding);
+          await store.set("defaultShadow", state.settings.shadow);
+          await store.save();
+        } catch (err) {
+          console.error("Failed to save effect settings as defaults:", err);
+          throw err;
+        }
+      },
+
+      // ========================================
       // Annotations
       // ========================================
       addAnnotation: (annotation) => {
@@ -470,14 +520,15 @@ export const useEditorStore = create<EditorStore>()(
       // ========================================
       // Reset
       // ========================================
-       reset: () => {
-         set((state) => {
-           state.annotations = [];
-           state.past = [];
-           state.future = [];
-           state._isInitialized = false;
-         });
-       },
+      reset: () => {
+        set((state) => {
+          state.settings = structuredClone(DEFAULT_SETTINGS);
+          state.annotations = [];
+          state.past = [];
+          state.future = [];
+          state._isInitialized = false;
+        });
+      },
     }))
   )
 );
@@ -528,6 +579,7 @@ export const editorActions = {
   get setShadowOffsetYTransient() { return useEditorStore.getState().setShadowOffsetYTransient; },
   get setShadowOpacity() { return useEditorStore.getState().setShadowOpacity; },
   get setShadowOpacityTransient() { return useEditorStore.getState().setShadowOpacityTransient; },
+  get saveEffectSettingsAsDefaults() { return useEditorStore.getState().saveEffectSettingsAsDefaults; },
   get addAnnotation() { return useEditorStore.getState().addAnnotation; },
   get updateAnnotation() { return useEditorStore.getState().updateAnnotation; },
   get updateAnnotationTransient() { return useEditorStore.getState().updateAnnotationTransient; },
