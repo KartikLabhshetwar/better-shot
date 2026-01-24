@@ -235,7 +235,10 @@ export interface PreviewGeneratorOptions {
   screenshotImage: HTMLImageElement | null;
   settings: EditorSettings;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  padding?: number;
+  paddingTop?: number;
+  paddingBottom?: number;
+  paddingLeft?: number;
+  paddingRight?: number;
   imagePath?: string;
 }
 
@@ -246,8 +249,8 @@ export interface PreviewGeneratorResult {
   renderHighQualityCanvas: (annotations: Annotation[], imagePath?: string) => Promise<HTMLCanvasElement | null>;
 }
 
-const PREVIEW_DEBOUNCE_MS = 50;
-const BLUR_DEBOUNCE_MS = 150;
+const PREVIEW_DEBOUNCE_MS = 16;
+const BLUR_DEBOUNCE_MS = 100;
 
 /**
  * Hook for generating preview images based on editor settings
@@ -257,7 +260,10 @@ export function usePreviewGenerator({
   screenshotImage,
   settings,
   canvasRef,
-  padding = 100,
+  paddingTop = 100,
+  paddingBottom = 100,
+  paddingLeft = 100,
+  paddingRight = 100,
   imagePath,
 }: PreviewGeneratorOptions): PreviewGeneratorResult {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -293,8 +299,8 @@ export function usePreviewGenerator({
     const currentRenderId = ++renderIdRef.current;
     const canvas = canvasRef.current;
 
-    const bgWidth = screenshotImage.width + padding * 2;
-    const bgHeight = screenshotImage.height + padding * 2;
+    const bgWidth = screenshotImage.width + paddingLeft + paddingRight;
+    const bgHeight = screenshotImage.height + paddingTop + paddingBottom;
 
     setIsGenerating(true);
     setError(null);
@@ -319,8 +325,9 @@ export function usePreviewGenerator({
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
 
-      // When padding is 0, skip background and shadow - just draw the image directly
-      if (padding === 0) {
+      // When all padding is 0, skip background and shadow - just draw the image directly
+      const totalPadding = paddingTop + paddingBottom + paddingLeft + paddingRight;
+      if (totalPadding === 0) {
         ctx.beginPath();
         ctx.roundRect(0, 0, screenshotImage.width, screenshotImage.height, settingsToRender.borderRadius);
         ctx.closePath();
@@ -366,7 +373,7 @@ export function usePreviewGenerator({
         ctx.shadowOffsetX = settingsToRender.shadow.offsetX;
         ctx.shadowOffsetY = settingsToRender.shadow.offsetY;
 
-        ctx.drawImage(imageCanvas, padding, padding);
+        ctx.drawImage(imageCanvas, paddingLeft, paddingTop);
 
         ctx.shadowColor = "transparent";
         ctx.shadowBlur = 0;
@@ -396,7 +403,7 @@ export function usePreviewGenerator({
         console.error("Preview generation failed:", err);
       }
     }
-  }, [screenshotImage, canvasRef, padding]);
+  }, [screenshotImage, canvasRef, paddingTop, paddingBottom, paddingLeft, paddingRight]);
 
   // Debounced preview generation
   useEffect(() => {
@@ -435,7 +442,10 @@ export function usePreviewGenerator({
     settings.shadow.offsetX,
     settings.shadow.offsetY,
     settings.shadow.opacity,
-    padding,
+    paddingTop,
+    paddingBottom,
+    paddingLeft,
+    paddingRight,
     canvasRef,
     generatePreview,
   ]);
@@ -466,7 +476,10 @@ export function usePreviewGenerator({
                 blur_amount: settings.blurAmount,
                 noise_amount: settings.noiseAmount,
                 border_radius: settings.borderRadius,
-                padding,
+                padding_top: paddingTop,
+                padding_bottom: paddingBottom,
+                padding_left: paddingLeft,
+                padding_right: paddingRight,
                 shadow_blur: settings.shadow.blur,
                 shadow_offset_x: settings.shadow.offsetX,
                 shadow_offset_y: settings.shadow.offsetY,
@@ -516,7 +529,10 @@ export function usePreviewGenerator({
           blurAmount: settings.blurAmount,
           noiseAmount: settings.noiseAmount,
           borderRadius: settings.borderRadius,
-          padding,
+          paddingTop,
+          paddingBottom,
+          paddingLeft,
+          paddingRight,
           gradientImage: settings.backgroundType === "gradient" ? bgImage : null,
           shadow: settings.shadow,
         });
@@ -537,7 +553,7 @@ export function usePreviewGenerator({
         return null;
       }
     },
-    [screenshotImage, settings, padding, imagePath]
+    [screenshotImage, settings, paddingTop, paddingBottom, paddingLeft, paddingRight, imagePath]
   );
 
   return {

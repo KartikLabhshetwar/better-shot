@@ -9,7 +9,10 @@ export interface RenderOptions {
   blurAmount: number;
   noiseAmount: number;
   borderRadius: number;
-  padding: number;
+  paddingTop: number;
+  paddingBottom: number;
+  paddingLeft: number;
+  paddingRight: number;
   scale?: number;
   gradientImage?: HTMLImageElement | null;
   shadow?: ShadowSettings;
@@ -25,15 +28,18 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
     blurAmount,
     noiseAmount,
     borderRadius,
-    padding,
+    paddingTop,
+    paddingBottom,
+    paddingLeft,
+    paddingRight,
     // Use scale = 1 to match preview exactly - the image is already at full resolution
     scale = 1,
     gradientImage = null,
     shadow = { blur: 33, offsetX: 18, offsetY: 23, opacity: 39 },
   } = options;
 
-  const bgWidth = image.width + padding * 2;
-  const bgHeight = image.height + padding * 2;
+  const bgWidth = image.width + paddingLeft + paddingRight;
+  const bgHeight = image.height + paddingTop + paddingBottom;
 
   const canvas = document.createElement("canvas");
   canvas.width = bgWidth * scale;
@@ -48,8 +54,9 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
 
-  // When padding is 0, skip background and shadow - just draw the image directly
-  if (padding === 0) {
+  // When all padding is 0, skip background and shadow - just draw the image directly
+  const totalPadding = paddingTop + paddingBottom + paddingLeft + paddingRight;
+  if (totalPadding === 0) {
     ctx.beginPath();
     ctx.roundRect(0, 0, image.width, image.height, borderRadius);
     ctx.closePath();
@@ -96,7 +103,7 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
     ctx.shadowOffsetX = shadow.offsetX;
     ctx.shadowOffsetY = shadow.offsetY;
 
-    ctx.drawImage(imageCanvas, padding, padding);
+    ctx.drawImage(imageCanvas, paddingLeft, paddingTop);
 
     ctx.shadowColor = "transparent";
     ctx.shadowBlur = 0;

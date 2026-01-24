@@ -136,7 +136,10 @@ pub struct RenderSettings {
     pub blur_amount: f32,
     pub noise_amount: f32,
     pub border_radius: f32,
-    pub padding: u32,
+    pub padding_top: u32,
+    pub padding_bottom: u32,
+    pub padding_left: u32,
+    pub padding_right: u32,
     pub shadow_blur: f32,
     pub shadow_offset_x: f32,
     pub shadow_offset_y: f32,
@@ -148,14 +151,11 @@ fn hex_to_rgba(hex: &str) -> Result<Rgba<u8>, String> {
     if hex.len() != 6 {
         return Err("Invalid hex color".to_string());
     }
-    
-    let r = u8::from_str_radix(&hex[0..2], 16)
-        .map_err(|_| "Invalid hex color")?;
-    let g = u8::from_str_radix(&hex[2..4], 16)
-        .map_err(|_| "Invalid hex color")?;
-    let b = u8::from_str_radix(&hex[4..6], 16)
-        .map_err(|_| "Invalid hex color")?;
-    
+
+    let r = u8::from_str_radix(&hex[0..2], 16).map_err(|_| "Invalid hex color")?;
+    let g = u8::from_str_radix(&hex[2..4], 16).map_err(|_| "Invalid hex color")?;
+    let b = u8::from_str_radix(&hex[4..6], 16).map_err(|_| "Invalid hex color")?;
+
     Ok(Rgba([r, g, b, 255]))
 }
 
@@ -166,7 +166,7 @@ fn create_background(
     custom_color: &str,
 ) -> RgbaImage {
     let mut img = RgbaImage::new(width, height);
-    
+
     match background_type {
         "transparent" => {
             for pixel in img.pixels_mut() {
@@ -200,7 +200,7 @@ fn create_background(
             }
         }
     }
-    
+
     img
 }
 
@@ -208,11 +208,11 @@ fn apply_noise(img: &mut RgbaImage, amount: f32) {
     if amount <= 0.0 {
         return;
     }
-    
+
     use rand::Rng;
     let mut rng = rand::thread_rng();
     let intensity = (amount * 2.55) as i32;
-    
+
     for pixel in img.pixels_mut() {
         let noise = rng.gen_range(-intensity..=intensity);
         let r = (pixel[0] as i32 + noise).clamp(0, 255) as u8;
@@ -222,46 +222,42 @@ fn apply_noise(img: &mut RgbaImage, amount: f32) {
     }
 }
 
-pub fn render_image_with_effects(
-    image_path: &str,
-    settings: RenderSettings,
-) -> AppResult<String> {
-    let img = image::open(image_path)
-        .map_err(|e| format!("Failed to open image: {}", e))?;
-    
+pub fn render_image_with_effects(image_path: &str, settings: RenderSettings) -> AppResult<String> {
+    let img = image::open(image_path).map_err(|e| format!("Failed to open image: {}", e))?;
+
     let img_width = img.width();
     let img_height = img.height();
-    let bg_width = img_width + settings.padding * 2;
-    let bg_height = img_height + settings.padding * 2;
-    
+    let bg_width = img_width + settings.padding_left + settings.padding_right;
+    let bg_height = img_height + settings.padding_top + settings.padding_bottom;
+
     let mut background = create_background(
         bg_width,
         bg_height,
         &settings.background_type,
         &settings.custom_color,
     );
-    
+
     if settings.blur_amount > 0.0 {
         background = gaussian_blur_f32(&background, settings.blur_amount);
     }
-    
+
     if settings.noise_amount > 0.0 {
         apply_noise(&mut background, settings.noise_amount);
     }
-    
+
     let img_rgba = img.to_rgba8();
     let mut final_img = RgbaImage::new(bg_width, bg_height);
-    
+
     for y in 0..bg_height {
         for x in 0..bg_width {
-            if x >= settings.padding
-                && x < settings.padding + img_width
-                && y >= settings.padding
-                && y < settings.padding + img_height
+            if x >= settings.padding_left
+                && x < settings.padding_left + img_width
+                && y >= settings.padding_top
+                && y < settings.padding_top + img_height
             {
-                let img_x = x - settings.padding;
-                let img_y = y - settings.padding;
-                
+                let img_x = x - settings.padding_left;
+                let img_y = y - settings.padding_top;
+
                 let corner_x = if img_x < settings.border_radius as u32 {
                     img_x
                 } else if img_x >= img_width.saturating_sub(settings.border_radius as u32) {
@@ -269,7 +265,7 @@ pub fn render_image_with_effects(
                 } else {
                     u32::MAX
                 };
-                
+
                 let corner_y = if img_y < settings.border_radius as u32 {
                     img_y
                 } else if img_y >= img_height.saturating_sub(settings.border_radius as u32) {
@@ -277,15 +273,15 @@ pub fn render_image_with_effects(
                 } else {
                     u32::MAX
                 };
-                
-                let in_corner = corner_x < settings.border_radius as u32 
+
+                let in_corner = corner_x < settings.border_radius as u32
                     && corner_y < settings.border_radius as u32;
-                
+
                 if in_corner {
                     let dist_x = corner_x as f32;
                     let dist_y = corner_y as f32;
                     let corner_dist = (dist_x * dist_x + dist_y * dist_y).sqrt();
-                    
+
                     if corner_dist <= settings.border_radius {
                         let pixel = img_rgba.get_pixel(img_x, img_y);
                         final_img.put_pixel(x, y, *pixel);
@@ -303,13 +299,13 @@ pub fn render_image_with_effects(
             }
         }
     }
-    
+
     let mut buffer = Vec::new();
     let mut cursor = std::io::Cursor::new(&mut buffer);
     DynamicImage::ImageRgba8(final_img)
         .write_to(&mut cursor, ImageFormat::Png)
         .map_err(|e| format!("Failed to encode image: {}", e))?;
-    
+
     let base64_data = general_purpose::STANDARD.encode(&buffer);
     Ok(format!("data:image/png;base64,{}", base64_data))
 }

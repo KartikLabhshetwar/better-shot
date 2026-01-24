@@ -109,7 +109,7 @@ export function useEditorSettings(): [EditorSettings, EditorSettingsActions] {
   // Effects state
   const [blurAmount, setBlurAmount] = useState(0);
   const [noiseAmount, setNoiseAmount] = useState(0);
-  const [borderRadius, setBorderRadius] = useState(18);
+  const [borderRadius, setBorderRadius] = useState(12);
   
   // Shadow state
   const [shadowBlur, setShadowBlur] = useState(33);

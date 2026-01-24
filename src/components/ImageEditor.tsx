@@ -60,7 +60,10 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
     screenshotImage,
     settings,
     canvasRef,
-    padding: settings.padding,
+    paddingTop: settings.paddingTop,
+    paddingBottom: settings.paddingBottom,
+    paddingLeft: settings.paddingLeft,
+    paddingRight: settings.paddingRight,
     imagePath,
   });
 
@@ -119,7 +122,10 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
       // Calculate smart default padding: 10% of average dimension, capped at 400px
       const avgDimension = (img.width + img.height) / 2;
       const defaultPadding = Math.min(Math.round(avgDimension * 0.1), 400);
-      actions.setPaddingTransient(defaultPadding);
+      actions.setPaddingTopTransient(defaultPadding);
+      actions.setPaddingBottomTransient(defaultPadding);
+      actions.setPaddingLeftTransient(defaultPadding);
+      actions.setPaddingRightTransient(defaultPadding);
     };
     img.onerror = () => {
       setLoadError(`Failed to load image from: ${imagePath}`);
@@ -250,6 +256,16 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
     actions.redo();
     setSelectedAnnotation(null);
   }, [actions]);
+
+  const handleResetPadding = useCallback(() => {
+    if (!screenshotImage) return;
+    const avgDimension = (screenshotImage.width + screenshotImage.height) / 2;
+    const defaultPadding = Math.min(Math.round(avgDimension * 0.1), 400);
+    actions.setPaddingTop(defaultPadding);
+    actions.setPaddingBottom(defaultPadding);
+    actions.setPaddingLeft(defaultPadding);
+    actions.setPaddingRight(defaultPadding);
+  }, [actions, screenshotImage]);
 
   // Delete annotation with keyboard
   useEffect(() => {
@@ -442,23 +458,35 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
               <EffectsPanel
                 blurAmount={settings.blurAmount}
                 noiseAmount={settings.noiseAmount}
-                padding={settings.padding}
+                paddingTop={settings.paddingTop}
+                paddingBottom={settings.paddingBottom}
+                paddingLeft={settings.paddingLeft}
+                paddingRight={settings.paddingRight}
                 shadow={settings.shadow}
                 onBlurAmountChangeTransient={actions.setBlurAmountTransient}
                 onNoiseChangeTransient={actions.setNoiseAmountTransient}
-                onPaddingChangeTransient={actions.setPaddingTransient}
+                onPaddingTopChangeTransient={actions.setPaddingTopTransient}
+                onPaddingBottomChangeTransient={actions.setPaddingBottomTransient}
+                onPaddingLeftChangeTransient={actions.setPaddingLeftTransient}
+                onPaddingRightChangeTransient={actions.setPaddingRightTransient}
+                onAllPaddingChangeTransient={actions.setAllPaddingTransient}
                 onShadowBlurChangeTransient={actions.setShadowBlurTransient}
                 onShadowOffsetXChangeTransient={actions.setShadowOffsetXTransient}
                 onShadowOffsetYChangeTransient={actions.setShadowOffsetYTransient}
                 onShadowOpacityChangeTransient={actions.setShadowOpacityTransient}
                 onBlurAmountChange={actions.setBlurAmount}
                 onNoiseChange={actions.setNoiseAmount}
-                onPaddingChange={actions.setPadding}
+                onPaddingTopChange={actions.setPaddingTop}
+                onPaddingBottomChange={actions.setPaddingBottom}
+                onPaddingLeftChange={actions.setPaddingLeft}
+                onPaddingRightChange={actions.setPaddingRight}
+                onAllPaddingChange={actions.setAllPadding}
                 onShadowBlurChange={actions.setShadowBlur}
                 onShadowOffsetXChange={actions.setShadowOffsetX}
                 onShadowOffsetYChange={actions.setShadowOffsetY}
                 onShadowOpacityChange={actions.setShadowOpacity}
                 onSaveAsDefaults={actions.saveEffectSettingsAsDefaults}
+                onResetPadding={handleResetPadding}
               />
 
               <ImageRoundnessControl

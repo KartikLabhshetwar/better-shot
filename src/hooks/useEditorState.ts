@@ -79,7 +79,7 @@ const DEFAULT_SETTINGS: EditorSettings = {
   gradientColors: DEFAULT_GRADIENT.colors,
   blurAmount: 0,
   noiseAmount: 0,
-  borderRadius: 18,
+  borderRadius: 12,
   shadow: {
     blur: 33,
     offsetX: 18,

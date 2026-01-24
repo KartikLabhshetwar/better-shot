@@ -40,6 +40,10 @@ export async function processScreenshotWithDefaultBackground(
       try {
         const avgDimension = (img.width + img.height) / 2;
         const padding = Math.min(Math.round(avgDimension * 0.1), 400);
+        const paddingTop = padding;
+        const paddingBottom = padding;
+        const paddingLeft = padding;
+        const paddingRight = padding;
 
         if (backgroundType === "image" || backgroundType === "gradient") {
           bgImage = new Image();
@@ -56,8 +60,11 @@ export async function processScreenshotWithDefaultBackground(
                 bgImage: isGradient ? null : bgImage,
                 blurAmount: 0,
                 noiseAmount: 20,
-                borderRadius: 18,
-                padding,
+                borderRadius: 12,
+                paddingTop,
+                paddingBottom,
+                paddingLeft,
+                paddingRight,
                 gradientImage: isGradient ? bgImage : null,
                 shadow: {
                   blur: 33,
@@ -100,6 +107,10 @@ export async function processScreenshotWithDefaultBackground(
             const isTransparent = backgroundType === "transparent";
             const blurAmount = 0;
             const finalPadding = isTransparent ? 0 : padding;
+            const paddingTop = finalPadding;
+            const paddingBottom = finalPadding;
+            const paddingLeft = finalPadding;
+            const paddingRight = finalPadding;
 
             const canvas = createHighQualityCanvas({
               image: img,
@@ -110,8 +121,11 @@ export async function processScreenshotWithDefaultBackground(
               gradientImage: null,
               blurAmount,
               noiseAmount: 20,
-              borderRadius: 18,
-              padding: finalPadding,
+              borderRadius: 12,
+              paddingTop,
+              paddingBottom,
+              paddingLeft,
+              paddingRight,
               shadow: isTransparent ? {
                 blur: 0,
                 offsetX: 0,
