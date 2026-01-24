@@ -1,29 +1,25 @@
 import { Annotation } from "@/types/annotations";
 
 export function drawAnnotationOnCanvas(ctx: CanvasRenderingContext2D, annotation: Annotation) {
-  const fillColor = annotation.fill.hex;
-  const fillOpacity = annotation.fill.opacity / 100;
-  const borderColor = annotation.border.color.hex;
-  const borderOpacity = annotation.border.color.opacity / 100;
-  const borderWidth = annotation.border.width;
+  const primaryColor = annotation.fill.hex;
+  const primaryOpacity = annotation.fill.opacity / 100;
 
   ctx.save();
 
-  const fillRgba = hexToRgba(fillColor, fillOpacity);
-  const borderRgba = hexToRgba(borderColor, borderOpacity);
+  const primaryRgba = hexToRgba(primaryColor, primaryOpacity);
 
   switch (annotation.type) {
     case "circle": {
       ctx.beginPath();
       ctx.arc(annotation.x, annotation.y, annotation.radius, 0, Math.PI * 2);
-      ctx.strokeStyle = borderRgba;
-      ctx.lineWidth = borderWidth || 5;
+      ctx.strokeStyle = primaryRgba;
+      ctx.lineWidth = annotation.border.width || 5;
       ctx.stroke();
       break;
     }
     case "rectangle": {
-      ctx.strokeStyle = borderRgba;
-      ctx.lineWidth = borderWidth || 5;
+      ctx.strokeStyle = primaryRgba;
+      ctx.lineWidth = annotation.border.width || 5;
       ctx.strokeRect(annotation.x, annotation.y, annotation.width, annotation.height);
       break;
     }
@@ -36,14 +32,14 @@ export function drawAnnotationOnCanvas(ctx: CanvasRenderingContext2D, annotation
       } else {
         ctx.lineTo(annotation.endX, annotation.endY);
       }
-      ctx.strokeStyle = fillRgba;
-      ctx.lineWidth = borderWidth || 5;
+      ctx.strokeStyle = primaryRgba;
+      ctx.lineWidth = annotation.border.width || 5;
       ctx.lineCap = "round";
       ctx.stroke();
       break;
     }
     case "arrow": {
-      const lineWidth = borderWidth || 5;
+      const lineWidth = annotation.border.width || 5;
       
       let angle: number;
       let lineEndX: number;
@@ -79,7 +75,7 @@ export function drawAnnotationOnCanvas(ctx: CanvasRenderingContext2D, annotation
       } else {
         ctx.lineTo(lineEndX, lineEndY);
       }
-      ctx.strokeStyle = fillRgba;
+      ctx.strokeStyle = primaryRgba;
       ctx.lineWidth = lineWidth;
       ctx.lineCap = "round";
       ctx.stroke();
@@ -100,13 +96,13 @@ export function drawAnnotationOnCanvas(ctx: CanvasRenderingContext2D, annotation
           annotation.endY - arrowHeadLength * Math.sin(angle + Math.PI / 6)
         );
         ctx.closePath();
-        ctx.fillStyle = fillRgba;
+        ctx.fillStyle = primaryRgba;
         ctx.fill();
       }
       break;
     }
     case "text": {
-      ctx.fillStyle = fillRgba;
+      ctx.fillStyle = primaryRgba;
       ctx.font = `${annotation.fontSize}px ${annotation.fontFamily}`;
       ctx.fillText(annotation.text, annotation.x, annotation.y + annotation.fontSize);
       break;
@@ -114,11 +110,11 @@ export function drawAnnotationOnCanvas(ctx: CanvasRenderingContext2D, annotation
     case "number": {
       ctx.beginPath();
       ctx.arc(annotation.x, annotation.y, annotation.radius, 0, Math.PI * 2);
-      ctx.fillStyle = fillRgba;
+      ctx.fillStyle = primaryRgba;
       ctx.fill();
-      if (borderWidth > 0) {
-        ctx.strokeStyle = borderRgba;
-        ctx.lineWidth = borderWidth;
+      if (annotation.border.width > 0) {
+        ctx.strokeStyle = primaryRgba;
+        ctx.lineWidth = annotation.border.width;
         ctx.stroke();
       }
       ctx.fillStyle = "#ffffff";
@@ -129,24 +125,17 @@ export function drawAnnotationOnCanvas(ctx: CanvasRenderingContext2D, annotation
       break;
     }
     case "blur": {
-      // Apply blur effect to the specified region
       const x = Math.max(0, Math.floor(annotation.x));
       const y = Math.max(0, Math.floor(annotation.y));
       const width = Math.min(Math.ceil(annotation.width), ctx.canvas.width - x);
       const height = Math.min(Math.ceil(annotation.height), ctx.canvas.height - y);
       
       if (width > 0 && height > 0) {
-        // Get the current image data for this region
         const imageData = ctx.getImageData(x, y, width, height);
-        
-        // Apply box blur algorithm
         const blurAmount = annotation.blurAmount || 20;
         const blurredData = applyBoxBlur(imageData, blurAmount);
-        
-        // Put the blurred data back
         ctx.putImageData(blurredData, x, y);
         
-        // Draw a subtle border to indicate blur region
         ctx.strokeStyle = "rgba(100, 100, 255, 0.3)";
         ctx.lineWidth = 2;
         ctx.setLineDash([5, 5]);

@@ -731,29 +731,52 @@ export const AnnotationCanvas = memo(function AnnotationCanvas({
       }
       case "text": {
         if (annotation.type !== "text" || startAnnotation.type !== "text") return annotation;
-        const dx = point.x - startPoint.x;
-        const dy = point.y - startPoint.y;
-        let { x, y, width, height } = startAnnotation;
         
-        if (handle === "nw") {
-          x = startAnnotation.x + dx;
-          y = startAnnotation.y + dy;
-          width = Math.max(50, startAnnotation.width - dx);
-          height = Math.max(20, startAnnotation.height - dy);
-        } else if (handle === "ne") {
-          y = startAnnotation.y + dy;
-          width = Math.max(50, startAnnotation.width + dx);
-          height = Math.max(20, startAnnotation.height - dy);
-        } else if (handle === "sw") {
-          x = startAnnotation.x + dx;
-          width = Math.max(50, startAnnotation.width - dx);
-          height = Math.max(20, startAnnotation.height + dy);
-        } else if (handle === "se") {
-          width = Math.max(50, startAnnotation.width + dx);
-          height = Math.max(20, startAnnotation.height + dy);
+        const isRightHandle = handle === "ne" || handle === "se" || handle === "e";
+        const isBottomHandle = handle === "sw" || handle === "se" || handle === "s";
+        const isLeftHandle = handle === "nw" || handle === "sw" || handle === "w";
+        const isTopHandle = handle === "nw" || handle === "ne" || handle === "n";
+        
+        let scaleX = 1;
+        let scaleY = 1;
+        
+        if (isRightHandle) {
+          scaleX = Math.max(0.1, (point.x - startAnnotation.x) / startAnnotation.width);
+        } else if (isLeftHandle) {
+          scaleX = Math.max(0.1, (startAnnotation.x - point.x) / startAnnotation.width);
         }
         
-        return { ...annotation, x, y, width, height };
+        if (isBottomHandle) {
+          scaleY = Math.max(0.1, (point.y - startAnnotation.y) / startAnnotation.height);
+        } else if (isTopHandle) {
+          scaleY = Math.max(0.1, (startAnnotation.y - point.y) / startAnnotation.height);
+        }
+        
+        const scale = Math.max(scaleX, scaleY);
+        const newFontSize = Math.max(8, Math.round(startAnnotation.fontSize * scale));
+        const fontScale = newFontSize / startAnnotation.fontSize;
+        
+        let newX = startAnnotation.x;
+        let newY = startAnnotation.y;
+        
+        if (isLeftHandle) {
+          newX = startAnnotation.x + startAnnotation.width - (startAnnotation.width * fontScale);
+        }
+        if (isTopHandle) {
+          newY = startAnnotation.y + startAnnotation.height - (startAnnotation.height * fontScale);
+        }
+        
+        const newWidth = Math.max(50, Math.round(startAnnotation.width * fontScale));
+        const newHeight = Math.max(20, Math.round(startAnnotation.height * fontScale));
+        
+        return { 
+          ...annotation, 
+          x: newX, 
+          y: newY, 
+          fontSize: newFontSize, 
+          width: newWidth, 
+          height: newHeight 
+        };
       }
       case "number": {
         const distance = Math.sqrt(
@@ -892,7 +915,8 @@ export const AnnotationCanvas = memo(function AnnotationCanvas({
                    annotation.width !== startAnn.width || annotation.height !== startAnn.height;
         } else if (annotation.type === "text" && startAnn.type === "text") {
           changed = annotation.x !== startAnn.x || annotation.y !== startAnn.y || 
-                   annotation.width !== startAnn.width || annotation.height !== startAnn.height;
+                    annotation.width !== startAnn.width || annotation.height !== startAnn.height ||
+                    annotation.fontSize !== startAnn.fontSize;
         } else if ((annotation.type === "line" || annotation.type === "arrow") && 
                    (startAnn.type === "line" || startAnn.type === "arrow")) {
           changed = annotation.x !== startAnn.x || annotation.y !== startAnn.y ||

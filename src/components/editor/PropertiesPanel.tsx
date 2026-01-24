@@ -3,7 +3,6 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Annotation, LineType, ArrowType } from "@/types/annotations";
 
-// Stop keyboard events from propagating to parent handlers (e.g., delete annotation shortcut)
 const stopPropagation = (e: React.KeyboardEvent) => {
   e.stopPropagation();
 };
@@ -14,13 +13,12 @@ interface PropertiesPanelProps {
 }
 
 export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpdate }: PropertiesPanelProps) {
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["fill", "border"]));
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["color"]));
 
-  // Auto-expand relevant sections based on annotation type
   useEffect(() => {
     if (!annotation) return;
     
-    const newExpanded = new Set(["fill", "border"]);
+    const newExpanded = new Set(["color"]);
     
     if (annotation.type === "text") {
       newExpanded.add("text");
@@ -33,9 +31,7 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
     }
     if (annotation.type === "blur") {
       newExpanded.add("blur");
-      // Don't show fill/border for blur
-      newExpanded.delete("fill");
-      newExpanded.delete("border");
+      newExpanded.delete("color");
     }
     
     setExpandedSections(newExpanded);
@@ -63,25 +59,8 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
     onUpdate({ ...annotation, ...updates } as Annotation);
   };
 
-  const handleColorChange = (type: "fill" | "border", hex: string) => {
-    if (type === "fill") {
-      updateAnnotation({ fill: { ...annotation.fill, hex } });
-    } else {
-      updateAnnotation({ border: { ...annotation.border, color: { ...annotation.border.color, hex } } });
-    }
-  };
-
-  const handleOpacityChange = (type: "fill" | "border", opacity: number) => {
-    if (type === "fill") {
-      updateAnnotation({ fill: { ...annotation.fill, opacity } });
-    } else {
-      updateAnnotation({ border: { ...annotation.border, color: { ...annotation.border.color, opacity } } });
-    }
-  };
-
   return (
     <div className="px-4 py-3 space-y-2">
-      {/* Blur Section - Only for blur annotations */}
       {annotation.type === "blur" && (
         <div className="space-y-1.5">
           <button
@@ -121,7 +100,6 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
         </div>
       )}
 
-      {/* Text Section - Only for text annotations */}
       {annotation.type === "text" && (
         <div className="space-y-1.5">
           <button
@@ -151,19 +129,28 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
                 />
               </div>
               <div>
-                <div className="text-xs text-foreground0 mb-1.5">Font Size</div>
+                <div className="text-xs text-foreground0 mb-1.5">Size</div>
                 <div className="flex items-center gap-2">
                   <Slider
                     value={[annotation.fontSize]}
                     onValueChange={([value]) => updateAnnotation({ fontSize: value })}
-                    min={12}
-                    max={72}
+                    min={8}
+                    max={200}
                     step={1}
                   />
                   <input
                     type="text"
                     value={annotation.fontSize}
-                    onChange={(e) => updateAnnotation({ fontSize: Number(e.target.value) || 24 })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "" || /^\d*$/.test(val)) {
+                        updateAnnotation({ fontSize: val as unknown as number });
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const val = Number(e.target.value);
+                      updateAnnotation({ fontSize: Math.max(8, Math.min(200, isNaN(val) ? 24 : val)) });
+                    }}
                     onKeyDown={stopPropagation}
                     className="w-14 px-1.5 py-1 bg-secondary border border-border rounded text-xs text-card-foreground"
                   />
@@ -174,7 +161,6 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
         </div>
       )}
 
-      {/* Line/Arrow Section */}
       {(annotation.type === "line" || annotation.type === "arrow") && (
         <div className="space-y-1.5">
           <button
@@ -242,7 +228,6 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
         </div>
       )}
 
-      {/* Number Section */}
       {annotation.type === "number" && (
         <div className="space-y-1.5">
           <button
@@ -260,14 +245,26 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
             <div className="space-y-2 pl-2">
               <div>
                 <div className="text-xs text-foreground0 mb-1.5">Value</div>
-                <input
-                  type="number"
-                  value={annotation.number}
-                  onChange={(e) => updateAnnotation({ number: Number(e.target.value) || 1 })}
-                  onKeyDown={stopPropagation}
-                  className="w-full px-2 py-1 bg-secondary border border-border rounded text-xs text-card-foreground"
-                  min={1}
-                />
+                  <input
+                    type="number"
+                    value={annotation.number}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "" || val === "-") {
+                        updateAnnotation({ number: val as unknown as number });
+                      } else {
+                        updateAnnotation({ number: Number(val) || 1 });
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value === "" || e.target.value === "-") {
+                        updateAnnotation({ number: 1 });
+                      }
+                    }}
+                    onKeyDown={stopPropagation}
+                    className="w-full px-2 py-1 bg-secondary border border-border rounded text-xs text-card-foreground"
+                    min={1}
+                  />
               </div>
               <div>
                 <div className="text-xs text-foreground0 mb-1.5">Size</div>
@@ -282,7 +279,19 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
                   <input
                     type="text"
                     value={annotation.radius}
-                    onChange={(e) => updateAnnotation({ radius: Number(e.target.value) || 20 })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "" || val === "-") {
+                        updateAnnotation({ radius: val as unknown as number });
+                      } else {
+                        updateAnnotation({ radius: Number(val) || 20 });
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value === "" || e.target.value === "-") {
+                        updateAnnotation({ radius: 20 });
+                      }
+                    }}
                     onKeyDown={stopPropagation}
                     className="w-14 px-1.5 py-1 bg-secondary border border-border rounded text-xs text-card-foreground"
                   />
@@ -293,132 +302,43 @@ export const PropertiesPanel = memo(function PropertiesPanel({ annotation, onUpd
         </div>
       )}
 
-      {/* Fill Section - Hide for blur */}
       {annotation.type !== "blur" && (
         <div className="space-y-1.5">
           <button
-            onClick={() => toggleSection("fill")}
+            onClick={() => toggleSection("color")}
             className="w-full flex items-center justify-between text-xs font-medium text-foreground hover:text-foreground"
           >
-            <span>Fill</span>
-            {expandedSections.has("fill") ? (
+            <span>Color</span>
+            {expandedSections.has("color") ? (
               <ChevronUp className="size-3" />
             ) : (
               <ChevronDown className="size-3" />
             )}
           </button>
-        {expandedSections.has("fill") && (
-          <div className="space-y-2 pl-2">
-            <div>
-              <div className="text-xs text-foreground0 mb-1.5">Color</div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={annotation.fill.hex}
-                  onChange={(e) => handleColorChange("fill", e.target.value)}
-                  className="size-7 rounded border border-border cursor-pointer"
-                />
-                <input
-                  type="text"
-                  value={annotation.fill.hex.toUpperCase()}
-                  onChange={(e) => handleColorChange("fill", e.target.value)}
-                  onKeyDown={stopPropagation}
-                  className="flex-1 px-2 py-1 bg-secondary border border-border rounded text-xs text-card-foreground"
-                />
-                <input
-                  type="text"
-                  value={`${Math.round(annotation.fill.opacity)}%`}
-                  readOnly
-                  className="w-12 px-1.5 py-1 bg-secondary border border-border rounded text-xs text-card-foreground"
-                />
-              </div>
-              <div className="mt-2">
-                <Slider
-                  value={[annotation.fill.opacity]}
-                  onValueChange={([value]) => handleOpacityChange("fill", value)}
-                  min={0}
-                  max={100}
-                  step={1}
-                />
+          {expandedSections.has("color") && (
+            <div className="space-y-2 pl-2">
+              <div>
+                <div className="text-xs text-foreground0 mb-1.5">
+                  {annotation.type === "text" ? "Text Color" : "Fill Color"}
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={annotation.fill.hex}
+                    onChange={(e) => updateAnnotation({ fill: { ...annotation.fill, hex: e.target.value } })}
+                    className="size-7 rounded border border-border cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={annotation.fill.hex.toUpperCase()}
+                    onChange={(e) => updateAnnotation({ fill: { ...annotation.fill, hex: e.target.value } })}
+                    onKeyDown={stopPropagation}
+                    className="flex-1 px-2 py-1 bg-secondary border border-border rounded text-xs text-card-foreground"
+                  />
+                </div>
               </div>
             </div>
-          </div>
-        )}
-        </div>
-      )}
-
-      {/* Border Section - Hide for blur */}
-      {annotation.type !== "blur" && (
-        <div className="space-y-1.5">
-          <button
-            onClick={() => toggleSection("border")}
-            className="w-full flex items-center justify-between text-xs font-medium text-foreground hover:text-foreground"
-          >
-            <span>Border</span>
-            {expandedSections.has("border") ? (
-              <ChevronUp className="size-3" />
-            ) : (
-              <ChevronDown className="size-3" />
-            )}
-          </button>
-        {expandedSections.has("border") && (
-          <div className="space-y-2 pl-2">
-            <div>
-              <div className="text-xs text-foreground0 mb-1.5">Width</div>
-              <div className="flex items-center gap-2">
-                <Slider
-                  value={[annotation.border.width]}
-                  onValueChange={([value]) => updateAnnotation({ border: { ...annotation.border, width: value } })}
-                  min={0}
-                  max={20}
-                  step={1}
-                />
-                <input
-                  type="text"
-                  value={annotation.border.width}
-                  onChange={(e) =>
-                    updateAnnotation({ border: { ...annotation.border, width: Number(e.target.value) || 0 } })
-                  }
-                  onKeyDown={stopPropagation}
-                  className="w-14 px-1.5 py-1 bg-secondary border border-border rounded text-xs text-card-foreground"
-                />
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-foreground0 mb-1.5">Color</div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={annotation.border.color.hex}
-                  onChange={(e) => handleColorChange("border", e.target.value)}
-                  className="size-7 rounded border border-border cursor-pointer"
-                />
-                <input
-                  type="text"
-                  value={annotation.border.color.hex.toUpperCase()}
-                  onChange={(e) => handleColorChange("border", e.target.value)}
-                  onKeyDown={stopPropagation}
-                  className="flex-1 px-2 py-1 bg-secondary border border-border rounded text-xs text-card-foreground"
-                />
-                <input
-                  type="text"
-                  value={`${Math.round(annotation.border.color.opacity)}%`}
-                  readOnly
-                  className="w-12 px-1.5 py-1 bg-secondary border border-border rounded text-xs text-card-foreground"
-                />
-              </div>
-              <div className="mt-2">
-                <Slider
-                  value={[annotation.border.color.opacity]}
-                  onValueChange={([value]) => handleOpacityChange("border", value)}
-                  min={0}
-                  max={100}
-                  step={1}
-                />
-              </div>
-            </div>
-          </div>
-        )}
+          )}
         </div>
       )}
     </div>
