@@ -10,7 +10,10 @@ use objc2::msg_send;
 use objc2_app_kit::NSWindow;
 
 use crate::clipboard::{copy_image_to_clipboard, copy_text_to_clipboard};
-use crate::image::{copy_screenshot_to_dir, crop_image, render_image_with_effects, save_base64_image, CropRegion, RenderSettings};
+use crate::image::{
+    copy_screenshot_to_dir, crop_image, render_image_with_effects, save_base64_image,
+    stitch_scroll_captures, CropRegion, RenderSettings,
+};
 use crate::ocr::recognize_text_from_image;
 use crate::screenshot::{
     capture_all_monitors as capture_monitors, capture_primary_monitor, MonitorShot,
@@ -443,6 +446,107 @@ pub async fn native_capture_window(save_dir: String) -> Result<String, String> {
         Ok(path_str)
     } else {
         Err("Screenshot was cancelled or failed".to_string())
+    }
+}
+#[tauri::command]
+pub async fn native_capture_scroll(save_dir: String) -> Result<String, String> {
+    #[cfg(not(target_os = "macos"))]
+    return Err("Scrolling capture is only supported on macOS.".to_string());
+
+    #[cfg(target_os = "macos")]
+    {
+    let _lock = SCREENCAPTURE_LOCK
+        .lock()
+        .map_err(|e| format!("Failed to acquire lock: {}", e))?;
+
+    if is_screencapture_running() {
+        return Err("Another screenshot capture is already in progress".to_string());
+    }
+
+    check_and_activate_permission().map_err(|e| {
+        format!("Permission check failed: {}. Please ensure Screen Recording permission is granted in System Settings > Privacy & Security > Screen Recording.", e)
+    })?;
+
+    let window_id_output = Command::new("osascript")
+        .arg("-e")
+        .arg("tell application \"System Events\" to get id of front window of (first process whose frontmost is true)")
+        .output()
+        .map_err(|e| format!("Failed to get front window: {}", e))?;
+
+    if !window_id_output.status.success() {
+        return Err("Could not get front window. Make sure an app window is focused.".to_string());
+    }
+
+    let window_id = String::from_utf8_lossy(&window_id_output.stdout).trim().to_string();
+    if window_id.is_empty() {
+        return Err("No front window found. Focus the window you want to capture (e.g. browser), then try again.".to_string());
+    }
+
+    let temp_dir = std::env::temp_dir().join(format!("bettershot_scroll_{}", std::process::id()));
+    std::fs::create_dir_all(&temp_dir).map_err(|e| format!("Failed to create temp dir: {}", e))?;
+    let _cleanup = TempDirGuard { path: temp_dir.clone() };
+
+    const MAX_STEPS: u32 = 30;
+    const OVERLAP_RATIO: f32 = 0.2;
+    const SCROLL_DELAY_MS: u64 = 400;
+
+    let mut paths = Vec::with_capacity(MAX_STEPS as usize);
+    for step in 0..MAX_STEPS {
+        let filename = format!("scroll_step_{}.png", step);
+        let path = temp_dir.join(&filename);
+        let path_str = path.to_string_lossy().to_string();
+
+        let status = Command::new("screencapture")
+            .arg("-l")
+            .arg(&window_id)
+            .arg("-x")
+            .arg(&path_str)
+            .status()
+            .map_err(|e| format!("Failed to run screencapture: {}", e))?;
+
+        if !status.success() || !path.exists() {
+            if step == 0 {
+                return Err("Failed to capture window. Ensure the window is visible and Screen Recording is allowed.".to_string());
+            }
+            break;
+        }
+        paths.push(path.clone());
+
+        if step + 1 >= MAX_STEPS {
+            break;
+        }
+
+        let _ = Command::new("osascript")
+            .arg("-e")
+            .arg("tell application \"System Events\" to key code 121")
+            .output();
+        std::thread::sleep(std::time::Duration::from_millis(SCROLL_DELAY_MS));
+    }
+
+    if paths.len() < 2 {
+        return Err("Scrolling capture needs at least 2 frames. Scroll the content a bit and try again.".to_string());
+    }
+
+    let save_path = PathBuf::from(&save_dir);
+    std::fs::create_dir_all(&save_path).map_err(|e| format!("Failed to create save dir: {}", e))?;
+
+    let out_path = stitch_scroll_captures(&paths, OVERLAP_RATIO, &save_dir)
+        .map_err(|e| format!("Failed to stitch: {}", e))?;
+
+    play_screenshot_sound().await.ok();
+    Ok(out_path)
+    }
+}
+
+#[cfg(target_os = "macos")]
+struct TempDirGuard {
+    path: std::path::PathBuf,
+}
+
+#[cfg(target_os = "macos")]
+impl Drop for TempDirGuard {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.path);
     }
 }
 

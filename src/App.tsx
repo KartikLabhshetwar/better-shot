@@ -15,7 +15,7 @@ import {
 } from "@tauri-apps/api/window";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Store } from "@tauri-apps/plugin-store";
-import { AppWindowMac, Crop, Monitor, ScanText } from "lucide-react";
+import { AppWindowMac, Crop, Monitor, ScanText, ScrollText } from "lucide-react";
 import { toast } from "sonner";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { KeyboardShortcut } from "./components/preferences/KeyboardShortcutManager";
@@ -27,7 +27,7 @@ const OnboardingFlow = lazy(() => import("./components/onboarding/OnboardingFlow
 const PreferencesPage = lazy(() => import("./components/preferences/PreferencesPage").then(m => ({ default: m.PreferencesPage })));
 
 type AppMode = "main" | "editing" | "preferences";
-type CaptureMode = "region" | "fullscreen" | "window" | "ocr";
+type CaptureMode = "region" | "fullscreen" | "window" | "scroll" | "ocr";
 
 // Loading fallback for lazy loaded components
 function LoadingFallback() {
@@ -48,6 +48,7 @@ const DEFAULT_SHORTCUTS: KeyboardShortcut[] = [
   { id: "region", action: "Capture Region", shortcut: "CommandOrControl+Shift+2", enabled: true },
   { id: "fullscreen", action: "Capture Screen", shortcut: "CommandOrControl+Shift+F", enabled: false },
   { id: "window", action: "Capture Window", shortcut: "CommandOrControl+Shift+D", enabled: false },
+  { id: "scroll", action: "Capture Scroll", shortcut: "CommandOrControl+Shift+S", enabled: false },
   { id: "ocr", action: "OCR Region", shortcut: "CommandOrControl+Shift+O", enabled: false },
 ];
 
@@ -434,6 +435,7 @@ function App() {
         region: "native_capture_interactive",
         fullscreen: "native_capture_fullscreen",
         window: "native_capture_window",
+        scroll: "native_capture_scroll",
       };
 
       const screenshotPath = await invoke<string>(commandMap[captureMode], {
@@ -535,6 +537,7 @@ function App() {
           "Capture Region": "region",
           "Capture Screen": "fullscreen",
           "Capture Window": "window",
+          "Capture Scroll": "scroll",
           "OCR Region": "ocr",
         };
 
@@ -580,6 +583,7 @@ function App() {
     let unlisten2: (() => void) | null = null;
     let unlisten3: (() => void) | null = null;
     let unlisten4: (() => void) | null = null;
+    let unlisten4b: (() => void) | null = null;
     let unlisten5: (() => void) | null = null;
     let unlisten6: (() => void) | null = null;
     let unlisten7: (() => void) | null = null;
@@ -599,6 +603,9 @@ function App() {
       });
       unlisten4 = await listen("capture-ocr", () => {
         if (mounted) handleCaptureRef.current("ocr");
+      });
+      unlisten4b = await listen("capture-scroll", () => {
+        if (mounted) handleCaptureRef.current("scroll");
       });
       unlisten5 = await listen("open-preferences", () => {
         if (mounted) setMode("preferences");
@@ -641,6 +648,7 @@ function App() {
       unlisten2?.();
       unlisten3?.();
       unlisten4?.();
+      unlisten4b?.();
       unlisten5?.();
       unlisten6?.();
       unlisten7?.();
@@ -815,6 +823,16 @@ function App() {
                 <AppWindowMac className="size-4" aria-hidden="true" />
                 Window
               </Button>
+              <Button
+                onClick={() => handleCapture("scroll")}
+                disabled={isCapturing}
+                variant="cta"
+                size="lg"
+                className="py-3 disabled:opacity-50 disabled:cursor-not-allowed col-span-2"
+              >
+                <ScrollText className="size-4" aria-hidden="true" />
+                Scroll capture
+              </Button>
             </div>
 
             {/* Quick Toggle for Auto-apply */}
@@ -881,6 +899,12 @@ function App() {
                   <span className="text-muted-foreground">Window</span>
                   <kbd className="px-2 py-1 bg-secondary border border-border rounded text-foreground font-mono text-xs tabular-nums">
                     {getShortcutDisplay("window")}
+                  </kbd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Scroll capture</span>
+                  <kbd className="px-2 py-1 bg-secondary border border-border rounded text-foreground font-mono text-xs tabular-nums">
+                    {getShortcutDisplay("scroll")}
                   </kbd>
                 </div>
                 <div className="flex items-center justify-between">

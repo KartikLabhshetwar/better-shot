@@ -178,6 +178,9 @@ pub fn run() {
             let capture_ocr_item =
                 MenuItemBuilder::with_id("capture_ocr", "OCR Region").build(app)?;
 
+            let capture_scroll_item =
+                MenuItemBuilder::with_id("capture_scroll", "Capture Scroll").build(app)?;
+
             let preferences_item =
                 MenuItemBuilder::with_id("preferences", "Preferences...")
                     .accelerator("CommandOrControl+,")
@@ -194,6 +197,7 @@ pub fn run() {
                     &capture_region_item,
                     &capture_screen_item,
                     &capture_window_item,
+                    &capture_scroll_item,
                     &capture_ocr_item,
                     &PredefinedMenuItem::separator(app)?,
                     &preferences_item,
@@ -224,6 +228,9 @@ pub fn run() {
                         "capture_ocr" => {
                             let _ = app.emit("capture-ocr", ());
                         }
+                        "capture_scroll" => {
+                            let _ = app.emit("capture-scroll", ());
+                        }
                         "preferences" => {
                             if let Err(e) = show_main_window(app) {
                                 eprintln!("Failed to show window: {}", e);
@@ -252,6 +259,7 @@ pub fn run() {
             native_capture_interactive,
             native_capture_fullscreen,
             native_capture_window,
+            native_capture_scroll,
             native_capture_ocr_region,
             play_screenshot_sound,
             get_mouse_position,

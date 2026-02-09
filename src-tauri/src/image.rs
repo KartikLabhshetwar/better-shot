@@ -109,6 +109,70 @@ pub fn save_base64_image(image_data: &str, save_dir: &str, prefix: &str) -> AppR
 
     Ok(file_path.to_string_lossy().into_owned())
 }
+pub fn stitch_scroll_captures(
+    image_paths: &[std::path::PathBuf],
+    overlap_ratio: f32,
+    save_dir: &str,
+) -> AppResult<String> {
+    if image_paths.is_empty() {
+        return Err("No images to stitch".into());
+    }
+    if overlap_ratio < 0.0 || overlap_ratio >= 1.0 {
+        return Err("overlap_ratio must be in [0, 1)".into());
+    }
+
+    let mut images: Vec<DynamicImage> = Vec::with_capacity(image_paths.len());
+    let (width, first_height) = {
+        let img = image::open(&image_paths[0])
+            .map_err(|e| format!("Failed to open first image: {}", e))?;
+        let (w, h) = (img.width(), img.height());
+        images.push(img);
+        (w, h)
+    };
+
+    for path in image_paths.iter().skip(1) {
+        let img = image::open(path).map_err(|e| format!("Failed to open image: {}", e))?;
+        if img.width() != width {
+            return Err(format!(
+                "Image width mismatch: expected {}, got {}",
+                width,
+                img.width()
+            ));
+        }
+        images.push(img);
+    }
+
+    let overlap_px = (first_height as f32 * overlap_ratio).round() as u32;
+    let append_height = first_height.saturating_sub(overlap_px);
+    let total_height = first_height
+        + append_height
+            .checked_mul(images.len().saturating_sub(1) as u32)
+            .unwrap_or(0);
+
+    let mut result = RgbaImage::new(width, total_height);
+    let first = images[0].to_rgba8();
+    image::imageops::replace(&mut result, &first, 0, 0);
+
+    let mut y = first_height as i64;
+    for img in images.iter().skip(1) {
+        let rgba = img.to_rgba8();
+        let crop_y = overlap_px.min(rgba.height().saturating_sub(1));
+        let crop_h = rgba.height().saturating_sub(crop_y);
+        if crop_h == 0 {
+            break;
+        }
+        let cropped_view = image::imageops::crop_imm(&rgba, 0, crop_y, width, crop_h);
+        let cropped_img =
+            RgbaImage::from_fn(width, crop_h, |x, y| *cropped_view.get_pixel(x, y));
+        if y + crop_h as i64 <= total_height as i64 {
+            image::imageops::replace(&mut result, &cropped_img, 0, y as u32);
+        }
+        y += crop_h as i64;
+    }
+
+    let final_img = DynamicImage::ImageRgba8(result);
+    save_image(&final_img, save_dir, "scroll")
+}
 
 /// Copy a screenshot file to a destination directory
 pub fn copy_screenshot_to_dir(source_path: &str, save_dir: &str) -> AppResult<String> {
