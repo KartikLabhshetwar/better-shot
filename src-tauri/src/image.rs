@@ -156,11 +156,12 @@ pub fn stitch_scroll_captures(
     let mut y = first_height as i64;
     for img in images.iter().skip(1) {
         let rgba = img.to_rgba8();
-        let crop_y = overlap_px.min(rgba.height().saturating_sub(1));
-        let crop_h = rgba.height().saturating_sub(crop_y);
-        if crop_h == 0 {
-            break;
+        if overlap_px >= rgba.height() {
+            return Err("overlap_ratio is too large for image height".into());
         }
+
+        let crop_y = overlap_px;
+        let crop_h = rgba.height() - crop_y;
         let cropped_view = image::imageops::crop_imm(&rgba, 0, crop_y, width, crop_h);
         let cropped_img =
             RgbaImage::from_fn(width, crop_h, |x, y| *cropped_view.get_pixel(x, y));
