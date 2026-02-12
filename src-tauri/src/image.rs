@@ -162,8 +162,6 @@ pub fn stitch_scroll_captures(
 
         let crop_y = overlap_px;
         let crop_h = rgba.height() - crop_y;
-        let cropped_view = image::imageops::crop_imm(&rgba, 0, crop_y, width, crop_h);
-        let cropped_img =
         let cropped_img = image::imageops::crop_imm(&rgba, 0, crop_y, width, crop_h).to_image();
         if y + crop_h as i64 <= total_height as i64 {
             image::imageops::replace(&mut result, &cropped_img, 0, y as u32);
