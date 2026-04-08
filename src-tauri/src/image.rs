@@ -5,7 +5,7 @@ use image::DynamicImage;
 use std::fs;
 use std::path::PathBuf;
 
-use crate::utils::{ensure_dir, generate_filename, AppResult};
+use crate::utils::{ensure_dir, generate_filename, sanitize_prefix, AppResult};
 
 /// Region coordinates for cropping
 #[derive(Debug, Clone, Copy)]
@@ -101,7 +101,7 @@ pub fn save_base64_image(image_data: &str, save_dir: &str, prefix: &str) -> AppR
     let dest_path = PathBuf::from(save_dir);
     ensure_dir(&dest_path)?;
 
-    let filename = generate_filename(prefix, "png")?;
+    let filename = generate_filename(&sanitize_prefix(prefix), "png")?;
     let file_path = dest_path.join(&filename);
 
     fs::write(&file_path, image_bytes).map_err(|e| format!("Failed to save image: {}", e))?;

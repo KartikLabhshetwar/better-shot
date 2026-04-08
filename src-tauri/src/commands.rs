@@ -1,8 +1,10 @@
 //! Tauri commands module
 
+use std::fs;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
 
 #[cfg(target_os = "macos")]
@@ -14,7 +16,9 @@ use crate::image::{copy_screenshot_to_dir, crop_image, save_base64_image, CropRe
 use crate::screenshot::{
     capture_all_monitors as capture_monitors, capture_primary_monitor, MonitorShot,
 };
-use crate::utils::{generate_filename, get_desktop_path};
+use crate::utils::{ensure_dir, generate_filename, get_desktop_path};
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine as _;
 
 static SCREENCAPTURE_LOCK: Mutex<()> = Mutex::new(());
 
@@ -97,8 +101,39 @@ pub async fn save_edited_image(
     image_data: String,
     save_dir: String,
     copy_to_clip: bool,
+    prefix: Option<String>,
+    filename: Option<String>,
 ) -> Result<String, String> {
-    let saved_path = save_base64_image(&image_data, &save_dir, "bettershot")?;
+    let chosen_prefix = prefix.unwrap_or_else(|| "bettershot".to_string());
+
+    let saved_path = if let Some(name) = filename {
+        // honor custom filename; append .png if needed
+        let mut final_name = name.trim().to_string();
+        if final_name.is_empty() {
+            save_base64_image(&image_data, &save_dir, &chosen_prefix)?
+        } else {
+            if !final_name.to_lowercase().ends_with(".png") {
+                final_name.push_str(".png");
+            }
+            let dest_path = PathBuf::from(&save_dir);
+            ensure_dir(&dest_path).map_err(|e| e)?;
+            let file_path = dest_path.join(final_name);
+            let base64_data = image_data
+                .strip_prefix("data:image/png;base64,")
+                .ok_or("Invalid image data format: expected data:image/png;base64, prefix")?;
+            let image_bytes = BASE64_STANDARD
+                .decode(base64_data)
+                .map_err(|e| format!("Failed to decode base64: {}", e))?;
+            std::fs::write(&file_path, image_bytes)
+                .map_err(|e| format!("Failed to save image: {}", e))?;
+            file_path
+                .to_str()
+                .map(|s| s.to_string())
+                .ok_or_else(|| "Failed to convert file path to string".to_string())?
+        }
+    } else {
+        save_base64_image(&image_data, &save_dir, &chosen_prefix)?
+    };
 
     if copy_to_clip {
         copy_image_to_clipboard(&saved_path)?;
@@ -290,6 +325,154 @@ pub async fn play_screenshot_sound() -> Result<(), String> {
     });
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn select_directory_dialog(default_path: Option<String>) -> Result<Option<String>, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let mut script = String::from("try\n");
+        script.push_str("  set chosen to choose folder with prompt \"Select save directory\"");
+        if let Some(path) = default_path {
+            let escaped = path.replace('"', "\\\"");
+            script.push(' ');
+            script.push_str(&format!("default location POSIX file \"{}\"", escaped));
+        }
+        script.push_str("\n  return POSIX path of chosen\n");
+        script.push_str("on error\n  return \"\"\nend try");
+
+        let output = Command::new("osascript")
+            .arg("-e")
+            .arg(script)
+            .output()
+            .map_err(|e| format!("Failed to launch directory picker: {}", e))?;
+
+        if !output.status.success() {
+            return Err("Directory picker was cancelled or failed".to_string());
+        }
+
+        let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if path.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(path))
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err("Directory picker is only supported on macOS".to_string())
+    }
+}
+
+#[tauri::command]
+pub fn open_image_file_dialog() -> Result<Option<String>, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let script = r#"try
+  set chosen to choose file with prompt "Select a photo to edit" of type {"public.png", "public.jpeg", "public.heic", "public.webp"}
+  POSIX path of chosen
+on error
+  ""
+end try"#;
+
+        let output = Command::new("osascript")
+            .arg("-e")
+            .arg(script)
+            .output()
+            .map_err(|e| format!("Failed to launch image picker: {}", e))?;
+
+        if !output.status.success() {
+            return Err("Image picker was cancelled or failed".to_string());
+        }
+
+        let selected = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if selected.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(selected))
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err("Image picker is only supported on macOS".to_string())
+    }
+}
+
+#[tauri::command]
+pub fn delete_temp_workspace_file(file_path: String) -> Result<(), String> {
+    let path = PathBuf::from(&file_path);
+    // Only delete files that are inside the bettershot-uploads temp directory
+    let mut expected_dir = std::env::temp_dir();
+    expected_dir.push("bettershot-uploads");
+    let canonical_path = path
+        .canonicalize()
+        .map_err(|_| "File not found or already deleted".to_string())?;
+    let canonical_dir = expected_dir
+        .canonicalize()
+        .map_err(|_| "Temp workspace directory not found".to_string())?;
+    if !canonical_path.starts_with(&canonical_dir) {
+        return Err("Refusing to delete file outside the bettershot-uploads workspace".to_string());
+    }
+    fs::remove_file(&canonical_path)
+        .map_err(|e| format!("Failed to delete temp file: {}", e))
+}
+
+#[tauri::command]
+pub fn copy_file_to_temp_workspace(source_path: String) -> Result<String, String> {
+    let source = PathBuf::from(&source_path);
+    // Canonicalize to resolve symlinks and reject path traversal components
+    let source = source
+        .canonicalize()
+        .map_err(|_| "Selected file not found or path is invalid".to_string())?;
+    if !source.exists() {
+        return Err("Selected file no longer exists".to_string());
+    }
+
+    let mut target_dir = std::env::temp_dir();
+    target_dir.push("bettershot-uploads");
+    fs::create_dir_all(&target_dir)
+        .map_err(|e| format!("Failed to prepare temporary folder: {}", e))?;
+
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|e| format!("Failed to read system time: {}", e))?;
+
+    let file_name = source
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("photo.png");
+    let sanitized = sanitize_filename(file_name);
+
+    let dest_name = format!("{}-{}", timestamp.as_millis(), sanitized);
+    let destination = target_dir.join(dest_name);
+
+    fs::copy(&source, &destination)
+        .map_err(|e| format!("Failed to copy file: {}", e))?;
+
+    destination
+        .to_str()
+        .map(|s| s.to_string())
+        .ok_or_else(|| "Failed to convert temp path to string".to_string())
+}
+
+fn sanitize_filename(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        "photo".to_string()
+    } else {
+        trimmed
+            .chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect()
+    }
 }
 
 /// Get the current mouse cursor position (for determining which screen to open editor on)

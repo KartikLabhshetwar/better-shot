@@ -1,26 +1,65 @@
 import { memo } from "react";
 import { Slider } from "@/components/ui/slider";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ShadowSettings } from "@/stores/editorStore";
 
 interface EffectsPanelProps {
   noiseAmount: number;
   padding: number;
   shadow: ShadowSettings;
-  // Transient handlers (during drag) - for visual feedback
+  noiseExpanded?: boolean;
+  shadowExpanded?: boolean;
   onNoiseChangeTransient?: (value: number) => void;
   onPaddingChangeTransient?: (value: number) => void;
   onShadowBlurChangeTransient?: (value: number) => void;
   onShadowOffsetXChangeTransient?: (value: number) => void;
   onShadowOffsetYChangeTransient?: (value: number) => void;
   onShadowOpacityChangeTransient?: (value: number) => void;
-  // Commit handlers (on release) - for state/history
   onNoiseChange: (value: number) => void;
   onPaddingChange: (value: number) => void;
   onShadowBlurChange: (value: number) => void;
   onShadowOffsetXChange: (value: number) => void;
   onShadowOffsetYChange: (value: number) => void;
   onShadowOpacityChange: (value: number) => void;
+  onNoiseToggle?: () => void;
+  onShadowToggle?: () => void;
+}
+
+function SliderRow({
+  label,
+  value,
+  unit = "px",
+  min,
+  max,
+  step = 1,
+  onChangeTransient,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  unit?: string;
+  min: number;
+  max: number;
+  step?: number;
+  onChangeTransient?: (v: number) => void;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div className="toggle-row" style={{ marginBottom: 6 }}>
+        <span className="toggle-label">{label}</span>
+        <span className="toggle-value">{value}{unit}</span>
+      </div>
+      <Slider
+        value={[value]}
+        onValueChange={(v) => onChangeTransient?.(v[0])}
+        onValueCommit={(v) => onChange(v[0])}
+        min={min}
+        max={max}
+        step={step}
+        className="studio-slider w-full"
+      />
+    </div>
+  );
 }
 
 export const EffectsPanel = memo(function EffectsPanel({
@@ -40,131 +79,76 @@ export const EffectsPanel = memo(function EffectsPanel({
   onShadowOffsetYChange,
   onShadowOpacityChange,
 }: EffectsPanelProps) {
-  const maxPadding = 200;
   return (
-    <div className="space-y-6">
-      {/* Background Effects */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-foreground font-mono text-balance">Background Effects</h3>
-        </div>
-
-        <div className="space-y-6">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-xs text-muted-foreground font-medium">Noise</label>
-              <span className="text-xs text-muted-foreground font-mono tabular-nums">{noiseAmount}%</span>
-            </div>
-            <Slider
-              value={[noiseAmount]}
-              onValueChange={(value) => onNoiseChangeTransient?.(value[0])}
-              onValueCommit={(value) => onNoiseChange(value[0])}
-              min={0}
-              max={100}
-              step={1}
-              className="w-full"
-            />
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <label className="text-xs text-muted-foreground font-medium cursor-help">Background Border</label>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="max-w-48">
-                    <p className="text-xs text-pretty">Adjust the width of the background border around the captured object.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <span className="text-xs text-muted-foreground font-mono tabular-nums">{padding}px</span>
-            </div>
-            <Slider
-              value={[padding]}
-              onValueChange={(value) => onPaddingChangeTransient?.(value[0])}
-              onValueCommit={(value) => onPaddingChange(value[0])}
-              min={0}
-              max={maxPadding}
-              step={1}
-              className="w-full"
-            />
-          </div>
-        </div>
+    <div>
+      {/* Padding */}
+      <div className="section-header">
+        <span className="section-title">Border</span>
       </div>
+      <SliderRow
+        label="Padding"
+        value={padding}
+        min={0}
+        max={200}
+        onChangeTransient={onPaddingChangeTransient}
+        onChange={onPaddingChange}
+      />
 
-      {/* Shadow Effects */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-foreground font-mono text-balance">Shadow</h3>
-        </div>
-        
-        <div className="space-y-6">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-xs text-muted-foreground font-medium">Blur</label>
-              <span className="text-xs text-muted-foreground font-mono tabular-nums">{shadow.blur}px</span>
-            </div>
-            <Slider
-              value={[shadow.blur]}
-              onValueChange={(value) => onShadowBlurChangeTransient?.(value[0])}
-              onValueCommit={(value) => onShadowBlurChange(value[0])}
-              min={0}
-              max={100}
-              step={1}
-              className="w-full"
-            />
-          </div>
+      <hr className="panel-divider" />
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-xs text-muted-foreground font-medium">Offset X</label>
-              <span className="text-xs text-muted-foreground font-mono tabular-nums">{shadow.offsetX}px</span>
-            </div>
-            <Slider
-              value={[shadow.offsetX]}
-              onValueChange={(value) => onShadowOffsetXChangeTransient?.(value[0])}
-              onValueCommit={(value) => onShadowOffsetXChange(value[0])}
-              min={-50}
-              max={50}
-              step={1}
-              className="w-full"
-            />
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-xs text-muted-foreground font-medium">Offset Y</label>
-              <span className="text-xs text-muted-foreground font-mono tabular-nums">{shadow.offsetY}px</span>
-            </div>
-            <Slider
-              value={[shadow.offsetY]}
-              onValueChange={(value) => onShadowOffsetYChangeTransient?.(value[0])}
-              onValueCommit={(value) => onShadowOffsetYChange(value[0])}
-              min={-50}
-              max={50}
-              step={1}
-              className="w-full"
-            />
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-xs text-muted-foreground font-medium">Opacity</label>
-              <span className="text-xs text-muted-foreground font-mono tabular-nums">{shadow.opacity}%</span>
-            </div>
-            <Slider
-              value={[shadow.opacity]}
-              onValueChange={(value) => onShadowOpacityChangeTransient?.(value[0])}
-              onValueCommit={(value) => onShadowOpacityChange(value[0])}
-              min={0}
-              max={100}
-              step={1}
-              className="w-full"
-            />
-          </div>
-        </div>
+      {/* Noise */}
+      <div className="section-header">
+        <span className="section-title">Noise</span>
       </div>
+      <SliderRow
+        label="Amount"
+        value={noiseAmount}
+        unit="%"
+        min={0}
+        max={100}
+        onChangeTransient={onNoiseChangeTransient}
+        onChange={onNoiseChange}
+      />
+
+      <hr className="panel-divider" />
+
+      {/* Shadow */}
+      <div className="section-header">
+        <span className="section-title">Shadow</span>
+      </div>
+      <SliderRow
+        label="Blur"
+        value={shadow.blur}
+        min={0}
+        max={100}
+        onChangeTransient={onShadowBlurChangeTransient}
+        onChange={onShadowBlurChange}
+      />
+      <SliderRow
+        label="Offset X"
+        value={shadow.offsetX}
+        min={-50}
+        max={50}
+        onChangeTransient={onShadowOffsetXChangeTransient}
+        onChange={onShadowOffsetXChange}
+      />
+      <SliderRow
+        label="Offset Y"
+        value={shadow.offsetY}
+        min={-50}
+        max={50}
+        onChangeTransient={onShadowOffsetYChangeTransient}
+        onChange={onShadowOffsetYChange}
+      />
+      <SliderRow
+        label="Opacity"
+        value={shadow.opacity}
+        unit="%"
+        min={0}
+        max={100}
+        onChangeTransient={onShadowOpacityChangeTransient}
+        onChange={onShadowOpacityChange}
+      />
     </div>
   );
 });

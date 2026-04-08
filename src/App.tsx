@@ -1,8 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { migrateStoredValue, isAssetId, isDataUrl } from "@/lib/asset-registry";
-import { processScreenshotWithDefaultBackground } from "@/lib/auto-process";
 import { hasCompletedOnboarding } from "@/lib/onboarding";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -12,7 +18,7 @@ import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Store } from "@tauri-apps/plugin-store";
 import type { KeyboardShortcut } from "./components/preferences/KeyboardShortcutManager";
 import { SettingsIcon } from "./components/SettingsIcon";
-import { AppWindowMac, Crop, Monitor } from "lucide-react";
+import { AppWindowMac, Crop, ImageUp, Monitor } from "lucide-react";
 import { toast } from "sonner";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { editorActions } from "@/stores/editorStore";
@@ -106,8 +112,8 @@ async function restoreWindow() {
 function App() {
   const [mode, setMode] = useState<AppMode>("main");
   const [saveDir, setSaveDir] = useState<string>("");
+  const [filenamePrefix, setFilenamePrefix] = useState<string>("bettershot");
   const [copyToClipboard, setCopyToClipboard] = useState(true);
-  const [autoApplyBackground, setAutoApplyBackground] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [tempScreenshotPath, setTempScreenshotPath] = useState<string | null>(null);
@@ -115,15 +121,16 @@ function App() {
   const [shortcuts, setShortcuts] = useState<KeyboardShortcut[]>(DEFAULT_SHORTCUTS);
   const [settingsVersion, setSettingsVersion] = useState(0);
   const [tempDir, setTempDir] = useState<string>("/tmp");
+  const [isSelectingFile, setIsSelectingFile] = useState(false);
 
   // Refs to hold current values for use in callbacks that may have stale closures
-  const settingsRef = useRef({ autoApplyBackground, saveDir, copyToClipboard, tempDir });
+  const settingsRef = useRef({ saveDir, copyToClipboard, tempDir, filenamePrefix });
   const registeredShortcutsRef = useRef<Set<string>>(new Set());
-  
+
   // Keep ref in sync with state
   useEffect(() => {
-    settingsRef.current = { autoApplyBackground, saveDir, copyToClipboard, tempDir };
-  }, [autoApplyBackground, saveDir, copyToClipboard, tempDir]);
+    settingsRef.current = { saveDir, copyToClipboard, tempDir, filenamePrefix };
+  }, [saveDir, copyToClipboard, tempDir, filenamePrefix]);
 
   // Load settings function
   const loadSettings = useCallback(async () => {
@@ -131,7 +138,6 @@ function App() {
       const store = await Store.load("settings.json", {
         defaults: {
           copyToClipboard: true,
-          autoApplyBackground: false,
         },
         autoSave: true,
       });
@@ -141,14 +147,14 @@ function App() {
         setCopyToClipboard(savedCopyToClip);
       }
 
-      const savedAutoApply = await store.get<boolean>("autoApplyBackground");
-      if (savedAutoApply !== null && savedAutoApply !== undefined) {
-        setAutoApplyBackground(savedAutoApply);
-      }
-
       const savedSaveDir = await store.get<string>("saveDir");
       if (savedSaveDir) {
         setSaveDir(savedSaveDir);
+      }
+
+      const savedFilenamePrefix = await store.get<string>("filenamePrefix");
+      if (savedFilenamePrefix && savedFilenamePrefix.trim() !== "") {
+        setFilenamePrefix(savedFilenamePrefix.trim());
       }
 
       const savedShortcuts = await store.get<KeyboardShortcut[]>("keyboardShortcuts");
@@ -193,7 +199,6 @@ function App() {
         const store = await Store.load("settings.json", {
           defaults: {
             copyToClipboard: true,
-            autoApplyBackground: false,
           },
           autoSave: true,
         });
@@ -201,11 +206,6 @@ function App() {
         const savedCopyToClip = await store.get<boolean>("copyToClipboard");
         if (savedCopyToClip !== null && savedCopyToClip !== undefined) {
           setCopyToClipboard(savedCopyToClip);
-        }
-
-        const savedAutoApply = await store.get<boolean>("autoApplyBackground");
-        if (savedAutoApply !== null && savedAutoApply !== undefined) {
-          setAutoApplyBackground(savedAutoApply);
         }
 
         // Only use saved directory if it's a non-empty string, otherwise use desktop
@@ -217,9 +217,16 @@ function App() {
           setSaveDir(desktopPath);
           if (desktopPath) {
             await store.set("saveDir", desktopPath);
-            await store.save();
           }
         }
+
+        const savedFilenamePrefix = await store.get<string>("filenamePrefix");
+        const finalPrefix = savedFilenamePrefix && savedFilenamePrefix.trim() !== ""
+          ? savedFilenamePrefix.trim()
+          : "bettershot";
+        setFilenamePrefix(finalPrefix);
+        await store.set("filenamePrefix", finalPrefix);
+        await store.save();
 
         const savedShortcuts = await store.get<KeyboardShortcut[]>("keyboardShortcuts");
         if (savedShortcuts && savedShortcuts.length > 0) {
@@ -268,7 +275,7 @@ function App() {
     const appWindow = getCurrentWindow();
     
     // Read current settings from ref to avoid stale closure issues
-    const { autoApplyBackground: shouldAutoApply, saveDir: currentSaveDir, copyToClipboard: shouldCopyToClipboard, tempDir: currentTempDir } = settingsRef.current;
+    const { tempDir: currentTempDir } = settingsRef.current;
 
     try {
       await appWindow.hide();
@@ -298,39 +305,6 @@ function App() {
 
       invoke("play_screenshot_sound").catch(console.error);
 
-      if (shouldAutoApply) {
-        
-        try {
-          const processedImageData = await processScreenshotWithDefaultBackground(screenshotPath);
-          
-          const savedPath = await invoke<string>("save_edited_image", {
-            imageData: processedImageData,
-            saveDir: currentSaveDir,
-            copyToClip: shouldCopyToClipboard,
-          });
-
-          toast.success("Screenshot processed and saved", {
-            description: savedPath,
-            duration: 3000,
-          });
-          
-          // Ensure window stays hidden after auto-apply
-          await appWindow.hide();
-        } catch (err) {
-          const errorMessage = err instanceof Error ? err.message : String(err);
-          setError(`Failed to process screenshot: ${errorMessage}`);
-          toast.error("Failed to process screenshot", {
-            description: errorMessage,
-            duration: 5000,
-          });
-          // Even on error, keep window hidden in auto-apply mode
-          await appWindow.hide();
-        } finally {
-          setIsCapturing(false);
-        }
-        return;
-      }
-
       setTempScreenshotPath(screenshotPath);
       setMode("editing");
       try {
@@ -341,15 +315,10 @@ function App() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       if (errorMessage.includes("cancelled") || errorMessage.includes("was cancelled")) {
-        // Only restore window if not in auto-apply mode
-        if (!shouldAutoApply) {
-          await restoreWindow();
-        }
+        await restoreWindow();
       } else if (errorMessage.includes("already in progress")) {
         setError("Please wait for the current screenshot to complete");
-        if (!shouldAutoApply) {
-          await restoreWindow();
-        }
+        await restoreWindow();
       } else if (
         errorMessage.toLowerCase().includes("permission") ||
         errorMessage.toLowerCase().includes("access") ||
@@ -358,13 +327,10 @@ function App() {
         setError(
           "Screen Recording permission required. Please go to System Settings > Privacy & Security > Screen Recording and enable access for Better Shot, then restart the app."
         );
-        // Always show window for permission errors so user can see the message
         await restoreWindow();
       } else {
         setError(errorMessage);
-        if (!shouldAutoApply) {
-          await restoreWindow();
-        }
+        await restoreWindow();
       }
     } finally {
       setIsCapturing(false);
@@ -463,37 +429,89 @@ function App() {
     setSettingsVersion(v => v + 1);
   }, [loadSettings]);
 
-  // Toggle auto-apply from main page
-  const handleAutoApplyToggle = useCallback(async (checked: boolean) => {
-    setAutoApplyBackground(checked);
-    try {
-      const store = await Store.load("settings.json");
-      await store.set("autoApplyBackground", checked);
-      await store.save();
-    } catch (err) {
-      console.error("Failed to save auto-apply setting:", err);
-      toast.error("Failed to save setting");
-    }
-  }, []);
-
   const handleBackFromPreferences = useCallback(async () => {
     await loadSettings();
     setSettingsVersion(v => v + 1);
     setMode("main");
   }, [loadSettings]);
 
-  async function handleEditorSave(editedImageData: string) {
+  const handleSaveDirChange = useCallback(async (newDir: string) => {
+    setSaveDir(newDir);
+    try {
+      const store = await Store.load("settings.json");
+      await store.set("saveDir", newDir);
+      await store.save();
+    } catch (err) {
+      console.error("Failed to save directory:", err);
+      toast.error("Failed to update save directory");
+    }
+  }, []);
+
+  const [isPermissionDialogOpen, setIsPermissionDialogOpen] = useState(false);
+
+  const handleUploadButtonClick = useCallback(() => {
+    setIsPermissionDialogOpen(true);
+  }, []);
+
+  const handlePermissionDialogClose = useCallback(() => {
+    if (!isSelectingFile) {
+      setIsPermissionDialogOpen(false);
+    }
+  }, [isSelectingFile]);
+
+  const handlePermissionDialogConfirm = useCallback(async () => {
+    if (isSelectingFile) return;
+
+    setError(null);
+    setIsSelectingFile(true);
+
+    try {
+      const selected = await invoke<string | null>("open_image_file_dialog");
+
+      if (!selected) {
+        setIsPermissionDialogOpen(false);
+        return;
+      }
+
+      const sandboxedPath = await invoke<string>("copy_file_to_temp_workspace", {
+        sourcePath: selected,
+      });
+
+      setTempScreenshotPath(sandboxedPath);
+      setMode("editing");
+      await restoreWindow();
+      setIsPermissionDialogOpen(false);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage);
+      toast.error("Failed to open image", {
+        description: errorMessage,
+        duration: 5000,
+      });
+    } finally {
+      setIsSelectingFile(false);
+    }
+  }, [isSelectingFile]);
+
+  async function handleEditorSave(editedImageData: string, filenameOverride?: string) {
     try {
       const savedPath = await invoke<string>("save_edited_image", {
         imageData: editedImageData,
         saveDir,
         copyToClip: copyToClipboard,
+        prefix: "bettershot",
+        filename: filenameOverride,
       });
 
       toast.success("Image saved", {
         description: savedPath,
         duration: 4000,
       });
+
+      // Clean up sandboxed temp file if it came from the upload flow
+      if (tempScreenshotPath?.includes("bettershot-uploads")) {
+        invoke("delete_temp_workspace_file", { filePath: tempScreenshotPath }).catch(console.error);
+      }
 
       editorActions.reset();
       setMode("main");
@@ -511,6 +529,10 @@ function App() {
   }
 
   async function handleEditorCancel() {
+    // Clean up sandboxed temp file if it came from the upload flow
+    if (tempScreenshotPath?.includes("bettershot-uploads")) {
+      invoke("delete_temp_workspace_file", { filePath: tempScreenshotPath }).catch(console.error);
+    }
     editorActions.reset();
     setMode("main");
     setTempScreenshotPath(null);
@@ -534,6 +556,8 @@ function App() {
           imagePath={tempScreenshotPath}
           onSave={handleEditorSave}
           onCancel={handleEditorCancel}
+          saveDir={saveDir}
+          onSaveDirChange={handleSaveDirChange}
         />
       </Suspense>
     );
@@ -616,20 +640,21 @@ function App() {
               </Button>
             </div>
 
-            {/* Quick Toggle for Auto-apply */}
-            <div className="flex items-center justify-between py-2 px-1">
-              <div className="flex-1">
-                <label htmlFor="auto-apply-toggle" className="text-sm font-medium text-foreground cursor-pointer block">
-                  Auto-apply background
-                </label>
-                <p className="text-xs text-muted-foreground">Apply default background and save instantly</p>
-              </div>
-              <Switch
-                id="auto-apply-toggle"
-                checked={autoApplyBackground}
-                onCheckedChange={handleAutoApplyToggle}
-              />
-            </div>
+        <div className="space-y-1">
+          <Button
+            onClick={handleUploadButtonClick}
+            disabled={isCapturing || isSelectingFile}
+            variant="outline"
+            size="lg"
+            className="w-full justify-center py-3 disabled:cursor-not-allowed"
+          >
+            <ImageUp className="size-4" aria-hidden="true" />
+            Upload photo to edit
+          </Button>
+          <p className="text-xs text-muted-foreground text-center text-pretty">
+            Bring an existing image into the editor without taking a new screenshot.
+          </p>
+        </div>
 
             {isCapturing && (
               <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
@@ -712,9 +737,53 @@ function App() {
                   <kbd className="px-2 py-1 bg-secondary border border-border rounded text-foreground font-mono text-xs tabular-nums">Esc</kbd>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog
+        open={isPermissionDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              handlePermissionDialogClose();
+            } else {
+              setIsPermissionDialogOpen(true);
+            }
+          }}
+      >
+        <DialogContent className="max-w-lg rounded-lg space-y-4">
+          <DialogHeader>
+            <DialogTitle className="text-lg text-foreground text-balance">Grant photo access</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground text-pretty">
+              Better Shot needs to copy the photo into a secure temporary folder ($TEMP/bettershot) so it can safely render it in the editor without needing permanent access to the original directory.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 text-sm text-muted-foreground text-pretty">
+            <p>We will:</p>
+            <ul className="list-disc list-inside">
+              <li>Ask you to pick the photo via Finder.</li>
+              <li>Copy it into a sandboxed temp folder that is already trusted.</li>
+              <li>Open the copied file inside the editor and delete it once you close the session.</li>
+            </ul>
+          </div>
+          <DialogFooter className="flex justify-end gap-2">
+            <Button
+              variant="ghost"
+              onClick={handlePermissionDialogClose}
+              disabled={isSelectingFile}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="cta"
+              onClick={handlePermissionDialogConfirm}
+              disabled={isSelectingFile}
+            >
+              {isSelectingFile ? "Opening picker…" : "Grant access & pick photo"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </div>
     </main>
     </>

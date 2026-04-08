@@ -249,3 +249,329 @@ describe("smart default padding calculation", () => {
     expect(calculatedPadding).toBe(10); // 200 * 0.05 = 10
   });
 });
+
+describe("editorStore - canvas dimensions feature", () => {
+  beforeEach(() => {
+    act(() => {
+      editorActions.reset();
+    });
+  });
+
+  describe("initial state", () => {
+    it("should have default canvas dimensions of 0 (auto)", () => {
+      const state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.width).toBe(0);
+      expect(state.settings.canvasDimensions.height).toBe(0);
+    });
+
+    it("should have aspect ratio locked by default", () => {
+      const state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.aspectRatioLocked).toBe(true);
+    });
+  });
+
+  describe("setCanvasWidth with aspect ratio locked", () => {
+    it("should update height proportionally when locked", () => {
+      act(() => {
+        editorActions.setCanvasDimensions({
+          width: 1600,
+          height: 1000,
+          aspectRatioLocked: true,
+        });
+      });
+
+      act(() => {
+        editorActions.setCanvasWidth(3200);
+      });
+
+      const state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.width).toBe(3200);
+      expect(state.settings.canvasDimensions.height).toBe(2000); // 3200 * (1000/1600)
+    });
+
+    it("should not update height when unlocked", () => {
+      act(() => {
+        editorActions.setCanvasDimensions({
+          width: 1600,
+          height: 1000,
+          aspectRatioLocked: false,
+        });
+      });
+
+      act(() => {
+        editorActions.setCanvasWidth(3200);
+      });
+
+      const state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.width).toBe(3200);
+      expect(state.settings.canvasDimensions.height).toBe(1000); // Unchanged
+    });
+
+    it("should only enforce aspect ratio when both dimensions are > 0", () => {
+      act(() => {
+        editorActions.setCanvasWidth(1280);
+      });
+
+      const state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.width).toBe(1280);
+      expect(state.settings.canvasDimensions.height).toBe(0); // No ratio calculation when height is 0
+    });
+  });
+
+  describe("setCanvasHeight with aspect ratio locked", () => {
+    it("should update width proportionally when locked", () => {
+      act(() => {
+        editorActions.setCanvasDimensions({
+          width: 1280,
+          height: 800,
+          aspectRatioLocked: true,
+        });
+      });
+
+      act(() => {
+        editorActions.setCanvasHeight(1600);
+      });
+
+      const state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.height).toBe(1600);
+      expect(state.settings.canvasDimensions.width).toBe(2560); // 1600 * (1280/800)
+    });
+  });
+
+  describe("App Store preset dimensions", () => {
+    it("should set 1280×800 preset", () => {
+      act(() => {
+        editorActions.setCanvasDimensions({ width: 1280, height: 800 });
+      });
+
+      const state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.width).toBe(1280);
+      expect(state.settings.canvasDimensions.height).toBe(800);
+    });
+
+    it("should set 1440×900 preset", () => {
+      act(() => {
+        editorActions.setCanvasDimensions({ width: 1440, height: 900 });
+      });
+
+      const state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.width).toBe(1440);
+      expect(state.settings.canvasDimensions.height).toBe(900);
+    });
+
+    it("should set 2560×1600 preset", () => {
+      act(() => {
+        editorActions.setCanvasDimensions({ width: 2560, height: 1600 });
+      });
+
+      const state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.width).toBe(2560);
+      expect(state.settings.canvasDimensions.height).toBe(1600);
+    });
+
+    it("should set 2880×1800 preset", () => {
+      act(() => {
+        editorActions.setCanvasDimensions({ width: 2880, height: 1800 });
+      });
+
+      const state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.width).toBe(2880);
+      expect(state.settings.canvasDimensions.height).toBe(1800);
+    });
+
+    it("should maintain 16:10 aspect ratio for all presets", () => {
+      const presets = [
+        { width: 1280, height: 800 },
+        { width: 1440, height: 900 },
+        { width: 2560, height: 1600 },
+        { width: 2880, height: 1800 },
+      ];
+
+      presets.forEach((preset) => {
+        const ratio = preset.width / preset.height;
+        expect(ratio).toBeCloseTo(1.6, 2); // 16:10 = 1.6
+      });
+    });
+  });
+
+  describe("iPhone display preset dimensions", () => {
+    it("should set 1242×2688 preset", () => {
+      act(() => {
+        editorActions.setCanvasDimensions({ width: 1242, height: 2688 });
+      });
+
+      const state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.width).toBe(1242);
+      expect(state.settings.canvasDimensions.height).toBe(2688);
+    });
+
+    it("should set 2688×1242 preset", () => {
+      act(() => {
+        editorActions.setCanvasDimensions({ width: 2688, height: 1242 });
+      });
+
+      const state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.width).toBe(2688);
+      expect(state.settings.canvasDimensions.height).toBe(1242);
+    });
+
+    it("should set 1284×2778 preset", () => {
+      act(() => {
+        editorActions.setCanvasDimensions({ width: 1284, height: 2778 });
+      });
+
+      const state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.width).toBe(1284);
+      expect(state.settings.canvasDimensions.height).toBe(2778);
+    });
+
+    it("should set 2778×1284 preset", () => {
+      act(() => {
+        editorActions.setCanvasDimensions({ width: 2778, height: 1284 });
+      });
+
+      const state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.width).toBe(2778);
+      expect(state.settings.canvasDimensions.height).toBe(1284);
+    });
+  });
+
+  describe("undo/redo with canvas dimensions", () => {
+    it("should undo dimension changes", () => {
+      act(() => {
+        editorActions.setCanvasDimensions({ width: 1280, height: 800 });
+      });
+
+      act(() => {
+        editorActions.undo();
+      });
+
+      const state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.width).toBe(0);
+      expect(state.settings.canvasDimensions.height).toBe(0);
+    });
+
+    it("should redo dimension changes", () => {
+      act(() => {
+        editorActions.setCanvasDimensions({ width: 2560, height: 1600 });
+        editorActions.undo();
+      });
+
+      act(() => {
+        editorActions.redo();
+      });
+
+      const state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.width).toBe(2560);
+      expect(state.settings.canvasDimensions.height).toBe(1600);
+    });
+
+    it("should support multiple undo/redo operations", () => {
+      act(() => {
+        editorActions.setCanvasDimensions({ width: 1280, height: 800 });
+        editorActions.setCanvasDimensions({ width: 2560, height: 1600 });
+      });
+
+      act(() => {
+        editorActions.undo();
+      });
+
+      let state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.width).toBe(1280);
+
+      act(() => {
+        editorActions.undo();
+      });
+
+      state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.width).toBe(0);
+
+      act(() => {
+        editorActions.redo();
+      });
+
+      state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.width).toBe(1280);
+    });
+  });
+
+  describe("transient updates", () => {
+    it("should not create history entries for transient width updates", () => {
+      const initialHistoryLength = useEditorStore.getState().past.length;
+
+      act(() => {
+        editorActions.setCanvasWidthTransient(1500);
+      });
+
+      expect(useEditorStore.getState().past.length).toBe(initialHistoryLength);
+    });
+
+    it("should not create history entries for transient height updates", () => {
+      const initialHistoryLength = useEditorStore.getState().past.length;
+
+      act(() => {
+        editorActions.setCanvasHeightTransient(900);
+      });
+
+      expect(useEditorStore.getState().past.length).toBe(initialHistoryLength);
+    });
+
+    it("should not create history entries for transient lock toggle", () => {
+      const initialHistoryLength = useEditorStore.getState().past.length;
+
+      act(() => {
+        editorActions.setAspectRatioLockedTransient(false);
+      });
+
+      expect(useEditorStore.getState().past.length).toBe(initialHistoryLength);
+    });
+
+    it("should allow rapid transient updates without history pollution", () => {
+      const initialHistoryLength = useEditorStore.getState().past.length;
+
+      // Simulate slider drag with many transient updates
+      act(() => {
+        for (let i = 1000; i <= 2000; i += 100) {
+          editorActions.setCanvasWidthTransient(i);
+        }
+      });
+
+      expect(useEditorStore.getState().past.length).toBe(initialHistoryLength);
+    });
+  });
+
+  describe("aspect ratio lock toggle", () => {
+    it("should toggle aspect ratio lock", () => {
+      let state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.aspectRatioLocked).toBe(true);
+
+      act(() => {
+        editorActions.setAspectRatioLocked(false);
+      });
+
+      state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.aspectRatioLocked).toBe(false);
+
+      act(() => {
+        editorActions.setAspectRatioLocked(true);
+      });
+
+      state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.aspectRatioLocked).toBe(true);
+    });
+
+    it("should include lock state in history", () => {
+      act(() => {
+        editorActions.setCanvasDimensions({ width: 1280, height: 800 });
+        editorActions.setAspectRatioLocked(false);
+      });
+
+      act(() => {
+        editorActions.undo();
+      });
+
+      const state = useEditorStore.getState();
+      expect(state.settings.canvasDimensions.aspectRatioLocked).toBe(true);
+    });
+  });
+});

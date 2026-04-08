@@ -17,12 +17,14 @@ interface PreferencesPageProps {
 interface GeneralSettings {
   saveDir: string;
   copyToClipboard: boolean;
+  filenamePrefix: string;
 }
 
 export function PreferencesPage({ onBack, onSettingsChange }: PreferencesPageProps) {
   const [settings, setSettings] = useState<GeneralSettings>({
     saveDir: "",
     copyToClipboard: true,
+    filenamePrefix: "bettershot",
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -34,10 +36,12 @@ export function PreferencesPage({ onBack, onSettingsChange }: PreferencesPagePro
         
         const copyToClip = await store.get<boolean>("copyToClipboard");
         const saveDir = await store.get<string>("saveDir");
+        const filenamePrefix = await store.get<string>("filenamePrefix");
         
         setSettings({
           saveDir: saveDir || "",
           copyToClipboard: copyToClip ?? true,
+          filenamePrefix: filenamePrefix?.trim() || "bettershot",
         });
       } catch (err) {
         console.error("Failed to load settings:", err);
@@ -130,6 +134,22 @@ export function PreferencesPage({ onBack, onSettingsChange }: PreferencesPagePro
                 className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-card-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all font-mono text-sm"
               />
               <p className="text-xs text-foreground0">Screenshots will be saved to this directory</p>
+            </div>
+
+            {/* Filename prefix */}
+            <div className="space-y-2">
+              <label htmlFor="filename-prefix" className="text-sm font-medium text-foreground flex items-center gap-2">
+                File name prefix
+              </label>
+              <input
+                id="filename-prefix"
+                type="text"
+                value={settings.filenamePrefix}
+                onChange={(e) => updateSetting("filenamePrefix", e.target.value)}
+                placeholder="bettershot"
+                className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-card-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all font-mono text-sm"
+              />
+              <p className="text-xs text-foreground0 text-pretty">Used when naming saved screenshots and exports (prefix + timestamp).</p>
             </div>
 
             {/* Copy to Clipboard */}

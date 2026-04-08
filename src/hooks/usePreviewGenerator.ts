@@ -1,6 +1,6 @@
 import { useRef, useEffect, useCallback, useState, useMemo } from "react";
 import { EditorSettings } from "@/stores/editorStore";
-import { createHighQualityCanvas } from "@/lib/canvas-utils";
+import { createHighQualityCanvas, calculateScaledImageDimensions } from "@/lib/canvas-utils";
 import { drawAnnotationOnCanvas } from "@/lib/annotation-utils";
 import { Annotation } from "@/types/annotations";
 
@@ -197,8 +197,20 @@ export function usePreviewGenerator({
     const currentRenderId = ++renderIdRef.current;
     const canvas = canvasRef.current;
 
-    const bgWidth = screenshotImage.width + padding * 2;
-    const bgHeight = screenshotImage.height + padding * 2;
+    // Calculate background dimensions: use custom if provided, otherwise auto (screenshot + padding)
+    let bgWidth: number;
+    let bgHeight: number;
+
+    if (
+      settingsToRender.canvasDimensions.width > 0 &&
+      settingsToRender.canvasDimensions.height > 0
+    ) {
+      bgWidth = settingsToRender.canvasDimensions.width;
+      bgHeight = settingsToRender.canvasDimensions.height;
+    } else {
+      bgWidth = screenshotImage.width + padding * 2;
+      bgHeight = screenshotImage.height + padding * 2;
+    }
 
     setIsGenerating(true);
     setError(null);
@@ -265,7 +277,33 @@ export function usePreviewGenerator({
         ctx.shadowOffsetX = settingsToRender.shadow.offsetX;
         ctx.shadowOffsetY = settingsToRender.shadow.offsetY;
 
-        ctx.drawImage(imageCanvas, padding, padding);
+        // Calculate scaled image dimensions (now includes offset internally)
+        const scaledDims = calculateScaledImageDimensions(
+          screenshotImage.width,
+          screenshotImage.height,
+          bgWidth,
+          bgHeight,
+          settingsToRender.imageScalingMode,
+          settingsToRender.imageBorderSize,
+          settingsToRender.imageOffset
+        );
+
+        let drawX = scaledDims.x;
+        let drawY = scaledDims.y;
+
+        // Draw border if fit-with-border mode is active
+        if (settingsToRender.imageScalingMode === "fit-with-border" && settingsToRender.imageBorderSize > 0) {
+          ctx.fillStyle = "#ffffff"; // White border
+          ctx.fillRect(
+            drawX - settingsToRender.imageBorderSize,
+            drawY - settingsToRender.imageBorderSize,
+            scaledDims.width + settingsToRender.imageBorderSize * 2,
+            scaledDims.height + settingsToRender.imageBorderSize * 2
+          );
+        }
+
+        // Draw the scaled image
+        ctx.drawImage(imageCanvas, drawX, drawY, scaledDims.width, scaledDims.height);
 
         ctx.shadowColor = "transparent";
         ctx.shadowBlur = 0;
@@ -330,6 +368,12 @@ export function usePreviewGenerator({
     settings.shadow.offsetX,
     settings.shadow.offsetY,
     settings.shadow.opacity,
+    settings.canvasDimensions.width,
+    settings.canvasDimensions.height,
+    settings.imageOffset.x,
+    settings.imageOffset.y,
+    settings.imageScalingMode,
+    settings.imageBorderSize,
     padding,
     canvasRef,
     generatePreview,
@@ -368,6 +412,10 @@ export function usePreviewGenerator({
           padding,
           gradientImage: settings.backgroundType === "gradient" ? bgImage : null,
           shadow: settings.shadow,
+          canvasDimensions: settings.canvasDimensions,
+          imageOffset: settings.imageOffset,
+          imageScalingMode: settings.imageScalingMode,
+          imageBorderSize: settings.imageBorderSize,
         });
 
         if (annotations.length > 0) {

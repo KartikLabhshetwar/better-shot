@@ -16,33 +16,63 @@ interface AssetGridProps {
   categories: AssetCategory[];
   selectedImage: string | null;
   backgroundType: string;
+  expanded?: boolean;
   onImageSelect: (imageSrc: string) => void;
+  onToggle?: () => void;
 }
 
-export const AssetGrid = memo(function AssetGrid({ categories, selectedImage, backgroundType, onImageSelect }: AssetGridProps) {
+export const AssetGrid = memo(function AssetGrid({
+  categories,
+  selectedImage,
+  backgroundType,
+  onImageSelect,
+}: AssetGridProps) {
   const [activeCategory, setActiveCategory] = useState(categories[0]?.name || "");
-
   const currentCategory = categories.find((cat) => cat.name === activeCategory);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-foreground font-mono text-balance">Wallpapers</h3>
+    <div>
+      {/* Section header */}
+      <div className="section-header">
+        <span className="section-title">Wallpapers</span>
       </div>
-      
+
+      {/* Category tabs */}
       {categories.length > 1 && (
-        <div className="flex p-1 bg-secondary/50 rounded-lg border border-border/50">
+        <div style={{
+          display: 'flex',
+          gap: 4,
+          marginBottom: 10,
+          background: 'oklch(0.135 0.008 250)',
+          borderRadius: 6,
+          padding: 3,
+          border: '1px solid oklch(0.22 0.009 250)',
+        }}>
           {categories.map((category) => (
             <button
               key={category.name}
               onClick={() => setActiveCategory(category.name)}
               aria-label={`Select ${category.name} category`}
-              className={cn(
-                "flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-                activeCategory === category.name
-                  ? "bg-muted text-white shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
-              )}
+              style={{
+                flex: 1,
+                padding: '4px 8px',
+                borderRadius: 4,
+                fontSize: 11,
+                fontWeight: 500,
+                transition: 'all 0.12s ease',
+                cursor: 'pointer',
+                border: 'none',
+                ...(activeCategory === category.name
+                  ? {
+                      background: 'oklch(0.22 0.009 250)',
+                      color: 'oklch(0.80 0.01 250)',
+                    }
+                  : {
+                      background: 'transparent',
+                      color: 'oklch(0.45 0.009 250)',
+                    }
+                ),
+              }}
             >
               {category.name === "Wallpapers" ? "Wallpapers" : category.name === "Mac Assets" ? "Mac" : category.name}
             </button>
@@ -50,35 +80,51 @@ export const AssetGrid = memo(function AssetGrid({ categories, selectedImage, ba
         </div>
       )}
 
-      <div className="grid grid-cols-4 gap-2 max-h-[400px] overflow-y-auto pr-4 pb-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-muted [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
-        {currentCategory?.assets.map((asset) => (
-          <button
-            key={asset.id}
-            onClick={() => onImageSelect(asset.src)}
-            aria-label={`Select ${asset.name} background`}
-            className={cn(
-              "group relative w-full aspect-square rounded-lg overflow-hidden transition-all",
-              backgroundType === "image" && selectedImage === asset.src
-                ? "ring-2 ring-primary ring-offset-2 ring-offset-card"
-                : "ring-1 ring-border hover:ring-ring"
-            )}
-          >
-            <img
-              src={asset.src}
-              alt={asset.name}
-              className="w-full h-full object-cover transition-transform group-hover:scale-110"
-            />
-            {backgroundType === "image" && selectedImage === asset.src && (
-              <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
-                <div className="size-6 rounded-full bg-blue-500 flex items-center justify-center shadow-lg">
-                  <svg className="size-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+      {/* Asset grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: 6,
+        maxHeight: 280,
+        overflowY: 'auto',
+        paddingRight: 2,
+        paddingBottom: 4,
+      }}>
+        {currentCategory?.assets.map((asset) => {
+          const isSelected = backgroundType === "image" && selectedImage === asset.src;
+          return (
+            <button
+              key={asset.id}
+              onClick={() => onImageSelect(asset.src)}
+              aria-label={`Select ${asset.name}`}
+              className={cn("gradient-thumb", isSelected && "selected")}
+              style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden' }}
+            >
+              <img
+                src={asset.src}
+                alt={asset.name}
+                style={{
+                  width: '100%', height: '100%', objectFit: 'cover',
+                  display: 'block',
+                  transition: 'transform 0.15s ease',
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLImageElement).style.transform = 'scale(1.08)'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLImageElement).style.transform = 'scale(1)'; }}
+              />
+              {isSelected && (
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  background: 'oklch(0.65 0.18 255 / 0.25)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
                   </svg>
                 </div>
-              </div>
-            )}
-          </button>
-        ))}
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

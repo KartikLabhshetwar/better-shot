@@ -12,6 +12,7 @@ export {
   useCanRedo,
   useEditorActions,
   editorActions,
+  clearPersistedEditorSettings,
 } from "./editorStore";
 
 export type { EditorStore, EditorSettings, ShadowSettings, BackgroundType } from "./editorStore";

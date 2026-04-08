@@ -3,7 +3,7 @@ import { subscribeWithSelector } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { Store } from "@tauri-apps/plugin-store";
 import { gradientOptions, type GradientOption } from "@/components/editor/BackgroundSelector";
-import { resolveBackgroundPath, getDefaultBackgroundPath } from "@/lib/asset-registry";
+import { resolveBackgroundPath, getDefaultBackgroundPath, toStorableValue } from "@/lib/asset-registry";
 import { Annotation } from "@/types/annotations";
 
 // ============================================================================
@@ -11,12 +11,24 @@ import { Annotation } from "@/types/annotations";
 // ============================================================================
 
 export type BackgroundType = "transparent" | "white" | "black" | "gray" | "gradient" | "custom" | "image";
+export type ImageScalingMode = "none" | "fit" | "fit-with-border" | "cover" | "contain";
 
 export interface ShadowSettings {
   blur: number;
   offsetX: number;
   offsetY: number;
   opacity: number;
+}
+
+export interface CanvasDimensions {
+  width: number;
+  height: number;
+  aspectRatioLocked: boolean;
+}
+
+export interface ImageOffset {
+  x: number;
+  y: number;
 }
 
 export interface EditorSettings {
@@ -30,6 +42,10 @@ export interface EditorSettings {
   borderRadius: number;
   padding: number;
   shadow: ShadowSettings;
+  canvasDimensions: CanvasDimensions;
+  imageOffset: ImageOffset;
+  imageScalingMode: ImageScalingMode;
+  imageBorderSize: number;
 }
 
 // Snapshot for undo/redo - stores complete state
@@ -86,7 +102,31 @@ interface EditorActions {
   setShadowOffsetX: (offsetX: number) => void;
   setShadowOffsetY: (offsetY: number) => void;
   setShadowOpacity: (opacity: number) => void;
-  
+
+  // Canvas dimensions - transient (during input)
+  setCanvasWidthTransient: (width: number) => void;
+  setCanvasHeightTransient: (height: number) => void;
+  setAspectRatioLockedTransient: (locked: boolean) => void;
+
+  // Canvas dimensions - commit (on release)
+  setCanvasWidth: (width: number) => void;
+  setCanvasHeight: (height: number) => void;
+  setAspectRatioLocked: (locked: boolean) => void;
+  setCanvasDimensions: (dimensions: Partial<CanvasDimensions>) => void;
+
+  // Image offset - transient (during drag)
+  setImageOffsetXTransient: (offsetX: number) => void;
+  setImageOffsetYTransient: (offsetY: number) => void;
+
+  // Image offset - commit (on release)
+  setImageOffsetX: (offsetX: number) => void;
+  setImageOffsetY: (offsetY: number) => void;
+  setImageOffset: (offset: ImageOffset) => void;
+
+  // Image scaling - commit (on release)
+  setImageScalingMode: (mode: ImageScalingMode) => void;
+  setImageBorderSize: (size: number) => void;
+
   // Annotation actions
   addAnnotation: (annotation: Annotation) => void;
   updateAnnotationTransient: (annotation: Annotation) => void;
@@ -131,6 +171,17 @@ const DEFAULT_SETTINGS: EditorSettings = {
     offsetY: 23,
     opacity: 39,
   },
+  canvasDimensions: {
+    width: 0,
+    height: 0,
+    aspectRatioLocked: true,
+  },
+  imageOffset: {
+    x: 0,
+    y: 0,
+  },
+  imageScalingMode: "none",
+  imageBorderSize: 0,
 };
 
 const INITIAL_STATE: EditorState = {
@@ -142,27 +193,141 @@ const INITIAL_STATE: EditorState = {
   _historyPaused: false,
 };
 
+const SETTINGS_STORE_NAME = "settings.json";
+const PERSISTED_SETTINGS_KEY = "lastEditorSettings";
+
+type PersistedEditorSettings = {
+  backgroundType?: BackgroundType;
+  customColor?: string;
+  selectedImage?: string | null;
+  gradientId?: string;
+  noiseAmount?: number;
+  borderRadius?: number;
+  padding?: number;
+  shadow?: Partial<ShadowSettings>;
+  canvasDimensions?: Partial<CanvasDimensions>;
+  imageOffset?: Partial<ImageOffset>;
+  imageScalingMode?: ImageScalingMode;
+  imageBorderSize?: number;
+};
+
+function buildSettingsFromPersisted(stored: PersistedEditorSettings): EditorSettings {
+  const gradientOption = gradientOptions.find((option) => option.id === stored.gradientId) ?? DEFAULT_GRADIENT;
+  return {
+    backgroundType: stored.backgroundType ?? DEFAULT_SETTINGS.backgroundType,
+    customColor: stored.customColor ?? DEFAULT_SETTINGS.customColor,
+    selectedImageSrc: resolveBackgroundPath(stored.selectedImage ?? null),
+    gradientId: gradientOption.id,
+    gradientSrc: gradientOption.src,
+    gradientColors: gradientOption.colors,
+    noiseAmount: stored.noiseAmount ?? DEFAULT_SETTINGS.noiseAmount,
+    borderRadius: stored.borderRadius ?? DEFAULT_SETTINGS.borderRadius,
+    padding: stored.padding ?? DEFAULT_SETTINGS.padding,
+    shadow: {
+      blur: stored.shadow?.blur ?? DEFAULT_SETTINGS.shadow.blur,
+      offsetX: stored.shadow?.offsetX ?? DEFAULT_SETTINGS.shadow.offsetX,
+      offsetY: stored.shadow?.offsetY ?? DEFAULT_SETTINGS.shadow.offsetY,
+      opacity: stored.shadow?.opacity ?? DEFAULT_SETTINGS.shadow.opacity,
+    },
+    canvasDimensions: {
+      width: stored.canvasDimensions?.width ?? DEFAULT_SETTINGS.canvasDimensions.width,
+      height: stored.canvasDimensions?.height ?? DEFAULT_SETTINGS.canvasDimensions.height,
+      aspectRatioLocked: stored.canvasDimensions?.aspectRatioLocked ?? DEFAULT_SETTINGS.canvasDimensions.aspectRatioLocked,
+    },
+    imageOffset: {
+      x: stored.imageOffset?.x ?? DEFAULT_SETTINGS.imageOffset.x,
+      y: stored.imageOffset?.y ?? DEFAULT_SETTINGS.imageOffset.y,
+    },
+    imageScalingMode: stored.imageScalingMode ?? DEFAULT_SETTINGS.imageScalingMode,
+    imageBorderSize: stored.imageBorderSize ?? DEFAULT_SETTINGS.imageBorderSize,
+  };
+}
+
+async function persistEditorSettings(settings: EditorSettings) {
+  try {
+    const store = await Store.load(SETTINGS_STORE_NAME);
+    const storableImage = settings.selectedImageSrc ? toStorableValue(settings.selectedImageSrc) : null;
+    await store.set(PERSISTED_SETTINGS_KEY, {
+      backgroundType: settings.backgroundType,
+      customColor: settings.customColor,
+      selectedImage: storableImage,
+      gradientId: settings.gradientId,
+      noiseAmount: settings.noiseAmount,
+      borderRadius: settings.borderRadius,
+      padding: settings.padding,
+      shadow: {
+        blur: settings.shadow.blur,
+        offsetX: settings.shadow.offsetX,
+        offsetY: settings.shadow.offsetY,
+        opacity: settings.shadow.opacity,
+      },
+      canvasDimensions: {
+        width: settings.canvasDimensions.width,
+        height: settings.canvasDimensions.height,
+        aspectRatioLocked: settings.canvasDimensions.aspectRatioLocked,
+      },
+      imageOffset: {
+        x: settings.imageOffset.x,
+        y: settings.imageOffset.y,
+      },
+      imageScalingMode: settings.imageScalingMode,
+      imageBorderSize: settings.imageBorderSize,
+    });
+    await store.save();
+  } catch (err) {
+    console.error("Failed to persist editor settings:", err);
+  }
+}
+
+export async function clearPersistedEditorSettings(): Promise<boolean> {
+  try {
+    const store = await Store.load(SETTINGS_STORE_NAME);
+    await store.delete(PERSISTED_SETTINGS_KEY);
+    await store.save();
+    return true;
+  } catch (err) {
+    console.error("Failed to clear persisted editor settings:", err);
+    return false;
+  }
+}
+
 // ============================================================================
 // Store
 // ============================================================================
 
 export const useEditorStore = create<EditorStore>()(
   subscribeWithSelector(
-    immer((set, get) => ({
-      ...INITIAL_STATE,
+    immer((set, get) => {
+      const persistIfReady = () => {
+        if (!get()._isInitialized) return;
+        persistEditorSettings(get().settings);
+      };
 
-      // ========================================
-      // Initialization
-      // ========================================
-      initialize: async () => {
+      return {
+        ...INITIAL_STATE,
+
+        // ========================================
+        // Initialization
+        // ========================================
+        initialize: async () => {
         if (get()._isInitialized) return;
-        
+
         try {
-          const store = await Store.load("settings.json");
+          const store = await Store.load(SETTINGS_STORE_NAME);
+          const storedSettings = await store.get<PersistedEditorSettings>(PERSISTED_SETTINGS_KEY);
+
+          if (storedSettings) {
+            set((state) => {
+              state.settings = buildSettingsFromPersisted(storedSettings);
+              state._isInitialized = true;
+            });
+            return;
+          }
+
           const storedBgType = await store.get<BackgroundType>("defaultBackgroundType");
           const storedCustomColor = await store.get<string>("defaultCustomColor");
           const storedBg = await store.get<string>("defaultBackgroundImage");
-          
+
           set((state) => {
             if (storedBgType) {
               state.settings.backgroundType = storedBgType;
@@ -182,7 +347,7 @@ export const useEditorStore = create<EditorStore>()(
             state._isInitialized = true;
           });
         }
-      },
+        },
 
       // ========================================
       // Settings - Transient (no history)
@@ -205,6 +370,7 @@ export const useEditorStore = create<EditorStore>()(
           Object.assign(state.settings, updates);
           state.future = [];
         });
+        persistIfReady();
       },
 
       setBackgroundType: (type) => {
@@ -279,6 +445,48 @@ export const useEditorStore = create<EditorStore>()(
         });
       },
 
+      setCanvasWidthTransient: (width) => {
+        set((state) => {
+          const dims = state.settings.canvasDimensions;
+          const oldWidth = dims.width;
+          dims.width = width;
+          if (dims.aspectRatioLocked && width > 0 && oldWidth > 0) {
+            const ratio = dims.height / oldWidth;
+            dims.height = Math.round(width * ratio);
+          }
+        });
+      },
+
+      setCanvasHeightTransient: (height) => {
+        set((state) => {
+          const dims = state.settings.canvasDimensions;
+          const oldHeight = dims.height;
+          dims.height = height;
+          if (dims.aspectRatioLocked && height > 0 && oldHeight > 0) {
+            const ratio = dims.width / oldHeight;
+            dims.width = Math.round(height * ratio);
+          }
+        });
+      },
+
+      setAspectRatioLockedTransient: (locked) => {
+        set((state) => {
+          state.settings.canvasDimensions.aspectRatioLocked = locked;
+        });
+      },
+
+      setImageOffsetXTransient: (offsetX) => {
+        set((state) => {
+          state.settings.imageOffset.x = offsetX;
+        });
+      },
+
+      setImageOffsetYTransient: (offsetY) => {
+        set((state) => {
+          state.settings.imageOffset.y = offsetY;
+        });
+      },
+
       // ========================================
       // Slider Settings - Commit (on release)
       // ========================================
@@ -300,6 +508,7 @@ export const useEditorStore = create<EditorStore>()(
           s.settings.shadow.blur = blur;
           s.future = [];
         });
+        persistIfReady();
       },
 
       setShadowOffsetX: (offsetX) => {
@@ -308,6 +517,7 @@ export const useEditorStore = create<EditorStore>()(
           state.settings.shadow.offsetX = offsetX;
           state.future = [];
         });
+        persistIfReady();
       },
 
       setShadowOffsetY: (offsetY) => {
@@ -316,6 +526,7 @@ export const useEditorStore = create<EditorStore>()(
           state.settings.shadow.offsetY = offsetY;
           state.future = [];
         });
+        persistIfReady();
       },
 
       setShadowOpacity: (opacity) => {
@@ -324,6 +535,75 @@ export const useEditorStore = create<EditorStore>()(
           state.settings.shadow.opacity = opacity;
           state.future = [];
         });
+        persistIfReady();
+      },
+
+      setCanvasWidth: (width) => {
+        const currentDims = get().settings.canvasDimensions;
+        const newDims = { ...currentDims, width };
+        if (currentDims.aspectRatioLocked && width > 0 && currentDims.width > 0) {
+          const ratio = currentDims.height / currentDims.width;
+          newDims.height = Math.round(width * ratio);
+        }
+        get().updateSettings({ canvasDimensions: newDims });
+      },
+
+      setCanvasHeight: (height) => {
+        const currentDims = get().settings.canvasDimensions;
+        const newDims = { ...currentDims, height };
+        if (currentDims.aspectRatioLocked && height > 0 && currentDims.height > 0) {
+          const ratio = currentDims.width / currentDims.height;
+          newDims.width = Math.round(height * ratio);
+        }
+        get().updateSettings({ canvasDimensions: newDims });
+      },
+
+      setAspectRatioLocked: (locked) => {
+        get().updateSettings({
+          canvasDimensions: {
+            ...get().settings.canvasDimensions,
+            aspectRatioLocked: locked,
+          },
+        });
+      },
+
+      setCanvasDimensions: (dimensions) => {
+        get().updateSettings({
+          canvasDimensions: {
+            ...get().settings.canvasDimensions,
+            ...dimensions,
+          },
+        });
+      },
+
+      setImageOffsetX: (offsetX) => {
+        get().updateSettings({
+          imageOffset: {
+            ...get().settings.imageOffset,
+            x: offsetX,
+          },
+        });
+      },
+
+      setImageOffsetY: (offsetY) => {
+        get().updateSettings({
+          imageOffset: {
+            ...get().settings.imageOffset,
+            y: offsetY,
+          },
+        });
+      },
+
+      setImageOffset: (offset) => {
+        get().updateSettings({ imageOffset: offset });
+      },
+
+      setImageScalingMode: (mode) => {
+        get().updateSettings({ imageScalingMode: mode });
+      },
+
+      setImageBorderSize: (size) => {
+        get().updateSettings({ imageBorderSize: size });
       },
 
       // ========================================
@@ -441,16 +721,15 @@ export const useEditorStore = create<EditorStore>()(
       // ========================================
       // Reset
       // ========================================
-       reset: () => {
-         set((state) => {
-           state.annotations = [];
-           state.past = [];
-           state.future = [];
-           state._isInitialized = false;
-         });
-       },
-    }))
-  )
+      reset: () => {
+        set((state) => {
+          Object.assign(state, INITIAL_STATE);
+          state._isInitialized = false;
+        });
+      },
+    };
+  })
+)
 );
 
 // ============================================================================
@@ -466,6 +745,8 @@ export const usePadding = () => useEditorStore((state) => state.settings.padding
 export const useShadow = () => useEditorStore((state) => state.settings.shadow);
 export const useSelectedImageSrc = () => useEditorStore((state) => state.settings.selectedImageSrc);
 export const useGradientId = () => useEditorStore((state) => state.settings.gradientId);
+export const useCanvasDimensions = () => useEditorStore((state) => state.settings.canvasDimensions);
+export const useImageOffset = () => useEditorStore((state) => state.settings.imageOffset);
 
 // Annotation selectors
 export const useAnnotations = () => useEditorStore((state) => state.annotations);
@@ -497,6 +778,20 @@ export const editorActions = {
   get setShadowOffsetYTransient() { return useEditorStore.getState().setShadowOffsetYTransient; },
   get setShadowOpacity() { return useEditorStore.getState().setShadowOpacity; },
   get setShadowOpacityTransient() { return useEditorStore.getState().setShadowOpacityTransient; },
+  get setCanvasWidth() { return useEditorStore.getState().setCanvasWidth; },
+  get setCanvasWidthTransient() { return useEditorStore.getState().setCanvasWidthTransient; },
+  get setCanvasHeight() { return useEditorStore.getState().setCanvasHeight; },
+  get setCanvasHeightTransient() { return useEditorStore.getState().setCanvasHeightTransient; },
+  get setAspectRatioLocked() { return useEditorStore.getState().setAspectRatioLocked; },
+  get setAspectRatioLockedTransient() { return useEditorStore.getState().setAspectRatioLockedTransient; },
+  get setCanvasDimensions() { return useEditorStore.getState().setCanvasDimensions; },
+  get setImageOffsetX() { return useEditorStore.getState().setImageOffsetX; },
+  get setImageOffsetXTransient() { return useEditorStore.getState().setImageOffsetXTransient; },
+  get setImageOffsetY() { return useEditorStore.getState().setImageOffsetY; },
+  get setImageOffsetYTransient() { return useEditorStore.getState().setImageOffsetYTransient; },
+  get setImageOffset() { return useEditorStore.getState().setImageOffset; },
+  get setImageScalingMode() { return useEditorStore.getState().setImageScalingMode; },
+  get setImageBorderSize() { return useEditorStore.getState().setImageBorderSize; },
   get addAnnotation() { return useEditorStore.getState().addAnnotation; },
   get updateAnnotation() { return useEditorStore.getState().updateAnnotation; },
   get updateAnnotationTransient() { return useEditorStore.getState().updateAnnotationTransient; },

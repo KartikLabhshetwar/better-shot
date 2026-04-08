@@ -27,9 +27,24 @@ pub fn ensure_dir(path: &PathBuf) -> AppResult<()> {
 }
 
 /// Generate a unique filename with a prefix and timestamp
+pub fn sanitize_prefix(raw: &str) -> String {
+    let trimmed = raw.trim();
+    let cleaned: String = trimmed
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect();
+    let collapsed = cleaned
+        .split('_')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("_");
+    if collapsed.is_empty() { "bettershot".to_string() } else { collapsed }
+}
+
 pub fn generate_filename(prefix: &str, extension: &str) -> AppResult<String> {
+    let safe_prefix = sanitize_prefix(prefix);
     let timestamp = get_timestamp()?;
-    Ok(format!("{}_{}.{}", prefix, timestamp, extension))
+    Ok(format!("{}_{}.{}", safe_prefix, timestamp, extension))
 }
 
 /// Generate a unique filename with prefix, id, and timestamp

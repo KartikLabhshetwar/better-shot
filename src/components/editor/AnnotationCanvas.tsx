@@ -29,6 +29,10 @@ interface AnnotationCanvasProps {
   selectedTool: ToolType;
   previewUrl: string | null;
   showTransparencyGrid?: boolean;
+  imageOffset?: { x: number; y: number };
+  canReposition?: boolean;
+  onImageOffsetUpdateTransient?: (offset: { x: number; y: number }) => void;
+  onImageOffsetUpdate?: (offset: { x: number; y: number }) => void;
   onAnnotationAdd: (annotation: Annotation) => void;
   /** Called during drag - should NOT commit to history */
   onAnnotationUpdateTransient?: (annotation: Annotation) => void;
@@ -44,6 +48,10 @@ export const AnnotationCanvas = memo(function AnnotationCanvas({
   selectedTool,
   previewUrl,
   showTransparencyGrid = false,
+  imageOffset = { x: 0, y: 0 },
+  canReposition = false,
+  onImageOffsetUpdateTransient,
+  onImageOffsetUpdate,
   onAnnotationAdd,
   onAnnotationUpdateTransient,
   onAnnotationUpdate,
@@ -66,7 +74,12 @@ export const AnnotationCanvas = memo(function AnnotationCanvas({
   const [resizeHandle, setResizeHandle] = useState<string | null>(null);
   const [resizeStartPoint, setResizeStartPoint] = useState<Point | null>(null);
   const [hoveredHandleId, setHoveredHandleId] = useState<string | null>(null);
-  
+
+  // Repositioning state
+  const [isRepositioning, setIsRepositioning] = useState(false);
+  const [repositionStart, setRepositionStart] = useState<Point | null>(null);
+  const repositionStartOffsetRef = useRef<{ x: number; y: number } | null>(null);
+
   // Track initial position for drag operations
   const dragStartAnnotationRef = useRef<Annotation | null>(null);
   const resizeStartAnnotationRef = useRef<Annotation | null>(null);
@@ -598,6 +611,14 @@ export const AnnotationCanvas = memo(function AnnotationCanvas({
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const point = getCanvasCoordinates(e);
 
+    // Check for Alt key for image repositioning
+    if (e.altKey && canReposition) {
+      setIsRepositioning(true);
+      setRepositionStart(point);
+      repositionStartOffsetRef.current = { ...imageOffset };
+      return;
+    }
+
     if (selectedTool === "select" || !selectedTool) {
       if (selectedAnnotation && selectedAnnotation.type !== "blur") {
         const handle = getHandleAtPoint(point, selectedAnnotation);
@@ -791,6 +812,22 @@ export const AnnotationCanvas = memo(function AnnotationCanvas({
     const point = getCanvasCoordinates(e);
     const canvas = canvasRef.current;
 
+    // Handle image repositioning with Alt key
+    if (isRepositioning && repositionStart && repositionStartOffsetRef.current && onImageOffsetUpdateTransient) {
+      const dx = point.x - repositionStart.x;
+      const dy = point.y - repositionStart.y;
+
+      const newOffsetX = repositionStartOffsetRef.current.x + dx;
+      const newOffsetY = repositionStartOffsetRef.current.y + dy;
+
+      // For now, no constraints - they'll be applied in the store if needed
+      onImageOffsetUpdateTransient({ x: newOffsetX, y: newOffsetY });
+      if (canvas) {
+        canvas.style.cursor = "grabbing";
+      }
+      return;
+    }
+
     if (resizingAnnotation && resizeHandle && resizeStartPoint && resizeStartAnnotationRef.current) {
       setHoveredHandleId(null);
       if (rafRef.current) {
@@ -863,9 +900,28 @@ export const AnnotationCanvas = memo(function AnnotationCanvas({
         setHoveredHandleId(null);
       }
     }
-  }, [getCanvasCoordinates, resizingAnnotation, resizeHandle, resizeStartPoint, draggingAnnotation, dragOffset, annotations, isDrawing, startPoint, selectedTool, selectedAnnotation, applyResize, getHandleAtPoint, isPointInAnnotation, getCursorForHandle, onAnnotationUpdateTransient, onAnnotationUpdate]);
+  }, [getCanvasCoordinates, resizingAnnotation, resizeHandle, resizeStartPoint, draggingAnnotation, dragOffset, annotations, isDrawing, startPoint, selectedTool, selectedAnnotation, applyResize, getHandleAtPoint, isPointInAnnotation, getCursorForHandle, onAnnotationUpdateTransient, onAnnotationUpdate, isRepositioning, repositionStart, onImageOffsetUpdateTransient]);
 
   const handleMouseUp = () => {
+    // Handle image repositioning release
+    if (isRepositioning && repositionStartOffsetRef.current && onImageOffsetUpdate) {
+      const offsetChanged =
+        imageOffset.x !== repositionStartOffsetRef.current.x ||
+        imageOffset.y !== repositionStartOffsetRef.current.y;
+
+      if (offsetChanged) {
+        onImageOffsetUpdate(imageOffset);
+      }
+
+      setIsRepositioning(false);
+      setRepositionStart(null);
+      repositionStartOffsetRef.current = null;
+      if (canvasRef.current) {
+        canvasRef.current.style.cursor = "default";
+      }
+      return;
+    }
+
     if (isDrawing && startPoint && currentPoint && selectedTool && selectedTool !== "select") {
       const newAnnotation = createAnnotation(selectedTool, startPoint, currentPoint);
       if (newAnnotation) {
