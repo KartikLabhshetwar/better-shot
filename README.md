@@ -1,89 +1,113 @@
-[![GitHub stars](https://img.shields.io/github/stars/luongnv89/better-shot?style=flat-square)](https://github.com/luongnv89/better-shot/stargazers)
-[![License: BSD-3](https://img.shields.io/badge/license-BSD--3--Clause-blue?style=flat-square)](./LICENSE)
 [![macOS](https://img.shields.io/badge/macOS-10.15%2B-lightgrey?style=flat-square)](https://github.com/luongnv89/better-shot/releases)
 [![Version](https://img.shields.io/github/v/release/luongnv89/better-shot?style=flat-square)](https://github.com/luongnv89/better-shot/releases)
+[![License: BSD-3](https://img.shields.io/badge/license-BSD--3--Clause-blue?style=flat-square)](./LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/luongnv89/better-shot?style=flat-square)](https://github.com/luongnv89/better-shot/stargazers)
 
-# Capture, polish, and export — no paid tools required
+# One shortcut. A screenshot worth sharing.
 
-Open-source macOS screenshot app with built-in background effects, annotations, and one-shortcut capture. A free alternative to CleanShot X.
+Better Shot captures your screen and opens it in an editor — add a background, shadow, and annotations before you share. Free, local, no account required.
 
 <img width="3600" height="2025" alt="Better Shot editor" src="./screenshot.png" />
 
-[**Download for macOS →**](#install)
+[**Download for macOS →**](#download)
 
 ---
 
-## How It Works
+## Before and after
+
+Without Better Shot, you paste a raw screenshot into a message or doc — sharp edges, white background, no context.
+
+With Better Shot, the same capture gets a polished background, soft shadow, and optional callout arrows in under a minute.
+
+---
+
+## How it works
 
 ```mermaid
-graph LR
-    A[Global shortcut] --> B[Capture region / window / fullscreen]
-    B --> C[Editor opens automatically]
-    C --> D[Background + effects + annotations]
-    D --> E[Save or copy to clipboard]
+sequenceDiagram
+    participant You
+    participant BetterShot
 
-    F[Upload photo] --> C
+    You->>BetterShot: Press ⌘⇧2
+    BetterShot->>You: Draw a region on screen
+    BetterShot->>BetterShot: Opens editor automatically
+    You->>BetterShot: Pick a background, adjust shadow
+    You->>BetterShot: Add arrows, labels, or text
+    You->>BetterShot: Press ⌘S or ⇧⌘C
+    BetterShot->>You: File saved or copied to clipboard
 ```
 
-The editor opens immediately after every capture — no extra clicks. Existing photos can be dropped in via the Upload button.
+One shortcut triggers everything. The editor opens immediately — no extra clicks, no switching apps.
 
-## Features
+---
 
-| Feature | What you get |
+## What you can do in the editor
+
+| | What it does |
 |---|---|
-| Background library | Wallpapers, Mac assets, mesh patterns, solid colors, transparent |
-| Effects | Blur, noise, shadow, corner radius, border size controls |
-| Annotations | Arrows, shapes, text, auto-numbered badges — all moveable and resizable |
-| Upload photo | Edit any existing image, not just fresh captures |
-| Global shortcuts | `⌘⇧2` captures from anywhere, even when the app is hidden |
-| Clipboard export | `⇧⌘C` copies directly — no save dialog needed |
-| Native performance | Rust + Tauri — no Electron overhead |
-| Local-only | Nothing leaves your machine |
+| **Backgrounds** | Wallpapers, mesh gradients, solid colors, transparent — pick one or use your own |
+| **Shadow + depth** | Adjust shadow size and corner radius to match your style |
+| **Border control** | Set padding from 0 (edge-to-edge) to 200px |
+| **Blur + noise** | Subtle texture effects on the background |
+| **Arrows and shapes** | Draw circles, rectangles, lines, arrows directly on the screenshot |
+| **Text labels** | Add text at any size and color |
+| **Numbered callouts** | Auto-incrementing badges for step-by-step walkthroughs |
+| **Undo / redo** | Full history — nothing is permanent until you export |
+| **Upload a photo** | Edit any existing image, not just fresh captures |
 
-## Install
+---
 
-**Homebrew (recommended):**
+## Keyboard shortcuts
+
+### Capturing
+
+| What | Shortcut |
+|---|---|
+| Capture a region | `⌘⇧2` (always on) |
+| Capture full screen | `⌘⇧F` (enable in Preferences) |
+| Capture a window | `⌘⇧D` (enable in Preferences) |
+| Cancel | `Esc` |
+
+Shortcuts work from anywhere — even when Better Shot is hidden in the menu bar.
+
+### In the editor
+
+| What | Shortcut |
+|---|---|
+| Save | `⌘S` |
+| Copy to clipboard | `⇧⌘C` |
+| Undo | `⌘Z` |
+| Redo | `⇧⌘Z` |
+| Delete selected annotation | `Delete` or `Backspace` |
+| Close editor | `Esc` |
+
+---
+
+## Download
+
+**Homebrew:**
 
 ```bash
 brew install --cask bettershot
 ```
 
-**DMG download:**
+**Direct download:**
 
-Go to [Releases](https://github.com/luongnv89/better-shot/releases) and download:
-- Apple Silicon (M1–M5): `bettershot_*_aarch64.dmg`
-- Intel: `bettershot_*_x64.dmg`
+Go to [Releases](https://github.com/luongnv89/better-shot/releases) and pick:
+- **Apple Silicon** (M1/M2/M3/M4/M5): `bettershot_*_aarch64.dmg`
+- **Intel Mac**: `bettershot_*_x64.dmg`
 
-On first launch, grant **Screen Recording** permission in System Settings → Privacy & Security → Screen Recording.
+Open the DMG, drag Better Shot to Applications, and launch it.
 
-## Quick Start
+**First launch:** macOS will ask for Screen Recording permission. Go to System Settings → Privacy & Security → Screen Recording and enable Better Shot. Restart the app once.
 
-1. Launch Better Shot (Applications or menu bar icon)
-2. Press `⌘⇧2` to capture a region
-3. Adjust background, effects, and annotations in the editor
-4. Press `⌘S` to save or `⇧⌘C` to copy to clipboard
+**Requirements:** macOS 10.15 or later.
 
-## Keyboard Shortcuts
+---
 
-### Capture
+## Privacy
 
-| Action | Shortcut |
-|---|---|
-| Capture region | `⌘⇧2` |
-| Capture fullscreen | `⌘⇧F` (enable in Preferences) |
-| Capture window | `⌘⇧D` (enable in Preferences) |
-| Cancel selection | `Esc` |
-
-### Editor
-
-| Action | Shortcut |
-|---|---|
-| Save image | `⌘S` |
-| Copy to clipboard | `⇧⌘C` |
-| Undo | `⌘Z` |
-| Redo | `⇧⌘Z` |
-| Delete annotation | `Delete` / `Backspace` |
-| Close editor | `Esc` |
+Everything runs on your Mac. No uploads, no account, no telemetry. Screenshots stay on your machine.
 
 ---
 
@@ -116,12 +140,9 @@ The installer lands in `src-tauri/target/release/bundle/`.
 pnpm tauri dev
 ```
 
-Other commands:
-
 ```bash
 pnpm lint:ci
 pnpm test:rust
-pnpm tauri build
 ```
 
 </details>
@@ -148,4 +169,4 @@ Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before submit
 
 ---
 
-**[Read the docs](./CONTRIBUTING.md) · [Open an issue](https://github.com/luongnv89/better-shot/issues) · BSD-3 Licensed**
+**[Download →](#download) · [Open an issue](https://github.com/luongnv89/better-shot/issues) · BSD-3 Licensed**
