@@ -47,7 +47,7 @@ brew install --cask bettershot
 
 **Requirements**: macOS >= 10.15
 
-Alternatively, download the latest release from [GitHub Releases](https://github.com/KartikLabhshetwar/better-shot/releases).
+Alternatively, download the latest release from [GitHub Releases](https://github.com/luongnv89/better-shot/releases).
 
 ## Development Setup
 
@@ -117,7 +117,6 @@ bettershot/
 │   │   │   ├── OnboardingFlow.tsx      # Multi-step onboarding
 │   │   │   ├── OnboardingStep.tsx      # Individual step component
 │   │   │   └── OnboardingProgress.tsx  # Progress indicator
-│   │   ├── landing/        # Landing page components
 │   │   └── ui/             # Reusable UI primitives
 │   ├── hooks/              # Custom React hooks
 │   │   ├── useEditorSettings.ts    # Editor state management

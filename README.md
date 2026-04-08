@@ -1,181 +1,122 @@
-# Better Shot
+[![GitHub stars](https://img.shields.io/github/stars/luongnv89/better-shot?style=flat-square)](https://github.com/luongnv89/better-shot/stargazers)
+[![License: BSD-3](https://img.shields.io/badge/license-BSD--3--Clause-blue?style=flat-square)](./LICENSE)
+[![macOS](https://img.shields.io/badge/macOS-10.15%2B-lightgrey?style=flat-square)](https://github.com/luongnv89/better-shot/releases)
+[![Version](https://img.shields.io/github/v/release/luongnv89/better-shot?style=flat-square)](https://github.com/luongnv89/better-shot/releases)
 
-<img width="3600" height="2025" alt="stage-1768238789948" src="https://github.com/user-attachments/assets/3051266a-5179-440f-a747-7980abd7bac3" />
+# Capture, polish, and export — no paid tools required
 
-[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/zThjstVs) 
-[![X (Twitter)](https://img.shields.io/badge/X-%231DA1F2.svg?style=for-the-badge&logo=X&logoColor=white)](https://x.com/code_kartik)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-%23FFDD00.svg?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/code_kartik)
+Open-source macOS screenshot app with built-in background effects, annotations, and one-shortcut capture. A free alternative to CleanShot X.
 
-> An open-source alternative to CleanShot X for macOS. Capture, edit, and enhance your screenshots with professional quality.
+<img width="3600" height="2025" alt="Better Shot editor" src="./screenshot.png" />
 
-Better Shot is a fast, lightweight screenshot tool built with Tauri + React. It provides a powerful yet simple workflow for capturing screenshots, editing them with backgrounds/effects/annotations, and exporting quickly.
+[**Download for macOS →**](#install)
 
-## Table of contents
+---
 
-- [Better Shot](#better-shot)
-  - [Table of contents](#table-of-contents)
-  - [Background](#background)
-  - [Features](#features)
-    - [Capture Modes](#capture-modes)
-    - [Image Editing](#image-editing)
-    - [Annotation Tools](#annotation-tools)
-    - [Workflow](#workflow)
-  - [Install](#install)
-    - [Download a release (recommended)](#download-a-release-recommended)
-    - [Homebrew (macOS)](#homebrew-macos)
-    - [Build from source](#build-from-source)
-      - [Requirements](#requirements)
-      - [Required permissions](#required-permissions)
-  - [Usage](#usage)
-    - [Quick Start](#quick-start)
-    - [Keyboard Shortcuts](#keyboard-shortcuts)
-      - [Capture Shortcuts](#capture-shortcuts)
-      - [Editor Shortcuts](#editor-shortcuts)
-  - [Development](#development)
-    - [Desktop app (Tauri)](#desktop-app-tauri)
-    - [Landing site (Next.js)](#landing-site-nextjs)
-  - [Contributing](#contributing)
-  - [License](#license)
-  - [Star history](#star-history)
+## How It Works
 
-## Background
+```mermaid
+graph LR
+    A[Global shortcut] --> B[Capture region / window / fullscreen]
+    B --> C[Editor opens automatically]
+    C --> D[Background + effects + annotations]
+    D --> E[Save or copy to clipboard]
 
-Clean screenshot workflows usually need three things: capture fast, polish fast (background/shadow/roundness), and annotate fast (arrows, labels). Better Shot is a macOS-native app that keeps everything local and lightweight.
+    F[Upload photo] --> C
+```
+
+The editor opens immediately after every capture — no extra clicks. Existing photos can be dropped in via the Upload button.
 
 ## Features
 
-### Capture Modes
-
-- **Region capture**: Select any area of your screen (`⌘⇧2`, enabled by default)
-- **Fullscreen capture**: Capture your entire screen (`⌘⇧F`, enable in Preferences)
-- **Window capture**: Capture a specific window (`⌘⇧D`, enable in Preferences)
-
-### Image Editing
-
-- **Background library**: Curated wallpapers, Mac assets, and mesh patterns
-- **Custom backgrounds**: Solid colors and transparent checkerboard
-- **Effects**: Blur + noise controls
-- **Shadow + roundness**: Tune depth and corner radius
-- **Export**: Save at high quality for docs, decks, and social
-
-### Annotation Tools
-
-- **Shapes**: Circle, rectangle, line, arrow
-- **Text**: Add text with adjustable size
-- **Numbered labels**: Auto-incrementing badges for step-by-step callouts
-- **Editability**: Select, move, and delete annotations
-- **Styling**: Colors, opacity, borders, alignment
-
-### Workflow
-
-- **Global shortcuts**: Capture from anywhere, even when hidden
-- **Upload photo**: Bring an existing image into the editor without taking a screenshot
-- **Clipboard**: Copy to clipboard after capture/export
-- **Preferences**: Save directory, defaults, and shortcut settings persist
-- **Menu bar**: Accessible from the menu bar
-- **Native performance**: Rust + Tauri
+| Feature | What you get |
+|---|---|
+| Background library | Wallpapers, Mac assets, mesh patterns, solid colors, transparent |
+| Effects | Blur, noise, shadow, corner radius, border size controls |
+| Annotations | Arrows, shapes, text, auto-numbered badges — all moveable and resizable |
+| Upload photo | Edit any existing image, not just fresh captures |
+| Global shortcuts | `⌘⇧2` captures from anywhere, even when the app is hidden |
+| Clipboard export | `⇧⌘C` copies directly — no save dialog needed |
+| Native performance | Rust + Tauri — no Electron overhead |
+| Local-only | Nothing leaves your machine |
 
 ## Install
 
-### Download a release (recommended)
-
-1. Go to [Releases](https://github.com/KartikLabhshetwar/better-shot/releases)
-2. Download the appropriate DMG file:
-   - **Apple Silicon** (M1/M2/M3/M4/M5): `bettershot_*_aarch64.dmg`
-   - **Intel**: `bettershot_*_x64.dmg`
-3. Open the DMG and drag Better Shot to Applications
-4. Launch Better Shot from Applications
-5. Grant Screen Recording permission when prompted in System Settings
-
-### Homebrew (macOS)
-
-Install via Homebrew:
+**Homebrew (recommended):**
 
 ```bash
 brew install --cask bettershot
 ```
 
-**Requirements**: macOS >= 10.15
+**DMG download:**
 
-### Build from source
+Go to [Releases](https://github.com/luongnv89/better-shot/releases) and download:
+- Apple Silicon (M1–M5): `bettershot_*_aarch64.dmg`
+- Intel: `bettershot_*_x64.dmg`
+
+On first launch, grant **Screen Recording** permission in System Settings → Privacy & Security → Screen Recording.
+
+## Quick Start
+
+1. Launch Better Shot (Applications or menu bar icon)
+2. Press `⌘⇧2` to capture a region
+3. Adjust background, effects, and annotations in the editor
+4. Press `⌘S` to save or `⇧⌘C` to copy to clipboard
+
+## Keyboard Shortcuts
+
+### Capture
+
+| Action | Shortcut |
+|---|---|
+| Capture region | `⌘⇧2` |
+| Capture fullscreen | `⌘⇧F` (enable in Preferences) |
+| Capture window | `⌘⇧D` (enable in Preferences) |
+| Cancel selection | `Esc` |
+
+### Editor
+
+| Action | Shortcut |
+|---|---|
+| Save image | `⌘S` |
+| Copy to clipboard | `⇧⌘C` |
+| Undo | `⌘Z` |
+| Redo | `⇧⌘Z` |
+| Delete annotation | `Delete` / `Backspace` |
+| Close editor | `Esc` |
+
+---
+
+<details>
+<summary>Build from source</summary>
+
+**Requirements:** Node.js 18+, pnpm, Rust (latest stable)
 
 ```bash
-git clone https://github.com/KartikLabhshetwar/better-shot.git
+git clone https://github.com/luongnv89/better-shot.git
 cd better-shot
+```
 
+```bash
 pnpm install
+```
 
+```bash
 pnpm tauri build
 ```
 
-The installer will be located in `src-tauri/target/release/bundle/`
+The installer lands in `src-tauri/target/release/bundle/`.
 
-#### Requirements
+</details>
 
-- **Node.js**: 18+
-- **pnpm**
-- **Rust**: latest stable
-
-#### Required permissions
-
-On first launch, macOS will request **Screen Recording** permission:
-
-1. Go to **System Settings → Privacy & Security → Screen Recording**
-2. Enable **Better Shot**
-3. Restart the application if needed
-
-This permission is required for the app to capture screenshots of your screen.
-
-## Usage
-
-### Quick Start
-
-1. Launch Better Shot from Applications (or use the menu bar icon)
-2. Capture:
-   - Default: `⌘⇧2` (region)
-   - Optional (enable in Preferences): `⌘⇧F` (fullscreen), `⌘⇧D` (window)
-3. Edit (background/effects/shadow/roundness)
-4. Annotate (shapes, arrows, text, numbered labels)
-5. Export: `⌘S` to save, `⇧⌘C` to copy to clipboard
-
-### Keyboard Shortcuts
-
-Capture shortcuts are customizable in Preferences.
-
-#### Capture Shortcuts
-
-| Action | Default Shortcut |
-| --- | --- |
-| Capture Region | `⌘⇧2` |
-| Capture Fullscreen | `⌘⇧F` (disabled by default) |
-| Capture Window | `⌘⇧D` (disabled by default) |
-| Cancel Selection | `Esc` |
-
-#### Editor Shortcuts
-
-| Action | Shortcut |
-| --- | --- |
-| Save Image | `⌘S` |
-| Copy to Clipboard | `⇧⌘C` |
-| Undo | `⌘Z` |
-| Redo | `⇧⌘Z` |
-| Delete Annotation | `Delete` or `Backspace` |
-| Close Editor | `Esc` |
-
-## Development
-
-This repo contains:
-
-- The **desktop app** (Tauri + Vite) at the repo root
-- The **landing site** (Next.js) in `bettershot-landing/`
-
-### Desktop app (Tauri)
+<details>
+<summary>Development</summary>
 
 ```bash
 pnpm tauri dev
 ```
 
-Other useful commands:
+Other commands:
 
 ```bash
 pnpm lint:ci
@@ -183,28 +124,28 @@ pnpm test:rust
 pnpm tauri build
 ```
 
-### Landing site (Next.js)
+</details>
 
-```bash
-cd bettershot-landing
-pnpm install
-pnpm dev
-```
+<details>
+<summary>Contributing</summary>
 
-## Contributing
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a pull request.
 
-Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a pull request.
+</details>
 
-## License
+<details>
+<summary>Star history</summary>
 
-This project is licensed under the BSD 3-Clause License - see the [LICENSE](LICENSE) file for details.
-
-## Star history
-
-<a href="https://www.star-history.com/#KartikLabhshetwar/better-shot&type=date&legend=top-left">
+<a href="https://www.star-history.com/#luongnv89/better-shot&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=KartikLabhshetwar/better-shot&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=KartikLabhshetwar/better-shot&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=KartikLabhshetwar/better-shot&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=luongnv89/better-shot&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=luongnv89/better-shot&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=luongnv89/better-shot&type=date&legend=top-left" />
  </picture>
 </a>
+
+</details>
+
+---
+
+**[Read the docs](./CONTRIBUTING.md) · [Open an issue](https://github.com/luongnv89/better-shot/issues) · BSD-3 Licensed**
