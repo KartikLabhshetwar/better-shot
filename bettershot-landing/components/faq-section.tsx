@@ -40,7 +40,7 @@ export function FAQSection() {
     {
       question: "Can I set a default background?",
       answer:
-        "Absolutely! In Preferences, you can choose any background from the built-in library or upload your own images. Set one as your default background, and it will be used when you enable Auto-apply background mode for instant captures without opening the editor.",
+        "Absolutely! In Preferences, you can choose any background from the built-in library or upload your own images. Set one as your default background and it will be applied automatically whenever you open the editor.",
     },
     {
       question: "What annotation tools are available?",

@@ -28,7 +28,6 @@ Better Shot is a fast, lightweight screenshot tool built with Tauri + React. It 
       - [Required permissions](#required-permissions)
   - [Usage](#usage)
     - [Quick Start](#quick-start)
-    - [Auto-apply workflow](#auto-apply-workflow)
     - [Keyboard Shortcuts](#keyboard-shortcuts)
       - [Capture Shortcuts](#capture-shortcuts)
       - [Editor Shortcuts](#editor-shortcuts)
@@ -70,7 +69,7 @@ Clean screenshot workflows usually need three things: capture fast, polish fast 
 ### Workflow
 
 - **Global shortcuts**: Capture from anywhere, even when hidden
-- **Auto-apply**: Apply default background and save without opening the editor
+- **Upload photo**: Bring an existing image into the editor without taking a screenshot
 - **Clipboard**: Copy to clipboard after capture/export
 - **Preferences**: Save directory, defaults, and shortcut settings persist
 - **Menu bar**: Accessible from the menu bar
@@ -138,15 +137,6 @@ This permission is required for the app to capture screenshots of your screen.
 3. Edit (background/effects/shadow/roundness)
 4. Annotate (shapes, arrows, text, numbered labels)
 5. Export: `⌘S` to save, `⇧⌘C` to copy to clipboard
-
-### Auto-apply workflow
-
-For faster workflows, enable **Auto-apply background** on the main screen:
-
-1. Toggle on "Auto-apply background" on the main page
-2. Set your preferred default background in Preferences
-3. Capture a screenshot - it will automatically apply the background and save instantly
-4. No editor needed - perfect for quick captures with consistent styling
 
 ### Keyboard Shortcuts
 

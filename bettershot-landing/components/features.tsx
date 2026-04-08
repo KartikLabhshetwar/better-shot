@@ -12,8 +12,8 @@ const features = [
     demoVideo: "zdqpEacK0p8",
   },
   {
-    title: "Auto-apply Background",
-    description: "Apply default background and save instantly. No need to open the editor. Perfect for quick captures with consistent styling.",
+    title: "Upload Photo to Edit",
+    description: "Bring any existing image into the editor without taking a screenshot. Pick a photo from Finder and it opens instantly in the full editor.",
     demoVideo: "MhfqtSFpfxw",
   },
   {
