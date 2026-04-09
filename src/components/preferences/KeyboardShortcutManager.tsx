@@ -18,6 +18,7 @@ interface KeyboardShortcutManagerProps {
 }
 
 const DEFAULT_SHORTCUTS: KeyboardShortcut[] = [
+  { id: "open", action: "Open BetterShot", shortcut: "CommandOrControl+Shift+B", enabled: true },
   { id: "region", action: "Capture Region", shortcut: "CommandOrControl+Shift+2", enabled: true },
   { id: "fullscreen", action: "Capture Screen", shortcut: "CommandOrControl+Shift+F", enabled: false },
   { id: "window", action: "Capture Window", shortcut: "CommandOrControl+Shift+D", enabled: false },
