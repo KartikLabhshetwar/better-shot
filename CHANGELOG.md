@@ -5,6 +5,26 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.7] - 2026-04-10
+
+### Added
+
+- **Device frames for screenshots**: New predefined device frames panel in the editor — wrap screenshots in iPhone or MacBook frames for polished presentations
+- **Global shortcut to open BetterShot**: Press `Cmd+Shift+B` from anywhere to bring the BetterShot window to the foreground
+
+### Fixed
+
+- **MacBook frame proportions**: Adjusted MacBook device frame to match reference proportions, including rework to full laptop silhouette
+- **iPhone frame layout**: Reworked iPhone frame to correctly wrap the screenshot and match reference design
+
+### Documentation
+
+- README rewritten for end users using the AIDA framework for clearer onboarding
+
+### Chores
+
+- Removed landing page; updated all project URLs to the fork
+
 ## [0.2.6] - 2026-04-09
 
 ### Added
