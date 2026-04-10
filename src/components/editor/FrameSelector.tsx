@@ -61,12 +61,16 @@ const FRAME_OPTIONS: FrameOption[] = [
     type: "macbook",
     label: "MacBook",
     preview: (
-      <svg width="36" height="26" viewBox="0 0 36 26" fill="none">
-        <rect x="2" y="1" width="32" height="21" rx="3" fill="#3d3d3d" />
-        <rect x="4" y="3" width="28" height="17" rx="1" fill="#1a1a1a" />
-        <rect x="5" y="4" width="26" height="15" rx="0.5" fill="#222" />
-        <rect x="0" y="22" width="36" height="3" rx="1.5" fill="#4a4a4a" />
-        <circle cx="18" cy="2.5" r="1.2" fill="#2a2a2a" />
+      // Display-only: thin dark bezel, screen, camera notch, small chin at bottom
+      <svg width="36" height="24" viewBox="0 0 36 24" fill="none">
+        {/* Lid shell */}
+        <rect x="0.5" y="0.5" width="35" height="20" rx="2.5" fill="#1e1e1e" />
+        {/* Screen */}
+        <rect x="2" y="4" width="32" height="14" fill="#000" />
+        {/* Camera notch pill */}
+        <rect x="15" y="1.5" width="6" height="2" rx="1" fill="#3a3a3a" />
+        {/* Bottom chin */}
+        <rect x="0.5" y="20.5" width="35" height="3" rx="1" fill="#2a2a2a" />
       </svg>
     ),
   },

@@ -266,32 +266,48 @@ export function drawIphoneFrame(
 
 // ---------------------------------------------------------------------------
 // MacBook frame
+// Reference screenshot: display-only lid, no base/keyboard.
+//
+// Structure:
+//   Outer lid shell — dark (#1e1e1e), rounded corners (~12px)
+//     Uniform thin bezel around screen (~10px sides/bottom, ~28px top for camera)
+//     Screen area — screenshot fills it, clipped to screen bounds
+//     Camera notch — tiny pill centered in top bezel
+//   Bottom chin — thin flat bar below screen (hinge area of lid), no base
+//
+// All bezel/radius values scale proportionally with screenshot width.
 // ---------------------------------------------------------------------------
 
-const MACBOOK_TOP_BEZEL = 28;
-const MACBOOK_SIDE_BEZEL = 20;
-const MACBOOK_BOTTOM_BEZEL = 24;
-const MACBOOK_LID_RADIUS = 10;
-const MACBOOK_BASE_HEIGHT_RATIO = 0.065;
-const MACBOOK_BASE_CORNER_RADIUS = 3;
-const MACBOOK_HINGE_HEIGHT = 6;
-const MACBOOK_CAMERA_RADIUS = 4;
-const MACBOOK_FRAME_COLOR = "#3d3d3d";
-const MACBOOK_INNER_BEZEL_COLOR = "#1a1a1a";
-const MACBOOK_BASE_COLOR = "#4a4a4a";
-const MACBOOK_BASE_EDGE_COLOR = "#2d2d2d";
+// Reference values at 1280px screenshot width
+const MB_REF_W = 1280;
+const MB_REF_SIDE   = 10;   // side/bottom bezel thickness
+const MB_REF_TOP    = 28;   // top bezel (taller to fit camera)
+const MB_REF_CHIN   = 14;   // bottom chin of lid below screen
+const MB_REF_OUTER_R = 12;  // outer lid corner radius
+const MB_REF_CAM_R  = 3.5;  // camera dot radius
+const MB_REF_NOTCH_W = 10;  // camera notch pill width
+const MB_REF_NOTCH_H = 6;   // camera notch pill height
+
+const MB_FRAME_COLOR  = "#1e1e1e";  // dark lid shell
+const MB_SCREEN_COLOR = "#000000";
+const MB_CHIN_COLOR   = "#2a2a2a";  // slightly lighter for depth
+const MB_CAM_COLOR    = "#3a3a3a";
 
 export function getMacbookFrameDimensions(screenshotWidth: number, screenshotHeight: number): FrameDimensions {
-  const lidWidth = screenshotWidth + MACBOOK_SIDE_BEZEL * 2;
-  const lidHeight = screenshotHeight + MACBOOK_TOP_BEZEL + MACBOOK_BOTTOM_BEZEL;
-  const baseHeight = Math.round(lidWidth * MACBOOK_BASE_HEIGHT_RATIO);
+  const scale      = screenshotWidth / MB_REF_W;
+  const side       = Math.round(MB_REF_SIDE * scale);
+  const top        = Math.round(MB_REF_TOP  * scale);
+  const chin       = Math.round(MB_REF_CHIN * scale);
+
+  const totalWidth  = screenshotWidth  + side * 2;
+  const totalHeight = screenshotHeight + top + side + chin;
 
   return {
-    totalWidth: lidWidth,
-    totalHeight: lidHeight + MACBOOK_HINGE_HEIGHT + baseHeight,
-    screenX: MACBOOK_SIDE_BEZEL,
-    screenY: MACBOOK_TOP_BEZEL,
-    screenWidth: screenshotWidth,
+    totalWidth,
+    totalHeight,
+    screenX: side,
+    screenY: top,
+    screenWidth:  screenshotWidth,
     screenHeight: screenshotHeight,
   };
 }
@@ -303,25 +319,33 @@ export function drawMacbookFrame(
   dims: FrameDimensions,
   screenshot: HTMLImageElement
 ) {
-  const { totalWidth, screenX, screenY, screenWidth, screenHeight } = dims;
-  const lidHeight = screenHeight + MACBOOK_TOP_BEZEL + MACBOOK_BOTTOM_BEZEL;
-  const baseHeight = Math.round(totalWidth * MACBOOK_BASE_HEIGHT_RATIO);
+  const { totalWidth, totalHeight, screenX, screenY, screenWidth, screenHeight } = dims;
+
+  const scale   = screenWidth / MB_REF_W;
+  const side    = Math.round(MB_REF_SIDE  * scale);
+  const top     = Math.round(MB_REF_TOP   * scale);
+  const chin    = Math.round(MB_REF_CHIN  * scale);
+  const outerR  = Math.max(4, Math.round(MB_REF_OUTER_R * scale));
+  const camR    = Math.max(2, Math.round(MB_REF_CAM_R  * scale));
+  const notchW  = Math.max(6, Math.round(MB_REF_NOTCH_W * scale));
+  const notchH  = Math.max(3, Math.round(MB_REF_NOTCH_H * scale));
+
+  const lidHeight = totalHeight - chin;
 
   ctx.save();
 
-  // ── Lid ──
+  // ── Outer lid shell ──
   ctx.beginPath();
-  ctx.roundRect(x, y, totalWidth, lidHeight, MACBOOK_LID_RADIUS);
-  ctx.fillStyle = MACBOOK_FRAME_COLOR;
+  ctx.roundRect(x, y, totalWidth, lidHeight, outerR);
+  ctx.fillStyle = MB_FRAME_COLOR;
   ctx.fill();
 
-  // Inner bezel (inset)
+  // ── Screen area: black fill then screenshot clipped to screen bounds ──
   ctx.beginPath();
-  ctx.roundRect(x + 4, y + 4, totalWidth - 8, lidHeight - 8, MACBOOK_LID_RADIUS - 2);
-  ctx.fillStyle = MACBOOK_INNER_BEZEL_COLOR;
+  ctx.rect(x + screenX, y + screenY, screenWidth, screenHeight);
+  ctx.fillStyle = MB_SCREEN_COLOR;
   ctx.fill();
 
-  // Screen area
   ctx.save();
   ctx.beginPath();
   ctx.rect(x + screenX, y + screenY, screenWidth, screenHeight);
@@ -329,36 +353,33 @@ export function drawMacbookFrame(
   ctx.drawImage(screenshot, x + screenX, y + screenY, screenWidth, screenHeight);
   ctx.restore();
 
-  // Camera dot
-  const cameraX = x + totalWidth / 2;
-  const cameraY = y + MACBOOK_TOP_BEZEL / 2;
+  // ── Camera notch — pill centered in top bezel ──
+  const notchX = x + (totalWidth - notchW) / 2;
+  const notchY = y + (top - notchH) / 2;
   ctx.beginPath();
-  ctx.arc(cameraX, cameraY, MACBOOK_CAMERA_RADIUS, 0, Math.PI * 2);
-  ctx.fillStyle = "#2a2a2a";
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(cameraX, cameraY, MACBOOK_CAMERA_RADIUS - 1.5, 0, Math.PI * 2);
-  ctx.fillStyle = "#3d3d3d";
+  ctx.roundRect(notchX, notchY, notchW, notchH, notchH / 2);
+  ctx.fillStyle = MB_CAM_COLOR;
   ctx.fill();
 
-  // ── Hinge ──
-  const hingeY = y + lidHeight;
-  ctx.fillStyle = MACBOOK_BASE_EDGE_COLOR;
-  ctx.fillRect(x, hingeY, totalWidth, MACBOOK_HINGE_HEIGHT);
-
-  // ── Base ──
-  const baseY = hingeY + MACBOOK_HINGE_HEIGHT;
+  // Camera lens dot inside notch
   ctx.beginPath();
-  ctx.roundRect(x, baseY, totalWidth, baseHeight, MACBOOK_BASE_CORNER_RADIUS);
-  ctx.fillStyle = MACBOOK_BASE_COLOR;
+  ctx.arc(x + totalWidth / 2, notchY + notchH / 2, camR, 0, Math.PI * 2);
+  ctx.fillStyle = "#1a1a1a";
   ctx.fill();
 
-  // Base edge highlight
+  // ── Bottom chin (hinge area of lid, below screen) ──
+  const chinY = y + lidHeight;
   ctx.beginPath();
-  ctx.moveTo(x, baseY + baseHeight);
-  ctx.lineTo(x + totalWidth, baseY + baseHeight);
-  ctx.strokeStyle = MACBOOK_BASE_EDGE_COLOR;
-  ctx.lineWidth = 2;
+  ctx.roundRect(x, chinY, totalWidth, chin, [0, 0, outerR, outerR]);
+  ctx.fillStyle = MB_CHIN_COLOR;
+  ctx.fill();
+
+  // Thin highlight line between screen bezel and chin
+  ctx.beginPath();
+  ctx.moveTo(x + side, chinY);
+  ctx.lineTo(x + totalWidth - side, chinY);
+  ctx.strokeStyle = "rgba(255,255,255,0.06)";
+  ctx.lineWidth = 1;
   ctx.stroke();
 
   ctx.restore();
