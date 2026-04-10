@@ -61,16 +61,21 @@ const FRAME_OPTIONS: FrameOption[] = [
     type: "macbook",
     label: "MacBook",
     preview: (
-      // Display-only: thin dark bezel, screen, camera notch, small chin at bottom
-      <svg width="36" height="24" viewBox="0 0 36 24" fill="none">
-        {/* Lid shell */}
-        <rect x="0.5" y="0.5" width="35" height="20" rx="2.5" fill="#1e1e1e" />
+      // Full MacBook: lid + wider base with keyboard deck + feet
+      <svg width="38" height="28" viewBox="0 0 38 28" fill="none">
+        {/* Base — wider than lid */}
+        <rect x="0" y="19" width="38" height="8" rx="1.5" fill="#242424" />
+        {/* Keyboard deck inset */}
+        <rect x="1.5" y="20.5" width="35" height="5" rx="1" fill="#1a1a1a" />
+        {/* Rubber feet */}
+        <rect x="3" y="26.5" width="5" height="1.5" rx="0.75" fill="#111" />
+        <rect x="30" y="26.5" width="5" height="1.5" rx="0.75" fill="#111" />
+        {/* Lid shell — centred, narrower than base */}
+        <rect x="2" y="0.5" width="34" height="19" rx="2" fill="#1e1e1e" />
         {/* Screen */}
-        <rect x="2" y="4" width="32" height="14" fill="#000" />
-        {/* Camera notch pill */}
-        <rect x="15" y="1.5" width="6" height="2" rx="1" fill="#3a3a3a" />
-        {/* Bottom chin */}
-        <rect x="0.5" y="20.5" width="35" height="3" rx="1" fill="#2a2a2a" />
+        <rect x="4" y="4" width="30" height="13" fill="#000" />
+        {/* Camera dot */}
+        <circle cx="19" cy="2.5" r="1" fill="#3a3a3a" />
       </svg>
     ),
   },
