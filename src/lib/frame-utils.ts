@@ -286,42 +286,39 @@ export function drawIphoneFrame(
 
 // Reference at 1280px screen width
 const MB_REF_W        = 1280;
-const MB_REF_BEZEL_S  = 12;    // side bezel
-const MB_REF_BEZEL_T  = 24;    // top bezel (camera area)
-const MB_REF_BEZEL_B  = 16;    // bottom bezel (chin below screen)
-const MB_REF_LID_R    = 8;     // lid outer corner radius
-const MB_REF_CAM_R    = 3;     // camera dot radius
-const MB_REF_BASE_OVERHANG = 30; // base wider than lid on each side
-const MB_REF_BASE_H   = 52;    // base height (keyboard body)
-const MB_REF_BASE_R   = 6;     // base bottom corner radius
-const MB_REF_DECK_PAD = 8;     // keyboard deck inset from base edges
-const MB_REF_DECK_R   = 4;     // keyboard deck corner radius
-const MB_REF_FOOT_W   = 20;    // rubber foot width
-const MB_REF_FOOT_H   = 4;     // rubber foot height
+const MB_REF_BEZEL_S  = 20;    // side bezel
+const MB_REF_BEZEL_T  = 36;    // top bezel (camera area)
+const MB_REF_BEZEL_B  = 20;    // bottom bezel (chin below screen)
+const MB_REF_LID_R    = 40;    // lid outer corner radius — large, prominent
+const MB_REF_SCREEN_R = 6;     // screen inner corner radius (subtle)
+const MB_REF_CAM_R    = 4;     // camera dot radius
+const MB_REF_BASE_OVERHANG = 60; // base wider than lid on each side
+const MB_REF_BASE_H   = 70;    // base height (keyboard body)
+const MB_REF_BASE_R   = 8;     // base bottom corner radius
+const MB_REF_FOOT_W   = 28;    // rubber foot width
+const MB_REF_FOOT_H   = 5;     // rubber foot height
 
-const MB_LID_COLOR    = "#1e1e1e";
+const MB_LID_COLOR    = "#2a2a2a";
 const MB_SCREEN_COLOR = "#000000";
-const MB_BASE_COLOR   = "#242424";
-const MB_DECK_COLOR   = "#1a1a1a";
-const MB_FOOT_COLOR   = "#111111";
+const MB_BASE_COLOR   = "#1e1e1e";
+const MB_FOOT_COLOR   = "#141414";
 
 export function getMacbookFrameDimensions(screenshotWidth: number, screenshotHeight: number): FrameDimensions {
-  const s          = screenshotWidth / MB_REF_W;
-  const bezelS     = Math.round(MB_REF_BEZEL_S * s);
-  const bezelT     = Math.round(MB_REF_BEZEL_T * s);
-  const bezelB     = Math.round(MB_REF_BEZEL_B * s);
-  const overhang   = Math.round(MB_REF_BASE_OVERHANG * s);
-  const baseH      = Math.round(MB_REF_BASE_H * s);
+  const s        = screenshotWidth / MB_REF_W;
+  const bezelS   = Math.round(MB_REF_BEZEL_S * s);
+  const bezelT   = Math.round(MB_REF_BEZEL_T * s);
+  const bezelB   = Math.round(MB_REF_BEZEL_B * s);
+  const overhang = Math.round(MB_REF_BASE_OVERHANG * s);
+  const baseH    = Math.round(MB_REF_BASE_H * s);
 
-  const lidWidth   = screenshotWidth + bezelS * 2;
-  const lidHeight  = screenshotHeight + bezelT + bezelB;
-  const totalWidth = lidWidth + overhang * 2;
+  const lidWidth    = screenshotWidth + bezelS * 2;
+  const lidHeight   = screenshotHeight + bezelT + bezelB;
+  const totalWidth  = lidWidth + overhang * 2;
   const totalHeight = lidHeight + baseH;
 
   return {
     totalWidth,
     totalHeight,
-    // screen is inset inside the lid, centred horizontally within totalWidth
     screenX: overhang + bezelS,
     screenY: bezelT,
     screenWidth:  screenshotWidth,
@@ -338,48 +335,35 @@ export function drawMacbookFrame(
 ) {
   const { totalWidth, screenX, screenY, screenWidth, screenHeight } = dims;
 
-  const s         = screenWidth / MB_REF_W;
-  const bezelS    = Math.round(MB_REF_BEZEL_S * s);
-  const bezelT    = Math.round(MB_REF_BEZEL_T * s);
-  const bezelB    = Math.round(MB_REF_BEZEL_B * s);
-  const lidR      = Math.max(3, Math.round(MB_REF_LID_R * s));
-  const camR      = Math.max(2, Math.round(MB_REF_CAM_R * s));
-  const overhang  = Math.round(MB_REF_BASE_OVERHANG * s);
-  const baseH     = Math.round(MB_REF_BASE_H * s);
-  const baseR     = Math.max(2, Math.round(MB_REF_BASE_R * s));
-  const deckPad   = Math.round(MB_REF_DECK_PAD * s);
-  const deckR     = Math.max(2, Math.round(MB_REF_DECK_R * s));
-  const footW     = Math.round(MB_REF_FOOT_W * s);
-  const footH     = Math.max(2, Math.round(MB_REF_FOOT_H * s));
+  const s        = screenWidth / MB_REF_W;
+  const bezelS   = Math.round(MB_REF_BEZEL_S  * s);
+  const bezelT   = Math.round(MB_REF_BEZEL_T  * s);
+  const bezelB   = Math.round(MB_REF_BEZEL_B  * s);
+  const lidR     = Math.max(4, Math.round(MB_REF_LID_R    * s));
+  const screenR  = Math.max(2, Math.round(MB_REF_SCREEN_R * s));
+  const camR     = Math.max(2, Math.round(MB_REF_CAM_R    * s));
+  const overhang = Math.round(MB_REF_BASE_OVERHANG * s);
+  const baseH    = Math.round(MB_REF_BASE_H    * s);
+  const baseR    = Math.max(2, Math.round(MB_REF_BASE_R   * s));
+  const footW    = Math.round(MB_REF_FOOT_W    * s);
+  const footH    = Math.max(2, Math.round(MB_REF_FOOT_H   * s));
 
   const lidWidth  = screenWidth + bezelS * 2;
   const lidHeight = screenHeight + bezelT + bezelB;
-  const lidX      = x + overhang;   // lid is centred; base extends beyond it
+  const lidX      = x + overhang;
 
   ctx.save();
 
-  // ── Base (keyboard body) — drawn first so lid sits on top ──
+  // ── Base (keyboard body) — drawn first, lid sits on top ──
   const baseY = y + lidHeight;
   ctx.beginPath();
   ctx.roundRect(x, baseY, totalWidth, baseH, [0, 0, baseR, baseR]);
   ctx.fillStyle = MB_BASE_COLOR;
   ctx.fill();
 
-  // Keyboard deck (inset platform)
-  ctx.beginPath();
-  ctx.roundRect(
-    x + deckPad,
-    baseY + deckPad,
-    totalWidth - deckPad * 2,
-    baseH - deckPad * 2,
-    deckR
-  );
-  ctx.fillStyle = MB_DECK_COLOR;
-  ctx.fill();
-
-  // Rubber feet at bottom corners
-  const footY = baseY + baseH - footH;
-  const footInset = Math.round(footW * 0.5);
+  // Rubber feet
+  const footY      = baseY + baseH - footH;
+  const footInset  = Math.round(footW * 0.6);
   [x + footInset, x + totalWidth - footInset - footW].forEach((fx) => {
     ctx.beginPath();
     ctx.roundRect(fx, footY, footW, footH, footH / 2);
@@ -387,21 +371,18 @@ export function drawMacbookFrame(
     ctx.fill();
   });
 
-  // ── Lid shell ──
+  // ── Lid shell — large rounded corners ──
   ctx.beginPath();
   ctx.roundRect(lidX, y, lidWidth, lidHeight, lidR);
   ctx.fillStyle = MB_LID_COLOR;
   ctx.fill();
 
-  // ── Screen fill + screenshot ──
-  ctx.beginPath();
-  ctx.rect(x + screenX, y + screenY, screenWidth, screenHeight);
-  ctx.fillStyle = MB_SCREEN_COLOR;
-  ctx.fill();
-
+  // ── Screen: black fill + screenshot, clipped with subtle rounded corners ──
   ctx.save();
   ctx.beginPath();
-  ctx.rect(x + screenX, y + screenY, screenWidth, screenHeight);
+  ctx.roundRect(x + screenX, y + screenY, screenWidth, screenHeight, screenR);
+  ctx.fillStyle = MB_SCREEN_COLOR;
+  ctx.fill();
   ctx.clip();
   ctx.drawImage(screenshot, x + screenX, y + screenY, screenWidth, screenHeight);
   ctx.restore();
@@ -418,12 +399,12 @@ export function drawMacbookFrame(
   ctx.fillStyle = "#111111";
   ctx.fill();
 
-  // Subtle hinge line where lid meets base
+  // ── Hinge shadow line ──
   ctx.beginPath();
   ctx.moveTo(x, y + lidHeight);
   ctx.lineTo(x + totalWidth, y + lidHeight);
-  ctx.strokeStyle = "rgba(0,0,0,0.5)";
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(0,0,0,0.6)";
+  ctx.lineWidth = 2;
   ctx.stroke();
 
   ctx.restore();
