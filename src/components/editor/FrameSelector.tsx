@@ -39,12 +39,21 @@ const FRAME_OPTIONS: FrameOption[] = [
     type: "iphone",
     label: "iPhone",
     preview: (
-      <svg width="20" height="32" viewBox="0 0 20 32" fill="none">
-        <rect x="1" y="1" width="18" height="30" rx="5" fill="#1a1a1a" />
-        <rect x="3" y="5" width="14" height="22" rx="2" fill="#0a0a0a" />
-        <rect x="3" y="5" width="14" height="22" rx="2" fill="#222" />
-        <rect x="6" y="2.5" width="8" height="3" rx="1.5" fill="#000" />
-        <rect x="7.5" y="28" width="5" height="1.5" rx="0.75" fill="rgba(255,255,255,0.3)" />
+      // Outer bezel (dark, 40px-radius equivalent), thin p-[6px] bezel, black screen inside
+      <svg width="18" height="32" viewBox="0 0 18 32" fill="none">
+        {/* Outer frame */}
+        <rect x="0.5" y="0.5" width="17" height="31" rx="5.5" fill="#1a1a1a" />
+        {/* Inner screen */}
+        <rect x="2" y="2" width="14" height="28" rx="4.5" fill="#000" />
+        {/* Dynamic Island pill */}
+        <rect x="5.5" y="4" width="7" height="2.8" rx="1.4" fill="#1a1a1a" />
+        {/* Home indicator */}
+        <rect x="6" y="27.5" width="6" height="1.5" rx="0.75" fill="rgba(255,255,255,0.3)" />
+        {/* Volume buttons left */}
+        <rect x="-1" y="9" width="1.5" height="4" rx="0.75" fill="#1a1a1a" />
+        <rect x="-1" y="15" width="1.5" height="4" rx="0.75" fill="#1a1a1a" />
+        {/* Power button right */}
+        <rect x="17.5" y="12" width="1.5" height="5" rx="0.75" fill="#1a1a1a" />
       </svg>
     ),
   },

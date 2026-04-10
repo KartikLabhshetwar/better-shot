@@ -116,27 +116,49 @@ export function drawTerminalFrame(
 
 // ---------------------------------------------------------------------------
 // iPhone frame
+// Reference: custats-info/src/components/MobileApp.jsx
+//
+// Structure (inside-out):
+//   outer bezel  rounded-[2.5rem]=40px,  bg-foreground/90 (~#1a1a1a)
+//     p-[6px] → inner screen container  rounded-[2.2rem]=35.2px, bg-black
+//       content fills screen (object-cover object-top)
+//       Dynamic Island: 90×28px pill, top-3 (12px from top), centered
+//       Home indicator: 30% width pill at bottom
+//   Side buttons drawn outside the bezel
 // ---------------------------------------------------------------------------
 
-const IPHONE_HORIZONTAL_BEZEL = 20;
-const IPHONE_TOP_BEZEL = 50;
-const IPHONE_BOTTOM_BEZEL = 56;
-const IPHONE_OUTER_RADIUS = 46;
-const IPHONE_INNER_RADIUS = 14;
-const IPHONE_NOTCH_WIDTH_RATIO = 0.32;
-const IPHONE_NOTCH_HEIGHT = 28;
-const IPHONE_BUTTON_WIDTH = 4;
-const IPHONE_FRAME_COLOR = "#1a1a1a";
-const IPHONE_BEZEL_INNER = "#111111";
-const IPHONE_HOME_INDICATOR_COLOR = "rgba(255,255,255,0.35)";
+// Bezel thickness and radii mirror the reference CSS exactly
+const IPHONE_BEZEL = 6;            // p-[6px]
+const IPHONE_OUTER_RADIUS = 40;    // rounded-[2.5rem]
+const IPHONE_SCREEN_RADIUS = 35;   // rounded-[2.2rem] ≈ 35.2px
+
+// Dynamic Island: 90px wide × 28px tall, 12px from top (top-3)
+const IPHONE_DI_WIDTH = 90;
+const IPHONE_DI_HEIGHT = 28;
+const IPHONE_DI_TOP = 12;
+
+// Side hardware buttons (drawn outside the bezel, same dark color)
+const IPHONE_BTN_W = 4;
+const IPHONE_BTN_RADIUS = 2;
+const IPHONE_FRAME_COLOR = "#1a1a1a"; // bg-foreground/90
+
+// Home indicator bar
+const IPHONE_INDICATOR_HEIGHT = 5;
+const IPHONE_INDICATOR_BOTTOM = 14;
+const IPHONE_INDICATOR_COLOR = "rgba(255,255,255,0.35)";
 
 export function getIphoneFrameDimensions(screenshotWidth: number, screenshotHeight: number): FrameDimensions {
+  // The outer body is: bezel + screen + bezel on each axis
+  const totalWidth  = screenshotWidth  + IPHONE_BEZEL * 2;
+  const totalHeight = screenshotHeight + IPHONE_BEZEL * 2;
+
   return {
-    totalWidth: screenshotWidth + IPHONE_HORIZONTAL_BEZEL * 2,
-    totalHeight: screenshotHeight + IPHONE_TOP_BEZEL + IPHONE_BOTTOM_BEZEL,
-    screenX: IPHONE_HORIZONTAL_BEZEL,
-    screenY: IPHONE_TOP_BEZEL,
-    screenWidth: screenshotWidth,
+    totalWidth,
+    totalHeight,
+    // Screen starts at top-left corner of the inner screen container
+    screenX: IPHONE_BEZEL,
+    screenY: IPHONE_BEZEL,
+    screenWidth:  screenshotWidth,
     screenHeight: screenshotHeight,
   };
 }
@@ -152,83 +174,70 @@ export function drawIphoneFrame(
 
   ctx.save();
 
-  // Outer iPhone body (main frame color)
+  // ── Side hardware buttons (drawn outside frame, same color, behind frame visually) ──
+
+  // Volume up + volume down (left side)
+  const volBtnX    = x - IPHONE_BTN_W + 1;
+  const volBtn1Y   = y + totalHeight * 0.22;
+  const volBtn2Y   = y + totalHeight * 0.31;
+  const volBtnH    = totalHeight * 0.07;
+
+  ctx.fillStyle = IPHONE_FRAME_COLOR;
+  [volBtn1Y, volBtn2Y].forEach((by) => {
+    ctx.beginPath();
+    ctx.roundRect(volBtnX, by, IPHONE_BTN_W, volBtnH, IPHONE_BTN_RADIUS);
+    ctx.fill();
+  });
+
+  // Power button (right side)
+  const pwrBtnX = x + totalWidth - 1;
+  const pwrBtnY = y + totalHeight * 0.26;
+  const pwrBtnH = totalHeight * 0.10;
+  ctx.beginPath();
+  ctx.roundRect(pwrBtnX, pwrBtnY, IPHONE_BTN_W, pwrBtnH, IPHONE_BTN_RADIUS);
+  ctx.fill();
+
+  // ── Outer bezel: dark rounded rect ──
   ctx.beginPath();
   ctx.roundRect(x, y, totalWidth, totalHeight, IPHONE_OUTER_RADIUS);
   ctx.fillStyle = IPHONE_FRAME_COLOR;
   ctx.fill();
 
-  // Side volume buttons (left side, 2 buttons)
-  const volBtnX = x - IPHONE_BUTTON_WIDTH + 1;
-  const volBtn1Y = y + totalHeight * 0.22;
-  const volBtn2Y = y + totalHeight * 0.31;
-  const volBtnH = totalHeight * 0.07;
-  const volBtnRadius = IPHONE_BUTTON_WIDTH / 2;
+  // ── Screen container: black, slightly smaller radius ──
+  const sx = x + IPHONE_BEZEL;
+  const sy = y + IPHONE_BEZEL;
 
-  ctx.fillStyle = IPHONE_FRAME_COLOR;
   ctx.beginPath();
-  ctx.roundRect(volBtnX, volBtn1Y, IPHONE_BUTTON_WIDTH, volBtnH, volBtnRadius);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.roundRect(volBtnX, volBtn2Y, IPHONE_BUTTON_WIDTH, volBtnH, volBtnRadius);
+  ctx.roundRect(sx, sy, screenWidth, screenHeight, IPHONE_SCREEN_RADIUS);
+  ctx.fillStyle = "#000000";
   ctx.fill();
 
-  // Power button (right side)
-  const powerBtnX = x + totalWidth - 1;
-  const powerBtnY = y + totalHeight * 0.26;
-  const powerBtnH = totalHeight * 0.10;
-  ctx.beginPath();
-  ctx.roundRect(powerBtnX, powerBtnY, IPHONE_BUTTON_WIDTH, powerBtnH, volBtnRadius);
-  ctx.fill();
-
-  // Inner bezel (the inset black area)
-  ctx.beginPath();
-  ctx.roundRect(
-    x + 3,
-    y + 3,
-    totalWidth - 6,
-    totalHeight - 6,
-    IPHONE_OUTER_RADIUS - 3
-  );
-  ctx.fillStyle = IPHONE_BEZEL_INNER;
-  ctx.fill();
-
-  // Clip to inner rounded rect for screen + chrome
-  ctx.beginPath();
-  ctx.roundRect(
-    x + IPHONE_HORIZONTAL_BEZEL - 6,
-    y + IPHONE_TOP_BEZEL - 6,
-    screenWidth + 12,
-    screenHeight + 12,
-    IPHONE_INNER_RADIUS
-  );
-  ctx.fillStyle = "#000";
-  ctx.fill();
-
-  // Screenshot
+  // ── Screenshot clipped to screen shape ──
   ctx.save();
   ctx.beginPath();
-  ctx.roundRect(x + screenX, y + screenY, screenWidth, screenHeight, IPHONE_INNER_RADIUS);
+  ctx.roundRect(x + screenX, y + screenY, screenWidth, screenHeight, IPHONE_SCREEN_RADIUS);
   ctx.clip();
   ctx.drawImage(screenshot, x + screenX, y + screenY, screenWidth, screenHeight);
   ctx.restore();
 
-  // Dynamic Island / notch (centered at top)
-  const notchWidth = totalWidth * IPHONE_NOTCH_WIDTH_RATIO;
-  const notchX = x + (totalWidth - notchWidth) / 2;
-  const notchY = y + IPHONE_TOP_BEZEL - IPHONE_NOTCH_HEIGHT - 2;
+  // ── Dynamic Island: 90×28px pill, 12px from top of screen, centered ──
+  const diWidth  = Math.min(IPHONE_DI_WIDTH, screenWidth * 0.35);
+  const diX = x + screenX + (screenWidth - diWidth) / 2;
+  const diY = y + screenY + IPHONE_DI_TOP;
+
   ctx.beginPath();
-  ctx.roundRect(notchX, notchY, notchWidth, IPHONE_NOTCH_HEIGHT, IPHONE_NOTCH_HEIGHT / 2);
-  ctx.fillStyle = "#000";
+  ctx.roundRect(diX, diY, diWidth, IPHONE_DI_HEIGHT, IPHONE_DI_HEIGHT / 2);
+  ctx.fillStyle = "#000000";
   ctx.fill();
 
-  // Home indicator bar at bottom
-  const indicatorWidth = totalWidth * 0.3;
-  const indicatorX = x + (totalWidth - indicatorWidth) / 2;
-  const indicatorY = y + totalHeight - 18;
+  // ── Home indicator bar ──
+  const indWidth = totalWidth * 0.3;
+  const indX = x + (totalWidth - indWidth) / 2;
+  const indY = y + totalHeight - IPHONE_INDICATOR_BOTTOM;
+
   ctx.beginPath();
-  ctx.roundRect(indicatorX, indicatorY, indicatorWidth, 5, 2.5);
-  ctx.fillStyle = IPHONE_HOME_INDICATOR_COLOR;
+  ctx.roundRect(indX, indY, indWidth, IPHONE_INDICATOR_HEIGHT, IPHONE_INDICATOR_HEIGHT / 2);
+  ctx.fillStyle = IPHONE_INDICATOR_COLOR;
   ctx.fill();
 
   ctx.restore();
