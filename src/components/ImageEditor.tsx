@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { BackgroundSelector, gradientOptions } from "./editor/BackgroundSelector";
 import { AssetGrid } from "./editor/AssetGrid";
 import { EffectsPanel } from "./editor/EffectsPanel";
+import { FrameSelector } from "./editor/FrameSelector";
 import { ImageRoundnessControl } from "./editor/ImageRoundnessControl";
 import { AnnotationCanvas } from "./editor/AnnotationCanvas";
 import { PropertiesPanel } from "./editor/PropertiesPanel";
@@ -527,6 +528,11 @@ export function ImageEditor({
                     <hr className="panel-divider" />
                   </div>
                 )}
+                <FrameSelector
+                  frameType={settings.frameType}
+                  onFrameTypeChange={actions.setFrameType}
+                />
+                <hr className="panel-divider" />
                 <ImageRoundnessControl
                   borderRadius={settings.borderRadius}
                   onBorderRadiusChangeTransient={actions.setBorderRadiusTransient}

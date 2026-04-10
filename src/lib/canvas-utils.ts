@@ -1,4 +1,5 @@
 import type { ShadowSettings } from "@/hooks/useEditorSettings";
+import { type FrameType, getFrameDimensions, drawFrame } from "@/lib/frame-utils";
 
 export type ImageScalingMode = "none" | "fit" | "fit-with-border" | "cover" | "contain";
 
@@ -19,6 +20,7 @@ export interface RenderOptions {
   imageOffset?: { x: number; y: number };
   imageScalingMode?: ImageScalingMode;
   imageBorderSize?: number;
+  frameType?: FrameType;
 }
 
 export interface OffsetLimits {
@@ -182,15 +184,25 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
     imageOffset = { x: 0, y: 0 },
     imageScalingMode = "none",
     imageBorderSize = 0,
+    frameType = "none",
   } = options;
 
+  // When a frame is active, compute frame dimensions first so we know the total size
+  const frameDims = frameType !== "none"
+    ? getFrameDimensions(frameType, image.width, image.height)
+    : null;
+
   // Calculate background dimensions: use custom if provided, otherwise auto (screenshot + padding)
+  // When a frame is active, the frame composite replaces the raw screenshot for sizing
   let bgWidth: number;
   let bgHeight: number;
 
   if (canvasDimensions && canvasDimensions.width > 0 && canvasDimensions.height > 0) {
     bgWidth = canvasDimensions.width;
     bgHeight = canvasDimensions.height;
+  } else if (frameDims) {
+    bgWidth = frameDims.totalWidth + padding * 2;
+    bgHeight = frameDims.totalHeight + padding * 2;
   } else {
     bgWidth = image.width + padding * 2;
     bgHeight = image.height + padding * 2;
@@ -209,8 +221,8 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
 
-  // When padding is 0, skip background and shadow - just draw the image directly
-  if (padding === 0) {
+  // When padding is 0 and no frame, skip background and shadow - just draw the image directly
+  if (padding === 0 && frameType === "none") {
     ctx.beginPath();
     ctx.roundRect(0, 0, image.width, image.height, borderRadius);
     ctx.closePath();
@@ -283,23 +295,8 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
       applyNoiseToBackground(bgCtx, bgWidth, bgHeight, noiseAmount);
     }
 
+    // Draw background layer
     ctx.drawImage(bgCanvas, 0, 0);
-
-    const imageCanvas = document.createElement("canvas");
-    imageCanvas.width = image.width;
-    imageCanvas.height = image.height;
-    const imageCtx = imageCanvas.getContext("2d");
-    if (!imageCtx) throw new Error("Failed to get image canvas context");
-
-    imageCtx.imageSmoothingEnabled = true;
-    imageCtx.imageSmoothingQuality = "high";
-
-    imageCtx.beginPath();
-    imageCtx.roundRect(0, 0, image.width, image.height, borderRadius);
-    imageCtx.closePath();
-    imageCtx.clip();
-
-    imageCtx.drawImage(image, 0, 0, image.width, image.height);
 
     ctx.save();
     ctx.shadowColor = `rgba(0, 0, 0, ${shadow.opacity / 100})`;
@@ -307,33 +304,57 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
     ctx.shadowOffsetX = shadow.offsetX;
     ctx.shadowOffsetY = shadow.offsetY;
 
-    // Calculate scaled image dimensions (now includes offset internally)
-    const scaledDims = calculateScaledImageDimensions(
-      image.width,
-      image.height,
-      bgWidth,
-      bgHeight,
-      imageScalingMode,
-      imageBorderSize,
-      imageOffset
-    );
+    if (frameDims) {
+      // Frame mode: draw the device frame (shadow applies to the whole frame composite)
+      const frameX = (bgWidth - frameDims.totalWidth) / 2;
+      const frameY = (bgHeight - frameDims.totalHeight) / 2;
+      drawFrame(ctx, frameType, frameX, frameY, frameDims, image);
+    } else {
+      // Normal mode: draw the screenshot with border radius + shadow
+      const imageCanvas = document.createElement("canvas");
+      imageCanvas.width = image.width;
+      imageCanvas.height = image.height;
+      const imageCtx = imageCanvas.getContext("2d");
+      if (!imageCtx) throw new Error("Failed to get image canvas context");
 
-    let drawX = scaledDims.x;
-    let drawY = scaledDims.y;
+      imageCtx.imageSmoothingEnabled = true;
+      imageCtx.imageSmoothingQuality = "high";
 
-    // Draw border if fit-with-border mode is active
-    if (imageScalingMode === "fit-with-border" && imageBorderSize > 0) {
-      ctx.fillStyle = "#ffffff"; // White border
-      ctx.fillRect(
-        drawX - imageBorderSize,
-        drawY - imageBorderSize,
-        scaledDims.width + imageBorderSize * 2,
-        scaledDims.height + imageBorderSize * 2
+      imageCtx.beginPath();
+      imageCtx.roundRect(0, 0, image.width, image.height, borderRadius);
+      imageCtx.closePath();
+      imageCtx.clip();
+
+      imageCtx.drawImage(image, 0, 0, image.width, image.height);
+
+      // Calculate scaled image dimensions (now includes offset internally)
+      const scaledDims = calculateScaledImageDimensions(
+        image.width,
+        image.height,
+        bgWidth,
+        bgHeight,
+        imageScalingMode,
+        imageBorderSize,
+        imageOffset
       );
-    }
 
-    // Draw the scaled image
-    ctx.drawImage(imageCanvas, drawX, drawY, scaledDims.width, scaledDims.height);
+      const drawX = scaledDims.x;
+      const drawY = scaledDims.y;
+
+      // Draw border if fit-with-border mode is active
+      if (imageScalingMode === "fit-with-border" && imageBorderSize > 0) {
+        ctx.fillStyle = "#ffffff"; // White border
+        ctx.fillRect(
+          drawX - imageBorderSize,
+          drawY - imageBorderSize,
+          scaledDims.width + imageBorderSize * 2,
+          scaledDims.height + imageBorderSize * 2
+        );
+      }
+
+      // Draw the scaled image
+      ctx.drawImage(imageCanvas, drawX, drawY, scaledDims.width, scaledDims.height);
+    }
 
     ctx.shadowColor = "transparent";
     ctx.shadowBlur = 0;

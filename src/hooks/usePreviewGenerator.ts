@@ -2,6 +2,7 @@ import { useRef, useEffect, useCallback, useState, useMemo } from "react";
 import { EditorSettings } from "@/stores/editorStore";
 import { createHighQualityCanvas, calculateScaledImageDimensions } from "@/lib/canvas-utils";
 import { drawAnnotationOnCanvas } from "@/lib/annotation-utils";
+import { getFrameDimensions, drawFrame } from "@/lib/frame-utils";
 import { Annotation } from "@/types/annotations";
 
 // Image cache with LRU-like cleanup (max 20 images)
@@ -197,6 +198,11 @@ export function usePreviewGenerator({
     const currentRenderId = ++renderIdRef.current;
     const canvas = canvasRef.current;
 
+    // When a frame is active, compute frame dimensions for canvas sizing
+    const frameDims = settingsToRender.frameType && settingsToRender.frameType !== "none"
+      ? getFrameDimensions(settingsToRender.frameType, screenshotImage.width, screenshotImage.height)
+      : null;
+
     // Calculate background dimensions: use custom if provided, otherwise auto (screenshot + padding)
     let bgWidth: number;
     let bgHeight: number;
@@ -207,6 +213,9 @@ export function usePreviewGenerator({
     ) {
       bgWidth = settingsToRender.canvasDimensions.width;
       bgHeight = settingsToRender.canvasDimensions.height;
+    } else if (frameDims) {
+      bgWidth = frameDims.totalWidth + padding * 2;
+      bgHeight = frameDims.totalHeight + padding * 2;
     } else {
       bgWidth = screenshotImage.width + padding * 2;
       bgHeight = screenshotImage.height + padding * 2;
@@ -235,8 +244,8 @@ export function usePreviewGenerator({
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
 
-      // When padding is 0, skip background and shadow - just draw the image directly
-      if (padding === 0) {
+      // When padding is 0 and no frame, skip background and shadow - just draw the image directly
+      if (padding === 0 && !frameDims) {
         ctx.beginPath();
         ctx.roundRect(0, 0, screenshotImage.width, screenshotImage.height, settingsToRender.borderRadius);
         ctx.closePath();
@@ -252,58 +261,66 @@ export function usePreviewGenerator({
 
         ctx.drawImage(tempCanvas, 0, 0);
 
-        const imageCanvas = document.createElement("canvas");
-        imageCanvas.width = screenshotImage.width;
-        imageCanvas.height = screenshotImage.height;
-        const imageCtx = imageCanvas.getContext("2d");
-        if (!imageCtx) {
-          setError("Failed to get image canvas context");
-          return;
-        }
-
-        imageCtx.imageSmoothingEnabled = true;
-        imageCtx.imageSmoothingQuality = "high";
-
-        imageCtx.beginPath();
-        imageCtx.roundRect(0, 0, screenshotImage.width, screenshotImage.height, settingsToRender.borderRadius);
-        imageCtx.closePath();
-        imageCtx.clip();
-
-        imageCtx.drawImage(screenshotImage, 0, 0, screenshotImage.width, screenshotImage.height);
-
         ctx.save();
         ctx.shadowColor = `rgba(0, 0, 0, ${settingsToRender.shadow.opacity / 100})`;
         ctx.shadowBlur = settingsToRender.shadow.blur;
         ctx.shadowOffsetX = settingsToRender.shadow.offsetX;
         ctx.shadowOffsetY = settingsToRender.shadow.offsetY;
 
-        // Calculate scaled image dimensions (now includes offset internally)
-        const scaledDims = calculateScaledImageDimensions(
-          screenshotImage.width,
-          screenshotImage.height,
-          bgWidth,
-          bgHeight,
-          settingsToRender.imageScalingMode,
-          settingsToRender.imageBorderSize,
-          settingsToRender.imageOffset
-        );
+        if (frameDims) {
+          // Frame mode: draw the device frame centered on the background
+          const frameX = (bgWidth - frameDims.totalWidth) / 2;
+          const frameY = (bgHeight - frameDims.totalHeight) / 2;
+          drawFrame(ctx, settingsToRender.frameType, frameX, frameY, frameDims, screenshotImage);
+        } else {
+          // Normal mode: screenshot with border radius + scaling
+          const imageCanvas = document.createElement("canvas");
+          imageCanvas.width = screenshotImage.width;
+          imageCanvas.height = screenshotImage.height;
+          const imageCtx = imageCanvas.getContext("2d");
+          if (!imageCtx) {
+            setError("Failed to get image canvas context");
+            return;
+          }
 
-        let drawX = scaledDims.x;
-        let drawY = scaledDims.y;
+          imageCtx.imageSmoothingEnabled = true;
+          imageCtx.imageSmoothingQuality = "high";
 
-        // Draw border if fit-with-border mode is active
-        if (settingsToRender.imageScalingMode === "fit-with-border" && settingsToRender.imageBorderSize > 0) {
-          ctx.fillStyle = "#ffffff"; // White border
-          ctx.fillRect(
-            drawX - settingsToRender.imageBorderSize,
-            drawY - settingsToRender.imageBorderSize,
-            scaledDims.width + settingsToRender.imageBorderSize * 2,
-            scaledDims.height + settingsToRender.imageBorderSize * 2
+          imageCtx.beginPath();
+          imageCtx.roundRect(0, 0, screenshotImage.width, screenshotImage.height, settingsToRender.borderRadius);
+          imageCtx.closePath();
+          imageCtx.clip();
+
+          imageCtx.drawImage(screenshotImage, 0, 0, screenshotImage.width, screenshotImage.height);
+
+          // Calculate scaled image dimensions (now includes offset internally)
+          const scaledDims = calculateScaledImageDimensions(
+            screenshotImage.width,
+            screenshotImage.height,
+            bgWidth,
+            bgHeight,
+            settingsToRender.imageScalingMode,
+            settingsToRender.imageBorderSize,
+            settingsToRender.imageOffset
           );
-        }
 
-        // Draw the scaled image
-        ctx.drawImage(imageCanvas, drawX, drawY, scaledDims.width, scaledDims.height);
+          const drawX = scaledDims.x;
+          const drawY = scaledDims.y;
+
+          // Draw border if fit-with-border mode is active
+          if (settingsToRender.imageScalingMode === "fit-with-border" && settingsToRender.imageBorderSize > 0) {
+            ctx.fillStyle = "#ffffff"; // White border
+            ctx.fillRect(
+              drawX - settingsToRender.imageBorderSize,
+              drawY - settingsToRender.imageBorderSize,
+              scaledDims.width + settingsToRender.imageBorderSize * 2,
+              scaledDims.height + settingsToRender.imageBorderSize * 2
+            );
+          }
+
+          // Draw the scaled image
+          ctx.drawImage(imageCanvas, drawX, drawY, scaledDims.width, scaledDims.height);
+        }
 
         ctx.shadowColor = "transparent";
         ctx.shadowBlur = 0;
@@ -374,6 +391,7 @@ export function usePreviewGenerator({
     settings.imageOffset.y,
     settings.imageScalingMode,
     settings.imageBorderSize,
+    settings.frameType,
     padding,
     canvasRef,
     generatePreview,
@@ -416,6 +434,7 @@ export function usePreviewGenerator({
           imageOffset: settings.imageOffset,
           imageScalingMode: settings.imageScalingMode,
           imageBorderSize: settings.imageBorderSize,
+          frameType: settings.frameType,
         });
 
         if (annotations.length > 0) {

@@ -5,6 +5,7 @@ import { Store } from "@tauri-apps/plugin-store";
 import { gradientOptions, type GradientOption } from "@/components/editor/BackgroundSelector";
 import { resolveBackgroundPath, getDefaultBackgroundPath, toStorableValue } from "@/lib/asset-registry";
 import { Annotation } from "@/types/annotations";
+import type { FrameType } from "@/lib/frame-utils";
 
 // ============================================================================
 // Types
@@ -12,6 +13,7 @@ import { Annotation } from "@/types/annotations";
 
 export type BackgroundType = "transparent" | "white" | "black" | "gray" | "gradient" | "custom" | "image";
 export type ImageScalingMode = "none" | "fit" | "fit-with-border" | "cover" | "contain";
+export type { FrameType };
 
 export interface ShadowSettings {
   blur: number;
@@ -46,6 +48,7 @@ export interface EditorSettings {
   imageOffset: ImageOffset;
   imageScalingMode: ImageScalingMode;
   imageBorderSize: number;
+  frameType: FrameType;
 }
 
 // Snapshot for undo/redo - stores complete state
@@ -127,6 +130,9 @@ interface EditorActions {
   setImageScalingMode: (mode: ImageScalingMode) => void;
   setImageBorderSize: (size: number) => void;
 
+  // Frame
+  setFrameType: (frameType: FrameType) => void;
+
   // Annotation actions
   addAnnotation: (annotation: Annotation) => void;
   updateAnnotationTransient: (annotation: Annotation) => void;
@@ -182,6 +188,7 @@ const DEFAULT_SETTINGS: EditorSettings = {
   },
   imageScalingMode: "none",
   imageBorderSize: 0,
+  frameType: "none",
 };
 
 const INITIAL_STATE: EditorState = {
@@ -209,6 +216,7 @@ type PersistedEditorSettings = {
   imageOffset?: Partial<ImageOffset>;
   imageScalingMode?: ImageScalingMode;
   imageBorderSize?: number;
+  frameType?: FrameType;
 };
 
 function buildSettingsFromPersisted(stored: PersistedEditorSettings): EditorSettings {
@@ -240,6 +248,7 @@ function buildSettingsFromPersisted(stored: PersistedEditorSettings): EditorSett
     },
     imageScalingMode: stored.imageScalingMode ?? DEFAULT_SETTINGS.imageScalingMode,
     imageBorderSize: stored.imageBorderSize ?? DEFAULT_SETTINGS.imageBorderSize,
+    frameType: stored.frameType ?? DEFAULT_SETTINGS.frameType,
   };
 }
 
@@ -272,6 +281,7 @@ async function persistEditorSettings(settings: EditorSettings) {
       },
       imageScalingMode: settings.imageScalingMode,
       imageBorderSize: settings.imageBorderSize,
+      frameType: settings.frameType,
     });
     await store.save();
   } catch (err) {
@@ -606,6 +616,10 @@ export const useEditorStore = create<EditorStore>()(
         get().updateSettings({ imageBorderSize: size });
       },
 
+      setFrameType: (frameType) => {
+        get().updateSettings({ frameType });
+      },
+
       // ========================================
       // Annotations
       // ========================================
@@ -792,6 +806,7 @@ export const editorActions = {
   get setImageOffset() { return useEditorStore.getState().setImageOffset; },
   get setImageScalingMode() { return useEditorStore.getState().setImageScalingMode; },
   get setImageBorderSize() { return useEditorStore.getState().setImageBorderSize; },
+  get setFrameType() { return useEditorStore.getState().setFrameType; },
   get addAnnotation() { return useEditorStore.getState().addAnnotation; },
   get updateAnnotation() { return useEditorStore.getState().updateAnnotation; },
   get updateAnnotationTransient() { return useEditorStore.getState().updateAnnotationTransient; },
