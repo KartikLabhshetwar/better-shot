@@ -220,6 +220,47 @@ describe("editorStore - padding feature", () => {
   });
 });
 
+describe("editorStore - macbook display background", () => {
+  beforeEach(() => {
+    act(() => {
+      editorActions.reset();
+    });
+  });
+
+  it("defaults to matching the outside background", () => {
+    const state = useEditorStore.getState();
+
+    expect(state.settings.macbookUseOuterBackground).toBe(true);
+    expect(state.settings.macbookBackground.backgroundType).toBe("image");
+    expect(state.settings.macbookBackground.selectedImageSrc).toBeTruthy();
+  });
+
+  it("can switch to a separate MacBook display background", () => {
+    act(() => {
+      editorActions.setMacbookUseOuterBackground(false);
+      editorActions.setMacbookBackgroundType("custom");
+      editorActions.setMacbookCustomColor("#123456");
+    });
+
+    const state = useEditorStore.getState();
+    expect(state.settings.macbookUseOuterBackground).toBe(false);
+    expect(state.settings.macbookBackground.backgroundType).toBe("custom");
+    expect(state.settings.macbookBackground.customColor).toBe("#123456");
+  });
+
+  it("sets the MacBook display image independently", () => {
+    act(() => {
+      editorActions.setMacbookUseOuterBackground(false);
+      editorActions.handleMacbookImageSelect("asset://display-bg");
+    });
+
+    const state = useEditorStore.getState();
+    expect(state.settings.macbookBackground.backgroundType).toBe("image");
+    expect(state.settings.macbookBackground.selectedImageSrc).toBe("asset://display-bg");
+    expect(state.settings.selectedImageSrc).not.toBe("asset://display-bg");
+  });
+});
+
 describe("smart default padding calculation", () => {
   it("should calculate 5% of average dimension", () => {
     // Test the calculation logic that's used in ImageEditor

@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState, useMemo } from "react";
-import { EditorSettings } from "@/stores/editorStore";
+import type { BackgroundFillSettings, EditorSettings } from "@/stores/editorStore";
 import { createHighQualityCanvas, calculateScaledImageDimensions } from "@/lib/canvas-utils";
 import { drawAnnotationOnCanvas } from "@/lib/annotation-utils";
 import { getFrameDimensions, drawFrame } from "@/lib/frame-utils";
@@ -51,7 +51,12 @@ export async function loadImage(src: string): Promise<HTMLImageElement> {
 /**
  * Get the background image source based on settings
  */
-function getBackgroundImageSrc(settings: EditorSettings): string | null {
+type BackgroundFillSource = Pick<
+  BackgroundFillSettings,
+  "backgroundType" | "customColor" | "selectedImageSrc" | "gradientSrc" | "gradientColors"
+>;
+
+function getBackgroundImageSrc(settings: BackgroundFillSource): string | null {
   if (settings.backgroundType === "image" && settings.selectedImageSrc) {
     return settings.selectedImageSrc;
   }
@@ -61,6 +66,24 @@ function getBackgroundImageSrc(settings: EditorSettings): string | null {
   return null;
 }
 
+function getOuterBackgroundFill(settings: EditorSettings): BackgroundFillSource {
+  return {
+    backgroundType: settings.backgroundType,
+    customColor: settings.customColor,
+    selectedImageSrc: settings.selectedImageSrc,
+    gradientSrc: settings.gradientSrc,
+    gradientColors: settings.gradientColors,
+  };
+}
+
+function getMacbookBackgroundFill(settings: EditorSettings): BackgroundFillSource {
+  if (settings.macbookUseOuterBackground) {
+    return getOuterBackgroundFill(settings);
+  }
+
+  return settings.macbookBackground;
+}
+
 /**
  * Draw background on a canvas context
  */
@@ -68,7 +91,7 @@ function drawBackground(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
-  settings: EditorSettings,
+  settings: BackgroundFillSource,
   bgImage: HTMLImageElement | null
 ) {
   switch (settings.backgroundType) {
@@ -182,6 +205,8 @@ export function usePreviewGenerator({
       gradientId: settings.gradientId,
       gradientSrc: settings.gradientSrc,
       customColor: settings.customColor,
+      macbookUseOuterBackground: settings.macbookUseOuterBackground,
+      macbookBackground: settings.macbookBackground,
     });
   }, [
     settings.backgroundType,
@@ -189,6 +214,8 @@ export function usePreviewGenerator({
     settings.gradientId,
     settings.gradientSrc,
     settings.customColor,
+    settings.macbookUseOuterBackground,
+    settings.macbookBackground,
   ]);
 
   // Core render function
@@ -225,10 +252,19 @@ export function usePreviewGenerator({
     setError(null);
 
     try {
-      const bgSrc = getBackgroundImageSrc(settingsToRender);
+      const backgroundFill = getOuterBackgroundFill(settingsToRender);
+      const macbookBackgroundFill = getMacbookBackgroundFill(settingsToRender);
+      const bgSrc = getBackgroundImageSrc(backgroundFill);
       let bgImage: HTMLImageElement | null = null;
       if (bgSrc) {
         bgImage = await loadImage(bgSrc);
+      }
+
+      const macbookBgSrc =
+        settingsToRender.frameType === "macbook" ? getBackgroundImageSrc(macbookBackgroundFill) : null;
+      let macbookBgImage: HTMLImageElement | null = null;
+      if (macbookBgSrc) {
+        macbookBgImage = macbookBgSrc === bgSrc ? bgImage : await loadImage(macbookBgSrc);
       }
 
       if (currentRenderId !== renderIdRef.current) return;
@@ -256,7 +292,7 @@ export function usePreviewGenerator({
         tempCanvas.width = bgWidth;
         tempCanvas.height = bgHeight;
         const tempCtx = tempCanvas.getContext("2d")!;
-        drawBackground(tempCtx, bgWidth, bgHeight, settingsToRender, bgImage);
+        drawBackground(tempCtx, bgWidth, bgHeight, backgroundFill, bgImage);
         applyNoise(tempCanvas, settingsToRender.noiseAmount);
 
         ctx.drawImage(tempCanvas, 0, 0);
@@ -271,7 +307,34 @@ export function usePreviewGenerator({
           // Frame mode: draw the device frame centered on the background
           const frameX = (bgWidth - frameDims.totalWidth) / 2;
           const frameY = (bgHeight - frameDims.totalHeight) / 2;
-          drawFrame(ctx, settingsToRender.frameType, frameX, frameY, frameDims, screenshotImage);
+          let macbookDisplayCanvas: HTMLCanvasElement | null = null;
+          if (settingsToRender.frameType === "macbook") {
+            macbookDisplayCanvas = document.createElement("canvas");
+            macbookDisplayCanvas.width = frameDims.screenWidth;
+            macbookDisplayCanvas.height = frameDims.screenHeight;
+            const macbookDisplayCtx = macbookDisplayCanvas.getContext("2d");
+            if (!macbookDisplayCtx) {
+              setError("Failed to get MacBook display canvas context");
+              return;
+            }
+            drawBackground(
+              macbookDisplayCtx,
+              frameDims.screenWidth,
+              frameDims.screenHeight,
+              macbookBackgroundFill,
+              macbookBgImage
+            );
+            applyNoise(macbookDisplayCanvas, settingsToRender.noiseAmount);
+          }
+          drawFrame(
+            ctx,
+            settingsToRender.frameType,
+            frameX,
+            frameY,
+            frameDims,
+            screenshotImage,
+            macbookDisplayCanvas
+          );
         } else {
           // Normal mode: screenshot with border radius + scaling
           const imageCanvas = document.createElement("canvas");
@@ -412,10 +475,17 @@ export function usePreviewGenerator({
       if (!screenshotImage) return null;
 
       try {
-        const bgSrc = getBackgroundImageSrc(settings);
+        const bgSrc = getBackgroundImageSrc(getOuterBackgroundFill(settings));
         let bgImage: HTMLImageElement | null = null;
         if (bgSrc) {
           bgImage = await loadImage(bgSrc);
+        }
+
+        const macbookBgSrc =
+          settings.frameType === "macbook" ? getBackgroundImageSrc(getMacbookBackgroundFill(settings)) : null;
+        let macbookBgImage: HTMLImageElement | null = null;
+        if (macbookBgSrc) {
+          macbookBgImage = macbookBgSrc === bgSrc ? bgImage : await loadImage(macbookBgSrc);
         }
 
         const canvas = createHighQualityCanvas({
@@ -435,6 +505,12 @@ export function usePreviewGenerator({
           imageScalingMode: settings.imageScalingMode,
           imageBorderSize: settings.imageBorderSize,
           frameType: settings.frameType,
+          macbookUseOuterBackground: settings.macbookUseOuterBackground,
+          macbookBackgroundType: settings.macbookBackground.backgroundType,
+          macbookCustomColor: settings.macbookBackground.customColor,
+          macbookSelectedImage: settings.macbookBackground.selectedImageSrc,
+          macbookBgImage,
+          macbookGradientImage: settings.macbookBackground.backgroundType === "gradient" ? macbookBgImage : null,
         });
 
         if (annotations.length > 0) {

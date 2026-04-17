@@ -61,21 +61,36 @@ const FRAME_OPTIONS: FrameOption[] = [
     type: "macbook",
     label: "MacBook",
     preview: (
-      // Full MacBook: lid + wider base with keyboard deck + feet
+      // Full MacBook: compact base + centred screen over selected backdrop
       <svg width="38" height="28" viewBox="0 0 38 28" fill="none">
-        {/* Base — wider than lid */}
-        <rect x="0" y="19" width="38" height="8" rx="1.5" fill="#242424" />
-        {/* Keyboard deck inset */}
-        <rect x="1.5" y="20.5" width="35" height="5" rx="1" fill="#1a1a1a" />
+        <defs>
+          <linearGradient id="macbook-lid" x1="19" y1="0.5" x2="19" y2="19" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#373c42" />
+            <stop offset="1" stopColor="#1a1d21" />
+          </linearGradient>
+          <linearGradient id="macbook-base" x1="19" y1="18" x2="19" y2="27" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#bbc2cc" />
+            <stop offset="1" stopColor="#737b87" />
+          </linearGradient>
+        </defs>
+        {/* Base — slimmer than previous */}
+        <rect x="1" y="19" width="36" height="6.5" rx="1.6" fill="url(#macbook-base)" />
+        <rect x="4" y="20.4" width="30" height="1.5" rx="0.75" fill="rgba(30,32,36,0.25)" />
+        <rect x="14" y="22" width="10" height="1.8" rx="0.9" stroke="rgba(74,80,88,0.55)" strokeWidth="0.6" />
+        <rect x="16.5" y="24.5" width="5" height="0.9" rx="0.45" fill="rgba(58,64,72,0.72)" />
         {/* Rubber feet */}
-        <rect x="3" y="26.5" width="5" height="1.5" rx="0.75" fill="#111" />
-        <rect x="30" y="26.5" width="5" height="1.5" rx="0.75" fill="#111" />
+        <rect x="4" y="26.2" width="4" height="1" rx="0.5" fill="#111" />
+        <rect x="30" y="26.2" width="4" height="1" rx="0.5" fill="#111" />
         {/* Lid shell — centred, narrower than base */}
-        <rect x="2" y="0.5" width="34" height="19" rx="2" fill="#1e1e1e" />
-        {/* Screen */}
-        <rect x="4" y="4" width="30" height="13" fill="#000" />
+        <rect x="3" y="0.5" width="32" height="18.8" rx="2.6" fill="url(#macbook-lid)" />
+        <rect x="4.5" y="2.2" width="29" height="15.3" rx="1.6" fill="#121417" />
+        {/* Screen backdrop */}
+        <rect x="5.8" y="3.4" width="26.4" height="12.8" rx="1.2" fill="#2d63d8" />
+        <path d="M5.8 13.2C11 10.5 15.5 9.6 32.2 6.8V16.2H5.8V13.2Z" fill="#2a1247" />
+        <rect x="11.2" y="8.5" width="15.6" height="3.2" rx="0.9" fill="#242437" />
         {/* Camera dot */}
-        <circle cx="19" cy="2.5" r="1" fill="#3a3a3a" />
+        <rect x="17.3" y="1.8" width="3.4" height="0.9" rx="0.45" fill="rgba(0,0,0,0.2)" />
+        <circle cx="19" cy="2.35" r="0.7" fill="#101215" />
       </svg>
     ),
   },
