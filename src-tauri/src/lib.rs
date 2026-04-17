@@ -20,18 +20,6 @@ use commands::{
 
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
-/// Sets the app to be an "accessory" application on macOS.
-/// This hides the Dock icon and removes the app from Cmd+Tab.
-#[cfg(target_os = "macos")]
-fn set_macos_accessory_mode() {
-    use objc2::{MainThreadMarker};
-    use objc2_app_kit::{NSApp, NSApplicationActivationPolicy};
-
-    let mtm = MainThreadMarker::new().unwrap();
-    let app = NSApp(mtm);
-    app.setActivationPolicy(NSApplicationActivationPolicy::Accessory);
-}
-
 /// Shows the main application window (creates it if needed, shows if hidden)
 fn show_main_window(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     if let Some(window) = app.get_webview_window("main") {
@@ -76,10 +64,6 @@ pub fn run() {
         ))
         .setup(|app| {
             use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem};
-
-            // Set accessory mode on macOS to hide Dock icon and Cmd+Tab entry
-            #[cfg(target_os = "macos")]
-            set_macos_accessory_mode();
 
             // Enable autostart by default (user can disable in settings)
             #[cfg(target_os = "macos")]
@@ -190,6 +174,18 @@ pub fn run() {
             copy_file_to_temp_workspace,
             delete_temp_workspace_file,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen {
+                has_visible_windows: false,
+                ..
+            } = event
+            {
+                if let Err(error) = show_main_window(app) {
+                    eprintln!("Failed to reopen main window from Dock: {}", error);
+                }
+            }
+        });
 }

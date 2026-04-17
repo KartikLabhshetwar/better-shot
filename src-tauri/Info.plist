@@ -3,6 +3,6 @@
 <plist version="1.0">
 <dict>
     <key>LSUIElement</key>
-    <true/>
+    <false/>
 </dict>
 </plist>
