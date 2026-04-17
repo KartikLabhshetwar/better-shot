@@ -193,11 +193,11 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
     imageBorderSize = 0,
     frameType = "none",
     macbookUseOuterBackground = true,
-    macbookBackgroundType = backgroundType,
-    macbookCustomColor = customColor,
-    macbookSelectedImage = selectedImage,
-    macbookBgImage = bgImage,
-    macbookGradientImage = gradientImage,
+    macbookBackgroundType,
+    macbookCustomColor,
+    macbookSelectedImage,
+    macbookBgImage,
+    macbookGradientImage,
     macbookScreenshotPadding = 0,
   } = options;
 
@@ -334,11 +334,11 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
           macbookDisplayCtx,
           frameDims.screenWidth,
           frameDims.screenHeight,
-          macbookUseOuterBackground ? backgroundType : macbookBackgroundType,
-          macbookUseOuterBackground ? customColor : macbookCustomColor,
-          macbookUseOuterBackground ? selectedImage : macbookSelectedImage,
-          macbookUseOuterBackground ? bgImage : macbookBgImage,
-          macbookUseOuterBackground ? gradientImage : macbookGradientImage
+          macbookUseOuterBackground ? backgroundType : (macbookBackgroundType ?? backgroundType),
+          macbookUseOuterBackground ? customColor : (macbookCustomColor ?? customColor),
+          macbookUseOuterBackground ? selectedImage : (macbookSelectedImage ?? null),
+          macbookUseOuterBackground ? bgImage : (macbookBgImage ?? null),
+          macbookUseOuterBackground ? gradientImage : (macbookGradientImage ?? null)
         );
 
         if (noiseAmount > 0) {
