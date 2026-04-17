@@ -27,6 +27,7 @@ export interface RenderOptions {
   macbookSelectedImage?: string | null;
   macbookBgImage?: HTMLImageElement | null;
   macbookGradientImage?: HTMLImageElement | null;
+  macbookScreenshotPadding?: number;
 }
 
 export interface OffsetLimits {
@@ -197,6 +198,7 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
     macbookSelectedImage = selectedImage,
     macbookBgImage = bgImage,
     macbookGradientImage = gradientImage,
+    macbookScreenshotPadding = 0,
   } = options;
 
   // When a frame is active, compute frame dimensions first so we know the total size
@@ -349,7 +351,7 @@ export function createHighQualityCanvas(options: RenderOptions): HTMLCanvasEleme
         }
       }
 
-      drawFrame(ctx, frameType, frameX, frameY, frameDims, image, macbookDisplayCanvas);
+      drawFrame(ctx, frameType, frameX, frameY, frameDims, image, macbookDisplayCanvas, macbookScreenshotPadding);
     } else {
       // Normal mode: draw the screenshot with border radius + shadow
       const imageCanvas = document.createElement("canvas");

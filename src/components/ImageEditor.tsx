@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { BackgroundSelector, gradientOptions } from "./editor/BackgroundSelector";
 import { AssetGrid } from "./editor/AssetGrid";
 import { EffectsPanel } from "./editor/EffectsPanel";
@@ -535,6 +536,26 @@ export function ImageEditor({
                   frameType={settings.frameType}
                   onFrameTypeChange={actions.setFrameType}
                 />
+                {settings.frameType === "macbook" && (
+                  <div style={{ marginTop: 14, marginBottom: 2 }}>
+                    <div className="section-header" style={{ paddingTop: 0 }}>
+                      <span className="section-title">MacBook Display</span>
+                    </div>
+                    <div style={{ marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <span className="toggle-label">Display Padding</span>
+                      <span className="toggle-value">{settings.macbookScreenshotPadding}%</span>
+                    </div>
+                    <Slider
+                      value={[settings.macbookScreenshotPadding]}
+                      onValueChange={(value) => actions.setMacbookScreenshotPaddingTransient(value[0])}
+                      onValueCommit={(value) => actions.setMacbookScreenshotPadding(value[0])}
+                      min={0}
+                      max={20}
+                      step={1}
+                      className="studio-slider w-full"
+                    />
+                  </div>
+                )}
                 <hr className="panel-divider" />
                 <ImageRoundnessControl
                   borderRadius={settings.borderRadius}

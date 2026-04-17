@@ -207,6 +207,7 @@ export function usePreviewGenerator({
       customColor: settings.customColor,
       macbookUseOuterBackground: settings.macbookUseOuterBackground,
       macbookBackground: settings.macbookBackground,
+      macbookScreenshotPadding: settings.macbookScreenshotPadding,
     });
   }, [
     settings.backgroundType,
@@ -216,6 +217,7 @@ export function usePreviewGenerator({
     settings.customColor,
     settings.macbookUseOuterBackground,
     settings.macbookBackground,
+    settings.macbookScreenshotPadding,
   ]);
 
   // Core render function
@@ -333,7 +335,8 @@ export function usePreviewGenerator({
             frameY,
             frameDims,
             screenshotImage,
-            macbookDisplayCanvas
+            macbookDisplayCanvas,
+            settingsToRender.macbookScreenshotPadding
           );
         } else {
           // Normal mode: screenshot with border radius + scaling
@@ -511,6 +514,7 @@ export function usePreviewGenerator({
           macbookSelectedImage: settings.macbookBackground.selectedImageSrc,
           macbookBgImage,
           macbookGradientImage: settings.macbookBackground.backgroundType === "gradient" ? macbookBgImage : null,
+          macbookScreenshotPadding: settings.macbookScreenshotPadding,
         });
 
         if (annotations.length > 0) {

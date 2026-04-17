@@ -51,6 +51,7 @@ export interface EditorSettings {
   gradientColors: [string, string];
   macbookUseOuterBackground: boolean;
   macbookBackground: BackgroundFillSettings;
+  macbookScreenshotPadding: number;
   noiseAmount: number;
   borderRadius: number;
   padding: number;
@@ -104,6 +105,8 @@ interface EditorActions {
   setMacbookSelectedImage: (src: string) => void;
   setMacbookGradient: (gradient: GradientOption) => void;
   handleMacbookImageSelect: (imageSrc: string) => void;
+  setMacbookScreenshotPaddingTransient: (padding: number) => void;
+  setMacbookScreenshotPadding: (padding: number) => void;
   
   // Transient settings (during slider drag)
   setNoiseAmountTransient: (amount: number) => void;
@@ -190,6 +193,7 @@ const DEFAULT_SETTINGS: EditorSettings = {
   ...DEFAULT_BACKGROUND_FILL,
   macbookUseOuterBackground: true,
   macbookBackground: structuredClone(DEFAULT_BACKGROUND_FILL),
+  macbookScreenshotPadding: 0,
   noiseAmount: 20,
   borderRadius: 18,
   padding: 100,
@@ -231,6 +235,7 @@ type PersistedEditorSettings = {
   selectedImage?: string | null;
   gradientId?: string;
   macbookUseOuterBackground?: boolean;
+  macbookScreenshotPadding?: number;
   macbookBackground?: {
     backgroundType?: BackgroundType;
     customColor?: string;
@@ -260,6 +265,7 @@ function buildSettingsFromPersisted(stored: PersistedEditorSettings): EditorSett
     gradientSrc: gradientOption.src,
     gradientColors: gradientOption.colors,
     macbookUseOuterBackground: stored.macbookUseOuterBackground ?? DEFAULT_SETTINGS.macbookUseOuterBackground,
+    macbookScreenshotPadding: stored.macbookScreenshotPadding ?? DEFAULT_SETTINGS.macbookScreenshotPadding,
     macbookBackground: {
       backgroundType: stored.macbookBackground?.backgroundType ?? DEFAULT_SETTINGS.macbookBackground.backgroundType,
       customColor: stored.macbookBackground?.customColor ?? DEFAULT_SETTINGS.macbookBackground.customColor,
@@ -305,6 +311,7 @@ async function persistEditorSettings(settings: EditorSettings) {
       selectedImage: storableImage,
       gradientId: settings.gradientId,
       macbookUseOuterBackground: settings.macbookUseOuterBackground,
+      macbookScreenshotPadding: settings.macbookScreenshotPadding,
       macbookBackground: {
         backgroundType: settings.macbookBackground.backgroundType,
         customColor: settings.macbookBackground.customColor,
@@ -510,6 +517,16 @@ export const useEditorStore = create<EditorStore>()(
             backgroundType: "image",
           },
         });
+      },
+
+      setMacbookScreenshotPaddingTransient: (padding) => {
+        set((state) => {
+          state.settings.macbookScreenshotPadding = padding;
+        });
+      },
+
+      setMacbookScreenshotPadding: (padding) => {
+        get().updateSettings({ macbookScreenshotPadding: padding });
       },
 
       // ========================================
@@ -886,6 +903,8 @@ export const editorActions = {
   get setMacbookSelectedImage() { return useEditorStore.getState().setMacbookSelectedImage; },
   get setMacbookGradient() { return useEditorStore.getState().setMacbookGradient; },
   get handleMacbookImageSelect() { return useEditorStore.getState().handleMacbookImageSelect; },
+  get setMacbookScreenshotPadding() { return useEditorStore.getState().setMacbookScreenshotPadding; },
+  get setMacbookScreenshotPaddingTransient() { return useEditorStore.getState().setMacbookScreenshotPaddingTransient; },
   get setNoiseAmount() { return useEditorStore.getState().setNoiseAmount; },
   get setNoiseAmountTransient() { return useEditorStore.getState().setNoiseAmountTransient; },
   get setBorderRadius() { return useEditorStore.getState().setBorderRadius; },

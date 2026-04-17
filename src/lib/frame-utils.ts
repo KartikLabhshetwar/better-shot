@@ -362,7 +362,8 @@ export function drawMacbookFrame(
   y: number,
   dims: FrameDimensions,
   screenshot: HTMLImageElement,
-  backdrop: CanvasImageSource | null = null
+  backdrop: CanvasImageSource | null = null,
+  screenshotPaddingPercent: number = 0
 ) {
   const { totalWidth, screenX, screenY, screenWidth, screenHeight } = dims;
 
@@ -398,6 +399,16 @@ export function drawMacbookFrame(
   const panelY = screenAbsY - panelInset;
   const panelWidth = screenWidth + panelInset * 2;
   const panelHeight = screenHeight + panelInset * 2;
+  const screenshotInset = Math.max(
+    0,
+    Math.round(
+      Math.min(screenWidth, screenHeight) * (Math.min(Math.max(screenshotPaddingPercent, 0), 20) / 100)
+    )
+  );
+  const screenshotAreaX = screenAbsX + screenshotInset;
+  const screenshotAreaY = screenAbsY + screenshotInset;
+  const screenshotAreaWidth = Math.max(1, screenWidth - screenshotInset * 2);
+  const screenshotAreaHeight = Math.max(1, screenHeight - screenshotInset * 2);
 
   ctx.save();
 
@@ -456,10 +467,10 @@ export function drawMacbookFrame(
   const fitted = getContainFitRect(
     screenshot.width,
     screenshot.height,
-    screenAbsX,
-    screenAbsY,
-    screenWidth,
-    screenHeight
+    screenshotAreaX,
+    screenshotAreaY,
+    screenshotAreaWidth,
+    screenshotAreaHeight
   );
   ctx.drawImage(screenshot, fitted.x, fitted.y, fitted.width, fitted.height);
 
@@ -574,11 +585,12 @@ export function drawFrame(
   y: number,
   dims: FrameDimensions,
   screenshot: HTMLImageElement,
-  backdrop: CanvasImageSource | null = null
+  backdrop: CanvasImageSource | null = null,
+  screenshotPaddingPercent: number = 0
 ) {
   switch (frameType) {
     case "terminal": drawTerminalFrame(ctx, x, y, dims, screenshot); break;
     case "iphone":   drawIphoneFrame(ctx, x, y, dims, screenshot);   break;
-    case "macbook":  drawMacbookFrame(ctx, x, y, dims, screenshot, backdrop);  break;
+    case "macbook":  drawMacbookFrame(ctx, x, y, dims, screenshot, backdrop, screenshotPaddingPercent);  break;
   }
 }

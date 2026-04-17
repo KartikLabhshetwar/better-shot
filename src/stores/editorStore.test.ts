@@ -231,6 +231,7 @@ describe("editorStore - macbook display background", () => {
     const state = useEditorStore.getState();
 
     expect(state.settings.macbookUseOuterBackground).toBe(true);
+    expect(state.settings.macbookScreenshotPadding).toBe(0);
     expect(state.settings.macbookBackground.backgroundType).toBe("image");
     expect(state.settings.macbookBackground.selectedImageSrc).toBeTruthy();
   });
@@ -258,6 +259,21 @@ describe("editorStore - macbook display background", () => {
     expect(state.settings.macbookBackground.backgroundType).toBe("image");
     expect(state.settings.macbookBackground.selectedImageSrc).toBe("asset://display-bg");
     expect(state.settings.selectedImageSrc).not.toBe("asset://display-bg");
+  });
+
+  it("updates the MacBook screenshot padding independently", () => {
+    act(() => {
+      editorActions.setMacbookScreenshotPaddingTransient(8);
+    });
+    expect(useEditorStore.getState().settings.macbookScreenshotPadding).toBe(8);
+
+    act(() => {
+      editorActions.setMacbookScreenshotPadding(12);
+    });
+
+    const state = useEditorStore.getState();
+    expect(state.settings.macbookScreenshotPadding).toBe(12);
+    expect(state.settings.padding).toBe(100);
   });
 });
 
