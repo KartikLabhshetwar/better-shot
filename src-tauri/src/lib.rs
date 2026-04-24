@@ -203,7 +203,8 @@ pub fn run() {
                 .build()?;
             let _tray = tauri::tray::TrayIconBuilder::new()
                 .menu(&menu)
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(tauri::include_image!("icons/menu/icon.png"))
+                .icon_as_template(true)
                 .tooltip("Better Shot")
                 .on_menu_event(move |app, event| {
                     match event.id().as_ref() {
