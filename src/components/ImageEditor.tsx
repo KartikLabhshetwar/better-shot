@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { toast } from "sonner";
@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { BackgroundSelector, gradientOptions } from "./editor/BackgroundSelector";
 import { AssetGrid } from "./editor/AssetGrid";
 import { EffectsPanel } from "./editor/EffectsPanel";
+import { ExportPanel } from "./editor/ExportPanel";
 import { ImageRoundnessControl } from "./editor/ImageRoundnessControl";
 import { AnnotationToolbar } from "./editor/AnnotationToolbar";
 import { AnnotationCanvas } from "./editor/AnnotationCanvas";
@@ -23,6 +24,11 @@ import {
   useCanRedo,
   editorActions,
 } from "@/stores";
+import {
+  createExportDataUrl,
+  getExportDimensions,
+  type ExportFormat,
+} from "@/lib/export-image";
 
 interface ImageEditorProps {
   imagePath: string;
@@ -48,6 +54,9 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
   const [tempDir, setTempDir] = useState<string>("/private/tmp");
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("png");
+  const [exportQuality, setExportQuality] = useState(92);
+  const [exportScalePercent, setExportScalePercent] = useState(100);
 
    // Annotation UI state (not part of undo/redo)
   const [selectedTool, setSelectedTool] = useState<ToolType>("select");
@@ -69,6 +78,25 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
 
   // Combined error
   const error = loadError || previewError;
+
+  const exportDimensions = useMemo(() => {
+    if (!screenshotImage) {
+      return { width: 0, height: 0 };
+    }
+
+    return getExportDimensions(
+      screenshotImage.width + settings.paddingLeft + settings.paddingRight,
+      screenshotImage.height + settings.paddingTop + settings.paddingBottom,
+      exportScalePercent,
+    );
+  }, [
+    screenshotImage,
+    settings.paddingLeft,
+    settings.paddingRight,
+    settings.paddingTop,
+    settings.paddingBottom,
+    exportScalePercent,
+  ]);
 
   // Initialize store on mount
   useEffect(() => {
@@ -154,31 +182,30 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
         return;
       }
 
-      highQualityCanvas.toBlob(
-        (blob) => {
-          if (blob) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              onSave(reader.result as string);
-              setIsSaving(false);
-            };
-            reader.onerror = () => {
-              setLoadError("Failed to read image data");
-              setIsSaving(false);
-            };
-            reader.readAsDataURL(blob);
-          } else {
-            setIsSaving(false);
-          }
-        },
-        "image/png",
-        1.0
-      );
+      const exportDataUrl = await createExportDataUrl(highQualityCanvas, {
+        format: exportFormat,
+        quality: exportQuality,
+        scalePercent: exportScalePercent,
+      });
+
+      onSave(exportDataUrl);
+      setIsSaving(false);
     } catch (err) {
       setLoadError(`Failed to save: ${err instanceof Error ? err.message : String(err)}`);
       setIsSaving(false);
     }
-  }, [screenshotImage, annotations, renderHighQualityCanvas, onSave, isSaving, isCopying, imagePath]);
+  }, [
+    screenshotImage,
+    annotations,
+    renderHighQualityCanvas,
+    onSave,
+    isSaving,
+    isCopying,
+    imagePath,
+    exportFormat,
+    exportQuality,
+    exportScalePercent,
+  ]);
 
   // Copy handler
   const handleCopy = useCallback(async () => {
@@ -193,7 +220,11 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
         return;
       }
 
-      const dataUrl = highQualityCanvas.toDataURL("image/png");
+      const dataUrl = await createExportDataUrl(highQualityCanvas, {
+        format: "png",
+        quality: 100,
+        scalePercent: exportScalePercent,
+      });
       
       await invoke<string>("save_edited_image", {
         imageData: dataUrl,
@@ -214,7 +245,16 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
     } finally {
       setIsCopying(false);
     }
-  }, [screenshotImage, annotations, renderHighQualityCanvas, isSaving, isCopying, tempDir, imagePath]);
+  }, [
+    screenshotImage,
+    annotations,
+    renderHighQualityCanvas,
+    isSaving,
+    isCopying,
+    tempDir,
+    imagePath,
+    exportScalePercent,
+  ]);
 
   // Annotation handlers
   const handleAnnotationAdd = useCallback((annotation: Annotation) => {
@@ -487,6 +527,17 @@ export function ImageEditor({ imagePath, onSave, onCancel }: ImageEditorProps) {
                 onShadowOpacityChange={actions.setShadowOpacity}
                 onSaveAsDefaults={actions.saveEffectSettingsAsDefaults}
                 onResetPadding={handleResetPadding}
+              />
+
+              <ExportPanel
+                format={exportFormat}
+                quality={exportQuality}
+                scalePercent={exportScalePercent}
+                outputWidth={exportDimensions.width}
+                outputHeight={exportDimensions.height}
+                onFormatChange={setExportFormat}
+                onQualityChange={setExportQuality}
+                onScalePercentChange={setExportScalePercent}
               />
 
               <ImageRoundnessControl

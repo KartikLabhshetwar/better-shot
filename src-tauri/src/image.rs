@@ -89,20 +89,44 @@ pub fn save_image(img: &DynamicImage, save_dir: &str, prefix: &str) -> AppResult
     Ok(file_path.to_string_lossy().into_owned())
 }
 
+struct ParsedImageDataUrl<'a> {
+    base64_data: &'a str,
+    extension: &'static str,
+}
+
+fn parse_image_data_url(image_data: &str) -> AppResult<ParsedImageDataUrl<'_>> {
+    let (prefix, extension) = if image_data.starts_with("data:image/png;base64,") {
+        ("data:image/png;base64,", "png")
+    } else if image_data.starts_with("data:image/jpeg;base64,") {
+        ("data:image/jpeg;base64,", "jpg")
+    } else {
+        return Err(
+            "Invalid image data format: expected PNG or JPEG data URL".to_string(),
+        );
+    };
+
+    let base64_data = image_data
+        .strip_prefix(prefix)
+        .ok_or("Invalid image data format: missing base64 prefix")?;
+
+    Ok(ParsedImageDataUrl {
+        base64_data,
+        extension,
+    })
+}
+
 /// Save base64-encoded image data to a file
 pub fn save_base64_image(image_data: &str, save_dir: &str, prefix: &str) -> AppResult<String> {
-    let base64_data = image_data
-        .strip_prefix("data:image/png;base64,")
-        .ok_or("Invalid image data format: expected data:image/png;base64, prefix")?;
+    let parsed = parse_image_data_url(image_data)?;
 
     let image_bytes = general_purpose::STANDARD
-        .decode(base64_data)
+        .decode(parsed.base64_data)
         .map_err(|e| format!("Failed to decode base64: {}", e))?;
 
     let dest_path = PathBuf::from(save_dir);
     ensure_dir(&dest_path)?;
 
-    let filename = generate_filename(prefix, "png")?;
+    let filename = generate_filename(prefix, parsed.extension)?;
     let file_path = dest_path.join(&filename);
 
     fs::write(&file_path, image_bytes).map_err(|e| format!("Failed to save image: {}", e))?;
@@ -126,6 +150,18 @@ pub fn copy_screenshot_to_dir(source_path: &str, save_dir: &str) -> AppResult<St
     fs::copy(&src_path, &file_path).map_err(|e| format!("Failed to copy screenshot: {}", e))?;
 
     Ok(file_path.to_string_lossy().into_owned())
+}
+
+/// Import an external image file into Better Shot's temporary screenshot flow.
+pub fn import_image_as_screenshot(source_path: &str, save_dir: &str) -> AppResult<String> {
+    let src_path = PathBuf::from(source_path);
+    if !src_path.is_file() {
+        return Err(format!("Image file not found: {}", source_path));
+    }
+
+    let img = image::open(&src_path).map_err(|e| format!("Failed to open dropped image: {}", e))?;
+
+    save_image(&img, save_dir, "screenshot")
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -400,6 +436,8 @@ mod tests {
     }
 
     mod base64_validation {
+        use super::super::parse_image_data_url;
+
         #[test]
         fn test_base64_prefix_validation() {
             let valid_prefix = "data:image/png;base64,";
@@ -416,6 +454,14 @@ mod tests {
 
             let result = invalid_data.strip_prefix("data:image/png;base64,");
             assert!(result.is_none());
+        }
+
+        #[test]
+        fn test_parse_jpeg_data_url() {
+            let parsed = parse_image_data_url("data:image/jpeg;base64,/9j/4AAQSkZJRg==").unwrap();
+
+            assert_eq!(parsed.extension, "jpg");
+            assert_eq!(parsed.base64_data, "/9j/4AAQSkZJRg==");
         }
     }
 }

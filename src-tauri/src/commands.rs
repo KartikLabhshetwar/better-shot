@@ -10,7 +10,11 @@ use objc2::msg_send;
 use objc2_app_kit::NSWindow;
 
 use crate::clipboard::{copy_image_to_clipboard, copy_text_to_clipboard};
-use crate::image::{copy_screenshot_to_dir, crop_image, render_image_with_effects, save_base64_image, CropRegion, RenderSettings};
+use crate::image::{
+    copy_screenshot_to_dir, crop_image,
+    import_image_as_screenshot as import_external_image_as_screenshot, render_image_with_effects,
+    save_base64_image, CropRegion, RenderSettings,
+};
 use crate::ocr::recognize_text_from_image;
 use crate::screenshot::{
     capture_all_monitors as capture_monitors, capture_primary_monitor, MonitorShot,
@@ -120,6 +124,15 @@ pub async fn save_edited_image(
     }
 
     Ok(saved_path)
+}
+
+/// Import a dropped image file and normalize it into the screenshot editing flow.
+#[tauri::command]
+pub async fn import_image_as_screenshot(
+    source_path: String,
+    save_dir: String,
+) -> Result<String, String> {
+    import_external_image_as_screenshot(&source_path, &save_dir).map_err(|e| e.to_string())
 }
 
 /// Get the user's Desktop directory path (cross-platform)

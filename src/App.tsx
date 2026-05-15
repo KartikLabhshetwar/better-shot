@@ -7,6 +7,7 @@ import { processScreenshotWithDefaultBackground } from "@/lib/auto-process";
 import { hasCompletedOnboarding } from "@/lib/onboarding";
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import {
   availableMonitors,
   getCurrentWindow,
@@ -15,7 +16,7 @@ import {
 } from "@tauri-apps/api/window";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Store } from "@tauri-apps/plugin-store";
-import { AppWindowMac, Crop, Monitor, ScanText } from "lucide-react";
+import { AppWindowMac, Crop, ImageUp, Monitor, ScanText } from "lucide-react";
 import { toast } from "sonner";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { KeyboardShortcut } from "./components/preferences/KeyboardShortcutManager";
@@ -217,6 +218,8 @@ function App() {
   const [autoApplyBackground, setAutoApplyBackground] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isDraggingImage, setIsDraggingImage] = useState(false);
+  const [isImportingDroppedImage, setIsImportingDroppedImage] = useState(false);
   const [tempScreenshotPath, setTempScreenshotPath] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [shortcuts, setShortcuts] = useState<KeyboardShortcut[]>(DEFAULT_SHORTCUTS);
@@ -517,6 +520,79 @@ function App() {
     }
   }, [isCapturing]);
 
+  const handleDroppedImage = useCallback(async (paths: string[]) => {
+    const sourcePath = paths[0];
+    if (!sourcePath) return;
+
+    if (isCapturing || isImportingDroppedImage) {
+      setError("Please wait for the current action to complete");
+      return;
+    }
+
+    setIsImportingDroppedImage(true);
+    setError(null);
+
+    try {
+      const importedPath = await invoke<string>("import_image_as_screenshot", {
+        sourcePath,
+        saveDir: settingsRef.current.tempDir,
+      });
+
+      editorActions.reset();
+      setTempScreenshotPath(importedPath);
+      setMode("editing");
+      try {
+        await invoke("move_window_to_active_space");
+      } catch {
+      }
+      await restoreWindow();
+
+      toast.success("Image ready to edit");
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage);
+      toast.error("Failed to open image", {
+        description: errorMessage,
+        duration: 5000,
+      });
+    } finally {
+      setIsImportingDroppedImage(false);
+    }
+  }, [isCapturing, isImportingDroppedImage]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    let mounted = true;
+
+    const setupFileDrop = async () => {
+      unlisten = await getCurrentWebview().onDragDropEvent((event) => {
+        if (!mounted) return;
+
+        if (event.payload.type === "enter" || event.payload.type === "over") {
+          setIsDraggingImage(true);
+          return;
+        }
+
+        if (event.payload.type === "leave") {
+          setIsDraggingImage(false);
+          return;
+        }
+
+        setIsDraggingImage(false);
+        void handleDroppedImage(event.payload.paths);
+      });
+    };
+
+    setupFileDrop().catch((err) => {
+      console.error("Failed to set up image drop listener:", err);
+    });
+
+    return () => {
+      mounted = false;
+      unlisten?.();
+    };
+  }, [handleDroppedImage]);
+
   // Setup hotkeys whenever settings change
   useEffect(() => {
     const setupHotkeys = async () => {
@@ -707,6 +783,30 @@ function App() {
     setTempScreenshotPath(null);
   }
 
+  const dropOverlay = isDraggingImage ? (
+    <div
+      className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/90 p-8"
+      style={{
+        paddingTop: "max(2rem, env(safe-area-inset-top))",
+        paddingRight: "max(2rem, env(safe-area-inset-right))",
+        paddingBottom: "max(2rem, env(safe-area-inset-bottom))",
+        paddingLeft: "max(2rem, env(safe-area-inset-left))",
+      }}
+    >
+      <div className="flex max-w-sm flex-col items-center gap-3 rounded-lg border border-border bg-card p-6 text-center shadow-lg">
+        <div className="flex size-12 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
+          <ImageUp className="size-6" aria-hidden="true" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-base font-medium text-foreground text-balance">Drop image to edit</p>
+          <p className="text-sm text-muted-foreground text-pretty">
+            Better Shot will import it as a screenshot.
+          </p>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   // Get shortcut display for a specific action
   const getShortcutDisplay = (actionId: string): string => {
     const shortcut = shortcuts.find(s => s.id === actionId);
@@ -720,36 +820,45 @@ function App() {
 
   if (mode === "editing" && tempScreenshotPath) {
     return (
-      <Suspense fallback={<LoadingFallback />}>
-        <ImageEditor
-          imagePath={tempScreenshotPath}
-          onSave={handleEditorSave}
-          onCancel={handleEditorCancel}
-        />
-      </Suspense>
+      <>
+        <Suspense fallback={<LoadingFallback />}>
+          <ImageEditor
+            imagePath={tempScreenshotPath}
+            onSave={handleEditorSave}
+            onCancel={handleEditorCancel}
+          />
+        </Suspense>
+        {dropOverlay}
+      </>
     );
   }
 
   if (showOnboarding) {
     return (
-      <Suspense fallback={<LoadingFallback />}>
-        <OnboardingFlow
-          onComplete={() => {
-            setShowOnboarding(false);
-          }}
-        />
-      </Suspense>
+      <>
+        <Suspense fallback={<LoadingFallback />}>
+          <OnboardingFlow
+            onComplete={() => {
+              setShowOnboarding(false);
+            }}
+          />
+        </Suspense>
+        {dropOverlay}
+      </>
     );
   }
 
   if (mode === "preferences") {
     return (
-      <Suspense fallback={<LoadingFallback />}>
-        <PreferencesPage 
-          onBack={handleBackFromPreferences} 
-          onSettingsChange={handleSettingsChange}
-        />
-      </Suspense>
+      <>
+        <Suspense fallback={<LoadingFallback />}>
+          <PreferencesPage 
+            onBack={handleBackFromPreferences} 
+            onSettingsChange={handleSettingsChange}
+          />
+        </Suspense>
+        {dropOverlay}
+      </>
     );
   }
 
@@ -777,7 +886,7 @@ function App() {
             <div className="grid grid-cols-2 gap-3">
               <Button
                 onClick={() => handleCapture("region")}
-                disabled={isCapturing}
+                disabled={isCapturing || isImportingDroppedImage}
                 variant="cta"
                 size="lg"
                 className="py-3 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -787,7 +896,7 @@ function App() {
               </Button>
               <Button
                 onClick={() => handleCapture("ocr")}
-                disabled={isCapturing}
+                disabled={isCapturing || isImportingDroppedImage}
                 variant="cta"
                 size="lg"
                 className="py-3 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -797,7 +906,7 @@ function App() {
               </Button>
               <Button
                 onClick={() => handleCapture("fullscreen")}
-                disabled={isCapturing}
+                disabled={isCapturing || isImportingDroppedImage}
                 variant="cta"
                 size="lg"
                 className="py-3 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -807,7 +916,7 @@ function App() {
               </Button>
               <Button
                 onClick={() => handleCapture("window")}
-                disabled={isCapturing}
+                disabled={isCapturing || isImportingDroppedImage}
                 variant="cta"
                 size="lg"
                 className="py-3 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -832,13 +941,13 @@ function App() {
               />
             </div>
 
-            {isCapturing && (
+            {(isCapturing || isImportingDroppedImage) && (
               <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
                 <svg className="animate-spin size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Waiting for selection...
+                {isImportingDroppedImage ? "Opening image..." : "Waiting for selection..."}
               </div>
             )}
 
@@ -924,6 +1033,7 @@ function App() {
         </Card>
       </div>
     </main>
+    {dropOverlay}
     </>
   );
 }
