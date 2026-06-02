@@ -11,24 +11,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **In-app update checker**: Check for Updates button in Preferences > About that queries GitHub releases API and links to the latest download
 - **Version tracking**: `version.json` file at project root for release management
-- **Rebuilt annotation tools**: Rectangle, filled rect, ellipse, line, arrow, freehand, numbered badges, text, pixelate, and blur — all with proper coordinate mapping that correctly handles the aspect-fit image display area
+- **Professional annotation system**: Complete rewrite of annotation tools
+  - **Interactive canvas**: Annotations render as live SwiftUI views — click to select, drag to move, handles to resize
+  - **Selection system**: Single select, multi-select (Shift/Cmd+click), marquee drag selection, select all (Cmd+A)
+  - **Curved arrows**: Quadratic Bézier arrows with draggable curve control handle and snap-to-straight
+  - **Live text editing**: Text annotations use inline NSTextView with full font family, size, bold/italic/underline, and alignment controls
+  - **Numbered circles**: Auto-incrementing numbered badges with proper outline and contrast text
+  - **Redaction tools**: Pixelate and blur with adjustable density slider and cached preview generation
+  - **Resize handles**: Corner handles for shapes, endpoint handles for lines/arrows, curve handle for arrows
+  - **Keyboard shortcuts**: Single-key tool switching (R/O/T/L/A/P/B/1/H), Delete to remove, Cmd+Z/Shift+Cmd+Z for undo/redo
+  - **Color picker**: 10 named color presets with popover selector + custom ColorPicker
+  - **Stroke width picker**: Visual popover with 5 presets (2/4/6/8/12px)
+- **Aspect-ratio locking**: Hold Shift while drawing rectangles/ellipses to constrain to square/circle
+- **Arrow snap-to-straight**: Arrow curves snap to a straight line when dragged near the start-end axis
 
 ### Fixed
 
 - **Menu bar icon**: Replaced generic circle template icon with the actual BetterShot app icon (orange ring) using original rendering
-- **Keyboard shortcut override**: Fixed the accessibility permission flow — the CGEvent tap now only registers after accessibility permission is confirmed, with polling to detect when the user grants permission. Previously the tap was registered before permission was granted, silently failing and letting native macOS screenshot shortcuts fire instead
+- **Keyboard shortcut override**: Fixed the accessibility permission flow — the CGEvent tap now only registers after accessibility permission is confirmed, with polling to detect when the user grants permission
 - **Annotation coordinate system**: Gesture tracking now normalizes against the actual image display rect (accounting for aspect-fit letterboxing), not the full view bounds
+
+### Changed
+
+- **Inspector panel redesigned**: Sidebar with sections for Tools, Style, Text, Effects, and Background — each with proper spacing, section headers, and dividers
+- **Canvas rendering**: Annotations now render directly as SwiftUI views on the canvas (not baked into a preview image), enabling real-time interaction without re-render delays
+- **Live beautifier preview**: Canvas shows the full rendered preview (background, padding, shadow, corner radius) with a 30ms debounced render pipeline
+- Version bumped to 0.3.0
+- Deployment target remains macOS 14.0
+- Simplified BetterShotDelegate — removed all video recording callback and frame extraction code
 
 ### Removed
 
 - **Screen recording**: Removed ScreenRecorder, VideoProcessor, RecordingControlPanel, and the bundled videokit binary — video features will return in a future release
 - **Layout section**: Removed alignment grid and aspect ratio picker from the editor inspector (non-functional in previous release)
-
-### Changed
-
-- Version bumped to 0.3.0
-- Deployment target remains macOS 14.0
-- Simplified BetterShotDelegate — removed all video recording callback and frame extraction code
+- **Old annotation system**: Replaced `ColorSwatch`, `StrokeWidth` enum, `AnnotationGestureView`, and basic `AnnotationItem` with the full interactive model
 
 ## [0.2.0] - 2026-06-02
 

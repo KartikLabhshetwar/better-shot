@@ -8,8 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		01CE948684943DFF96B077F7 /* AppUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BADFC6B5CCEDC123DF696D8 /* AppUpdater.swift */; };
-		031816AC9A11241D76C241B9 /* AnnotationGestureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF4FA8F2A4E19B27358C2D41 /* AnnotationGestureView.swift */; };
 		06D6F16CF243DDB4531BEE29 /* AnnotationDrawing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17544CDA089E3F65F7BCE622 /* AnnotationDrawing.swift */; };
+		0B76BB9ECF0DEA0C47B75DAC /* AnnotationItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD21E8B1BB111C9A2991D570 /* AnnotationItemView.swift */; };
 		12F0105D52F612AA1BD73023 /* BetterShotDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A8FF0E5AD713FC1D7E99DE7 /* BetterShotDelegate.swift */; };
 		13B8472EC13ED5548E55212F /* HistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11DEB19CCE7ED49CF1136508 /* HistoryStore.swift */; };
 		174D457C94F688B0DDD75E64 /* WindowPickerOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61D783D3556AA5344DAFDC63 /* WindowPickerOverlay.swift */; };
@@ -22,6 +22,7 @@
 		615EE1453C9A7BDFD9248E09 /* ScreenCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4495302A23BB2192D91C5ED3 /* ScreenCapture.swift */; };
 		6682480DF2FDA028736D23D2 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9822447B9DE8F15B9CC94381 /* PreferencesView.swift */; };
 		7492DCC25BAEBAFD914AAC6C /* EditorCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D72A7FD249FD623240D8735 /* EditorCanvasView.swift */; };
+		7A3EBC41CA7A6F9DE045888B /* AnnotationRedactionImageProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 147306FB804DB8E1D8FC83DA /* AnnotationRedactionImageProcessor.swift */; };
 		8782829F9AD2E1BE2B796AC7 /* ShortcutService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAE1EE5C32D7D0D099A88951 /* ShortcutService.swift */; };
 		87B41081A50FF4716E4423EC /* EditorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9057B39C894A83FE5C27A761 /* EditorWindowController.swift */; };
 		918CF31A69D7A8EB445F4164 /* CaptureRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5558B01BB764A6621835508 /* CaptureRecord.swift */; };
@@ -30,6 +31,8 @@
 		B20B0C52AEF6529B4DEE0B46 /* AnnotationItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6DFE09CC845C78A0C3D2685 /* AnnotationItem.swift */; };
 		BA2E35F115F67D7CA6DEE5A9 /* BetterShotApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F74F2F48E0775A96906E180F /* BetterShotApp.swift */; };
 		BC811FEA82E635D6292A80FD /* MenuBarContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE87F338892DCBFEA8FD7BDA /* MenuBarContentView.swift */; };
+		CF7361CA58691AC8B76B31C8 /* AnnotationKeyboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EA870DD2C387FEFFB50527E /* AnnotationKeyboard.swift */; };
+		DB55A5FF7B47E7320A84BE44 /* AnnotationEditorInteractionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E8B6DF3EDCB19D828A14168 /* AnnotationEditorInteractionState.swift */; };
 		E29FA26E5F3F90C0653923E8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B350EE68E3E974004660FC0A /* Assets.xcassets */; };
 		EB848575CC3229A7EFFA6F13 /* BackgroundStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE8FF05309B340FEAE149775 /* BackgroundStyle.swift */; };
 		F3BAB5D4C1617D203E95885B /* BundledBackgrounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94D707990F014D8BE452023A /* BundledBackgrounds.swift */; };
@@ -38,6 +41,7 @@
 
 /* Begin PBXFileReference section */
 		11DEB19CCE7ED49CF1136508 /* HistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStore.swift; sourceTree = "<group>"; };
+		147306FB804DB8E1D8FC83DA /* AnnotationRedactionImageProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationRedactionImageProcessor.swift; sourceTree = "<group>"; };
 		17544CDA089E3F65F7BCE622 /* AnnotationDrawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationDrawing.swift; sourceTree = "<group>"; };
 		1A8FF0E5AD713FC1D7E99DE7 /* BetterShotDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BetterShotDelegate.swift; sourceTree = "<group>"; };
 		4495302A23BB2192D91C5ED3 /* ScreenCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCapture.swift; sourceTree = "<group>"; };
@@ -46,7 +50,9 @@
 		5BADFC6B5CCEDC123DF696D8 /* AppUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdater.swift; sourceTree = "<group>"; };
 		61D783D3556AA5344DAFDC63 /* WindowPickerOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowPickerOverlay.swift; sourceTree = "<group>"; };
 		7307DAB0AA0DDC8AB161E476 /* EditorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorModel.swift; sourceTree = "<group>"; };
+		7E8B6DF3EDCB19D828A14168 /* AnnotationEditorInteractionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationEditorInteractionState.swift; sourceTree = "<group>"; };
 		868F0E1B6C8FC7DF50B4A79B /* RegionSelectionOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegionSelectionOverlay.swift; sourceTree = "<group>"; };
+		8EA870DD2C387FEFFB50527E /* AnnotationKeyboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationKeyboard.swift; sourceTree = "<group>"; };
 		9057B39C894A83FE5C27A761 /* EditorWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorWindowController.swift; sourceTree = "<group>"; };
 		94D707990F014D8BE452023A /* BundledBackgrounds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundledBackgrounds.swift; sourceTree = "<group>"; };
 		9822447B9DE8F15B9CC94381 /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
@@ -57,6 +63,7 @@
 		B350EE68E3E974004660FC0A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B5FC4CD374D6C387202BB773 /* EditorWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorWindowView.swift; sourceTree = "<group>"; };
 		BAE1EE5C32D7D0D099A88951 /* ShortcutService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutService.swift; sourceTree = "<group>"; };
+		BD21E8B1BB111C9A2991D570 /* AnnotationItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationItemView.swift; sourceTree = "<group>"; };
 		BE8FF05309B340FEAE149775 /* BackgroundStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundStyle.swift; sourceTree = "<group>"; };
 		C5558B01BB764A6621835508 /* CaptureRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureRecord.swift; sourceTree = "<group>"; };
 		C757566A38307689528E5A9E /* AppPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferences.swift; sourceTree = "<group>"; };
@@ -64,7 +71,6 @@
 		F46A331394FBCD6FCFD29F62 /* BetterShot.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BetterShot.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F6DFE09CC845C78A0C3D2685 /* AnnotationItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationItem.swift; sourceTree = "<group>"; };
 		F74F2F48E0775A96906E180F /* BetterShotApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BetterShotApp.swift; sourceTree = "<group>"; };
-		FF4FA8F2A4E19B27358C2D41 /* AnnotationGestureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationGestureView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -90,7 +96,10 @@
 			isa = PBXGroup;
 			children = (
 				17544CDA089E3F65F7BCE622 /* AnnotationDrawing.swift */,
-				FF4FA8F2A4E19B27358C2D41 /* AnnotationGestureView.swift */,
+				7E8B6DF3EDCB19D828A14168 /* AnnotationEditorInteractionState.swift */,
+				BD21E8B1BB111C9A2991D570 /* AnnotationItemView.swift */,
+				8EA870DD2C387FEFFB50527E /* AnnotationKeyboard.swift */,
+				147306FB804DB8E1D8FC83DA /* AnnotationRedactionImageProcessor.swift */,
 				9D72A7FD249FD623240D8735 /* EditorCanvasView.swift */,
 				5229BD9DF667A270F2BF5A01 /* EditorInspectorView.swift */,
 				7307DAB0AA0DDC8AB161E476 /* EditorModel.swift */,
@@ -265,8 +274,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				06D6F16CF243DDB4531BEE29 /* AnnotationDrawing.swift in Sources */,
-				031816AC9A11241D76C241B9 /* AnnotationGestureView.swift in Sources */,
+				DB55A5FF7B47E7320A84BE44 /* AnnotationEditorInteractionState.swift in Sources */,
 				B20B0C52AEF6529B4DEE0B46 /* AnnotationItem.swift in Sources */,
+				0B76BB9ECF0DEA0C47B75DAC /* AnnotationItemView.swift in Sources */,
+				CF7361CA58691AC8B76B31C8 /* AnnotationKeyboard.swift in Sources */,
+				7A3EBC41CA7A6F9DE045888B /* AnnotationRedactionImageProcessor.swift in Sources */,
 				6158A6FD21D793D955B2E0E9 /* AppPreferences.swift in Sources */,
 				01CE948684943DFF96B077F7 /* AppUpdater.swift in Sources */,
 				EB848575CC3229A7EFFA6F13 /* BackgroundStyle.swift in Sources */,

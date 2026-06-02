@@ -7,14 +7,21 @@ struct EditorWindowView: View {
 
     var body: some View {
         HSplitView {
-            // Canvas area
             EditorCanvasView(model: model)
                 .frame(minWidth: 500, minHeight: 400)
                 .background(Color(nsColor: .windowBackgroundColor))
 
-            // Inspector panel
             EditorInspectorView(model: model)
                 .frame(width: 280)
+        }
+        .background {
+            AnnotationKeyCommandHandler(
+                onDelete: { model.deleteSelectedAnnotation() },
+                onUndo: { model.undo() },
+                onRedo: { model.redo() },
+                onSelectAll: { model.selectAllAnnotations() },
+                onSelectTool: { tool in model.selectTool(tool) }
+            )
         }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {

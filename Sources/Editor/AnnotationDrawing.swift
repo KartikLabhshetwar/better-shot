@@ -1,179 +1,299 @@
 import CoreGraphics
 import CoreImage
+import CoreImage.CIFilterBuiltins
 import AppKit
 
 enum AnnotationDrawing {
 
+    private static let ciContext = CIContext(options: [.cacheIntermediates: false])
+
     static func draw(_ items: [AnnotationItem], in ctx: CGContext, canvasSize: CGSize, sourceImage: CGImage?) {
         let canvasRect = CGRect(origin: .zero, size: canvasSize)
+        ctx.setLineCap(.round)
+        ctx.setLineJoin(.round)
         for item in items {
-            ctx.saveGState()
-            drawItem(item, in: ctx, canvasRect: canvasRect, sourceImage: sourceImage)
-            ctx.restoreGState()
-        }
-    }
+            autoreleasepool {
+                ctx.setStrokeColor(item.swatch.nsColor.cgColor)
+                ctx.setFillColor(item.swatch.nsColor.cgColor)
 
-    private static func drawItem(_ item: AnnotationItem, in ctx: CGContext, canvasRect: CGRect, sourceImage: CGImage?) {
-        let color = item.swatch.cgColor
-        let lw = item.strokeWidth
+                let lineWidth = renderedLineWidth(for: item, imageSize: canvasRect.size)
+                ctx.setLineWidth(lineWidth)
 
-        let rect = denormRect(item.rect, in: canvasRect)
+                switch item.tool {
+                case .select:
+                    return
 
-        switch item.tool {
-        case .rectangle:
-            ctx.setStrokeColor(color)
-            ctx.setLineWidth(lw)
-            ctx.stroke(rect)
+                case .rectangle:
+                    ctx.stroke(renderedRect(item.bounds, in: canvasRect))
 
-        case .filledRect:
-            ctx.setFillColor(CGColor(srgbRed: item.swatch.red, green: item.swatch.green, blue: item.swatch.blue, alpha: 0.7))
-            let path = CGPath(roundedRect: rect, cornerWidth: 4, cornerHeight: 4, transform: nil)
-            ctx.addPath(path)
-            ctx.fillPath()
+                case .filledRectangle:
+                    let rect = renderedRect(item.bounds, in: canvasRect)
+                    ctx.addPath(CGPath(
+                        roundedRect: rect,
+                        cornerWidth: AnnotationFilledRectangleMetrics.cornerRadius(for: rect),
+                        cornerHeight: AnnotationFilledRectangleMetrics.cornerRadius(for: rect),
+                        transform: nil
+                    ))
+                    ctx.fillPath()
 
-        case .ellipse:
-            ctx.setStrokeColor(color)
-            ctx.setLineWidth(lw)
-            ctx.strokeEllipse(in: rect)
+                case .ellipse:
+                    ctx.strokeEllipse(in: renderedRect(item.bounds, in: canvasRect))
 
-        case .line:
-            guard item.points.count >= 2 else { return }
-            let p0 = denormPoint(item.points[0], in: canvasRect)
-            let p1 = denormPoint(item.points[1], in: canvasRect)
-            ctx.setStrokeColor(color)
-            ctx.setLineWidth(lw)
-            ctx.setLineCap(.round)
-            ctx.move(to: p0)
-            ctx.addLine(to: p1)
-            ctx.strokePath()
+                case .numberedCircle:
+                    drawNumberedCircle(item, in: renderedRect(item.bounds, in: canvasRect), context: ctx)
 
-        case .arrow:
-            guard item.points.count >= 2 else { return }
-            let p0 = denormPoint(item.points[0], in: canvasRect)
-            let p1 = denormPoint(item.points[1], in: canvasRect)
-            ctx.setStrokeColor(color)
-            ctx.setLineWidth(lw)
-            ctx.setLineCap(.round)
-            ctx.setLineJoin(.round)
-            ctx.move(to: p0)
-            ctx.addLine(to: p1)
-            ctx.strokePath()
+                case .pixelate:
+                    guard let sourceImage else { return }
+                    applyPixelation(
+                        in: renderedRect(item.bounds, in: canvasRect),
+                        context: ctx,
+                        canvasSize: canvasSize,
+                        colorSpace: CGColorSpaceCreateDeviceRGB(),
+                        density: item.redactionDensity
+                    )
 
-            let angle = atan2(p1.y - p0.y, p1.x - p0.x)
-            let hl: CGFloat = lw * 3.5
-            let ha: CGFloat = .pi / 6
-            ctx.move(to: CGPoint(x: p1.x - hl * cos(angle - ha), y: p1.y - hl * sin(angle - ha)))
-            ctx.addLine(to: p1)
-            ctx.addLine(to: CGPoint(x: p1.x - hl * cos(angle + ha), y: p1.y - hl * sin(angle + ha)))
-            ctx.strokePath()
+                case .blur:
+                    guard let sourceImage else { return }
+                    applyBlur(
+                        in: renderedRect(item.bounds, in: canvasRect),
+                        context: ctx,
+                        canvasSize: canvasSize,
+                        density: item.redactionDensity
+                    )
 
-        case .freehand:
-            guard item.points.count >= 2 else { return }
-            ctx.setStrokeColor(color)
-            ctx.setLineWidth(lw)
-            ctx.setLineCap(.round)
-            ctx.setLineJoin(.round)
-            let pts = item.points.map { denormPoint($0, in: canvasRect) }
-            ctx.move(to: pts[0])
-            for i in 1..<pts.count {
-                if i < pts.count - 1 {
-                    let mid = CGPoint(x: (pts[i].x + pts[i+1].x) / 2, y: (pts[i].y + pts[i+1].y) / 2)
-                    ctx.addQuadCurve(to: mid, control: pts[i])
-                } else {
-                    ctx.addLine(to: pts[i])
+                case .text:
+                    drawText(item, in: renderedRect(item.bounds, in: canvasRect), imageHeight: canvasRect.height, context: ctx)
+
+                case .line:
+                    guard let first = item.points.first,
+                          let last = item.points.last else { return }
+                    let start = renderedPoint(first, in: canvasRect)
+                    let end = renderedPoint(last, in: canvasRect)
+                    ctx.beginPath()
+                    ctx.move(to: start)
+                    ctx.addLine(to: end)
+                    ctx.strokePath()
+
+                case .freehand:
+                    drawFreehand(points: item.points, imageRect: canvasRect, context: ctx)
+
+                case .arrow:
+                    guard let first = item.points.first,
+                          let control = item.controlPoint,
+                          let last = item.points.last,
+                          let geometry = AnnotationArrowGeometry(
+                            start: renderedPoint(first, in: canvasRect),
+                            control: renderedPoint(control, in: canvasRect),
+                            end: renderedPoint(last, in: canvasRect),
+                            lineWidth: lineWidth
+                          ) else { return }
+                    ctx.beginPath()
+                    ctx.move(to: renderedPoint(first, in: canvasRect))
+                    ctx.addQuadCurve(to: geometry.tip, control: geometry.shaftControl)
+                    ctx.strokePath()
+                    drawArrowHead(geometry, context: ctx)
                 }
             }
-            ctx.strokePath()
-
-        case .numberedBadge:
-            let size = max(rect.width, rect.height, 24)
-            let badgeRect = CGRect(x: rect.midX - size / 2, y: rect.midY - size / 2, width: size, height: size)
-            ctx.setFillColor(color)
-            ctx.fillEllipse(in: badgeRect)
-
-            let text = "\(item.badgeNumber)" as NSString
-            let font = NSFont.boldSystemFont(ofSize: size * 0.5)
-            let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
-            let textSize = text.size(withAttributes: attrs)
-            let textRect = CGRect(
-                x: badgeRect.midX - textSize.width / 2,
-                y: badgeRect.midY - textSize.height / 2,
-                width: textSize.width, height: textSize.height
-            )
-            NSGraphicsContext.saveGraphicsState()
-            NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
-            text.draw(in: textRect, withAttributes: attrs)
-            NSGraphicsContext.restoreGraphicsState()
-
-        case .text:
-            let text = item.text as NSString
-            let font = item.isBold ? NSFont.boldSystemFont(ofSize: item.fontSize) : NSFont.systemFont(ofSize: item.fontSize)
-            let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor(cgColor: color) ?? .red]
-            NSGraphicsContext.saveGraphicsState()
-            NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
-            text.draw(in: rect, withAttributes: attrs)
-            NSGraphicsContext.restoreGraphicsState()
-
-        case .pixelate:
-            guard let sourceImage else { return }
-            let pixelRect = CGRect(
-                x: rect.origin.x,
-                y: rect.origin.y,
-                width: rect.width,
-                height: rect.height
-            )
-            guard pixelRect.width > 0, pixelRect.height > 0,
-                  let cropped = sourceImage.cropping(to: pixelRect) else { return }
-            let blockSize = max(2, Int(item.redactionDensity))
-            let smallW = max(1, Int(pixelRect.width) / blockSize)
-            let smallH = max(1, Int(pixelRect.height) / blockSize)
-            let cs = CGColorSpaceCreateDeviceRGB()
-            guard let smallCtx = CGContext(data: nil, width: smallW, height: smallH, bitsPerComponent: 8, bytesPerRow: 0, space: cs,
-                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue) else { return }
-            smallCtx.interpolationQuality = .none
-            smallCtx.draw(cropped, in: CGRect(x: 0, y: 0, width: smallW, height: smallH))
-            guard let pixelated = smallCtx.makeImage() else { return }
-            ctx.interpolationQuality = .none
-            ctx.draw(pixelated, in: pixelRect)
-            ctx.interpolationQuality = .default
-
-        case .blur:
-            guard let sourceImage else { return }
-            let pixelRect = CGRect(
-                x: rect.origin.x,
-                y: rect.origin.y,
-                width: rect.width,
-                height: rect.height
-            )
-            guard pixelRect.width > 0, pixelRect.height > 0,
-                  let cropped = sourceImage.cropping(to: pixelRect) else { return }
-            let ciImage = CIImage(cgImage: cropped)
-            guard let filter = CIFilter(name: "CIGaussianBlur") else { return }
-            filter.setValue(ciImage, forKey: kCIInputImageKey)
-            filter.setValue(12.0, forKey: kCIInputRadiusKey)
-            let ciCtx = CIContext()
-            guard let output = filter.outputImage, let blurred = ciCtx.createCGImage(output, from: ciImage.extent) else { return }
-            ctx.draw(blurred, in: pixelRect)
-
-        case .select:
-            break
         }
     }
 
-    // All coordinates are stored normalized (0..1). Convert to pixel coords.
-    private static func denormPoint(_ point: CGPoint, in rect: CGRect) -> CGPoint {
-        CGPoint(
-            x: rect.minX + point.x * rect.width,
-            y: rect.minY + (1 - point.y) * rect.height
+    private static func renderedRect(_ rect: CGRect, in imageRect: CGRect) -> CGRect {
+        CGRect(
+            x: imageRect.minX + rect.minX * imageRect.width,
+            y: imageRect.minY + (1 - rect.maxY) * imageRect.height,
+            width: rect.width * imageRect.width,
+            height: rect.height * imageRect.height
         )
     }
 
-    private static func denormRect(_ normalized: CGRect, in canvas: CGRect) -> CGRect {
-        CGRect(
-            x: canvas.minX + normalized.origin.x * canvas.width,
-            y: canvas.minY + (1 - normalized.origin.y - normalized.height) * canvas.height,
-            width: normalized.width * canvas.width,
-            height: normalized.height * canvas.height
+    private static func renderedPoint(_ point: CGPoint, in imageRect: CGRect) -> CGPoint {
+        CGPoint(
+            x: imageRect.minX + point.x * imageRect.width,
+            y: imageRect.minY + (1 - point.y) * imageRect.height
         )
+    }
+
+    private static func drawArrowHead(_ geometry: AnnotationArrowGeometry, context: CGContext) {
+        context.beginPath()
+        context.move(to: geometry.firstWing)
+        context.addLine(to: geometry.tip)
+        context.addLine(to: geometry.secondWing)
+        context.strokePath()
+    }
+
+    private static func drawNumberedCircle(_ item: AnnotationItem, in rect: CGRect, context: CGContext) {
+        let diameter = min(rect.width, rect.height)
+        guard diameter > 1 else { return }
+
+        let outlineWidth = AnnotationNumberedCircleMetrics.outlineWidth(for: diameter)
+        context.saveGState()
+        context.setFillColor(item.swatch.nsColor.cgColor)
+        context.fillEllipse(in: rect)
+        context.setStrokeColor(item.swatch.numberedCircleOutlineNSColor.cgColor)
+        context.setLineWidth(outlineWidth)
+        context.strokeEllipse(in: rect.insetBy(dx: outlineWidth / 2, dy: outlineWidth / 2))
+        context.restoreGState()
+
+        let fontSize = AnnotationNumberedCircleMetrics.fontSize(for: diameter, text: item.text)
+        let font = NSFont.monospacedDigitSystemFont(ofSize: fontSize, weight: .bold)
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = .center
+        paragraphStyle.lineBreakMode = .byClipping
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: item.swatch.numberedCircleTextNSColor,
+            .paragraphStyle: paragraphStyle
+        ]
+        let attributedText = NSAttributedString(string: item.text, attributes: attributes)
+        let measuredRect = attributedText.boundingRect(
+            with: CGSize(width: rect.width, height: rect.height),
+            options: [.usesLineFragmentOrigin, .usesFontLeading]
+        )
+        let textRect = CGRect(
+            x: rect.minX,
+            y: rect.midY - measuredRect.height / 2 - fontSize * 0.04,
+            width: rect.width,
+            height: measuredRect.height + 2
+        )
+
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+        attributedText.draw(with: textRect, options: [.usesLineFragmentOrigin, .usesFontLeading])
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
+    private static func drawFreehand(points: [CGPoint], imageRect: CGRect, context: CGContext) {
+        let renderedPoints = points.map { renderedPoint($0, in: imageRect) }
+        guard let first = renderedPoints.first else { return }
+
+        context.beginPath()
+        context.move(to: first)
+        guard renderedPoints.count > 1 else { return }
+
+        if renderedPoints.count == 2 {
+            context.addLine(to: renderedPoints[1])
+            context.strokePath()
+            return
+        }
+
+        for index in 1..<renderedPoints.count {
+            let previous = renderedPoints[index - 1]
+            let current = renderedPoints[index]
+            context.addQuadCurve(to: midpoint(previous, current), control: previous)
+        }
+
+        context.addLine(to: renderedPoints[renderedPoints.count - 1])
+        context.strokePath()
+    }
+
+    private static func midpoint(_ lhs: CGPoint, _ rhs: CGPoint) -> CGPoint {
+        CGPoint(x: (lhs.x + rhs.x) / 2, y: (lhs.y + rhs.y) / 2)
+    }
+
+    private static func drawText(_ item: AnnotationItem, in rect: CGRect, imageHeight: CGFloat, context: CGContext) {
+        let text = item.text.trimmingCharacters(in: .newlines)
+        guard !text.isEmpty, rect.width > 1, rect.height > 1 else { return }
+
+        let fontSize = AnnotationTextMetrics.renderedFontSize(lineHeight: item.textLineHeight, imagePixelHeight: imageHeight)
+        let font = item.resolvedFont(size: fontSize)
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = item.textAlignment
+        paragraphStyle.lineBreakMode = .byClipping
+
+        var attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: item.swatch.nsColor,
+            .paragraphStyle: paragraphStyle,
+            .shadow: AnnotationTextMetrics.textShadow
+        ]
+        if item.isUnderline {
+            attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
+        }
+        let attributedText = NSAttributedString(string: text, attributes: attributes)
+
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+        attributedText.draw(with: rect, options: [.usesLineFragmentOrigin, .usesFontLeading])
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
+    private static func applyPixelation(
+        in rect: CGRect,
+        context: CGContext,
+        canvasSize: CGSize,
+        colorSpace: CGColorSpace,
+        density: CGFloat
+    ) {
+        let targetRect = rect.integral.intersection(CGRect(origin: .zero, size: canvasSize))
+        guard targetRect.width >= 1,
+              targetRect.height >= 1,
+              let currentImage = context.makeImage(),
+              let croppedImage = currentImage.cropping(to: imageCropRect(for: targetRect, imageHeight: CGFloat(currentImage.height))) else {
+            return
+        }
+
+        let pixelSize = RedactionImageProcessor.pixelBlockSize(for: density)
+        let lowWidth = max(1, Int(targetRect.width / pixelSize))
+        let lowHeight = max(1, Int(targetRect.height / pixelSize))
+
+        guard let lowContext = CGContext(
+            data: nil, width: lowWidth, height: lowHeight,
+            bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return }
+
+        lowContext.interpolationQuality = .medium
+        lowContext.draw(croppedImage, in: CGRect(x: 0, y: 0, width: lowWidth, height: lowHeight))
+        guard let pixelatedImage = lowContext.makeImage() else { return }
+
+        context.saveGState()
+        context.clip(to: targetRect)
+        context.interpolationQuality = .none
+        context.draw(pixelatedImage, in: targetRect)
+        context.restoreGState()
+    }
+
+    private static func applyBlur(
+        in rect: CGRect,
+        context: CGContext,
+        canvasSize: CGSize,
+        density: CGFloat
+    ) {
+        let targetRect = rect.integral.intersection(CGRect(origin: .zero, size: canvasSize))
+        guard targetRect.width >= 1,
+              targetRect.height >= 1,
+              let currentImage = context.makeImage(),
+              let croppedImage = currentImage.cropping(to: imageCropRect(for: targetRect, imageHeight: CGFloat(currentImage.height))) else {
+            return
+        }
+
+        let inputImage = CIImage(cgImage: croppedImage)
+        let filter = CIFilter.gaussianBlur()
+        filter.inputImage = inputImage.clampedToExtent()
+        filter.radius = Float(RedactionImageProcessor.blurRadius(for: density))
+
+        guard let outputImage = filter.outputImage,
+              let blurredImage = ciContext.createCGImage(outputImage, from: inputImage.extent) else {
+            return
+        }
+
+        context.saveGState()
+        context.clip(to: targetRect)
+        context.draw(blurredImage, in: targetRect)
+        context.restoreGState()
+    }
+
+    private static func renderedLineWidth(for item: AnnotationItem, imageSize: CGSize) -> CGFloat {
+        max(1.5, item.strokeWidth * max(imageSize.width, imageSize.height) / 900)
+    }
+
+    private static func imageCropRect(for contextRect: CGRect, imageHeight: CGFloat) -> CGRect {
+        CGRect(
+            x: contextRect.minX,
+            y: imageHeight - contextRect.maxY,
+            width: contextRect.width,
+            height: contextRect.height
+        ).integral
     }
 }
