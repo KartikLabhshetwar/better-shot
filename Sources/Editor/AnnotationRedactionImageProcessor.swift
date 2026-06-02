@@ -99,25 +99,9 @@ enum RedactionImageProcessor {
 
         downsampleContext.interpolationQuality = .medium
         downsampleContext.draw(croppedImage, in: CGRect(x: 0, y: 0, width: smallWidth, height: smallHeight))
-        guard let downsampledImage = downsampleContext.makeImage() else { return nil }
+        guard let output = downsampleContext.makeImage() else { return nil }
 
-        guard let upsampleContext = CGContext(
-            data: nil,
-            width: pixelWidth,
-            height: pixelHeight,
-            bitsPerComponent: croppedImage.bitsPerComponent,
-            bytesPerRow: 0,
-            space: colorSpace,
-            bitmapInfo: bitmapInfo.rawValue
-        ) else {
-            return nil
-        }
-
-        upsampleContext.interpolationQuality = .none
-        upsampleContext.draw(downsampledImage, in: CGRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight))
-        guard let output = upsampleContext.makeImage() else { return nil }
-
-        return NSImage(cgImage: output, size: CGSize(width: output.width, height: output.height))
+        return NSImage(cgImage: output, size: CGSize(width: smallWidth, height: smallHeight))
     }
 
     private static func makeBlurredImage(

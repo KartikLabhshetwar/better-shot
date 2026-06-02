@@ -107,18 +107,23 @@ struct EditorCanvasView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .onChange(of: model.config, initial: true) { _, _ in scheduleRender() }
         .onChange(of: model.sourceImage) { _, _ in scheduleRender() }
+        .onChange(of: model.isSliderDragging) { _, isDragging in
+            if !isDragging { scheduleRender() }
+        }
     }
 
     private func scheduleRender() {
         renderTask?.cancel()
+        let isDragging = model.isSliderDragging
+        let delay: UInt64 = isDragging ? 50 : 30
         renderTask = Task {
-            try? await Task.sleep(for: .milliseconds(30))
+            try? await Task.sleep(for: .milliseconds(delay))
             guard !Task.isCancelled else { return }
             guard let source = model.sourceImage else { return }
 
             let config = model.config
             let result = await Task.detached(priority: .userInitiated) {
-                renderPreview(image: source, config: config)
+                renderPreview(image: source, config: config, lowQuality: isDragging)
             }.value
 
             guard !Task.isCancelled, let cgImage = result else { return }
@@ -232,8 +237,8 @@ struct EditorCanvasView: View {
     }
 }
 
-private func renderPreview(image: CGImage, config: BeautifierConfig) -> CGImage? {
-    let maxDim: CGFloat = 2400
+private func renderPreview(image: CGImage, config: BeautifierConfig, lowQuality: Bool = false) -> CGImage? {
+    let maxDim: CGFloat = lowQuality ? 1200 : 2400
     let imgW = CGFloat(image.width)
     let imgH = CGFloat(image.height)
     let scale: CGFloat = max(imgW, imgH) > maxDim ? maxDim / max(imgW, imgH) : 1.0
@@ -248,7 +253,7 @@ private func renderPreview(image: CGImage, config: BeautifierConfig) -> CGImage?
             bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace,
             bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
         ) else { return nil }
-        ctx.interpolationQuality = .high
+        ctx.interpolationQuality = lowQuality ? .medium : .high
         ctx.draw(image, in: CGRect(x: 0, y: 0, width: newW, height: newH))
         guard let scaled = ctx.makeImage() else { return nil }
         previewImage = scaled

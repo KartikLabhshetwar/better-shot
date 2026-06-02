@@ -785,6 +785,7 @@ struct BackgroundPickerSection: View {
 
 struct BeautifierControlsSection: View {
     @Bindable var model: EditorModel
+    @State private var configBeforeDrag: BeautifierConfig?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -794,25 +795,40 @@ struct BeautifierControlsSection: View {
                 label: "Padding",
                 value: Binding(get: { model.config.padding }, set: { model.config.padding = $0 }),
                 range: 0.0...0.45,
-                format: { "\(Int($0 * 100))%" }
+                format: { "\(Int($0 * 100))%" },
+                onEditingChanged: { editing in handleSliderEditing(editing) }
             )
 
             LabeledSlider(
                 label: "Corner Radius",
                 value: Binding(get: { model.config.cornerRadius }, set: { model.config.cornerRadius = $0 }),
                 range: 0.0...0.12,
-                format: { "\(Int($0 * 1000))" }
+                format: { "\(Int($0 * 1000))" },
+                onEditingChanged: { editing in handleSliderEditing(editing) }
             )
 
             LabeledSlider(
                 label: "Shadow",
                 value: Binding(get: { model.config.shadowStrength }, set: { model.config.shadowStrength = $0 }),
                 range: 0.0...1.0,
-                format: { "\(Int($0 * 100))%" }
+                format: { "\(Int($0 * 100))%" },
+                onEditingChanged: { editing in handleSliderEditing(editing) }
             )
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 14)
+    }
+
+    private func handleSliderEditing(_ editing: Bool) {
+        model.isSliderDragging = editing
+        if editing {
+            configBeforeDrag = model.config
+        } else if let saved = configBeforeDrag {
+            let current = model.config
+            model.config = saved
+            model.updateConfig { $0 = current }
+            configBeforeDrag = nil
+        }
     }
 }
 
@@ -821,6 +837,7 @@ struct LabeledSlider: View {
     @Binding var value: CGFloat
     let range: ClosedRange<CGFloat>
     let format: (CGFloat) -> String
+    var onEditingChanged: ((Bool) -> Void)?
 
     var body: some View {
         VStack(spacing: 4) {
@@ -833,8 +850,10 @@ struct LabeledSlider: View {
                     .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(.tertiary)
             }
-            Slider(value: $value, in: range)
-                .controlSize(.small)
+            Slider(value: $value, in: range) { editing in
+                onEditingChanged?(editing)
+            }
+            .controlSize(.small)
         }
     }
 }
