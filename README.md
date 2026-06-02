@@ -6,214 +6,91 @@
 [![X (Twitter)](https://img.shields.io/badge/X-%231DA1F2.svg?style=for-the-badge&logo=X&logoColor=white)](https://x.com/code_kartik)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-%23FFDD00.svg?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/code_kartik)
 
-> An open-source alternative to CleanShot X for macOS. Capture, edit, and enhance your screenshots with professional quality.
-
-Better Shot is a fast, lightweight screenshot tool built with Tauri + React. It provides a powerful yet simple workflow for capturing screenshots, editing them with backgrounds/effects/annotations, and exporting quickly.
-
-## Table of contents
-
-- [Better Shot](#better-shot)
-  - [Table of contents](#table-of-contents)
-  - [Background](#background)
-  - [Features](#features)
-    - [Capture Modes](#capture-modes)
-    - [Image Editing](#image-editing)
-    - [Annotation Tools](#annotation-tools)
-    - [Workflow](#workflow)
-  - [Install](#install)
-    - [Download a release (recommended)](#download-a-release-recommended)
-    - [Homebrew (macOS)](#homebrew-macos)
-    - [Build from source](#build-from-source)
-      - [Requirements](#requirements)
-      - [Required permissions](#required-permissions)
-  - [Usage](#usage)
-    - [Quick Start](#quick-start)
-    - [Auto-apply workflow](#auto-apply-workflow)
-    - [Keyboard Shortcuts](#keyboard-shortcuts)
-      - [Capture Shortcuts](#capture-shortcuts)
-      - [Editor Shortcuts](#editor-shortcuts)
-  - [Development](#development)
-    - [Desktop app (Tauri)](#desktop-app-tauri)
-    - [Landing site (Next.js)](#landing-site-nextjs)
-  - [Contributing](#contributing)
-  - [License](#license)
-  - [Star history](#star-history)
-
-## Background
-
-Clean screenshot workflows usually need three things: capture fast, polish fast (background/shadow/roundness), and annotate fast (arrows, labels). Better Shot is a macOS-native app that keeps everything local and lightweight.
+> An open-source alternative to CleanShot X. Native Swift app — fast, lightweight, local-first.
 
 ## Features
 
-### Capture Modes
+**Capture** — Region (`⌘⇧4`), fullscreen (`⌘⇧3`), window (`⌘⇧5`), OCR text extraction (`⌘⇧O`), screen recording (`⌘⇧6`).
 
-- **Region capture**: Select any area of your screen (`⌘⇧2`, enabled by default)
-- **Fullscreen capture**: Capture your entire screen (`⌘⇧F`, enable in Preferences)
-- **Window capture**: Capture a specific window (`⌘⇧D`, enable in Preferences)
-- **OCR Region**: Extract text from a selected region using macOS Vision framework - automatically copies recognized text to clipboard (`⌘⇧O`, enable in Preferences)
+**Edit** — Background library (wallpapers, gradients, solid colors), shadow, corner radius, padding, alignment.
 
-### Image Editing
+**Annotate** — Rectangle, ellipse, line, arrow, freehand, text, numbered badges, pixelate, blur.
 
-- **Background library**: Curated wallpapers, Mac assets, and mesh patterns
-- **Custom backgrounds**: Solid colors and transparent checkerboard
-- **Effects**: Blur + noise controls
-- **Shadow + roundness**: Tune depth and corner radius
-- **Export**: Save at high quality for docs, decks, and social
-
-### Annotation Tools
-
-- **Shapes**: Circle, rectangle, line, arrow
-- **Text**: Add text with adjustable size
-- **Numbered labels**: Auto-incrementing badges for step-by-step callouts
-- **Editability**: Select, move, and delete annotations
-- **Styling**: Colors, opacity, borders, alignment
-
-### Workflow
-
-- **Global shortcuts**: Capture from anywhere, even when hidden
-- **Auto-apply**: Apply default background and save without opening the editor
-- **Quick Overlay**: Preview captures in a floating overlay that automatically fades and hides after 5 seconds
-- **OCR text extraction**: Extract and copy text from screenshots using native macOS Vision framework
-- **Clipboard**: Copy to clipboard after capture/export
-- **Preferences**: Save directory, defaults, and shortcut settings persist
-- **Menu bar**: Accessible from the menu bar
-- **Native performance**: Rust + Tauri
+**Workflow** — Auto-apply default background, floating preview overlay, copy to clipboard, menu bar app.
 
 ## Install
 
-### Download a release (recommended)
+### Download
 
 1. Go to [Releases](https://github.com/KartikLabhshetwar/better-shot/releases)
-2. Download the appropriate DMG file:
-   - **Apple Silicon** (M1/M2/M3/M4/M5): `bettershot_*_aarch64.dmg`
-   - **Intel**: `bettershot_*_x64.dmg`
-3. Open the DMG and drag Better Shot to Applications
-4. Launch Better Shot from Applications
-5. Grant Screen Recording permission when prompted in System Settings
-
-### Homebrew (macOS)
-
-Install via Homebrew:
-
-```bash
-brew install --cask bettershot
-```
-
-**Requirements**: macOS >= 10.15
+2. Download `BetterShot.dmg`
+3. Open the DMG, drag BetterShot to Applications
+4. Launch and grant permissions when prompted (see below)
 
 ### Build from source
 
 ```bash
 git clone https://github.com/KartikLabhshetwar/better-shot.git
 cd better-shot
-
-pnpm install
-
-pnpm tauri build
 ```
 
-The installer will be located in `src-tauri/target/release/bundle/`
+Open `BetterShot.xcodeproj` in Xcode, then **Product → Build** (`⌘B`).
 
-#### Requirements
+**Requirements**: macOS 14.0+, Xcode 15+
 
-- **Node.js**: 18+
-- **pnpm**
-- **Rust**: latest stable
+### Required permissions
 
-#### Required permissions
+BetterShot needs two macOS permissions:
 
-On first launch, macOS will request **Screen Recording** permission:
+1. **Screen Recording** — System Settings → Privacy & Security → Screen Recording → enable BetterShot
+2. **Accessibility** — System Settings → Privacy & Security → Accessibility → enable BetterShot
 
-1. Go to **System Settings → Privacy & Security → Screen Recording**
-2. Enable **Better Shot**
-3. Restart the application if needed
-
-This permission is required for the app to capture screenshots of your screen.
+Screen Recording is required for ScreenCaptureKit to capture screen content. Accessibility is required for keyboard shortcuts to override the default macOS screenshot tool (`⌘⇧3/4/5`).
 
 ## Usage
 
-### Quick Start
+1. Launch BetterShot — it appears in your menu bar
+2. Use a keyboard shortcut or click a menu bar action
+3. Edit the screenshot (background, shadow, annotations)
+4. `⌘S` to save, `⇧⌘C` to copy to clipboard
 
-1. Launch Better Shot from Applications (or use the menu bar icon)
-2. Capture:
-   - Default: `⌘⇧2` (region)
-   - Optional (enable in Preferences): `⌘⇧F` (fullscreen), `⌘⇧D` (window)
-3. Edit (background/effects/shadow/roundness)
-4. Annotate (shapes, arrows, text, numbered labels)
-5. Export: `⌘S` to save, `⇧⌘C` to copy to clipboard
-
-### Auto-apply workflow
-
-For faster workflows, enable **Auto-apply background** on the main screen:
-
-1. Toggle on "Auto-apply background" on the main page
-2. Set your preferred default background in Preferences
-3. Capture a screenshot - it will automatically apply the background and save instantly
-4. A Quick Overlay window appears showing the capture preview
-5. The overlay automatically fades out and hides after 5 seconds
-6. No editor needed - perfect for quick captures with consistent styling
-
-### Keyboard Shortcuts
-
-Capture shortcuts are customizable in Preferences.
-
-#### Capture Shortcuts
-
-| Action | Default Shortcut |
-| --- | --- |
-| Capture Region | `⌘⇧2` |
-| Capture Fullscreen | `⌘⇧F` (disabled by default) |
-| Capture Window | `⌘⇧D` (disabled by default) |
-| OCR Region | `⌘⇧O` (disabled by default) |
-| Cancel Selection | `Esc` |
-
-#### Editor Shortcuts
+### Keyboard shortcuts
 
 | Action | Shortcut |
-| --- | --- |
-| Save Image | `⌘S` |
+|---|---|
+| Capture Region | `⌘⇧4` |
+| Capture Fullscreen | `⌘⇧3` |
+| Capture Window | `⌘⇧5` |
+| OCR Region | `⌘⇧O` |
+| Screen Recording | `⌘⇧6` |
+| Cancel | `Esc` |
+
+| Editor | Shortcut |
+|---|---|
+| Save | `⌘S` |
 | Copy to Clipboard | `⇧⌘C` |
 | Undo | `⌘Z` |
 | Redo | `⇧⌘Z` |
-| Delete Annotation | `Delete` or `Backspace` |
+| Delete Annotation | `Delete` |
 | Close Editor | `Esc` |
 
-## Development
+## Architecture
 
-This repo contains:
+Native Swift/SwiftUI app. No Electron, no web views.
 
-- The **desktop app** (Tauri + Vite) at the repo root
-- The **landing site** (Next.js) in `bettershot-landing/`
-
-### Desktop app (Tauri)
-
-```bash
-pnpm tauri dev
-```
-
-Other useful commands:
-
-```bash
-pnpm lint:ci
-pnpm test:rust
-pnpm tauri build
-```
-
-### Landing site (Next.js)
-
-```bash
-cd bettershot-landing
-pnpm install
-pnpm dev
-```
+- **ScreenCaptureKit** — all screenshot and recording capture (`SCScreenshotManager`, `SCStream`)
+- **CoreGraphics** — image compositing, annotation rendering
+- **Vision** — OCR text extraction
+- **AVFoundation** — screen recording export (HEVC)
+- **Carbon** — global keyboard shortcut registration
 
 ## Contributing
 
-Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a pull request.
+Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-This project is licensed under the BSD 3-Clause License - see the [LICENSE](LICENSE) file for details.
+BSD 3-Clause — see [LICENSE](LICENSE).
 
 ## Star history
 
