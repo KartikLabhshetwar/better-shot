@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "design-anti-slop": {
+      "source": "prathameshagrawal/design-anti-slop",
+      "sourceType": "github",
+      "skillPath": "skills/design-anti-slop/SKILL.md",
+      "computedHash": "fba68ada511edb26065d747ae3ddedebcaf4ecfb95c3cd5815acf881a31040ec"
+    }
+  }
+}
