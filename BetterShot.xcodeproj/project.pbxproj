@@ -1,0 +1,434 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		06D6F16CF243DDB4531BEE29 /* AnnotationDrawing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17544CDA089E3F65F7BCE622 /* AnnotationDrawing.swift */; };
+		12F0105D52F612AA1BD73023 /* BetterShotDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A8FF0E5AD713FC1D7E99DE7 /* BetterShotDelegate.swift */; };
+		13B8472EC13ED5548E55212F /* HistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11DEB19CCE7ED49CF1136508 /* HistoryStore.swift */; };
+		1881BC67C7A74FEC212DA8EC /* EditorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7307DAB0AA0DDC8AB161E476 /* EditorModel.swift */; };
+		2D2CFBFFDA6767FA9FB2C2E9 /* BeautifierRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D58300A37E3A994CE15987C5 /* BeautifierRenderer.swift */; };
+		3F10E4A10ECE3E37549B99BA /* EditorWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5FC4CD374D6C387202BB773 /* EditorWindowView.swift */; };
+		6158A6FD21D793D955B2E0E9 /* AppPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = C757566A38307689528E5A9E /* AppPreferences.swift */; };
+		615EE1453C9A7BDFD9248E09 /* ScreenCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4495302A23BB2192D91C5ED3 /* ScreenCapture.swift */; };
+		6682480DF2FDA028736D23D2 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9822447B9DE8F15B9CC94381 /* PreferencesView.swift */; };
+		7492DCC25BAEBAFD914AAC6C /* EditorCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D72A7FD249FD623240D8735 /* EditorCanvasView.swift */; };
+		8782829F9AD2E1BE2B796AC7 /* ShortcutService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAE1EE5C32D7D0D099A88951 /* ShortcutService.swift */; };
+		918CF31A69D7A8EB445F4164 /* CaptureRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5558B01BB764A6621835508 /* CaptureRecord.swift */; };
+		9A417A3F04D2578AE8199ACC /* EditorInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5229BD9DF667A270F2BF5A01 /* EditorInspectorView.swift */; };
+		A548A41489DDA1DF28A3C44A /* PreviewOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1AF97C84324A8DA1B6948D /* PreviewOverlay.swift */; };
+		B20B0C52AEF6529B4DEE0B46 /* AnnotationItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6DFE09CC845C78A0C3D2685 /* AnnotationItem.swift */; };
+		BA2E35F115F67D7CA6DEE5A9 /* BetterShotApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F74F2F48E0775A96906E180F /* BetterShotApp.swift */; };
+		BC811FEA82E635D6292A80FD /* MenuBarContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE87F338892DCBFEA8FD7BDA /* MenuBarContentView.swift */; };
+		CDB16E049BE1C8CF4F166FCB /* VideoProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3171ECF70910E5F3108D95E9 /* VideoProcessor.swift */; };
+		EB848575CC3229A7EFFA6F13 /* BackgroundStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE8FF05309B340FEAE149775 /* BackgroundStyle.swift */; };
+		F3BAB5D4C1617D203E95885B /* BundledBackgrounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94D707990F014D8BE452023A /* BundledBackgrounds.swift */; };
+		FE59D61ABB427B6DFC1D377A /* CaptureOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B626577BDFABF32D144DC8B /* CaptureOrchestrator.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		11DEB19CCE7ED49CF1136508 /* HistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStore.swift; sourceTree = "<group>"; };
+		17544CDA089E3F65F7BCE622 /* AnnotationDrawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationDrawing.swift; sourceTree = "<group>"; };
+		1A8FF0E5AD713FC1D7E99DE7 /* BetterShotDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BetterShotDelegate.swift; sourceTree = "<group>"; };
+		3171ECF70910E5F3108D95E9 /* VideoProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoProcessor.swift; sourceTree = "<group>"; };
+		4495302A23BB2192D91C5ED3 /* ScreenCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCapture.swift; sourceTree = "<group>"; };
+		4B626577BDFABF32D144DC8B /* CaptureOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureOrchestrator.swift; sourceTree = "<group>"; };
+		5229BD9DF667A270F2BF5A01 /* EditorInspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorInspectorView.swift; sourceTree = "<group>"; };
+		7307DAB0AA0DDC8AB161E476 /* EditorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorModel.swift; sourceTree = "<group>"; };
+		94D707990F014D8BE452023A /* BundledBackgrounds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundledBackgrounds.swift; sourceTree = "<group>"; };
+		9822447B9DE8F15B9CC94381 /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
+		9D72A7FD249FD623240D8735 /* EditorCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorCanvasView.swift; sourceTree = "<group>"; };
+		AE1AF97C84324A8DA1B6948D /* PreviewOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewOverlay.swift; sourceTree = "<group>"; };
+		AE87F338892DCBFEA8FD7BDA /* MenuBarContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContentView.swift; sourceTree = "<group>"; };
+		B5FC4CD374D6C387202BB773 /* EditorWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorWindowView.swift; sourceTree = "<group>"; };
+		BAE1EE5C32D7D0D099A88951 /* ShortcutService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutService.swift; sourceTree = "<group>"; };
+		BE8FF05309B340FEAE149775 /* BackgroundStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundStyle.swift; sourceTree = "<group>"; };
+		C5558B01BB764A6621835508 /* CaptureRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureRecord.swift; sourceTree = "<group>"; };
+		C757566A38307689528E5A9E /* AppPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferences.swift; sourceTree = "<group>"; };
+		D58300A37E3A994CE15987C5 /* BeautifierRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeautifierRenderer.swift; sourceTree = "<group>"; };
+		F46A331394FBCD6FCFD29F62 /* BetterShot.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BetterShot.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F6DFE09CC845C78A0C3D2685 /* AnnotationItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationItem.swift; sourceTree = "<group>"; };
+		F74F2F48E0775A96906E180F /* BetterShotApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BetterShotApp.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		02E0E07267FD5201B631F82C /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				D58300A37E3A994CE15987C5 /* BeautifierRenderer.swift */,
+				BAE1EE5C32D7D0D099A88951 /* ShortcutService.swift */,
+				3171ECF70910E5F3108D95E9 /* VideoProcessor.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		259B01DEB5B62634004C4016 /* Editor */ = {
+			isa = PBXGroup;
+			children = (
+				17544CDA089E3F65F7BCE622 /* AnnotationDrawing.swift */,
+				9D72A7FD249FD623240D8735 /* EditorCanvasView.swift */,
+				5229BD9DF667A270F2BF5A01 /* EditorInspectorView.swift */,
+				7307DAB0AA0DDC8AB161E476 /* EditorModel.swift */,
+				B5FC4CD374D6C387202BB773 /* EditorWindowView.swift */,
+			);
+			path = Editor;
+			sourceTree = "<group>";
+		};
+		39D4566D88515C653CF4F4DB /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				F6DFE09CC845C78A0C3D2685 /* AnnotationItem.swift */,
+				C757566A38307689528E5A9E /* AppPreferences.swift */,
+				BE8FF05309B340FEAE149775 /* BackgroundStyle.swift */,
+				94D707990F014D8BE452023A /* BundledBackgrounds.swift */,
+				C5558B01BB764A6621835508 /* CaptureRecord.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		49CD1ABB4117999E05DAEA92 /* Capture */ = {
+			isa = PBXGroup;
+			children = (
+				4B626577BDFABF32D144DC8B /* CaptureOrchestrator.swift */,
+				4495302A23BB2192D91C5ED3 /* ScreenCapture.swift */,
+			);
+			path = Capture;
+			sourceTree = "<group>";
+		};
+		4B049A4676B9CFEECB1A3DF6 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F46A331394FBCD6FCFD29F62 /* BetterShot.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		4FE4E3ABA1756F22921DCB42 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				AE87F338892DCBFEA8FD7BDA /* MenuBarContentView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		749E9D00F818F70E06F34BB9 /* History */ = {
+			isa = PBXGroup;
+			children = (
+				11DEB19CCE7ED49CF1136508 /* HistoryStore.swift */,
+			);
+			path = History;
+			sourceTree = "<group>";
+		};
+		99E8726305BC9AF4B98FA73B /* Preview */ = {
+			isa = PBXGroup;
+			children = (
+				AE1AF97C84324A8DA1B6948D /* PreviewOverlay.swift */,
+			);
+			path = Preview;
+			sourceTree = "<group>";
+		};
+		B8FC14134195149286D737C0 = {
+			isa = PBXGroup;
+			children = (
+				C750A8B0B7E68485E0FF536F /* Sources */,
+				4B049A4676B9CFEECB1A3DF6 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		C750A8B0B7E68485E0FF536F /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				DF41CB44E94F5FBDBF8695A2 /* App */,
+				49CD1ABB4117999E05DAEA92 /* Capture */,
+				259B01DEB5B62634004C4016 /* Editor */,
+				749E9D00F818F70E06F34BB9 /* History */,
+				39D4566D88515C653CF4F4DB /* Models */,
+				99E8726305BC9AF4B98FA73B /* Preview */,
+				02E0E07267FD5201B631F82C /* Services */,
+				E4007FFA622C92BA5142F86A /* Settings */,
+				4FE4E3ABA1756F22921DCB42 /* Views */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		DF41CB44E94F5FBDBF8695A2 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				F74F2F48E0775A96906E180F /* BetterShotApp.swift */,
+				1A8FF0E5AD713FC1D7E99DE7 /* BetterShotDelegate.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		E4007FFA622C92BA5142F86A /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				9822447B9DE8F15B9CC94381 /* PreferencesView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		61A826F3D9A89949C4B965D9 /* BetterShot */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B653F2DD902FE6BD261B2987 /* Build configuration list for PBXNativeTarget "BetterShot" */;
+			buildPhases = (
+				B29A156E16289E808758DF72 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BetterShot;
+			packageProductDependencies = (
+			);
+			productName = BetterShot;
+			productReference = F46A331394FBCD6FCFD29F62 /* BetterShot.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		2B52F79D372EB35C81219180 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+			};
+			buildConfigurationList = FDE4C5BE7F87318CFEAA3DDB /* Build configuration list for PBXProject "BetterShot" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = B8FC14134195149286D737C0;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				61A826F3D9A89949C4B965D9 /* BetterShot */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B29A156E16289E808758DF72 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				06D6F16CF243DDB4531BEE29 /* AnnotationDrawing.swift in Sources */,
+				B20B0C52AEF6529B4DEE0B46 /* AnnotationItem.swift in Sources */,
+				6158A6FD21D793D955B2E0E9 /* AppPreferences.swift in Sources */,
+				EB848575CC3229A7EFFA6F13 /* BackgroundStyle.swift in Sources */,
+				2D2CFBFFDA6767FA9FB2C2E9 /* BeautifierRenderer.swift in Sources */,
+				BA2E35F115F67D7CA6DEE5A9 /* BetterShotApp.swift in Sources */,
+				12F0105D52F612AA1BD73023 /* BetterShotDelegate.swift in Sources */,
+				F3BAB5D4C1617D203E95885B /* BundledBackgrounds.swift in Sources */,
+				FE59D61ABB427B6DFC1D377A /* CaptureOrchestrator.swift in Sources */,
+				918CF31A69D7A8EB445F4164 /* CaptureRecord.swift in Sources */,
+				7492DCC25BAEBAFD914AAC6C /* EditorCanvasView.swift in Sources */,
+				9A417A3F04D2578AE8199ACC /* EditorInspectorView.swift in Sources */,
+				1881BC67C7A74FEC212DA8EC /* EditorModel.swift in Sources */,
+				3F10E4A10ECE3E37549B99BA /* EditorWindowView.swift in Sources */,
+				13B8472EC13ED5548E55212F /* HistoryStore.swift in Sources */,
+				BC811FEA82E635D6292A80FD /* MenuBarContentView.swift in Sources */,
+				6682480DF2FDA028736D23D2 /* PreferencesView.swift in Sources */,
+				A548A41489DDA1DF28A3C44A /* PreviewOverlay.swift in Sources */,
+				615EE1453C9A7BDFD9248E09 /* ScreenCapture.swift in Sources */,
+				8782829F9AD2E1BE2B796AC7 /* ShortcutService.swift in Sources */,
+				CDB16E049BE1C8CF4F166FCB /* VideoProcessor.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		31BAFDED17709DBDF81651E4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		6862FA1689C1F0144B5E1DEA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		BD8594A1D94B81B2F7847C3F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Resources/BetterShot.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bettershot.app;
+				PRODUCT_NAME = BetterShot;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		C9BDF34D8B30DE9AFEF8F791 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Resources/BetterShot.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bettershot.app;
+				PRODUCT_NAME = BetterShot;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B653F2DD902FE6BD261B2987 /* Build configuration list for PBXNativeTarget "BetterShot" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BD8594A1D94B81B2F7847C3F /* Debug */,
+				C9BDF34D8B30DE9AFEF8F791 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		FDE4C5BE7F87318CFEAA3DDB /* Build configuration list for PBXProject "BetterShot" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6862FA1689C1F0144B5E1DEA /* Debug */,
+				31BAFDED17709DBDF81651E4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 2B52F79D372EB35C81219180 /* Project object */;
+}

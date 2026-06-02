@@ -1,0 +1,36 @@
+name: BetterShot
+options:
+  bundleIdPrefix: com.bettershot
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.0"
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: false
+
+targets:
+  BetterShot:
+    type: application
+    platform: macOS
+    sources:
+      - Sources
+    resources:
+      - Resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.bettershot.app
+        PRODUCT_NAME: BetterShot
+        INFOPLIST_FILE: Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Resources/BetterShot.entitlements
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_HARDENED_RUNTIME: true
+        COMBINE_HIDPI_IMAGES: true
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
+    entitlements:
+      path: Resources/BetterShot.entitlements
