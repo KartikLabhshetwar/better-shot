@@ -6,6 +6,12 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.appearance = NSAppearance(named: .aqua)
         NSApp.setActivationPolicy(.accessory)
+
+        // Request accessibility permission (needed for CGEvent tap to intercept Cmd+Shift+3/4/5)
+        if !ShortcutService.hasAccessibilityPermission {
+            ShortcutService.requestAccessibilityPermission()
+        }
+
         ShortcutService.shared.registerAll()
         configureRecordingCallback()
     }
@@ -27,7 +33,6 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
                 let dir = AppPreferences.saveDirectory
                 let stamp = Int(Date().timeIntervalSince1970 * 1000)
 
-                // 1. Save raw video
                 let videoPath = "\(dir)/bettershot_\(stamp).mov"
                 let videoURL = URL(fileURLWithPath: videoPath)
                 do {
@@ -37,7 +42,6 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
                     return
                 }
 
-                // 2. Compress via videokit if available
                 let processor = VideoProcessor.shared
                 await processor.checkFFmpeg()
                 if processor.ffmpegAvailable {
@@ -62,17 +66,14 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
 
-                // 3. Extract first frame as PNG for the editor
                 let frameURL = await Self.extractFrame(from: videoURL, stamp: stamp)
 
-                // 4. Show preview overlay (clicking pen opens editor with the frame)
                 if let frameURL {
                     PreviewOverlay.shared.show(url: frameURL)
                 } else {
                     PreviewOverlay.shared.show(url: videoURL)
                 }
 
-                // Clean up temp recording
                 try? FileManager.default.removeItem(at: url)
             }
         }

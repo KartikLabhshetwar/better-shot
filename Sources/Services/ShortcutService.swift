@@ -1,13 +1,13 @@
 import Carbon
 import AppKit
+import CoreGraphics
 
-/// Manages global keyboard shortcuts via Carbon API.
 @MainActor
 final class ShortcutService {
     static let shared = ShortcutService()
 
-    private var hotkeyRefs: [EventHotKeyRef] = []
-    private var handlerRef: EventHandlerRef?
+    private var eventTap: CFMachPort?
+    private var runLoopSource: CFRunLoopSource?
 
     private init() {}
 
@@ -18,14 +18,10 @@ final class ShortcutService {
         var modifiers: UInt32
         var enabled: Bool
 
-        // Cmd+Shift+4 = region (overrides macOS screenshot)
         static let defaultRegion = Shortcut(keyCode: UInt32(kVK_ANSI_4), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
-        // Cmd+Shift+3 = fullscreen (overrides macOS screenshot)
         static let defaultFullscreen = Shortcut(keyCode: UInt32(kVK_ANSI_3), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
-        // Cmd+Shift+5 = window (overrides macOS screenshot panel)
         static let defaultWindow = Shortcut(keyCode: UInt32(kVK_ANSI_5), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultOCR = Shortcut(keyCode: UInt32(kVK_ANSI_O), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
-        // Cmd+Shift+6 = screen recording
         static let defaultRecording = Shortcut(keyCode: UInt32(kVK_ANSI_6), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
     }
 
@@ -37,32 +33,42 @@ final class ShortcutService {
         case recording = 5
     }
 
-    // MARK: - Registration
+    // MARK: - Registration (CGEvent tap — intercepts system shortcuts)
 
     func registerAll() {
         unregisterAll()
 
-        let shortcuts: [(Action, Shortcut)] = [
-            (.region, loadShortcut(for: .region) ?? .defaultRegion),
-            (.fullscreen, loadShortcut(for: .fullscreen) ?? .defaultFullscreen),
-            (.window, loadShortcut(for: .window) ?? .defaultWindow),
-            (.ocr, loadShortcut(for: .ocr) ?? .defaultOCR),
-            (.recording, loadShortcut(for: .recording) ?? .defaultRecording),
-        ]
+        let eventMask: CGEventMask = (1 << CGEventType.keyDown.rawValue)
 
-        installHandler()
-
-        for (action, shortcut) in shortcuts {
-            guard shortcut.enabled else { continue }
-            register(action: action, shortcut: shortcut)
+        guard let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: eventMask,
+            callback: ShortcutService.eventTapCallback,
+            userInfo: nil
+        ) else {
+            print("BetterShot: Failed to create event tap — grant Accessibility permission in System Settings > Privacy & Security > Accessibility")
+            return
         }
+
+        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+
+        self.eventTap = tap
+        self.runLoopSource = source
     }
 
     func unregisterAll() {
-        for ref in hotkeyRefs {
-            UnregisterEventHotKey(ref)
+        if let tap = eventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
         }
-        hotkeyRefs.removeAll()
+        if let source = runLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
+        }
+        eventTap = nil
+        runLoopSource = nil
     }
 
     // MARK: - Persistence
@@ -80,59 +86,65 @@ final class ShortcutService {
         return try? JSONDecoder().decode(Shortcut.self, from: data)
     }
 
-    // MARK: - Private
+    // MARK: - Accessibility Permission
 
-    private func register(action: Action, shortcut: Shortcut) {
-        let signature = OSType(0x4253_4854) // "BSHT"
-        var hotkeyID = EventHotKeyID(signature: signature, id: action.rawValue)
-        var ref: EventHotKeyRef?
-
-        let status = RegisterEventHotKey(
-            shortcut.keyCode,
-            shortcut.modifiers,
-            hotkeyID,
-            GetEventDispatcherTarget(),
-            0,
-            &ref
-        )
-
-        if status == noErr, let ref {
-            hotkeyRefs.append(ref)
-        }
+    static func requestAccessibilityPermission() {
+        let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
     }
 
-    private func installHandler() {
-        guard handlerRef == nil else { return }
+    nonisolated static var hasAccessibilityPermission: Bool {
+        AXIsProcessTrusted()
+    }
 
-        var eventSpec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+    // MARK: - Event Tap Callback
 
-        let handler: EventHandlerUPP = { _, event, _ -> OSStatus in
-            var hotkeyID = EventHotKeyID()
-            let status = GetEventParameter(
-                event,
-                EventParamName(kEventParamDirectObject),
-                EventParamType(typeEventHotKeyID),
-                nil,
-                MemoryLayout<EventHotKeyID>.size,
-                nil,
-                &hotkeyID
-            )
-            guard status == noErr else { return status }
-
+    private static let eventTapCallback: CGEventTapCallBack = { _, type, event, _ in
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            // Re-enable the tap if macOS disables it
             Task { @MainActor in
-                guard let action = Action(rawValue: hotkeyID.id) else { return }
-                await CaptureOrchestrator.shared.performCapture(action)
+                if let tap = ShortcutService.shared.eventTap {
+                    CGEvent.tapEnable(tap: tap, enable: true)
+                }
             }
-            return noErr
+            return Unmanaged.passRetained(event)
         }
 
-        InstallEventHandler(
-            GetEventDispatcherTarget(),
-            handler,
-            1,
-            &eventSpec,
-            nil,
-            &handlerRef
-        )
+        guard type == .keyDown else {
+            return Unmanaged.passRetained(event)
+        }
+
+        let keyCode = UInt32(event.getIntegerValueField(.keyboardEventKeycode))
+        let flags = event.flags
+
+        // Convert CGEventFlags to Carbon modifier mask for comparison
+        var carbonMods: UInt32 = 0
+        if flags.contains(.maskCommand) { carbonMods |= UInt32(cmdKey) }
+        if flags.contains(.maskShift) { carbonMods |= UInt32(shiftKey) }
+        if flags.contains(.maskAlternate) { carbonMods |= UInt32(optionKey) }
+        if flags.contains(.maskControl) { carbonMods |= UInt32(controlKey) }
+
+        let service = ShortcutService.shared
+
+        let shortcuts: [(Action, Shortcut)] = [
+            (.region, service.loadShortcut(for: .region) ?? .defaultRegion),
+            (.fullscreen, service.loadShortcut(for: .fullscreen) ?? .defaultFullscreen),
+            (.window, service.loadShortcut(for: .window) ?? .defaultWindow),
+            (.ocr, service.loadShortcut(for: .ocr) ?? .defaultOCR),
+            (.recording, service.loadShortcut(for: .recording) ?? .defaultRecording),
+        ]
+
+        for (action, shortcut) in shortcuts {
+            guard shortcut.enabled else { continue }
+            if keyCode == shortcut.keyCode && carbonMods == shortcut.modifiers {
+                Task { @MainActor in
+                    await CaptureOrchestrator.shared.performCapture(action)
+                }
+                // Return nil to consume the event — prevents macOS screenshot tool from firing
+                return nil
+            }
+        }
+
+        return Unmanaged.passRetained(event)
     }
 }

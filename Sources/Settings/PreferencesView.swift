@@ -259,16 +259,25 @@ struct HistoryTab: View {
 // MARK: - About
 
 struct AboutTab: View {
+    private var version: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.0"
+    }
+    private var build: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
+    }
+
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "camera.viewfinder")
-                .font(.system(size: 48, weight: .thin))
-                .foregroundStyle(.secondary)
+            if let appIcon = NSApp.applicationIconImage {
+                Image(nsImage: appIcon)
+                    .resizable()
+                    .frame(width: 96, height: 96)
+            }
 
             Text("BetterShot")
                 .font(.title2.weight(.semibold))
 
-            Text("Version 1.0.0")
+            Text("Version \(version) (\(build))")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
