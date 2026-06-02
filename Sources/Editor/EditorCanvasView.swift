@@ -4,7 +4,7 @@ struct EditorCanvasView: View {
     @Bindable var model: EditorModel
     @State private var cachedPreview: NSImage?
     @State private var renderTask: Task<Void, Never>?
-    @State private var imageFrame: CGRect = .zero
+    @State private var isDraggingSlider = false
 
     var body: some View {
         GeometryReader { _ in
@@ -19,20 +19,14 @@ struct EditorCanvasView: View {
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .padding(24)
-                            .background(
-                                GeometryReader { imgGeo in
-                                    Color.clear.preference(key: ImageFrameKey.self, value: imgGeo.frame(in: .named("annotationSpace")))
+                            .overlay {
+                                if model.activeTool.createsAnnotation {
+                                    AnnotationGestureView(model: model)
                                 }
-                            )
+                            }
                     }
-
-                    AnnotationCanvas(model: model, imageFrame: imageFrame)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .coordinateSpace(name: "annotationSpace")
-                .onPreferenceChange(ImageFrameKey.self) { frame in
-                    imageFrame = frame
-                }
             } else {
                 ContentUnavailableView("Loading image...", systemImage: "photo")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -40,19 +34,21 @@ struct EditorCanvasView: View {
         }
         .onChange(of: model.config, initial: true) { _, _ in scheduleRender() }
         .onChange(of: model.sourceImage) { _, _ in scheduleRender() }
+        .onChange(of: model.annotations) { _, _ in scheduleRender() }
     }
 
     private func scheduleRender() {
         renderTask?.cancel()
         renderTask = Task {
-            try? await Task.sleep(for: .milliseconds(16))
+            try? await Task.sleep(for: .milliseconds(50))
             guard !Task.isCancelled else { return }
             guard let source = model.sourceImage else { return }
 
             let config = model.config
+            let annotations = model.annotations
 
             let result = await Task.detached(priority: .userInitiated) {
-                renderPreview(image: source, config: config)
+                renderPreview(image: source, config: config, annotations: annotations)
             }.value
 
             guard !Task.isCancelled, let cgImage = result else { return }
@@ -61,13 +57,12 @@ struct EditorCanvasView: View {
     }
 }
 
-private func renderPreview(image: CGImage, config: BeautifierConfig) -> CGImage? {
-    let maxPreviewDimension: CGFloat = 1400
+private func renderPreview(image: CGImage, config: BeautifierConfig, annotations: [AnnotationItem]) -> CGImage? {
+    let maxDim: CGFloat = 800
     let imgW = CGFloat(image.width)
     let imgH = CGFloat(image.height)
-    let maxDim = max(imgW, imgH)
 
-    let scale: CGFloat = maxDim > maxPreviewDimension ? maxPreviewDimension / maxDim : 1.0
+    let scale: CGFloat = max(imgW, imgH) > maxDim ? maxDim / max(imgW, imgH) : 1.0
 
     var previewImage = image
     if scale < 1.0 {
@@ -79,22 +74,13 @@ private func renderPreview(image: CGImage, config: BeautifierConfig) -> CGImage?
             bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace,
             bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
         ) else { return nil }
-        ctx.interpolationQuality = .high
+        ctx.interpolationQuality = .medium
         ctx.draw(image, in: CGRect(x: 0, y: 0, width: newW, height: newH))
         guard let scaled = ctx.makeImage() else { return nil }
         previewImage = scaled
     }
 
-    return BeautifierRenderer.render(image: previewImage, config: config, annotations: [])
-}
-
-// MARK: - Preference Key
-
-private struct ImageFrameKey: PreferenceKey {
-    static let defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        value = nextValue()
-    }
+    return BeautifierRenderer.render(image: previewImage, config: config, annotations: annotations)
 }
 
 // MARK: - Transparency Grid

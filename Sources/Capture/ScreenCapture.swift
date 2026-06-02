@@ -20,21 +20,19 @@ final class ScreenCapture {
         isCapturing = true
         defer { isCapturing = false }
 
-        guard let cgImage = CGWindowListCreateImage(
-            CGRect.null,
-            .optionOnScreenOnly,
-            kCGNullWindowID,
-            [.bestResolution, .boundsIgnoreFraming]
-        ) else {
-            print("CGWindowListCreateImage failed — screen recording permission may not be granted")
-            return nil
-        }
+        // Let menu bar popover fully dismiss so it's not captured
+        try? await Task.sleep(for: .milliseconds(200))
 
         let tempPath = makeTempPath()
-        let url = URL(fileURLWithPath: tempPath)
+        // -x: no sound, -m: main monitor only
+        let exitCode = try await runScreenCapture(args: ["-x", "-m", tempPath])
 
-        guard saveCGImage(cgImage, to: url) else { return nil }
-        return url
+        if exitCode != 0 {
+            print("screencapture fullscreen exited with code \(exitCode)")
+        }
+
+        guard FileManager.default.fileExists(atPath: tempPath) else { return nil }
+        return URL(fileURLWithPath: tempPath)
     }
 
     // MARK: - Region (Interactive — uses screencapture CLI)
@@ -44,15 +42,25 @@ final class ScreenCapture {
         isCapturing = true
         defer { isCapturing = false }
 
+        try? await Task.sleep(for: .milliseconds(150))
+
+        // Show custom selection overlay
+        let overlay = RegionSelectionOverlay()
+        guard let selectedRect = await overlay.selectRegion() else { return nil }
+        guard selectedRect.width > 1, selectedRect.height > 1 else { return nil }
+
+        // Capture the screen region at the selected coordinates
+        guard let fullImage = CGWindowListCreateImage(
+            selectedRect,
+            .optionOnScreenOnly,
+            kCGNullWindowID,
+            [.bestResolution]
+        ) else { return nil }
+
         let tempPath = makeTempPath()
-        let exitCode = try await runScreenCapture(args: ["-i", "-x", tempPath])
-
-        if exitCode != 0 {
-            print("screencapture region exited with code \(exitCode)")
-        }
-
-        guard FileManager.default.fileExists(atPath: tempPath) else { return nil }
-        return URL(fileURLWithPath: tempPath)
+        let url = URL(fileURLWithPath: tempPath)
+        guard saveCGImage(fullImage, to: url) else { return nil }
+        return url
     }
 
     // MARK: - Window (Interactive — uses screencapture CLI)
@@ -61,6 +69,8 @@ final class ScreenCapture {
         guard !isCapturing else { return nil }
         isCapturing = true
         defer { isCapturing = false }
+
+        try? await Task.sleep(for: .milliseconds(200))
 
         let tempPath = makeTempPath()
         var args = ["-w", "-x"]
@@ -71,13 +81,6 @@ final class ScreenCapture {
 
         if exitCode != 0 {
             print("screencapture window exited with code \(exitCode)")
-
-            // Fallback: try CGWindowListCreateImage if screencapture fails
-            if !FileManager.default.fileExists(atPath: tempPath) {
-                print("Falling back to fullscreen capture via CoreGraphics")
-                isCapturing = false
-                return try await captureFullscreen()
-            }
         }
 
         guard FileManager.default.fileExists(atPath: tempPath) else { return nil }

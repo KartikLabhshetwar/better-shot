@@ -6,7 +6,7 @@ struct BetterShotApp: App {
     @State private var showMenuBarIcon = true
 
     var body: some Scene {
-        MenuBarExtra("BetterShot", systemImage: "camera.viewfinder", isInserted: $showMenuBarIcon) {
+        MenuBarExtra("BetterShot", image: "MenuBarIcon", isInserted: $showMenuBarIcon) {
             MenuBarContentView()
         }
 

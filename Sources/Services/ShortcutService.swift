@@ -91,7 +91,7 @@ final class ShortcutService {
             shortcut.keyCode,
             shortcut.modifiers,
             hotkeyID,
-            GetApplicationEventTarget(),
+            GetEventDispatcherTarget(),
             0,
             &ref
         )
@@ -127,7 +127,7 @@ final class ShortcutService {
         }
 
         InstallEventHandler(
-            GetApplicationEventTarget(),
+            GetEventDispatcherTarget(),
             handler,
             1,
             &eventSpec,
