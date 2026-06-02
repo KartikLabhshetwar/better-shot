@@ -21,6 +21,35 @@ final class CaptureOrchestrator {
             await captureAndProcess { try await ScreenCapture.shared.captureWindow() }
         case .ocr:
             await performOCR()
+        case .recording:
+            await toggleRecording()
+        }
+    }
+
+    func toggleRecording() async {
+        let recorder = ScreenRecorder.shared
+        if recorder.isRecording {
+            recorder.stop()
+            RecordingControlPanel.shared.hide()
+        } else {
+            await recorder.startFullscreen()
+            if recorder.state == .recording {
+                RecordingControlPanel.shared.show()
+            }
+        }
+    }
+
+    func startRecordingFullscreen() async {
+        await ScreenRecorder.shared.startFullscreen()
+        if ScreenRecorder.shared.state == .recording {
+            RecordingControlPanel.shared.show()
+        }
+    }
+
+    func startRecordingWindow() async {
+        await ScreenRecorder.shared.startWindow()
+        if ScreenRecorder.shared.state == .recording {
+            RecordingControlPanel.shared.show()
         }
     }
 

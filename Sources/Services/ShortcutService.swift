@@ -18,10 +18,15 @@ final class ShortcutService {
         var modifiers: UInt32
         var enabled: Bool
 
-        static let defaultRegion = Shortcut(keyCode: UInt32(kVK_ANSI_2), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
-        static let defaultFullscreen = Shortcut(keyCode: UInt32(kVK_ANSI_F), modifiers: UInt32(cmdKey | shiftKey), enabled: false)
-        static let defaultWindow = Shortcut(keyCode: UInt32(kVK_ANSI_D), modifiers: UInt32(cmdKey | shiftKey), enabled: false)
-        static let defaultOCR = Shortcut(keyCode: UInt32(kVK_ANSI_O), modifiers: UInt32(cmdKey | shiftKey), enabled: false)
+        // Cmd+Shift+4 = region (overrides macOS screenshot)
+        static let defaultRegion = Shortcut(keyCode: UInt32(kVK_ANSI_4), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
+        // Cmd+Shift+3 = fullscreen (overrides macOS screenshot)
+        static let defaultFullscreen = Shortcut(keyCode: UInt32(kVK_ANSI_3), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
+        // Cmd+Shift+5 = window (overrides macOS screenshot panel)
+        static let defaultWindow = Shortcut(keyCode: UInt32(kVK_ANSI_5), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
+        static let defaultOCR = Shortcut(keyCode: UInt32(kVK_ANSI_O), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
+        // Cmd+Shift+6 = screen recording
+        static let defaultRecording = Shortcut(keyCode: UInt32(kVK_ANSI_6), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
     }
 
     enum Action: UInt32, CaseIterable {
@@ -29,6 +34,7 @@ final class ShortcutService {
         case fullscreen = 2
         case window = 3
         case ocr = 4
+        case recording = 5
     }
 
     // MARK: - Registration
@@ -41,6 +47,7 @@ final class ShortcutService {
             (.fullscreen, loadShortcut(for: .fullscreen) ?? .defaultFullscreen),
             (.window, loadShortcut(for: .window) ?? .defaultWindow),
             (.ocr, loadShortcut(for: .ocr) ?? .defaultOCR),
+            (.recording, loadShortcut(for: .recording) ?? .defaultRecording),
         ]
 
         installHandler()

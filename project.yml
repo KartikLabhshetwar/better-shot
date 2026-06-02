@@ -18,19 +18,24 @@ targets:
     platform: macOS
     sources:
       - Sources
-    resources:
-      - Resources
+      - path: Resources/Backgrounds
+        type: folder
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bettershot.app
         PRODUCT_NAME: BetterShot
         INFOPLIST_FILE: Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: Resources/BetterShot.entitlements
-        MARKETING_VERSION: "1.0.0"
-        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "0.2.0"
+        CURRENT_PROJECT_VERSION: "2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_HARDENED_RUNTIME: true
         COMBINE_HIDPI_IMAGES: true
         LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
+    postCompileScripts:
+      - script: |
+          cp "${SRCROOT}/videokit/videokit" "${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/MacOS/videokit"
+        name: Bundle videokit
     entitlements:
       path: Resources/BetterShot.entitlements

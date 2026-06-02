@@ -12,6 +12,8 @@ final class PreviewOverlay {
     private var panel: NSPanel?
     private var dismissTask: Task<Void, Never>?
 
+    var onAnnotate: ((URL) -> Void)?
+
     private init() {}
 
     func show(url: URL) {
@@ -39,17 +41,24 @@ final class PreviewOverlay {
 
     // MARK: - Panel Setup
 
+    func openAnnotateEditor() {
+        guard let url = currentURL else { return }
+        dismiss()
+        onAnnotate?(url)
+    }
+
     private func createPanel() {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 320, height: 200),
+            contentRect: NSRect(x: 0, y: 0, width: 180, height: 150),
             styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
+        panel.hasShadow = false
         panel.level = .floating
+        panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isMovableByWindowBackground = false
 
@@ -62,23 +71,22 @@ final class PreviewOverlay {
     private func positionPanel() {
         guard let panel, let screen = NSScreen.main else { return }
 
-        let margin: CGFloat = 16
-        let panelSize = panel.frame.size
         let screenFrame = screen.visibleFrame
+        let panelSize = CGSize(width: 280, height: 220)
 
         let x: CGFloat
         let y: CGFloat
 
         switch AppPreferences.overlayPosition {
         case .bottomRight:
-            x = screenFrame.maxX - panelSize.width - margin
-            y = screenFrame.minY + margin
+            x = screenFrame.maxX - panelSize.width
+            y = screenFrame.minY
         case .bottomLeft:
-            x = screenFrame.minX + margin
-            y = screenFrame.minY + margin
+            x = screenFrame.minX
+            y = screenFrame.minY
         }
 
-        panel.setFrameOrigin(NSPoint(x: x, y: y))
+        panel.setFrame(NSRect(origin: NSPoint(x: x, y: y), size: panelSize), display: true)
     }
 
     private func scheduleDismiss() {
@@ -95,54 +103,114 @@ final class PreviewOverlay {
 
 struct PreviewCardView: View {
     let overlay: PreviewOverlay
+    @State private var isHovered = false
+
+    private let cardSize = CGSize(width: 165, height: 124)
 
     var body: some View {
         Group {
             if let url = overlay.currentURL, let image = NSImage(contentsOf: url) {
-                VStack(spacing: 0) {
+                ZStack {
                     Image(nsImage: image)
                         .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(maxWidth: 300, maxHeight: 170)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: cardSize.width, height: cardSize.height)
+                        .clipped()
 
-                    HStack(spacing: 12) {
-                        Button("Copy") {
-                            let pb = NSPasteboard.general
-                            pb.clearContents()
-                            pb.writeObjects([image])
-                            overlay.dismiss()
-                        }
-                        .buttonStyle(.plain)
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-
-                        Button("Save") {
-                            overlay.dismiss()
-                        }
-                        .buttonStyle(.plain)
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-
-                        Spacer()
-
-                        Button {
-                            overlay.dismiss()
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.caption2)
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.tertiary)
+                    if isHovered {
+                        hoverOverlay(image: image)
+                            .transition(.opacity.animation(.easeInOut(duration: 0.15)))
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
                 }
-                .padding(8)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .shadow(color: .black.opacity(0.2), radius: 16, y: 8)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.35), radius: 20, y: 8)
+                .shadow(color: .black.opacity(0.15), radius: 6, y: 3)
+                .onHover { hovering in
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        isHovered = hovering
+                    }
+                }
+                .draggable(image)
             }
         }
-        .frame(width: 320, height: 200)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        .padding(.trailing, 28)
+        .padding(.bottom, 32)
+        .frame(width: 280, height: 220)
+    }
+
+    @ViewBuilder
+    private func hoverOverlay(image: NSImage) -> some View {
+        ZStack {
+            Color.black.opacity(0.45)
+
+            // Corner actions
+            VStack {
+                HStack {
+                    // Delete
+                    cornerButton("trash.circle.fill") {
+                        if let url = overlay.currentURL {
+                            try? FileManager.default.removeItem(at: url)
+                        }
+                        overlay.dismiss()
+                    }
+                    Spacer()
+                    // Dismiss
+                    cornerButton("xmark.circle.fill") {
+                        overlay.dismiss()
+                    }
+                }
+
+                Spacer()
+
+                HStack {
+                    // Annotate (pen icon)
+                    cornerButton("pencil.circle.fill") {
+                        overlay.openAnnotateEditor()
+                    }
+                    Spacer()
+                }
+            }
+            .padding(8)
+
+            // Center pill actions
+            HStack(spacing: 6) {
+                pillButton("Copy") {
+                    let pb = NSPasteboard.general
+                    pb.clearContents()
+                    pb.writeObjects([image])
+                    overlay.dismiss()
+                }
+                pillButton("Save") {
+                    overlay.dismiss()
+                }
+            }
+        }
+    }
+
+    private func cornerButton(_ systemName: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .symbolRenderingMode(.palette)
+                .foregroundStyle(.white, .white.opacity(0.25))
+                .font(.title2)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func pillButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(.white.opacity(0.85), in: Capsule())
+        }
+        .buttonStyle(.plain)
     }
 }

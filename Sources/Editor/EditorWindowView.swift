@@ -59,6 +59,9 @@ struct EditorWindowView: View {
         .onAppear {
             model.loadImage(from: imageURL)
         }
+        .onChange(of: imageURL) { _, newURL in
+            model.loadImage(from: newURL)
+        }
     }
 
     private func exportImage() async {

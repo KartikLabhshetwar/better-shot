@@ -23,7 +23,8 @@ final class HistoryStore {
     // MARK: - Import
 
     func importCapture(from tempURL: URL) -> CaptureRecord? {
-        let filename = "bettershot_\(Int(Date().timeIntervalSince1970 * 1000)).png"
+        let ext = tempURL.pathExtension.isEmpty ? "png" : tempURL.pathExtension
+        let filename = "bettershot_\(Int(Date().timeIntervalSince1970 * 1000)).\(ext)"
         let destURL = storageDir.appendingPathComponent(filename)
 
         do {
@@ -33,7 +34,6 @@ final class HistoryStore {
             return nil
         }
 
-        // Read dimensions
         var width = 0, height = 0
         if let source = CGImageSourceCreateWithURL(destURL as CFURL, nil),
            let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] {
@@ -49,7 +49,6 @@ final class HistoryStore {
         records.insert(record, at: 0)
         saveRecords()
 
-        // Clean up temp file
         try? FileManager.default.removeItem(at: tempURL)
 
         return record

@@ -90,17 +90,15 @@ final class VideoProcessor {
     }
 
     private var videokitURL: URL {
-        // Look for videokit binary next to the app bundle, or in the repo
-        let bundle = Bundle.main.bundlePath
-        let bundleSibling = URL(fileURLWithPath: bundle)
-            .deletingLastPathComponent()
-            .appendingPathComponent("videokit")
-
-        if FileManager.default.fileExists(atPath: bundleSibling.path) {
-            return bundleSibling
+        // 1. Look inside the app bundle (bundled by build script)
+        if let execURL = Bundle.main.executableURL {
+            let bundled = execURL.deletingLastPathComponent().appendingPathComponent("videokit")
+            if FileManager.default.fileExists(atPath: bundled.path) {
+                return bundled
+            }
         }
 
-        // Dev fallback: look in the videokit/ directory relative to the project
+        // 2. Dev fallback: look in the videokit/ directory relative to the project
         let devPath = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -111,7 +109,16 @@ final class VideoProcessor {
             return devPath
         }
 
-        // Last resort: check PATH
+        // 3. Next to the app bundle
+        let bundle = Bundle.main.bundlePath
+        let sibling = URL(fileURLWithPath: bundle)
+            .deletingLastPathComponent()
+            .appendingPathComponent("videokit")
+
+        if FileManager.default.fileExists(atPath: sibling.path) {
+            return sibling
+        }
+
         return URL(fileURLWithPath: "/usr/local/bin/videokit")
     }
 

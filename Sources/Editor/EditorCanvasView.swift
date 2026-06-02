@@ -14,7 +14,6 @@ struct EditorCanvasView: View {
 
                 if let nsImage {
                     ZStack {
-                        // Transparency checkerboard (only for no-background)
                         if case .none = model.config.style {
                             TransparencyGrid()
                         }
@@ -23,6 +22,7 @@ struct EditorCanvasView: View {
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .padding(24)
+                            .id(model.sourceURL)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }

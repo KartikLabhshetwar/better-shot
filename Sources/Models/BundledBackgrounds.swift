@@ -9,20 +9,15 @@ enum BundledBackgrounds {
         let category: Category
 
         var image: NSImage? {
-            guard let url = Bundle.main.url(
-                forResource: filename.components(separatedBy: ".").first,
-                withExtension: filename.components(separatedBy: ".").last,
-                subdirectory: category.subdirectory
-            ) else { return nil }
+            guard let url else { return nil }
             return NSImage(contentsOf: url)
         }
 
         var url: URL? {
-            Bundle.main.url(
-                forResource: filename.components(separatedBy: ".").first,
-                withExtension: filename.components(separatedBy: ".").last,
-                subdirectory: category.subdirectory
-            )
+            guard let resourceURL = Bundle.main.resourceURL else { return nil }
+            let fileURL = resourceURL.appendingPathComponent(category.subdirectory).appendingPathComponent(filename)
+            guard FileManager.default.fileExists(atPath: fileURL.path) else { return nil }
+            return fileURL
         }
     }
 

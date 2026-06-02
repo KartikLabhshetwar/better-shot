@@ -5,32 +5,62 @@ struct MenuBarContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Capture actions
+            // Screenshot capture actions
             Group {
                 Button {
                     Task { await CaptureOrchestrator.shared.performCapture(.region) }
                 } label: {
                     Label("Capture Region", systemImage: "rectangle.dashed")
                 }
-                .keyboardShortcut("2", modifiers: [.command, .shift])
+                .keyboardShortcut("4", modifiers: [.command, .shift])
 
                 Button {
                     Task { await CaptureOrchestrator.shared.performCapture(.fullscreen) }
                 } label: {
                     Label("Capture Screen", systemImage: "desktopcomputer")
                 }
+                .keyboardShortcut("3", modifiers: [.command, .shift])
 
                 Button {
                     Task { await CaptureOrchestrator.shared.performCapture(.window) }
                 } label: {
                     Label("Capture Window", systemImage: "macwindow")
                 }
+                .keyboardShortcut("5", modifiers: [.command, .shift])
 
                 Button {
                     Task { await CaptureOrchestrator.shared.performCapture(.ocr) }
                 } label: {
                     Label("OCR Region", systemImage: "doc.text.viewfinder")
                 }
+            }
+
+            Divider()
+
+            // Screen recording
+            Menu {
+                Button {
+                    Task { await CaptureOrchestrator.shared.startRecordingFullscreen() }
+                } label: {
+                    Label("Full Screen", systemImage: "desktopcomputer")
+                }
+
+                Button {
+                    Task { await CaptureOrchestrator.shared.startRecordingWindow() }
+                } label: {
+                    Label("Window", systemImage: "macwindow")
+                }
+            } label: {
+                Label("Record Screen", systemImage: "record.circle")
+            }
+
+            if ScreenRecorder.shared.isRecording {
+                Button {
+                    Task { await CaptureOrchestrator.shared.toggleRecording() }
+                } label: {
+                    Label("Stop Recording", systemImage: "stop.circle.fill")
+                }
+                .keyboardShortcut("6", modifiers: [.command, .shift])
             }
 
             Divider()

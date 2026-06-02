@@ -1,8 +1,9 @@
 import AppKit
-import ScreenCaptureKit
 import Vision
+import CoreGraphics
 
-/// Handles all screenshot capture methods.
+/// Handles screenshot capture using CoreGraphics APIs where possible,
+/// falling back to screencapture CLI for interactive selection.
 @MainActor
 @Observable
 final class ScreenCapture {
@@ -12,7 +13,31 @@ final class ScreenCapture {
 
     private init() {}
 
-    // MARK: - Region (Interactive)
+    // MARK: - Fullscreen (CoreGraphics — no permission dialog)
+
+    func captureFullscreen() async throws -> URL? {
+        guard !isCapturing else { return nil }
+        isCapturing = true
+        defer { isCapturing = false }
+
+        guard let cgImage = CGWindowListCreateImage(
+            CGRect.null,
+            .optionOnScreenOnly,
+            kCGNullWindowID,
+            [.bestResolution, .boundsIgnoreFraming]
+        ) else {
+            print("CGWindowListCreateImage failed — screen recording permission may not be granted")
+            return nil
+        }
+
+        let tempPath = makeTempPath()
+        let url = URL(fileURLWithPath: tempPath)
+
+        guard saveCGImage(cgImage, to: url) else { return nil }
+        return url
+    }
+
+    // MARK: - Region (Interactive — uses screencapture CLI)
 
     func captureRegion() async throws -> URL? {
         guard !isCapturing else { return nil }
@@ -20,39 +45,17 @@ final class ScreenCapture {
         defer { isCapturing = false }
 
         let tempPath = makeTempPath()
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        process.arguments = ["-i", "-x", tempPath]
+        let exitCode = try await runScreenCapture(args: ["-i", "-x", tempPath])
 
-        try process.run()
-        process.waitUntilExit()
+        if exitCode != 0 {
+            print("screencapture region exited with code \(exitCode)")
+        }
 
-        let url = URL(fileURLWithPath: tempPath)
         guard FileManager.default.fileExists(atPath: tempPath) else { return nil }
-        return url
+        return URL(fileURLWithPath: tempPath)
     }
 
-    // MARK: - Fullscreen
-
-    func captureFullscreen() async throws -> URL? {
-        guard !isCapturing else { return nil }
-        isCapturing = true
-        defer { isCapturing = false }
-
-        let tempPath = makeTempPath()
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        process.arguments = ["-x", tempPath]
-
-        try process.run()
-        process.waitUntilExit()
-
-        let url = URL(fileURLWithPath: tempPath)
-        guard FileManager.default.fileExists(atPath: tempPath) else { return nil }
-        return url
-    }
-
-    // MARK: - Window
+    // MARK: - Window (Interactive — uses screencapture CLI)
 
     func captureWindow(includeShadow: Bool = false) async throws -> URL? {
         guard !isCapturing else { return nil }
@@ -64,16 +67,21 @@ final class ScreenCapture {
         if !includeShadow { args.append("-o") }
         args.append(tempPath)
 
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        process.arguments = args
+        let exitCode = try await runScreenCapture(args: args)
 
-        try process.run()
-        process.waitUntilExit()
+        if exitCode != 0 {
+            print("screencapture window exited with code \(exitCode)")
 
-        let url = URL(fileURLWithPath: tempPath)
+            // Fallback: try CGWindowListCreateImage if screencapture fails
+            if !FileManager.default.fileExists(atPath: tempPath) {
+                print("Falling back to fullscreen capture via CoreGraphics")
+                isCapturing = false
+                return try await captureFullscreen()
+            }
+        }
+
         guard FileManager.default.fileExists(atPath: tempPath) else { return nil }
-        return url
+        return URL(fileURLWithPath: tempPath)
     }
 
     // MARK: - OCR Region
@@ -119,7 +127,9 @@ final class ScreenCapture {
 
     func playShutterSound() {
         guard AppPreferences.playSound else { return }
-        if let sound = NSSound(named: "Blow") {
+        let path = "/System/Library/Components/CoreAudio.component/Contents/SharedSupport/SystemSounds/system/Screen Capture.aif"
+        let url = URL(fileURLWithPath: path)
+        if let sound = NSSound(contentsOf: url, byReference: true) {
             sound.play()
         }
     }
@@ -130,5 +140,29 @@ final class ScreenCapture {
         let dir = NSTemporaryDirectory()
         let stamp = Int(Date().timeIntervalSince1970 * 1000)
         return "\(dir)bettershot_\(stamp).png"
+    }
+
+    private func runScreenCapture(args: [String]) async throws -> Int32 {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Int32, Error>) in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+            process.arguments = args
+            process.terminationHandler = { proc in
+                continuation.resume(returning: proc.terminationStatus)
+            }
+            do {
+                try process.run()
+            } catch {
+                continuation.resume(throwing: error)
+            }
+        }
+    }
+
+    private func saveCGImage(_ image: CGImage, to url: URL) -> Bool {
+        guard let destination = CGImageDestinationCreateWithURL(
+            url as CFURL, "public.png" as CFString, 1, nil
+        ) else { return false }
+        CGImageDestinationAddImage(destination, image, nil)
+        return CGImageDestinationFinalize(destination)
     }
 }

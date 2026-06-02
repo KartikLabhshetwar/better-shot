@@ -5,11 +5,11 @@
 
 :root {
   --background: oklch(1.0 0 0);
-  --foreground: #121113; /* Updated foreground color to specified dark color */
+  --foreground: #121113;
   --card: oklch(1.0 0 0);
-  --card-foreground: #121113; /* Updated card foreground to match */
+  --card-foreground: #121113;
   --popover: oklch(1.0 0 0);
-  --popover-foreground: #121113; /* Updated popover foreground to match */
+  --popover-foreground: #121113;
   --primary: oklch(0.6716 0.1368 48.513);
   --primary-foreground: oklch(1.0 0 0);
   --secondary: oklch(0.536 0.0398 196.028);
@@ -17,7 +17,7 @@
   --muted: oklch(0.967 0.0029 264.5419);
   --muted-foreground: oklch(0.551 0.0234 264.3637);
   --accent: oklch(0.9491 0 0);
-  --accent-foreground: #121113; /* Updated accent foreground to match */
+  --accent-foreground: #121113;
   --destructive: oklch(0.6368 0.2078 25.3313);
   --destructive-foreground: oklch(0.9851 0 0);
   --border: oklch(0.9276 0.0058 264.5313);
@@ -29,11 +29,11 @@
   --chart-4: oklch(0.6268 0 0);
   --chart-5: oklch(0.683 0 0);
   --sidebar: oklch(0.967 0.0029 264.5419);
-  --sidebar-foreground: #121113; /* Updated sidebar foreground to match */
+  --sidebar-foreground: #121113;
   --sidebar-primary: oklch(0.6716 0.1368 48.513);
   --sidebar-primary-foreground: oklch(1.0 0 0);
   --sidebar-accent: oklch(1.0 0 0);
-  --sidebar-accent-foreground: #121113; /* Updated sidebar accent foreground to match */
+  --sidebar-accent-foreground: #121113;
   --sidebar-border: oklch(0.9276 0.0058 264.5313);
   --sidebar-ring: oklch(0.6716 0.1368 48.513);
   --font-sans: Geist Mono, ui-monospace, monospace;
@@ -50,8 +50,6 @@
   --shadow-2xl: 0px 1px 4px 0px hsl(0 0% 0% / 0.13);
   --tracking-normal: 0rem;
   --spacing: 0.25rem;
-  --duration: 10s; /* Added duration for marquee animation */
-  --gap: 1rem; /* Added gap for marquee animation */
 }
 
 .dark {
@@ -165,7 +163,6 @@ body {
   letter-spacing: var(--tracking-normal);
 }
 
-/* Added custom text selection styling with orange background and dark text */
 ::selection {
   background-color: #e78a53;
   color: #121113;
@@ -183,48 +180,4 @@ body {
   body {
     @apply bg-background text-foreground;
   }
-}
-
-/* Added marquee animations for testimonials section */
-@keyframes marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(calc(-100% - var(--gap)));
-  }
-}
-
-@keyframes marquee-vertical {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(calc(-100% - var(--gap)));
-  }
-}
-
-/* Added shiny text animation for new release promo section */
-@keyframes shiny-text {
-  0%,
-  90%,
-  100% {
-    background-position: calc(-100px) 0;
-  }
-  30%,
-  60% {
-    background-position: calc(100% + 100px) 0;
-  }
-}
-
-.animate-marquee {
-  animation: marquee var(--duration) linear infinite;
-}
-
-.animate-marquee-vertical {
-  animation: marquee-vertical var(--duration) linear infinite;
-}
-
-.animate-shiny-text {
-  animation: shiny-text 3s ease-in-out infinite;
 }

@@ -176,6 +176,7 @@ struct ShortcutRow: View {
         case .fullscreen: return .defaultFullscreen
         case .window: return .defaultWindow
         case .ocr: return .defaultOCR
+        case .recording: return .defaultRecording
         }
     }
 
