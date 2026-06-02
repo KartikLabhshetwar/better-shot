@@ -38,8 +38,8 @@ targets:
     postCompileScripts:
       - script: |
           cp "${SRCROOT}/videokit/videokit" "${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/MacOS/videokit"
-          if [ -n "${BETTERSHOT_SIGN_IDENTITY}" ]; then
-            /usr/bin/codesign --force --options runtime --sign "${BETTERSHOT_SIGN_IDENTITY}" "${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/MacOS/videokit"
+          if [ -n "${EXPANDED_CODE_SIGN_IDENTITY}" ] && [ "${EXPANDED_CODE_SIGN_IDENTITY}" != "-" ]; then
+            /usr/bin/codesign --force --options runtime --timestamp --sign "${EXPANDED_CODE_SIGN_IDENTITY}" "${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/MacOS/videokit"
           else
             /usr/bin/codesign --force --sign - "${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/MacOS/videokit"
           fi
