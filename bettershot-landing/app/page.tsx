@@ -1,18 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { DownloadDropdown } from "@/components/download-dropdown"
 
 export default function Home() {
   const [starCount, setStarCount] = useState(0)
   const [targetStars, setTargetStars] = useState(0)
-
-  useEffect(() => {
-    const root = window.document.documentElement
-    root.classList.remove("light", "system")
-    root.classList.add("dark")
-  }, [])
 
   useEffect(() => {
     const fetchStarCount = async () => {
@@ -49,11 +44,12 @@ export default function Home() {
   }, [targetStars])
 
   return (
-    <div className="min-h-screen w-full flex flex-col bg-[#08080a]">
+    <div className="min-h-screen w-full flex flex-col bg-[#faf9f7]">
       <header className="fixed top-0 left-0 right-0 z-50">
-        <div className="backdrop-blur-lg bg-[#08080a]/70">
+        <div className="backdrop-blur-lg bg-[#faf9f7]/80">
           <div className="max-w-[880px] mx-auto px-6 h-12 flex items-center justify-between">
-            <a href="/" className="text-[13px] font-medium text-white/70 tracking-[-0.01em]">
+            <a href="/" className="flex items-center gap-2 text-[13px] font-medium text-[#1a1a1a]/70 tracking-[-0.01em]">
+              <Image src="/logo.png" alt="Better Shot" width={20} height={20} className="rounded-[4px]" />
               Better Shot
             </a>
             <div className="flex items-center gap-4">
@@ -61,7 +57,7 @@ export default function Home() {
                 href="https://github.com/KartikLabhshetwar/better-shot"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[12px] text-white/30 hover:text-white/60 transition-colors"
+                className="text-[12px] text-[#1a1a1a]/30 hover:text-[#1a1a1a]/60 transition-colors"
               >
                 GitHub{starCount > 0 ? ` (${starCount})` : ""}
               </a>
@@ -73,11 +69,22 @@ export default function Home() {
 
       <main className="flex-1 flex flex-col items-center justify-center px-6">
         <div className="max-w-[520px] w-full text-center">
-          <h1 className="text-[clamp(40px,7vw,72px)] leading-[1.02] font-semibold tracking-[-0.045em] text-white">
+          <div className="flex justify-center mb-8">
+            <Image
+              src="/logo.png"
+              alt="Better Shot"
+              width={72}
+              height={72}
+              className="rounded-[16px] shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
+              priority
+            />
+          </div>
+
+          <h1 className="text-[clamp(40px,7vw,72px)] leading-[1.02] font-semibold tracking-[-0.045em] text-[#1a1a1a]">
             Better Shot
           </h1>
 
-          <p className="text-[15px] leading-[1.7] text-white/30 mt-5 max-w-[340px] mx-auto">
+          <p className="text-[15px] leading-[1.7] text-[#1a1a1a]/40 mt-5 max-w-[340px] mx-auto">
             Free, open-source screenshot tool for macOS.
             Capture, annotate, share.
           </p>
@@ -88,7 +95,7 @@ export default function Home() {
               href="https://github.com/KartikLabhshetwar/better-shot"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center px-4 py-2 text-[13px] font-medium text-white/35 hover:text-white/60 border border-white/[0.07] hover:border-white/[0.12] rounded-lg transition-all"
+              className="inline-flex items-center px-4 py-2 text-[13px] font-medium text-[#1a1a1a]/35 hover:text-[#1a1a1a]/60 border border-[#1a1a1a]/[0.08] hover:border-[#1a1a1a]/[0.15] rounded-lg transition-all"
             >
               Source
             </a>
@@ -98,7 +105,7 @@ export default function Home() {
 
       <footer>
         <div className="max-w-[880px] mx-auto px-6 py-8 flex items-center justify-between">
-          <p className="text-[11px] text-white/15">
+          <p className="text-[11px] text-[#1a1a1a]/15">
             &copy; {new Date().getFullYear()} Better Shot
           </p>
           <nav className="flex items-center gap-5">
@@ -106,13 +113,13 @@ export default function Home() {
               href="https://x.com/code_kartik"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[11px] text-white/15 hover:text-white/40 transition-colors"
+              className="text-[11px] text-[#1a1a1a]/15 hover:text-[#1a1a1a]/40 transition-colors"
             >
               Twitter
             </a>
             <Link
               href="/privacy"
-              className="text-[11px] text-white/15 hover:text-white/40 transition-colors"
+              className="text-[11px] text-[#1a1a1a]/15 hover:text-[#1a1a1a]/40 transition-colors"
             >
               Privacy
             </Link>

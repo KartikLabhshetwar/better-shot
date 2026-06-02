@@ -4,6 +4,7 @@ struct EditorCanvasView: View {
     @Bindable var model: EditorModel
     @State private var cachedPreview: NSImage?
     @State private var renderTask: Task<Void, Never>?
+    @State private var imageFrame: CGRect = .zero
 
     var body: some View {
         GeometryReader { _ in
@@ -18,9 +19,20 @@ struct EditorCanvasView: View {
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .padding(24)
+                            .background(
+                                GeometryReader { imgGeo in
+                                    Color.clear.preference(key: ImageFrameKey.self, value: imgGeo.frame(in: .named("annotationSpace")))
+                                }
+                            )
                     }
+
+                    AnnotationCanvas(model: model, imageFrame: imageFrame)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .coordinateSpace(name: "annotationSpace")
+                .onPreferenceChange(ImageFrameKey.self) { frame in
+                    imageFrame = frame
+                }
             } else {
                 ContentUnavailableView("Loading image...", systemImage: "photo")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -73,7 +85,16 @@ private func renderPreview(image: CGImage, config: BeautifierConfig) -> CGImage?
         previewImage = scaled
     }
 
-    return BeautifierRenderer.render(image: previewImage, config: config)
+    return BeautifierRenderer.render(image: previewImage, config: config, annotations: [])
+}
+
+// MARK: - Preference Key
+
+private struct ImageFrameKey: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
 }
 
 // MARK: - Transparency Grid

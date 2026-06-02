@@ -4,6 +4,7 @@ import AVFoundation
 @MainActor
 final class BetterShotDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.appearance = NSAppearance(named: .aqua)
         NSApp.setActivationPolicy(.accessory)
         ShortcutService.shared.registerAll()
         configureRecordingCallback()

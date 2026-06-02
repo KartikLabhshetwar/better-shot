@@ -8,6 +8,13 @@ final class EditorModel {
     var sourceURL: URL?
     var config = BeautifierConfig.default
 
+    // Annotations
+    var annotations: [AnnotationItem] = []
+    var activeTool: AnnotationTool = .select
+    var currentSwatch: ColorSwatch = .presets[0]
+    var currentStrokeWidth: CGFloat = 4
+
+    // Undo / Redo
     private var past: [Snapshot] = []
     private var future: [Snapshot] = []
     var canUndo: Bool { !past.isEmpty }
@@ -15,6 +22,7 @@ final class EditorModel {
 
     private struct Snapshot {
         let config: BeautifierConfig
+        let annotations: [AnnotationItem]
     }
 
     // MARK: - Load
@@ -33,8 +41,8 @@ final class EditorModel {
 
     // MARK: - History
 
-    func pushHistory() {
-        let snap = Snapshot(config: config)
+    private func pushHistory() {
+        let snap = Snapshot(config: config, annotations: annotations)
         past.append(snap)
         if past.count > 50 { past.removeFirst() }
         future.removeAll()
@@ -42,15 +50,17 @@ final class EditorModel {
 
     func undo() {
         guard let prev = past.popLast() else { return }
-        future.insert(Snapshot(config: config), at: 0)
+        future.insert(Snapshot(config: config, annotations: annotations), at: 0)
         config = prev.config
+        annotations = prev.annotations
     }
 
     func redo() {
         guard !future.isEmpty else { return }
         let next = future.removeFirst()
-        past.append(Snapshot(config: config))
+        past.append(Snapshot(config: config, annotations: annotations))
         config = next.config
+        annotations = next.annotations
     }
 
     // MARK: - Config Updates
@@ -60,11 +70,25 @@ final class EditorModel {
         update(&config)
     }
 
+    // MARK: - Annotations
+
+    func addAnnotation(_ item: AnnotationItem) {
+        pushHistory()
+        annotations.append(item)
+    }
+
+    func clearAnnotations() {
+        guard !annotations.isEmpty else { return }
+        pushHistory()
+        annotations.removeAll()
+    }
+
     // MARK: - Render
 
     func renderFinal() -> CGImage? {
         guard let image = sourceImage else { return nil }
-        return BeautifierRenderer.render(image: image, config: config)
+        let items = annotations
+        return BeautifierRenderer.render(image: image, config: config, annotations: items)
     }
 
     // MARK: - Save Config as Default

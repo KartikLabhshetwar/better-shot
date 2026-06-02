@@ -18,6 +18,8 @@ targets:
     platform: macOS
     sources:
       - Sources
+      - path: Resources/Assets.xcassets
+        buildPhase: resources
       - path: Resources/Backgrounds
         type: folder
         buildPhase: resources

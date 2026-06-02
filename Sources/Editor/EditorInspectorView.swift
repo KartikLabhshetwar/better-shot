@@ -17,6 +17,10 @@ struct EditorInspectorView: View {
 
                 BeautifierControlsSection(model: model)
 
+                Divider()
+
+                AnnotationToolsSection(model: model)
+
                 Spacer(minLength: 20)
 
                 Button {
@@ -348,6 +352,104 @@ struct LabeledSlider: View {
             }
             Slider(value: $value, in: range)
                 .controlSize(.small)
+        }
+    }
+}
+
+// MARK: - Annotation Tools
+
+struct AnnotationToolsSection: View {
+    @Bindable var model: EditorModel
+
+    private let tools: [(AnnotationTool, String, String)] = [
+        (.select, "arrow.up.left", "Select"),
+        (.rectangle, "rectangle", "Rectangle"),
+        (.filledRect, "rectangle.fill", "Filled Rect"),
+        (.ellipse, "circle", "Ellipse"),
+        (.line, "line.diagonal", "Line"),
+        (.arrow, "arrow.up.right", "Arrow"),
+        (.freehand, "pencil.tip", "Freehand"),
+        (.numberedBadge, "1.circle.fill", "Number"),
+        (.pixelate, "square.grid.3x3", "Pixelate"),
+        (.blur, "aqi.medium", "Blur"),
+        (.text, "textformat", "Text"),
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Annotate")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(32), spacing: 4), count: 6), spacing: 4) {
+                ForEach(tools, id: \.0) { tool, icon, label in
+                    let isSelected = model.activeTool == tool
+                    Button {
+                        model.activeTool = tool
+                    } label: {
+                        Image(systemName: icon)
+                            .font(.system(size: 13))
+                            .frame(width: 32, height: 28)
+                            .background(
+                                isSelected ? AnyShapeStyle(Color.accentColor.opacity(0.2)) : AnyShapeStyle(.clear),
+                                in: RoundedRectangle(cornerRadius: 5)
+                            )
+                            .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help(label)
+                }
+            }
+
+            if model.activeTool.createsAnnotation && !model.activeTool.isRedactionTool {
+                HStack(spacing: 4) {
+                    ForEach(Array(ColorSwatch.presets.enumerated()), id: \.offset) { _, swatch in
+                        let isSelected = model.currentSwatch == swatch
+                        Button {
+                            model.currentSwatch = swatch
+                        } label: {
+                            Circle()
+                                .fill(Color(red: swatch.red, green: swatch.green, blue: swatch.blue))
+                                .frame(width: 18, height: 18)
+                                .overlay(
+                                    Circle().strokeBorder(
+                                        isSelected ? Color.accentColor : Color.primary.opacity(0.1),
+                                        lineWidth: isSelected ? 2 : 0.5
+                                    )
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                HStack(spacing: 6) {
+                    Text("Stroke")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    Picker("", selection: Binding(
+                        get: { model.currentStrokeWidth },
+                        set: { model.currentStrokeWidth = $0 }
+                    )) {
+                        ForEach(StrokeWidth.allCases, id: \.self) { preset in
+                            Text(preset.label).tag(preset.rawValue)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .controlSize(.small)
+                }
+            }
+
+            if !model.annotations.isEmpty {
+                Button(role: .destructive) {
+                    model.clearAnnotations()
+                } label: {
+                    Label("Clear All", systemImage: "trash")
+                        .font(.caption)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
         }
     }
 }

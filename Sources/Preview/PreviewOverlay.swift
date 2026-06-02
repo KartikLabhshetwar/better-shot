@@ -12,8 +12,6 @@ final class PreviewOverlay {
     private var panel: NSPanel?
     private var dismissTask: Task<Void, Never>?
 
-    var onAnnotate: ((URL) -> Void)?
-
     private init() {}
 
     func show(url: URL) {
@@ -44,7 +42,7 @@ final class PreviewOverlay {
     func openAnnotateEditor() {
         guard let url = currentURL else { return }
         dismiss()
-        onAnnotate?(url)
+        EditorWindowController.shared.open(url: url)
     }
 
     private func createPanel() {

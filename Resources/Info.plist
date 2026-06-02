@@ -24,5 +24,7 @@
     <true/>
     <key>NSScreenCaptureUsageDescription</key>
     <string>BetterShot needs screen recording access to capture screenshots and record your screen.</string>
+    <key>NSRequiresAquaSystemAppearance</key>
+    <true/>
 </dict>
 </plist>

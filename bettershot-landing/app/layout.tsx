@@ -76,7 +76,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <head>
         <meta name="google-site-verification" content="zI8OdLzuEkWozadNrjWCYY6B1MSeQ229HiqRMJNaB60" />
         <script defer src="https://cloud.umami.is/script.js" data-website-id="86300559-2d99-4d80-b25e-1d494de4f16b"></script>
@@ -92,7 +92,7 @@ html {
 }
         `}</style>
       </head>
-      <body className="dark">{children}</body>
+      <body>{children}</body>
     </html>
   )
 }

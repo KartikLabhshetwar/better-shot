@@ -71,7 +71,7 @@ struct MenuBarContentView: View {
                     ForEach(HistoryStore.shared.records.prefix(5)) { record in
                         Button(record.filename) {
                             let url = HistoryStore.shared.urlForRecord(record)
-                            NSWorkspace.shared.open(url)
+                            EditorWindowController.shared.open(url: url)
                         }
                     }
                 }
