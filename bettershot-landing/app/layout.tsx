@@ -5,16 +5,26 @@ import { GeistMono } from "geist/font/mono"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Better Shot - Free Screenshot Tool for macOS",
-  description: "An open-source alternative to CleanShot X for macOS. Capture, annotate, and share screenshots with a single shortcut. No account needed.",
+  title: "Better Shot — Screenshot tool for macOS",
+  description:
+    "Free, open-source screenshot tool for macOS. Capture, annotate, and beautify screenshots with a single shortcut. No account needed.",
   metadataBase: new URL("https://bettershot.site"),
   alternates: {
     canonical: "/",
   },
-  keywords: ["screenshot", "macOS", "screen capture", "open source", "CleanShot alternative", "annotation", "free screenshot tool"],
+  keywords: [
+    "screenshot",
+    "macOS",
+    "screen capture",
+    "open source",
+    "CleanShot alternative",
+    "annotation",
+    "free screenshot tool",
+  ],
   openGraph: {
-    title: "Better Shot - Free Screenshot Tool for macOS",
-    description: "An open-source alternative to CleanShot X for macOS. Capture, annotate, and share screenshots with a single shortcut.",
+    title: "Better Shot — Screenshot tool for macOS",
+    description:
+      "Free, open-source screenshot tool for macOS. Capture, annotate, and beautify screenshots with a single shortcut.",
     url: "https://bettershot.site",
     siteName: "Better Shot",
     images: [
@@ -22,7 +32,7 @@ export const metadata: Metadata = {
         url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "Better Shot - Free Screenshot Tool for macOS",
+        alt: "Better Shot — Screenshot tool for macOS",
       },
     ],
     locale: "en_US",
@@ -30,8 +40,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Better Shot - Free Screenshot Tool for macOS",
-    description: "An open-source alternative to CleanShot X for macOS. Capture, annotate, and share screenshots with a single shortcut.",
+    title: "Better Shot — Screenshot tool for macOS",
+    description:
+      "Free, open-source screenshot tool for macOS. Capture, annotate, and beautify screenshots with a single shortcut.",
     images: ["/og.png"],
     creator: "@code_kartik",
   },
@@ -59,10 +70,10 @@ const jsonLd = {
     price: "0",
     priceCurrency: "USD",
   },
-  description: "An open-source alternative to CleanShot X for macOS. Capture, annotate, and share screenshots.",
+  description:
+    "Free, open-source screenshot tool for macOS. Capture, annotate, and beautify screenshots.",
   url: "https://bettershot.site",
   downloadUrl: "https://github.com/KartikLabhshetwar/better-shot/releases",
-  softwareVersion: "0.2.4",
   author: {
     "@type": "Person",
     name: "Kartik Labhshetwar",
@@ -76,23 +87,23 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <head>
-        <meta name="google-site-verification" content="zI8OdLzuEkWozadNrjWCYY6B1MSeQ229HiqRMJNaB60" />
-        <script defer src="https://cloud.umami.is/script.js" data-website-id="86300559-2d99-4d80-b25e-1d494de4f16b"></script>
+        <meta
+          name="google-site-verification"
+          content="zI8OdLzuEkWozadNrjWCYY6B1MSeQ229HiqRMJNaB60"
+        />
+        <script
+          defer
+          src="https://cloud.umami.is/script.js"
+          data-website-id="86300559-2d99-4d80-b25e-1d494de4f16b"
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        <style>{`
-html {
-  font-family: ${GeistSans.style.fontFamily};
-  --font-sans: ${GeistSans.variable};
-  --font-mono: ${GeistMono.variable};
-}
-        `}</style>
       </head>
-      <body>{children}</body>
+      <body className="antialiased">{children}</body>
     </html>
   )
 }

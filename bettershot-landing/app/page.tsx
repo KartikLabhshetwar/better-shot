@@ -1,111 +1,153 @@
-"use client"
-
-import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { ArrowUpRight } from "lucide-react"
 import { DownloadDropdown } from "@/components/download-dropdown"
+import { getLatestRelease } from "@/lib/downloads"
+import { StarCount } from "@/components/star-count"
 
-export default function Home() {
-  const [starCount, setStarCount] = useState(0)
-  const [targetStars, setTargetStars] = useState(0)
-
-  useEffect(() => {
-    const fetchStarCount = async () => {
-      try {
-        const response = await fetch("https://api.github.com/repos/KartikLabhshetwar/better-shot")
-        if (response.ok) {
-          const data = await response.json()
-          setTargetStars(data.stargazers_count || 0)
-        }
-      } catch (error) {
-        console.error("Failed to fetch star count:", error)
-      }
-    }
-    fetchStarCount()
-  }, [])
-
-  useEffect(() => {
-    if (targetStars === 0) return
-    const duration = 800
-    const steps = 40
-    const increment = targetStars / steps
-    const stepDuration = duration / steps
-    let current = 0
-    const timer = setInterval(() => {
-      current += increment
-      if (current >= targetStars) {
-        setStarCount(targetStars)
-        clearInterval(timer)
-      } else {
-        setStarCount(Math.floor(current))
-      }
-    }, stepDuration)
-    return () => clearInterval(timer)
-  }, [targetStars])
+export default async function Home() {
+  const release = await getLatestRelease()
 
   return (
-    <div className="min-h-screen w-full flex flex-col bg-[#faf9f7]">
-      <header className="fixed top-0 left-0 right-0 z-50">
-        <div className="backdrop-blur-lg bg-[#faf9f7]/80">
-          <div className="max-w-[880px] mx-auto px-6 h-12 flex items-center justify-between">
-            <a href="/" className="flex items-center gap-2 text-[13px] font-medium text-[#1a1a1a]/70 tracking-[-0.01em]">
-              <Image src="/logo.png" alt="Better Shot" width={20} height={20} className="rounded-[4px]" />
+    <div className="min-h-screen w-full bg-[#fafaf9] text-[#111] selection:bg-[#e78a53]/20">
+      {/* Nav */}
+      <nav className="fixed top-0 inset-x-0 z-50 h-14 backdrop-blur-xl bg-[#fafaf9]/80">
+        <div className="max-w-[960px] mx-auto h-full px-6 flex items-center justify-between">
+          <a href="/" className="flex items-center gap-2.5">
+            <Image src="/logo.png" alt="" width={22} height={22} className="rounded-[5px]" />
+            <span className="text-[13px] font-medium tracking-[-0.01em] text-[#111]/50">
               Better Shot
-            </a>
-            <div className="flex items-center gap-4">
-              <a
-                href="https://github.com/KartikLabhshetwar/better-shot"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[12px] text-[#1a1a1a]/30 hover:text-[#1a1a1a]/60 transition-colors"
-              >
-                GitHub{starCount > 0 ? ` (${starCount})` : ""}
-              </a>
-              <DownloadDropdown source="navbar" size="sm" showLabel={false} />
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="flex-1 flex flex-col items-center justify-center px-6">
-        <div className="max-w-[520px] w-full text-center">
-          <div className="flex justify-center mb-8">
-            <Image
-              src="/logo.png"
-              alt="Better Shot"
-              width={72}
-              height={72}
-              className="rounded-[16px] shadow-[0_2px_8px_rgba(0,0,0,0.06)]"
-              priority
-            />
-          </div>
-
-          <h1 className="text-[clamp(40px,7vw,72px)] leading-[1.02] font-semibold tracking-[-0.045em] text-[#1a1a1a]">
-            Better Shot
-          </h1>
-
-          <p className="text-[15px] leading-[1.7] text-[#1a1a1a]/40 mt-5 max-w-[340px] mx-auto">
-            Free, open-source screenshot tool for macOS.
-            Capture, annotate, share.
-          </p>
-
-          <div className="flex items-center justify-center gap-3 mt-10">
-            <DownloadDropdown source="hero" />
+            </span>
+          </a>
+          <div className="flex items-center gap-5">
             <a
               href="https://github.com/KartikLabhshetwar/better-shot"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center px-4 py-2 text-[13px] font-medium text-[#1a1a1a]/35 hover:text-[#1a1a1a]/60 border border-[#1a1a1a]/[0.08] hover:border-[#1a1a1a]/[0.15] rounded-lg transition-all"
+              className="text-[12px] text-[#111]/25 hover:text-[#111]/50 transition-colors"
             >
-              Source
+              <StarCount />
             </a>
+            <DownloadDropdown release={release} source="navbar" size="sm" showLabel={false} />
           </div>
         </div>
+      </nav>
+
+      {/* Hero */}
+      <main className="pt-14">
+        <section className="flex flex-col items-center px-6 pt-28 pb-20">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[#111]/[0.06] bg-[#111]/[0.02] mb-8">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <span className="text-[11px] font-medium text-[#111]/35 tracking-wide uppercase">
+              v{release.version} — Free &amp; open source
+            </span>
+          </div>
+
+          <h1 className="text-center text-[clamp(36px,6.5vw,64px)] leading-[1.05] font-semibold tracking-[-0.035em] text-[#111] max-w-[680px] text-balance">
+            Screenshots that look like you tried
+          </h1>
+
+          <p className="text-center text-[15px] leading-[1.7] text-[#111]/40 mt-5 max-w-[400px] text-pretty">
+            Capture, annotate, beautify. A local-first screenshot tool for macOS — no account, no cloud, no tracking.
+          </p>
+
+          <div className="flex items-center gap-3 mt-10">
+            <DownloadDropdown release={release} source="hero" />
+            <a
+              href="https://github.com/KartikLabhshetwar/better-shot"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-4 h-10 text-[13px] font-medium text-[#111]/30 hover:text-[#111]/55 border border-[#111]/[0.08] hover:border-[#111]/[0.15] rounded-lg transition-all"
+            >
+              Source
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </a>
+          </div>
+
+          <div className="flex items-center gap-6 mt-8 text-[11px] text-[#111]/20">
+            <span>macOS 14+</span>
+            <span className="h-3 w-px bg-[#111]/8" />
+            <span>Apple Silicon &amp; Intel</span>
+          </div>
+        </section>
+
+        {/* Screenshot preview */}
+        <section className="max-w-[880px] mx-auto px-6 pb-24">
+          <div className="rounded-xl border border-[#111]/[0.06] bg-[#111]/[0.02] p-2 overflow-hidden">
+            <Image
+              src="/hero.png"
+              alt="BetterShot editor showing a beautified screenshot"
+              width={1720}
+              height={1080}
+              className="w-full rounded-lg"
+              priority
+            />
+          </div>
+        </section>
+
+        {/* Features — linear list */}
+        <section className="max-w-[960px] mx-auto px-6 pb-28">
+          <div className="border-t border-[#111]/[0.06]" />
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-0 divide-y md:divide-y-0 md:divide-x divide-[#111]/[0.06]">
+            <Feature
+              title="Capture"
+              items={[
+                "Region, fullscreen, window",
+                "Override ⌘⇧3/4/5 shortcuts",
+                "Floating preview overlay",
+                "OCR text extraction",
+              ]}
+            />
+            <Feature
+              title="Annotate"
+              items={[
+                "Arrows, shapes, freehand",
+                "Text with full font control",
+                "Pixelate & blur redaction",
+                "Numbered callout badges",
+              ]}
+            />
+            <Feature
+              title="Beautify"
+              items={[
+                "Backgrounds & gradients",
+                "Padding, shadow, corner radius",
+                "Bundled wallpapers",
+                "Export as PNG or JPEG",
+              ]}
+            />
+          </div>
+        </section>
+
+        {/* Shortcuts */}
+        <section className="max-w-[480px] mx-auto px-6 pb-28">
+          <h2 className="text-[13px] font-medium text-[#111]/20 tracking-wide uppercase text-center mb-8">
+            Keyboard shortcuts
+          </h2>
+          <div className="space-y-0 divide-y divide-[#111]/[0.06] border-y border-[#111]/[0.06] rounded-lg overflow-hidden bg-[#111]/[0.015]">
+            <Shortcut label="Capture region" keys={["⌘", "⇧", "4"]} />
+            <Shortcut label="Capture screen" keys={["⌘", "⇧", "3"]} />
+            <Shortcut label="Capture window" keys={["⌘", "⇧", "5"]} />
+            <Shortcut label="OCR region" keys={["⌘", "⇧", "O"]} />
+          </div>
+        </section>
+
+        {/* CTA */}
+        <section className="border-t border-[#111]/[0.06] py-20">
+          <div className="text-center px-6">
+            <p className="text-[15px] text-[#111]/30 mb-6 text-pretty">
+              No account. No subscription. Just a better screenshot tool.
+            </p>
+            <DownloadDropdown release={release} source="cta" />
+          </div>
+        </section>
       </main>
 
-      <footer>
-        <div className="max-w-[880px] mx-auto px-6 py-8 flex items-center justify-between">
-          <p className="text-[11px] text-[#1a1a1a]/15">
+      {/* Footer */}
+      <footer className="border-t border-[#111]/[0.04]">
+        <div className="max-w-[960px] mx-auto px-6 py-6 flex items-center justify-between">
+          <p className="text-[11px] text-[#111]/15">
             &copy; {new Date().getFullYear()} Better Shot
           </p>
           <nav className="flex items-center gap-5">
@@ -113,19 +155,53 @@ export default function Home() {
               href="https://x.com/code_kartik"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[11px] text-[#1a1a1a]/15 hover:text-[#1a1a1a]/40 transition-colors"
+              className="text-[11px] text-[#111]/15 hover:text-[#111]/40 transition-colors"
             >
               Twitter
             </a>
             <Link
               href="/privacy"
-              className="text-[11px] text-[#1a1a1a]/15 hover:text-[#1a1a1a]/40 transition-colors"
+              className="text-[11px] text-[#111]/15 hover:text-[#111]/40 transition-colors"
             >
               Privacy
             </Link>
           </nav>
         </div>
       </footer>
+    </div>
+  )
+}
+
+function Feature({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="py-10 md:px-8 first:md:pl-0 last:md:pr-0">
+      <h3 className="text-[13px] font-semibold text-[#111]/60 tracking-[-0.01em] mb-4">{title}</h3>
+      <ul className="space-y-2.5">
+        {items.map((item) => (
+          <li key={item} className="flex items-start gap-2.5">
+            <span className="mt-[7px] h-1 w-1 rounded-full bg-[#111]/15 shrink-0" />
+            <span className="text-[13px] leading-[1.6] text-[#111]/35">{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function Shortcut({ label, keys }: { label: string; keys: string[] }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-3">
+      <span className="text-[13px] text-[#111]/40">{label}</span>
+      <div className="flex items-center gap-1">
+        {keys.map((k, i) => (
+          <kbd
+            key={i}
+            className="inline-flex items-center justify-center h-6 min-w-[24px] px-1.5 text-[11px] font-medium text-[#111]/50 bg-white border border-[#111]/[0.08] rounded shadow-[0_1px_0_rgba(0,0,0,0.04)]"
+          >
+            {k}
+          </kbd>
+        ))}
+      </div>
     </div>
   )
 }

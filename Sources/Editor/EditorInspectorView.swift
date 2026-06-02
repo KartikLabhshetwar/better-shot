@@ -19,6 +19,20 @@ struct EditorInspectorView: View {
                     .padding(.top, 14)
                     .padding(.bottom, 16)
 
+                    if !model.items.isEmpty {
+                        Button(role: .destructive) {
+                            model.clearAnnotations()
+                        } label: {
+                            Label("Clear All", systemImage: "trash")
+                                .font(.caption)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 12)
+                    }
+
                     if model.inspectedTool != nil {
                         InspectorDivider()
 
@@ -94,37 +108,7 @@ struct EditorInspectorView: View {
                     // MARK: Background
                     BackgroundPickerSection(model: model)
 
-                    if !model.items.isEmpty {
-                        InspectorDivider()
-
-                        VStack(alignment: .leading, spacing: 10) {
-                            Button(role: .destructive) {
-                                model.clearAnnotations()
-                            } label: {
-                                Label("Clear All Annotations", systemImage: "trash")
-                                    .font(.caption)
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 14)
-                    }
-
                     Spacer(minLength: 20)
-
-                    VStack {
-                        Button {
-                            model.saveConfigAsDefault()
-                        } label: {
-                            Label("Set as Default", systemImage: "bookmark")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 14)
                 }
             }
             .scrollContentBackground(.hidden)

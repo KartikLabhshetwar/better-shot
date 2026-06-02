@@ -6,40 +6,51 @@ final class EditorWindowController {
     static let shared = EditorWindowController()
 
     private var window: NSWindow?
+    private var currentURL: CurrentURL?
 
     private init() {}
 
     func open(url: URL) {
-        close()
+        if let window, window.isVisible {
+            currentURL?.url = url
+            window.makeKeyAndOrderFront(nil)
+            NSApp.setActivationPolicy(.regular)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        let urlHolder = CurrentURL(url: url)
+        currentURL = urlHolder
 
         let hostingView = NSHostingView(rootView:
-            EditorWindowView(imageURL: url)
+            EditorWindowView(urlHolder: urlHolder)
                 .frame(minWidth: 800, minHeight: 550)
         )
 
-        let window = NSWindow(
+        let win = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1100, height: 760),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
-        window.contentView = hostingView
-        window.title = "BetterShot — Annotate"
-        window.isReleasedWhenClosed = false
-        window.delegate = WindowCloseDelegate.shared
+        win.contentView = hostingView
+        win.title = "BetterShot"
+        win.isReleasedWhenClosed = false
+        win.delegate = WindowCloseDelegate.shared
 
-        centerOnActiveScreen(window)
+        centerOnActiveScreen(win)
 
         NSApp.setActivationPolicy(.regular)
-        window.makeKeyAndOrderFront(nil)
+        win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
-        self.window = window
+        self.window = win
     }
 
     func close() {
         window?.close()
         window = nil
+        currentURL = nil
         NSApp.setActivationPolicy(.accessory)
     }
 
@@ -58,6 +69,16 @@ final class EditorWindowController {
         let y = screenFrame.midY - windowSize.height / 2
 
         window.setFrameOrigin(NSPoint(x: x, y: y))
+    }
+}
+
+@MainActor
+@Observable
+final class CurrentURL {
+    var url: URL
+
+    init(url: URL) {
+        self.url = url
     }
 }
 

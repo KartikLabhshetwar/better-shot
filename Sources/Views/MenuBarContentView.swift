@@ -57,6 +57,10 @@ struct MenuBarContentView: View {
             }
             .keyboardShortcut(",", modifiers: .command)
 
+            Button("Check for Updates...") {
+                Task { await AppUpdater.shared.checkForUpdates() }
+            }
+
             Divider()
 
             Button("Quit BetterShot") {

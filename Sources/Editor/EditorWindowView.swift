@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct EditorWindowView: View {
-    let imageURL: URL
+    @Bindable var urlHolder: CurrentURL
     @State private var model = EditorModel()
     @Environment(\.dismiss) private var dismiss
 
@@ -44,7 +44,7 @@ struct EditorWindowView: View {
                 Spacer()
 
                 Button("Cancel") {
-                    dismiss()
+                    EditorWindowController.shared.close()
                 }
                 .keyboardShortcut(.escape, modifiers: [])
 
@@ -64,9 +64,9 @@ struct EditorWindowView: View {
             }
         }
         .onAppear {
-            model.loadImage(from: imageURL)
+            model.loadImage(from: urlHolder.url)
         }
-        .onChange(of: imageURL) { _, newURL in
+        .onChange(of: urlHolder.url) { _, newURL in
             model.loadImage(from: newURL)
         }
     }
@@ -102,7 +102,7 @@ struct EditorWindowView: View {
             }
         }
 
-        dismiss()
+        EditorWindowController.shared.close()
     }
 
     private func copyToClipboard() async {
