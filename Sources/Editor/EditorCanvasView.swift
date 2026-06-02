@@ -1,41 +1,79 @@
 import SwiftUI
 
-/// The main canvas area that shows the screenshot with its background.
 struct EditorCanvasView: View {
     @Bindable var model: EditorModel
+    @State private var cachedPreview: NSImage?
+    @State private var renderTask: Task<Void, Never>?
 
     var body: some View {
-        GeometryReader { proxy in
-            if let image = model.sourceImage {
-                let displayImage = renderPreview(image: image)
-                let nsImage = displayImage.flatMap {
-                    NSImage(cgImage: $0, size: NSSize(width: $0.width, height: $0.height))
-                }
+        GeometryReader { _ in
+            if model.sourceImage != nil {
+                ZStack {
+                    if case .none = model.config.style {
+                        TransparencyGrid()
+                    }
 
-                if let nsImage {
-                    ZStack {
-                        if case .none = model.config.style {
-                            TransparencyGrid()
-                        }
-
-                        Image(nsImage: nsImage)
+                    if let preview = cachedPreview {
+                        Image(nsImage: preview)
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .padding(24)
-                            .id(model.sourceURL)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ContentUnavailableView("Loading image...", systemImage: "photo")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .onChange(of: model.config, initial: true) { _, _ in scheduleRender() }
+        .onChange(of: model.sourceImage) { _, _ in scheduleRender() }
     }
 
-    private func renderPreview(image: CGImage) -> CGImage? {
-        BeautifierRenderer.render(image: image, config: model.config)
+    private func scheduleRender() {
+        renderTask?.cancel()
+        renderTask = Task {
+            try? await Task.sleep(for: .milliseconds(16))
+            guard !Task.isCancelled else { return }
+            guard let source = model.sourceImage else { return }
+
+            let config = model.config
+
+            let result = await Task.detached(priority: .userInitiated) {
+                renderPreview(image: source, config: config)
+            }.value
+
+            guard !Task.isCancelled, let cgImage = result else { return }
+            cachedPreview = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+        }
     }
+}
+
+private func renderPreview(image: CGImage, config: BeautifierConfig) -> CGImage? {
+    let maxPreviewDimension: CGFloat = 1400
+    let imgW = CGFloat(image.width)
+    let imgH = CGFloat(image.height)
+    let maxDim = max(imgW, imgH)
+
+    let scale: CGFloat = maxDim > maxPreviewDimension ? maxPreviewDimension / maxDim : 1.0
+
+    var previewImage = image
+    if scale < 1.0 {
+        let newW = Int(imgW * scale)
+        let newH = Int(imgH * scale)
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let ctx = CGContext(
+            data: nil, width: newW, height: newH,
+            bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        ) else { return nil }
+        ctx.interpolationQuality = .high
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: newW, height: newH))
+        guard let scaled = ctx.makeImage() else { return nil }
+        previewImage = scaled
+    }
+
+    return BeautifierRenderer.render(image: previewImage, config: config)
 }
 
 // MARK: - Transparency Grid

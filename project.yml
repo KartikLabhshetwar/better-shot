@@ -36,6 +36,7 @@ targets:
     postCompileScripts:
       - script: |
           cp "${SRCROOT}/videokit/videokit" "${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/MacOS/videokit"
+          /usr/bin/codesign --force --sign - "${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/MacOS/videokit"
         name: Bundle videokit
     entitlements:
       path: Resources/BetterShot.entitlements

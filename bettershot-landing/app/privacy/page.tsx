@@ -11,27 +11,26 @@ export const metadata: Metadata = {
 
 export default function PrivacyPolicy() {
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white/80">
-      <header className="border-b border-white/[0.06]">
-        <div className="max-w-[720px] mx-auto px-6 h-14 flex items-center">
-          <Link href="/" className="flex items-center gap-2.5">
-            <img src="/icon.png" alt="Better Shot" className="w-6 h-6" />
-            <span className="text-[15px] font-medium text-white/90">Better Shot</span>
+    <div className="min-h-screen bg-[#08080a] text-white/80">
+      <header>
+        <div className="max-w-[600px] mx-auto px-6 h-12 flex items-center">
+          <Link href="/" className="text-[13px] font-medium text-white/70 tracking-[-0.01em]">
+            Better Shot
           </Link>
         </div>
       </header>
 
-      <main className="max-w-[720px] mx-auto px-6 py-16">
-        <h1 className="text-3xl font-semibold tracking-tight text-white mb-2">
+      <main className="max-w-[600px] mx-auto px-6 py-16">
+        <h1 className="text-2xl font-semibold tracking-[-0.03em] text-white mb-2">
           Privacy Policy
         </h1>
-        <p className="text-[13px] text-white/30 mb-12">
+        <p className="text-[12px] text-white/25 mb-12">
           Last updated: June 2, 2026
         </p>
 
-        <div className="space-y-10 text-[15px] leading-relaxed text-white/50">
+        <div className="space-y-10 text-[14px] leading-[1.7] text-white/40">
           <section>
-            <h2 className="text-lg font-medium text-white/80 mb-3">Overview</h2>
+            <h2 className="text-[15px] font-medium text-white/70 mb-3">Overview</h2>
             <p>
               Better Shot is a free, open-source screenshot tool for macOS. We are committed
               to protecting your privacy. This policy explains what data we collect and how
@@ -40,7 +39,7 @@ export default function PrivacyPolicy() {
           </section>
 
           <section>
-            <h2 className="text-lg font-medium text-white/80 mb-3">Data Collection</h2>
+            <h2 className="text-[15px] font-medium text-white/70 mb-3">Data Collection</h2>
             <p className="mb-3">
               <strong className="text-white/70">Better Shot does not collect, store, or transmit
               any personal data.</strong> All screenshots and annotations are processed locally
@@ -52,7 +51,7 @@ export default function PrivacyPolicy() {
           </section>
 
           <section>
-            <h2 className="text-lg font-medium text-white/80 mb-3">Website Analytics</h2>
+            <h2 className="text-[15px] font-medium text-white/70 mb-3">Website Analytics</h2>
             <p>
               This website (bettershot.site) uses Umami, a privacy-focused analytics tool,
               to collect anonymous usage statistics such as page views and download counts.
@@ -62,7 +61,7 @@ export default function PrivacyPolicy() {
           </section>
 
           <section>
-            <h2 className="text-lg font-medium text-white/80 mb-3">Third-Party Services</h2>
+            <h2 className="text-[15px] font-medium text-white/70 mb-3">Third-Party Services</h2>
             <p>
               Better Shot does not integrate with any third-party services that collect user
               data. The application is distributed via GitHub Releases and Homebrew.
@@ -70,7 +69,7 @@ export default function PrivacyPolicy() {
           </section>
 
           <section>
-            <h2 className="text-lg font-medium text-white/80 mb-3">Open Source</h2>
+            <h2 className="text-[15px] font-medium text-white/70 mb-3">Open Source</h2>
             <p>
               Better Shot is open source under the MIT License. You can inspect the full
               source code on{" "}
@@ -87,7 +86,7 @@ export default function PrivacyPolicy() {
           </section>
 
           <section>
-            <h2 className="text-lg font-medium text-white/80 mb-3">Contact</h2>
+            <h2 className="text-[15px] font-medium text-white/70 mb-3">Contact</h2>
             <p>
               If you have questions about this privacy policy, you can reach out via{" "}
               <a
@@ -112,12 +111,12 @@ export default function PrivacyPolicy() {
           </section>
         </div>
 
-        <div className="mt-16 pt-6 border-t border-white/[0.06]">
+        <div className="mt-16 pt-6 border-t border-white/[0.04]">
           <Link
             href="/"
-            className="text-[13px] text-white/30 hover:text-white/50 transition-colors"
+            className="text-[12px] text-white/25 hover:text-white/50 transition-colors"
           >
-            &larr; Back to home
+            &larr; Home
           </Link>
         </div>
       </main>

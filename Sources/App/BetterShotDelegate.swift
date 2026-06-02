@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 
 @MainActor
 final class BetterShotDelegate: NSObject, NSApplicationDelegate {
@@ -22,28 +23,26 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
     private func configureRecordingCallback() {
         ScreenRecorder.shared.onFinished = { @MainActor url in
             Task {
-                // Save raw recording to user's save directory
                 let dir = AppPreferences.saveDirectory
                 let stamp = Int(Date().timeIntervalSince1970 * 1000)
-                let savedPath = "\(dir)/bettershot_\(stamp).mov"
-                let savedURL = URL(fileURLWithPath: savedPath)
 
+                // 1. Save raw video
+                let videoPath = "\(dir)/bettershot_\(stamp).mov"
+                let videoURL = URL(fileURLWithPath: videoPath)
                 do {
-                    try FileManager.default.copyItem(at: url, to: savedURL)
+                    try FileManager.default.copyItem(at: url, to: videoURL)
                 } catch {
                     print("Failed to save recording: \(error)")
                     return
                 }
 
-                // Compress via videokit if ffmpeg is available
+                // 2. Compress via videokit if available
                 let processor = VideoProcessor.shared
                 await processor.checkFFmpeg()
-
-                var finalURL = savedURL
                 if processor.ffmpegAvailable {
-                    let compressedPath = "\(dir)/bettershot_\(stamp)_compressed.mov"
+                    let compressedPath = "\(dir)/bettershot_\(stamp)_c.mov"
                     let opts = VideoProcessor.CompressOptions(
-                        input_path: savedPath,
+                        input_path: videoPath,
                         output_path: compressedPath,
                         quality: "medium",
                         speed: "fast",
@@ -54,28 +53,53 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
                     if let result = await processor.compress(opts),
                        result.success,
                        let outputPath = result.output_path {
-                        finalURL = URL(fileURLWithPath: outputPath)
-                        // Remove uncompressed version
-                        try? FileManager.default.removeItem(at: savedURL)
-                        // Rename compressed to clean name
-                        let cleanURL = URL(fileURLWithPath: savedPath)
-                        try? FileManager.default.moveItem(at: finalURL, to: cleanURL)
-                        finalURL = cleanURL
+                        try? FileManager.default.removeItem(at: videoURL)
+                        try? FileManager.default.moveItem(
+                            at: URL(fileURLWithPath: outputPath),
+                            to: videoURL
+                        )
                     }
                 }
 
-                // Import to history
-                let record = HistoryStore.shared.importCapture(from: finalURL)
-                if let record {
-                    let historyURL = HistoryStore.shared.urlForRecord(record)
-                    if AppPreferences.showOverlayAfterCapture {
-                        PreviewOverlay.shared.show(url: historyURL)
-                    }
+                // 3. Extract first frame as PNG for the editor
+                let frameURL = await Self.extractFrame(from: videoURL, stamp: stamp)
+
+                // 4. Show preview overlay (clicking pen opens editor with the frame)
+                if let frameURL {
+                    PreviewOverlay.shared.show(url: frameURL)
+                } else {
+                    PreviewOverlay.shared.show(url: videoURL)
                 }
 
-                // Clean up temp file
+                // Clean up temp recording
                 try? FileManager.default.removeItem(at: url)
             }
+        }
+    }
+
+    private static func extractFrame(from videoURL: URL, stamp: Int) async -> URL? {
+        let asset = AVAsset(url: videoURL)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = CMTime(seconds: 0.5, preferredTimescale: 600)
+
+        do {
+            let (cgImage, _) = try await generator.image(at: .zero)
+            let dir = AppPreferences.saveDirectory
+            let framePath = "\(dir)/bettershot_\(stamp)_frame.png"
+            let frameURL = URL(fileURLWithPath: framePath)
+
+            guard let dest = CGImageDestinationCreateWithURL(
+                frameURL as CFURL, "public.png" as CFString, 1, nil
+            ) else { return nil }
+            CGImageDestinationAddImage(dest, cgImage, nil)
+            guard CGImageDestinationFinalize(dest) else { return nil }
+
+            return frameURL
+        } catch {
+            print("Failed to extract frame: \(error)")
+            return nil
         }
     }
 }

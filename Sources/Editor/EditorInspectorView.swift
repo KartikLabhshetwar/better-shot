@@ -1,34 +1,24 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Right-hand inspector panel with background, layout, and annotation controls.
 struct EditorInspectorView: View {
     @Bindable var model: EditorModel
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // MARK: - Background
                 BackgroundPickerSection(model: model)
 
                 Divider()
 
-                // MARK: - Layout (Alignment + Aspect Ratio)
                 LayoutSection(model: model)
 
                 Divider()
 
-                // MARK: - Beautifier Controls
                 BeautifierControlsSection(model: model)
 
-                Divider()
+                Spacer(minLength: 20)
 
-                // MARK: - Annotation Tools
-                AnnotationToolsSection(model: model)
-
-                Spacer()
-
-                // Save as default
                 Button {
                     model.saveConfigAsDefault()
                 } label: {
@@ -54,7 +44,6 @@ struct BackgroundPickerSection: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
 
-            // Solid colors grid
             Text("Solid")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
@@ -80,7 +69,6 @@ struct BackgroundPickerSection: View {
                     .buttonStyle(.plain)
                 }
 
-                // None (transparent)
                 Button {
                     model.updateConfig { $0.style = .none }
                 } label: {
@@ -98,7 +86,6 @@ struct BackgroundPickerSection: View {
                 .buttonStyle(.plain)
             }
 
-            // Gradients
             Text("Gradients")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
@@ -126,7 +113,6 @@ struct BackgroundPickerSection: View {
                 }
             }
 
-            // Bundled image backgrounds (wallpapers, mesh gradients, mac assets)
             ForEach(BundledBackgrounds.Category.allCases, id: \.self) { category in
                 let assets = assetsForCategory(category)
                 if !assets.isEmpty {
@@ -167,7 +153,6 @@ struct BackgroundPickerSection: View {
                 }
             }
 
-            // Custom wallpaper from disk
             Button {
                 pickCustomWallpaper()
             } label: {
@@ -221,17 +206,16 @@ struct LayoutSection: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
 
-            HStack(alignment: .top, spacing: 20) {
-                // Alignment 3x3 grid
+            VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Alignment")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
 
                     Grid(horizontalSpacing: 3, verticalSpacing: 3) {
-                        ForEach(0..<3) { row in
+                        ForEach(0..<3, id: \.self) { row in
                             GridRow {
-                                ForEach(0..<3) { col in
+                                ForEach(0..<3, id: \.self) { col in
                                     let alignment = alignmentFor(row: row, col: col)
                                     let isSelected = model.config.alignment == alignment
 
@@ -262,9 +246,8 @@ struct LayoutSection: View {
                     .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
                 }
 
-                // Aspect ratio pills
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Ratio")
+                    Text("Aspect Ratio")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
 
@@ -365,69 +348,6 @@ struct LabeledSlider: View {
             }
             Slider(value: $value, in: range)
                 .controlSize(.small)
-        }
-    }
-}
-
-// MARK: - Annotation Tools
-
-struct AnnotationToolsSection: View {
-    @Bindable var model: EditorModel
-
-    private let tools: [(AnnotationTool, String, String)] = [
-        (.select, "arrow.up.left", "Select"),
-        (.rectangle, "rectangle", "Rectangle"),
-        (.filledRect, "rectangle.fill", "Filled Rect"),
-        (.ellipse, "circle", "Ellipse"),
-        (.line, "line.diagonal", "Line"),
-        (.arrow, "arrow.up.right", "Arrow"),
-        (.freehand, "pencil.tip", "Freehand"),
-        (.numberedBadge, "1.circle", "Number"),
-        (.pixelate, "square.grid.3x3", "Pixelate"),
-        (.blur, "aqi.medium", "Blur"),
-        (.text, "textformat", "Text"),
-    ]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Tools")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-            LazyVGrid(columns: Array(repeating: GridItem(.fixed(32), spacing: 4), count: 6), spacing: 4) {
-                ForEach(tools, id: \.0) { tool, icon, label in
-                    let isSelected = model.activeTool == tool
-                    Button {
-                        model.activeTool = tool
-                    } label: {
-                        Image(systemName: icon)
-                            .font(.system(size: 13))
-                            .frame(width: 32, height: 28)
-                            .background(
-                                isSelected ? AnyShapeStyle(Color.accentColor.opacity(0.2)) : AnyShapeStyle(.clear),
-                                in: RoundedRectangle(cornerRadius: 5)
-                            )
-                            .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help(label)
-                }
-            }
-
-            // Color swatches for annotations
-            if model.activeTool != .select && model.activeTool != .pixelate && model.activeTool != .blur {
-                HStack(spacing: 4) {
-                    ForEach(Array(ColorSwatch.presets.enumerated()), id: \.offset) { _, swatch in
-                        Circle()
-                            .fill(Color(red: swatch.red, green: swatch.green, blue: swatch.blue))
-                            .frame(width: 18, height: 18)
-                            .overlay(
-                                Circle()
-                                    .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
-                            )
-                    }
-                }
-            }
         }
     }
 }

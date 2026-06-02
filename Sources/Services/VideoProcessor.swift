@@ -90,35 +90,50 @@ final class VideoProcessor {
     }
 
     private var videokitURL: URL {
-        // 1. Look inside the app bundle (bundled by build script)
+        // 1. Inside the app bundle's MacOS directory (bundled by post-compile script)
         if let execURL = Bundle.main.executableURL {
             let bundled = execURL.deletingLastPathComponent().appendingPathComponent("videokit")
-            if FileManager.default.fileExists(atPath: bundled.path) {
+            if FileManager.default.isExecutableFile(atPath: bundled.path) {
                 return bundled
             }
         }
 
-        // 2. Dev fallback: look in the videokit/ directory relative to the project
-        let devPath = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("videokit/videokit")
-
-        if FileManager.default.fileExists(atPath: devPath.path) {
-            return devPath
-        }
-
-        // 3. Next to the app bundle
-        let bundle = Bundle.main.bundlePath
-        let sibling = URL(fileURLWithPath: bundle)
+        // 2. Next to the .app bundle (common for dev builds via Xcode)
+        let sibling = URL(fileURLWithPath: Bundle.main.bundlePath)
             .deletingLastPathComponent()
             .appendingPathComponent("videokit")
-
-        if FileManager.default.fileExists(atPath: sibling.path) {
+        if FileManager.default.isExecutableFile(atPath: sibling.path) {
             return sibling
         }
 
+        // 3. Project root videokit/ directory (dev: when running from Xcode with SRCROOT set)
+        if let srcRoot = ProcessInfo.processInfo.environment["SRCROOT"] {
+            let projectBinary = URL(fileURLWithPath: srcRoot)
+                .appendingPathComponent("videokit/videokit")
+            if FileManager.default.isExecutableFile(atPath: projectBinary.path) {
+                return projectBinary
+            }
+        }
+
+        // 4. Workspace-relative fallback using the bundle path heuristic
+        //    DerivedData/.../Build/Products/Debug/BetterShot.app -> walk up to find project root
+        var search = URL(fileURLWithPath: Bundle.main.bundlePath)
+        for _ in 0..<8 {
+            search = search.deletingLastPathComponent()
+            let candidate = search.appendingPathComponent("videokit/videokit")
+            if FileManager.default.isExecutableFile(atPath: candidate.path) {
+                return candidate
+            }
+        }
+
+        // 5. Homebrew / system PATH fallback
+        for path in ["/opt/homebrew/bin/videokit", "/usr/local/bin/videokit"] {
+            if FileManager.default.isExecutableFile(atPath: path) {
+                return URL(fileURLWithPath: path)
+            }
+        }
+
+        // Last resort — will fail gracefully at call site
         return URL(fileURLWithPath: "/usr/local/bin/videokit")
     }
 

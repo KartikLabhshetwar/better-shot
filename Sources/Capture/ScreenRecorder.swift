@@ -2,35 +2,50 @@ import AppKit
 import ScreenCaptureKit
 import AVFoundation
 import CoreMedia
+import CoreVideo
 
-// MARK: - Thread-safe writer that processes sample buffers off the main actor
+// MARK: - Thread-safe writer using pixel buffer adaptor
 
 final class RecordingWriter: @unchecked Sendable {
     private let writer: AVAssetWriter
     private let videoInput: AVAssetWriterInput
-    private let queue = DispatchQueue(label: "com.bettershot.recording-writer")
+    private let adaptor: AVAssetWriterInputPixelBufferAdaptor
+    private let writingQueue = DispatchQueue(label: "com.bettershot.recording-writer")
 
     private var sessionStartTime: CMTime?
     private var totalPauseDuration: CMTime = .zero
     private var isPaused = false
     private var pauseStartTime: CMTime?
+    private var needsPauseDurationUpdate = false
+    private var latestSampleTime: CMTime = .zero
 
     init(url: URL, width: Int, height: Int) throws {
         writer = try AVAssetWriter(outputURL: url, fileType: .mov)
 
+        let bitRate = max(20_000_000, width * height * 4)
         let videoSettings: [String: Any] = [
             AVVideoCodecKey: AVVideoCodecType.hevc,
             AVVideoWidthKey: width,
             AVVideoHeightKey: height,
             AVVideoCompressionPropertiesKey: [
-                AVVideoAverageBitRateKey: max(20_000_000, (width / 2) * (height / 2) * 4),
+                AVVideoAverageBitRateKey: bitRate,
                 AVVideoExpectedSourceFrameRateKey: 60,
                 AVVideoMaxKeyFrameIntervalKey: 60,
-            ]
+            ] as [String: Any]
         ]
 
         videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
         videoInput.expectsMediaDataInRealTime = true
+
+        let sourceAttrs: [String: Any] = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+            kCVPixelBufferWidthKey as String: width,
+            kCVPixelBufferHeightKey as String: height,
+        ]
+        adaptor = AVAssetWriterInputPixelBufferAdaptor(
+            assetWriterInput: videoInput,
+            sourcePixelBufferAttributes: sourceAttrs
+        )
 
         if writer.canAdd(videoInput) {
             writer.add(videoInput)
@@ -40,62 +55,66 @@ final class RecordingWriter: @unchecked Sendable {
     }
 
     func processSampleBuffer(_ sampleBuffer: CMSampleBuffer) {
-        queue.sync {
-            guard !isPaused else { return }
-            guard videoInput.isReadyForMoreMediaData else { return }
+        writingQueue.sync {
+            guard CMSampleBufferDataIsReady(sampleBuffer) else { return }
+            guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
-            let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+            let time = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
 
+            // Handle pause state
+            if isPaused {
+                if pauseStartTime == nil { pauseStartTime = time }
+                return
+            }
+            if needsPauseDurationUpdate, let pauseStart = pauseStartTime {
+                totalPauseDuration = CMTimeAdd(totalPauseDuration, CMTimeSubtract(time, pauseStart))
+                self.pauseStartTime = nil
+                needsPauseDurationUpdate = false
+            }
+            latestSampleTime = time
+
+            // First frame: start session at .zero
             if sessionStartTime == nil {
-                sessionStartTime = pts
+                sessionStartTime = time
                 writer.startSession(atSourceTime: .zero)
             }
 
+            // Remap PTS to 0-based, minus pauses
             guard let startTime = sessionStartTime else { return }
-            let adjustedPTS = CMTimeSubtract(CMTimeSubtract(pts, startTime), totalPauseDuration)
-            guard adjustedPTS.seconds >= 0 else { return }
-
-            var timing = CMSampleTimingInfo(
-                duration: CMSampleBufferGetDuration(sampleBuffer),
-                presentationTimeStamp: adjustedPTS,
-                decodeTimeStamp: .invalid
-            )
-            var newBuffer: CMSampleBuffer?
-            CMSampleBufferCreateCopyWithNewTiming(
-                allocator: kCFAllocatorDefault,
-                sampleBuffer: sampleBuffer,
-                sampleTimingEntryCount: 1,
-                sampleTimingArray: &timing,
-                sampleBufferOut: &newBuffer
-            )
-
-            if let newBuffer {
-                videoInput.append(newBuffer)
+            var adjustedPTS = CMTimeSubtract(time, startTime)
+            if totalPauseDuration > .zero {
+                adjustedPTS = CMTimeSubtract(adjustedPTS, totalPauseDuration)
             }
+            guard adjustedPTS >= .zero else { return }
+
+            guard videoInput.isReadyForMoreMediaData else { return }
+            adaptor.append(pixelBuffer, withPresentationTime: adjustedPTS)
         }
     }
 
     func pause() {
-        queue.sync {
+        writingQueue.sync {
+            guard !isPaused else { return }
             isPaused = true
-            pauseStartTime = CMClockGetTime(CMClockGetHostTimeClock())
+            pauseStartTime = latestSampleTime
         }
     }
 
     func resume() {
-        queue.sync {
-            if let pauseStart = pauseStartTime {
-                let now = CMClockGetTime(CMClockGetHostTimeClock())
-                totalPauseDuration = CMTimeAdd(totalPauseDuration, CMTimeSubtract(now, pauseStart))
-            }
-            pauseStartTime = nil
+        writingQueue.sync {
+            guard isPaused else { return }
             isPaused = false
+            needsPauseDurationUpdate = true
         }
     }
 
     func finish() async {
         videoInput.markAsFinished()
-        await writer.finishWriting()
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            writer.finishWriting {
+                continuation.resume()
+            }
+        }
     }
 }
 
@@ -119,6 +138,8 @@ final class ScreenRecorder {
     private var recordingWriter: RecordingWriter?
     private var timerTask: Task<Void, Never>?
     private var recordingStartDate: Date?
+    private var pausedDuration: TimeInterval = 0
+    private var lastPauseDate: Date?
     private var outputURL: URL?
 
     var onFinished: ((URL) -> Void)?
@@ -141,7 +162,9 @@ final class ScreenRecorder {
             let ownBundleID = Bundle.main.bundleIdentifier ?? ""
             let excludedWindows = content.windows.filter { $0.owningApplication?.bundleIdentifier == ownBundleID }
             let filter = SCContentFilter(display: display, excludingWindows: excludedWindows)
-            await startRecording(filter: filter, width: display.width, height: display.height)
+
+            let scaleFactor = max(1, Int(display.width) > 2000 ? 1 : 2)
+            await startRecording(filter: filter, width: display.width * scaleFactor, height: display.height * scaleFactor)
         } catch {
             print("Failed to get screen content: \(error)")
             state = .idle
@@ -167,8 +190,8 @@ final class ScreenRecorder {
             }
 
             let filter = SCContentFilter(desktopIndependentWindow: frontWindow)
-            let w = Int(frontWindow.frame.width)
-            let h = Int(frontWindow.frame.height)
+            let w = Int(frontWindow.frame.width) * 2
+            let h = Int(frontWindow.frame.height) * 2
             await startRecording(filter: filter, width: w, height: h)
         } catch {
             print("Failed to start window recording: \(error)")
@@ -187,12 +210,17 @@ final class ScreenRecorder {
     func pause() {
         guard state == .recording else { return }
         recordingWriter?.pause()
+        lastPauseDate = Date()
         state = .paused
     }
 
     func resume() {
         guard state == .paused else { return }
         recordingWriter?.resume()
+        if let lastPause = lastPauseDate {
+            pausedDuration += Date().timeIntervalSince(lastPause)
+        }
+        lastPauseDate = nil
         state = .recording
     }
 
@@ -209,15 +237,16 @@ final class ScreenRecorder {
     // MARK: - Private
 
     private func startRecording(filter: SCContentFilter, width: Int, height: Int) async {
-        let pixelWidth = width * 2
-        let pixelHeight = height * 2
+        // Ensure even dimensions (required by HEVC encoder)
+        let pixelWidth = width % 2 == 0 ? width : width + 1
+        let pixelHeight = height % 2 == 0 ? height : height + 1
 
         let config = SCStreamConfiguration()
         config.width = pixelWidth
         config.height = pixelHeight
         config.minimumFrameInterval = CMTime(value: 1, timescale: 60)
         config.pixelFormat = kCVPixelFormatType_32BGRA
-        config.queueDepth = 5
+        config.queueDepth = 3
         config.showsCursor = true
 
         let url = makeOutputURL()
@@ -232,12 +261,14 @@ final class ScreenRecorder {
             })
 
             let stream = SCStream(filter: filter, configuration: config, delegate: delegate)
-            try stream.addStreamOutput(delegate, type: .screen, sampleHandlerQueue: .global(qos: .userInitiated))
+            try stream.addStreamOutput(delegate, type: .screen, sampleHandlerQueue: DispatchQueue(label: "com.bettershot.screen-capture", qos: .userInitiated))
             try await stream.startCapture()
 
             self.stream = stream
             state = .recording
             recordingStartDate = Date()
+            pausedDuration = 0
+            lastPauseDate = nil
             elapsedSeconds = 0
             startTimer()
         } catch {
@@ -279,7 +310,10 @@ final class ScreenRecorder {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(250))
                 guard let self, let start = self.recordingStartDate else { continue }
-                let elapsed = Date().timeIntervalSince(start)
+                var elapsed = Date().timeIntervalSince(start) - self.pausedDuration
+                if self.state == .paused, let lastPause = self.lastPauseDate {
+                    elapsed -= Date().timeIntervalSince(lastPause)
+                }
                 self.elapsedSeconds = max(0, elapsed)
             }
         }
@@ -312,7 +346,16 @@ private final class StreamDelegate: NSObject, SCStreamOutput, SCStreamDelegate, 
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
         guard type == .screen else { return }
-        writer.processSampleBuffer(sampleBuffer)
+
+        // Filter out blank/invalid frames
+        guard let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
+              let statusRaw = attachments.first?[.status] as? Int,
+              statusRaw == 0 // SCFrameStatus.complete
+        else { return }
+
+        autoreleasepool {
+            writer.processSampleBuffer(sampleBuffer)
+        }
     }
 
     func stream(_ stream: SCStream, didStopWithError error: any Error) {

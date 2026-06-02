@@ -1,27 +1,18 @@
 import CoreGraphics
 import AppKit
 
-/// Renders a screenshot with background, padding, shadow, alignment, and corner radii.
 enum BeautifierRenderer {
 
-    /// Compose a screenshot onto a beautified background canvas.
-    static func render(
-        image: CGImage,
-        config: BeautifierConfig,
-        annotations: ((CGContext, CGRect) -> Void)? = nil
-    ) -> CGImage? {
+    static func render(image: CGImage, config: BeautifierConfig) -> CGImage? {
         let imgW = CGFloat(image.width)
         let imgH = CGFloat(image.height)
         let shortEdge = min(imgW, imgH)
 
-        // Compute padding in pixels (config.padding is fractional 0…0.5)
         let pad = shortEdge * config.padding
 
-        // Canvas size before aspect ratio
         var canvasW = imgW + pad * 2
         var canvasH = imgH + pad * 2
 
-        // Apply forced aspect ratio
         if let ratio = config.aspectRatio.numericValue {
             let current = canvasW / canvasH
             if current < ratio {
@@ -31,13 +22,11 @@ enum BeautifierRenderer {
             }
         }
 
-        // Alignment: compute image origin within canvas
         let totalHPad = canvasW - imgW
         let totalVPad = canvasH - imgH
         let imgX = config.alignment.xFactor * totalHPad
         let imgY = config.alignment.yFactor * totalVPad
 
-        // Corner radii (fractional -> pixels, zeroed on stuck edges)
         let baseRadius = config.cornerRadius * shortEdge
         let m = config.alignment.cornerMultipliers
         let radii = PerCornerRadii(
@@ -61,29 +50,19 @@ enum BeautifierRenderer {
 
         let canvasRect = CGRect(x: 0, y: 0, width: canvasW, height: canvasH)
 
-        // 1. Draw background
         drawBackground(in: ctx, rect: canvasRect, style: config.style, colorSpace: colorSpace)
 
-        // 2. Draw shadow
         let imageRect = CGRect(x: imgX, y: imgY, width: imgW, height: imgH)
         if config.shadowStrength > 0 {
             drawShadow(in: ctx, rect: imageRect, radii: radii, strength: config.shadowStrength, shortEdge: shortEdge)
         }
 
-        // 3. Clip and draw image with per-corner radii
         ctx.saveGState()
         let clipPath = radii.path(in: imageRect)
         ctx.addPath(clipPath)
         ctx.clip()
         ctx.draw(image, in: imageRect)
         ctx.restoreGState()
-
-        // 4. Draw annotations on top of the image
-        if let annotations {
-            ctx.saveGState()
-            annotations(ctx, imageRect)
-            ctx.restoreGState()
-        }
 
         return ctx.makeImage()
     }
@@ -152,14 +131,12 @@ enum BeautifierRenderer {
             color: CGColor(gray: 0, alpha: alpha)
         )
 
-        // Draw an opaque shape to cast the shadow (will be drawn over by the image)
         let path = radii.path(in: rect)
         ctx.setFillColor(CGColor(gray: 0, alpha: 1))
         ctx.addPath(path)
         ctx.fillPath()
         ctx.restoreGState()
 
-        // Clear the filled shape so only the shadow remains
         ctx.saveGState()
         ctx.addPath(path)
         ctx.clip()
@@ -189,31 +166,26 @@ struct PerCornerRadii {
         let minX = rect.minX, maxX = rect.maxX
         let minY = rect.minY, maxY = rect.maxY
 
-        // Start at top-left, move clockwise (in CG coordinates: bottom-left visually)
         path.move(to: CGPoint(x: minX + topLeft, y: maxY))
 
-        // Top edge -> top-right corner
         path.addLine(to: CGPoint(x: maxX - topRight, y: maxY))
         if topRight > 0 {
             path.addArc(center: CGPoint(x: maxX - topRight, y: maxY - topRight),
                         radius: topRight, startAngle: .pi / 2, endAngle: 0, clockwise: true)
         }
 
-        // Right edge -> bottom-right corner
         path.addLine(to: CGPoint(x: maxX, y: minY + bottomRight))
         if bottomRight > 0 {
             path.addArc(center: CGPoint(x: maxX - bottomRight, y: minY + bottomRight),
                         radius: bottomRight, startAngle: 0, endAngle: -.pi / 2, clockwise: true)
         }
 
-        // Bottom edge -> bottom-left corner
         path.addLine(to: CGPoint(x: minX + bottomLeft, y: minY))
         if bottomLeft > 0 {
             path.addArc(center: CGPoint(x: minX + bottomLeft, y: minY + bottomLeft),
                         radius: bottomLeft, startAngle: -.pi / 2, endAngle: .pi, clockwise: true)
         }
 
-        // Left edge -> top-left corner
         path.addLine(to: CGPoint(x: minX, y: maxY - topLeft))
         if topLeft > 0 {
             path.addArc(center: CGPoint(x: minX + topLeft, y: maxY - topLeft),

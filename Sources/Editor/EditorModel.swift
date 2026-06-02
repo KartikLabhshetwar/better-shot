@@ -1,24 +1,13 @@
 import AppKit
 import SwiftUI
 
-/// Central model for the annotation editor. Manages image, beautifier config,
-/// annotations, and undo/redo history.
 @MainActor
 @Observable
 final class EditorModel {
-    // Image
     var sourceImage: CGImage?
     var sourceURL: URL?
-
-    // Beautifier
     var config = BeautifierConfig.default
 
-    // Annotations
-    var annotations: [AnnotationItem] = []
-    var selectedAnnotationID: UUID?
-    var activeTool: AnnotationTool = .select
-
-    // Undo / Redo
     private var past: [Snapshot] = []
     private var future: [Snapshot] = []
     var canUndo: Bool { !past.isEmpty }
@@ -26,7 +15,6 @@ final class EditorModel {
 
     private struct Snapshot {
         let config: BeautifierConfig
-        let annotations: [AnnotationItem]
     }
 
     // MARK: - Load
@@ -37,7 +25,6 @@ final class EditorModel {
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return }
         sourceImage = image
 
-        // Load saved default config
         if let data = UserDefaults.standard.data(forKey: "bs_defaultBeautifierConfig"),
            let saved = try? JSONDecoder().decode(BeautifierConfig.self, from: data) {
             config = saved
@@ -47,7 +34,7 @@ final class EditorModel {
     // MARK: - History
 
     func pushHistory() {
-        let snap = Snapshot(config: config, annotations: annotations)
+        let snap = Snapshot(config: config)
         past.append(snap)
         if past.count > 50 { past.removeFirst() }
         future.removeAll()
@@ -55,17 +42,15 @@ final class EditorModel {
 
     func undo() {
         guard let prev = past.popLast() else { return }
-        future.insert(Snapshot(config: config, annotations: annotations), at: 0)
+        future.insert(Snapshot(config: config), at: 0)
         config = prev.config
-        annotations = prev.annotations
     }
 
     func redo() {
         guard !future.isEmpty else { return }
         let next = future.removeFirst()
-        past.append(Snapshot(config: config, annotations: annotations))
+        past.append(Snapshot(config: config))
         config = next.config
-        annotations = next.annotations
     }
 
     // MARK: - Config Updates
@@ -75,43 +60,11 @@ final class EditorModel {
         update(&config)
     }
 
-    // MARK: - Annotations
-
-    func addAnnotation(_ item: AnnotationItem) {
-        pushHistory()
-        annotations.append(item)
-        selectedAnnotationID = item.id
-    }
-
-    func updateAnnotation(_ item: AnnotationItem) {
-        pushHistory()
-        if let idx = annotations.firstIndex(where: { $0.id == item.id }) {
-            annotations[idx] = item
-        }
-    }
-
-    func deleteAnnotation(id: UUID) {
-        pushHistory()
-        annotations.removeAll { $0.id == id }
-        if selectedAnnotationID == id { selectedAnnotationID = nil }
-    }
-
-    func deleteSelected() {
-        if let id = selectedAnnotationID {
-            deleteAnnotation(id: id)
-        }
-    }
-
     // MARK: - Render
 
     func renderFinal() -> CGImage? {
         guard let image = sourceImage else { return nil }
-        let items = self.annotations
-        return BeautifierRenderer.render(image: image, config: config) { ctx, imageRect in
-            for annotation in items {
-                AnnotationDrawing.draw(annotation, in: ctx, imageRect: imageRect)
-            }
-        }
+        return BeautifierRenderer.render(image: image, config: config)
     }
 
     // MARK: - Save Config as Default
