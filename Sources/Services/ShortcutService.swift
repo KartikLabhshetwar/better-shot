@@ -9,6 +9,8 @@ final class ShortcutService {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
 
+    var isRegistered: Bool { eventTap != nil }
+
     private init() {}
 
     // MARK: - Shortcut Definition
@@ -22,7 +24,6 @@ final class ShortcutService {
         static let defaultFullscreen = Shortcut(keyCode: UInt32(kVK_ANSI_3), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultWindow = Shortcut(keyCode: UInt32(kVK_ANSI_5), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultOCR = Shortcut(keyCode: UInt32(kVK_ANSI_O), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
-        static let defaultRecording = Shortcut(keyCode: UInt32(kVK_ANSI_6), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
     }
 
     enum Action: UInt32, CaseIterable {
@@ -30,13 +31,17 @@ final class ShortcutService {
         case fullscreen = 2
         case window = 3
         case ocr = 4
-        case recording = 5
     }
 
     // MARK: - Registration (CGEvent tap — intercepts system shortcuts)
 
     func registerAll() {
         unregisterAll()
+
+        guard Self.hasAccessibilityPermission else {
+            print("BetterShot: No accessibility permission, skipping event tap registration")
+            return
+        }
 
         let eventMask: CGEventMask = (1 << CGEventType.keyDown.rawValue)
 
@@ -48,7 +53,7 @@ final class ShortcutService {
             callback: ShortcutService.eventTapCallback,
             userInfo: nil
         ) else {
-            print("BetterShot: Failed to create event tap — grant Accessibility permission in System Settings > Privacy & Security > Accessibility")
+            print("BetterShot: Failed to create event tap — app may need a restart after granting Accessibility permission")
             return
         }
 
@@ -58,6 +63,7 @@ final class ShortcutService {
 
         self.eventTap = tap
         self.runLoopSource = source
+        print("BetterShot: Event tap registered successfully — keyboard shortcuts active")
     }
 
     func unregisterAll() {
@@ -107,11 +113,11 @@ final class ShortcutService {
                     CGEvent.tapEnable(tap: tap, enable: true)
                 }
             }
-            return Unmanaged.passRetained(event)
+            return Unmanaged.passUnretained(event)
         }
 
         guard type == .keyDown else {
-            return Unmanaged.passRetained(event)
+            return Unmanaged.passUnretained(event)
         }
 
         let keyCode = UInt32(event.getIntegerValueField(.keyboardEventKeycode))
@@ -131,7 +137,6 @@ final class ShortcutService {
             (.fullscreen, service.loadShortcut(for: .fullscreen) ?? .defaultFullscreen),
             (.window, service.loadShortcut(for: .window) ?? .defaultWindow),
             (.ocr, service.loadShortcut(for: .ocr) ?? .defaultOCR),
-            (.recording, service.loadShortcut(for: .recording) ?? .defaultRecording),
         ]
 
         for (action, shortcut) in shortcuts {
@@ -145,6 +150,6 @@ final class ShortcutService {
             }
         }
 
-        return Unmanaged.passRetained(event)
+        return Unmanaged.passUnretained(event)
     }
 }

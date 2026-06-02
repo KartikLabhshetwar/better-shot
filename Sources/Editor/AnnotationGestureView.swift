@@ -2,28 +2,55 @@ import SwiftUI
 
 struct AnnotationGestureView: NSViewRepresentable {
     @Bindable var model: EditorModel
+    let imageAspectRatio: CGFloat
 
     func makeNSView(context: Context) -> AnnotationTrackingView {
         let view = AnnotationTrackingView()
         view.model = model
+        view.imageAspectRatio = imageAspectRatio
         return view
     }
 
     func updateNSView(_ nsView: AnnotationTrackingView, context: Context) {
         nsView.model = model
+        nsView.imageAspectRatio = imageAspectRatio
     }
 }
 
 final class AnnotationTrackingView: NSView {
     var model: EditorModel?
+    var imageAspectRatio: CGFloat = 1.0
     private var dragStart: NSPoint?
     private var freehandPoints: [CGPoint] = []
 
     override var acceptsFirstResponder: Bool { true }
 
+    private var imageDisplayRect: CGRect {
+        let viewW = bounds.width
+        let viewH = bounds.height
+        guard viewW > 0, viewH > 0, imageAspectRatio > 0 else { return bounds }
+
+        let viewAspect = viewW / viewH
+        let w: CGFloat
+        let h: CGFloat
+
+        if viewAspect > imageAspectRatio {
+            h = viewH
+            w = h * imageAspectRatio
+        } else {
+            w = viewW
+            h = w / imageAspectRatio
+        }
+
+        let x = (viewW - w) / 2
+        let y = (viewH - h) / 2
+        return CGRect(x: x, y: y, width: w, height: h)
+    }
+
     override func mouseDown(with event: NSEvent) {
         guard let model, model.activeTool.createsAnnotation else { return }
         let loc = convert(event.locationInWindow, from: nil)
+        guard imageDisplayRect.contains(loc) else { return }
         dragStart = loc
         freehandPoints = []
 
@@ -89,17 +116,16 @@ final class AnnotationTrackingView: NSView {
 
     override func resetCursorRects() {
         if let model, model.activeTool.createsAnnotation {
-            addCursorRect(bounds, cursor: .crosshair)
+            addCursorRect(imageDisplayRect, cursor: .crosshair)
         }
     }
 
     private func normalize(_ point: NSPoint) -> CGPoint {
-        let w = bounds.width
-        let h = bounds.height
-        guard w > 0, h > 0 else { return .zero }
+        let imgRect = imageDisplayRect
+        guard imgRect.width > 0, imgRect.height > 0 else { return .zero }
         return CGPoint(
-            x: max(0, min(1, point.x / w)),
-            y: max(0, min(1, point.y / h))
+            x: max(0, min(1, (point.x - imgRect.minX) / imgRect.width)),
+            y: max(0, min(1, (point.y - imgRect.minY) / imgRect.height))
         )
     }
 

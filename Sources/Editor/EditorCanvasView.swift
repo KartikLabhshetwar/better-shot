@@ -4,7 +4,12 @@ struct EditorCanvasView: View {
     @Bindable var model: EditorModel
     @State private var cachedPreview: NSImage?
     @State private var renderTask: Task<Void, Never>?
-    @State private var isDraggingSlider = false
+
+    private var previewAspectRatio: CGFloat {
+        guard let preview = cachedPreview else { return 1.0 }
+        guard preview.size.height > 0 else { return 1.0 }
+        return preview.size.width / preview.size.height
+    }
 
     var body: some View {
         GeometryReader { _ in
@@ -21,7 +26,8 @@ struct EditorCanvasView: View {
                             .padding(24)
                             .overlay {
                                 if model.activeTool.createsAnnotation {
-                                    AnnotationGestureView(model: model)
+                                    AnnotationGestureView(model: model, imageAspectRatio: previewAspectRatio)
+                                        .padding(24)
                                 }
                             }
                     }
@@ -57,8 +63,8 @@ struct EditorCanvasView: View {
     }
 }
 
-private func renderPreview(image: CGImage, config: BeautifierConfig, annotations: [AnnotationItem]) -> CGImage? {
-    let maxDim: CGFloat = 800
+private func renderPreview(image: CGImage, config: BeautifierConfig, annotations: [AnnotationItem] = []) -> CGImage? {
+    let maxDim: CGFloat = 2400
     let imgW = CGFloat(image.width)
     let imgH = CGFloat(image.height)
 
@@ -74,7 +80,7 @@ private func renderPreview(image: CGImage, config: BeautifierConfig, annotations
             bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace,
             bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
         ) else { return nil }
-        ctx.interpolationQuality = .medium
+        ctx.interpolationQuality = .high
         ctx.draw(image, in: CGRect(x: 0, y: 0, width: newW, height: newH))
         guard let scaled = ctx.makeImage() else { return nil }
         previewImage = scaled

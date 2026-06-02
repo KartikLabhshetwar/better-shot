@@ -11,10 +11,6 @@ struct EditorInspectorView: View {
 
                 Divider()
 
-                LayoutSection(model: model)
-
-                Divider()
-
                 BeautifierControlsSection(model: model)
 
                 Divider()
@@ -199,96 +195,6 @@ struct BackgroundPickerSection: View {
     }
 }
 
-// MARK: - Layout Section
-
-struct LayoutSection: View {
-    @Bindable var model: EditorModel
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Layout")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-            VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Alignment")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-
-                    Grid(horizontalSpacing: 3, verticalSpacing: 3) {
-                        ForEach(0..<3, id: \.self) { row in
-                            GridRow {
-                                ForEach(0..<3, id: \.self) { col in
-                                    let alignment = alignmentFor(row: row, col: col)
-                                    let isSelected = model.config.alignment == alignment
-
-                                    Button {
-                                        model.updateConfig { $0.alignment = alignment }
-                                    } label: {
-                                        ZStack {
-                                            RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                                .fill(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
-                                                .frame(width: 24, height: 18)
-
-                                            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                                                .fill(isSelected ? Color.accentColor : Color.primary.opacity(0.3))
-                                                .frame(width: 8, height: 6)
-                                                .offset(
-                                                    x: CGFloat(col - 1) * 6,
-                                                    y: CGFloat(row - 1) * 4
-                                                )
-                                        }
-                                    }
-                                    .buttonStyle(.plain)
-                                    .help(alignment.rawValue)
-                                }
-                            }
-                        }
-                    }
-                    .padding(4)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Aspect Ratio")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-
-                    HStack(spacing: 2) {
-                        ForEach(CanvasAspectRatio.allCases, id: \.self) { ratio in
-                            let isSelected = model.config.aspectRatio == ratio
-                            Button {
-                                model.updateConfig { $0.aspectRatio = ratio }
-                            } label: {
-                                Text(ratio.rawValue)
-                                    .font(.system(size: 10, weight: .medium))
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 3)
-                                    .background(
-                                        isSelected ? AnyShapeStyle(Color.accentColor.opacity(0.2)) : AnyShapeStyle(.quaternary),
-                                        in: RoundedRectangle(cornerRadius: 4)
-                                    )
-                                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func alignmentFor(row: Int, col: Int) -> ImageAlignment {
-        let grid: [[ImageAlignment]] = [
-            [.topLeading, .top, .topTrailing],
-            [.leading, .center, .trailing],
-            [.bottomLeading, .bottom, .bottomTrailing],
-        ]
-        return grid[row][col]
-    }
-}
-
 // MARK: - Beautifier Controls
 
 struct BeautifierControlsSection: View {
@@ -329,29 +235,6 @@ struct BeautifierControlsSection: View {
                 range: 0.0...1.0,
                 format: { "\(Int($0 * 100))%" }
             )
-        }
-    }
-}
-
-struct LabeledSlider: View {
-    let label: String
-    @Binding var value: CGFloat
-    let range: ClosedRange<CGFloat>
-    let format: (CGFloat) -> String
-
-    var body: some View {
-        VStack(spacing: 4) {
-            HStack {
-                Text(label)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                Spacer()
-                Text(format(value))
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-            }
-            Slider(value: $value, in: range)
-                .controlSize(.small)
         }
     }
 }
@@ -453,3 +336,27 @@ struct AnnotationToolsSection: View {
         }
     }
 }
+
+struct LabeledSlider: View {
+    let label: String
+    @Binding var value: CGFloat
+    let range: ClosedRange<CGFloat>
+    let format: (CGFloat) -> String
+
+    var body: some View {
+        VStack(spacing: 4) {
+            HStack {
+                Text(label)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                Spacer()
+                Text(format(value))
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+            }
+            Slider(value: $value, in: range)
+                .controlSize(.small)
+        }
+    }
+}
+

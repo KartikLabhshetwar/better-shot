@@ -1,22 +1,27 @@
 import AppKit
-import AVFoundation
 
 @MainActor
 final class BetterShotDelegate: NSObject, NSApplicationDelegate {
+    private var permissionPollTimer: Timer?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.appearance = NSAppearance(named: .aqua)
         NSApp.setActivationPolicy(.accessory)
 
-        // Request accessibility permission (needed for CGEvent tap to intercept Cmd+Shift+3/4/5)
-        if !ShortcutService.hasAccessibilityPermission {
-            ShortcutService.requestAccessibilityPermission()
-        }
+        if ShortcutService.hasAccessibilityPermission {
+            ShortcutService.shared.registerAll()
 
-        ShortcutService.shared.registerAll()
-        configureRecordingCallback()
+            if !ShortcutService.shared.isRegistered {
+                Self.promptRestart()
+            }
+        } else {
+            ShortcutService.requestAccessibilityPermission()
+            startPermissionPolling()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        permissionPollTimer?.invalidate()
         ShortcutService.shared.unregisterAll()
     }
 
@@ -27,81 +32,36 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
-    private func configureRecordingCallback() {
-        ScreenRecorder.shared.onFinished = { @MainActor url in
-            Task {
-                let dir = AppPreferences.saveDirectory
-                let stamp = Int(Date().timeIntervalSince1970 * 1000)
+    private func startPermissionPolling() {
+        permissionPollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
+            guard ShortcutService.hasAccessibilityPermission else { return }
+            timer.invalidate()
 
-                let videoPath = "\(dir)/bettershot_\(stamp).mov"
-                let videoURL = URL(fileURLWithPath: videoPath)
-                do {
-                    try FileManager.default.copyItem(at: url, to: videoURL)
-                } catch {
-                    print("Failed to save recording: \(error)")
-                    return
+            DispatchQueue.main.async {
+                self?.permissionPollTimer = nil
+                ShortcutService.shared.registerAll()
+
+                if !ShortcutService.shared.isRegistered {
+                    Self.promptRestart()
                 }
-
-                let processor = VideoProcessor.shared
-                await processor.checkFFmpeg()
-                if processor.ffmpegAvailable {
-                    let compressedPath = "\(dir)/bettershot_\(stamp)_c.mov"
-                    let opts = VideoProcessor.CompressOptions(
-                        input_path: videoPath,
-                        output_path: compressedPath,
-                        quality: "medium",
-                        speed: "fast",
-                        codec: "hevc",
-                        resolution: "original",
-                        remove_audio: true
-                    )
-                    if let result = await processor.compress(opts),
-                       result.success,
-                       let outputPath = result.output_path {
-                        try? FileManager.default.removeItem(at: videoURL)
-                        try? FileManager.default.moveItem(
-                            at: URL(fileURLWithPath: outputPath),
-                            to: videoURL
-                        )
-                    }
-                }
-
-                let frameURL = await Self.extractFrame(from: videoURL, stamp: stamp)
-
-                if let frameURL {
-                    PreviewOverlay.shared.show(url: frameURL)
-                } else {
-                    PreviewOverlay.shared.show(url: videoURL)
-                }
-
-                try? FileManager.default.removeItem(at: url)
             }
         }
     }
 
-    private static func extractFrame(from videoURL: URL, stamp: Int) async -> URL? {
-        let asset = AVAsset(url: videoURL)
-        let generator = AVAssetImageGenerator(asset: asset)
-        generator.appliesPreferredTrackTransform = true
-        generator.requestedTimeToleranceBefore = .zero
-        generator.requestedTimeToleranceAfter = CMTime(seconds: 0.5, preferredTimescale: 600)
+    private static func promptRestart() {
+        let alert = NSAlert()
+        alert.messageText = "Restart Required"
+        alert.informativeText = "BetterShot needs to restart to activate keyboard shortcut overrides. Restart now?"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Restart")
+        alert.addButton(withTitle: "Later")
 
-        do {
-            let (cgImage, _) = try await generator.image(at: .zero)
-            let dir = AppPreferences.saveDirectory
-            let framePath = "\(dir)/bettershot_\(stamp)_frame.png"
-            let frameURL = URL(fileURLWithPath: framePath)
-
-            guard let dest = CGImageDestinationCreateWithURL(
-                frameURL as CFURL, "public.png" as CFString, 1, nil
-            ) else { return nil }
-            CGImageDestinationAddImage(dest, cgImage, nil)
-            guard CGImageDestinationFinalize(dest) else { return nil }
-
-            return frameURL
-        } catch {
-            print("Failed to extract frame: \(error)")
-            return nil
+        if alert.runModal() == .alertFirstButtonReturn {
+            let task = Process()
+            task.launchPath = "/bin/sh"
+            task.arguments = ["-c", "sleep 0.5; open \"\(Bundle.main.bundlePath)\""]
+            try? task.run()
+            NSApp.terminate(nil)
         }
     }
 }

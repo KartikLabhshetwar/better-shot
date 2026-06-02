@@ -87,8 +87,7 @@ final class EditorModel {
 
     func renderFinal() -> CGImage? {
         guard let image = sourceImage else { return nil }
-        let items = annotations
-        return BeautifierRenderer.render(image: image, config: config, annotations: items)
+        return BeautifierRenderer.render(image: image, config: config, annotations: annotations)
     }
 
     // MARK: - Save Config as Default

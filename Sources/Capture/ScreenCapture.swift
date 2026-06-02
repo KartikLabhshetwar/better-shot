@@ -60,7 +60,7 @@ final class ScreenCapture {
         guard selection.pointsRect.width > 1, selection.pointsRect.height > 1 else { return nil }
 
         // Wait for overlay windows to fully dismiss from the window server
-        try? await Task.sleep(for: .milliseconds(250))
+        try? await Task.sleep(for: .milliseconds(400))
 
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
 

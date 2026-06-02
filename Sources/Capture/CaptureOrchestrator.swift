@@ -21,35 +21,6 @@ final class CaptureOrchestrator {
             await captureAndProcess { try await ScreenCapture.shared.captureWindow() }
         case .ocr:
             await performOCR()
-        case .recording:
-            await toggleRecording()
-        }
-    }
-
-    func toggleRecording() async {
-        let recorder = ScreenRecorder.shared
-        if recorder.isRecording {
-            recorder.stop()
-            RecordingControlPanel.shared.hide()
-        } else {
-            await recorder.startFullscreen()
-            if recorder.state == .recording {
-                RecordingControlPanel.shared.show()
-            }
-        }
-    }
-
-    func startRecordingFullscreen() async {
-        await ScreenRecorder.shared.startFullscreen()
-        if ScreenRecorder.shared.state == .recording {
-            RecordingControlPanel.shared.show()
-        }
-    }
-
-    func startRecordingWindow() async {
-        await ScreenRecorder.shared.startWindow()
-        if ScreenRecorder.shared.state == .recording {
-            RecordingControlPanel.shared.show()
         }
     }
 
@@ -102,8 +73,8 @@ final class CaptureOrchestrator {
     }
 
     private func autoApplyAndSave(_ url: URL) async {
-        guard let image = NSImage(contentsOf: url),
-              let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return }
 
         let config = loadDefaultBeautifierConfig()
         let rendered = BeautifierRenderer.render(image: cgImage, config: config)
@@ -155,9 +126,11 @@ final class CaptureOrchestrator {
     }
 
     private func copyToClipboard(_ url: URL) {
-        guard let image = NSImage(contentsOf: url) else { return }
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return }
+        let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
         let pb = NSPasteboard.general
         pb.clearContents()
-        pb.writeObjects([image])
+        pb.writeObjects([nsImage])
     }
 }

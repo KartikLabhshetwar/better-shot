@@ -176,7 +176,6 @@ struct ShortcutRow: View {
         case .fullscreen: return .defaultFullscreen
         case .window: return .defaultWindow
         case .ocr: return .defaultOCR
-        case .recording: return .defaultRecording
         }
     }
 
@@ -259,8 +258,10 @@ struct HistoryTab: View {
 // MARK: - About
 
 struct AboutTab: View {
+    private let updater = AppUpdater.shared
+
     private var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.0"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.0"
     }
     private var build: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
@@ -285,7 +286,57 @@ struct AboutTab: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
+
+            updateSection
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private var updateSection: some View {
+        switch updater.state {
+        case .idle:
+            Button("Check for Updates") {
+                Task { await updater.checkForUpdates() }
+            }
+            .buttonStyle(.bordered)
+
+        case .checking:
+            ProgressView()
+                .controlSize(.small)
+            Text("Checking for updates...")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+        case .available(let newVersion, let url):
+            VStack(spacing: 8) {
+                Text("Version \(newVersion) is available!")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.green)
+
+                Button("Download Update") {
+                    updater.openDownload(url)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+
+        case .upToDate:
+            Label("You're up to date", systemImage: "checkmark.circle.fill")
+                .font(.caption)
+                .foregroundStyle(.green)
+
+        case .failed(let message):
+            VStack(spacing: 6) {
+                Text("Update check failed: \(message)")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+
+                Button("Retry") {
+                    Task { await updater.checkForUpdates() }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+        }
     }
 }

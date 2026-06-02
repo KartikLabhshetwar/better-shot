@@ -14,9 +14,6 @@ xcuserdata/
 .build/
 Package.resolved
 
-# Go
-videokit/videokit
-
 # macOS
 .DS_Store
 *.swp
@@ -29,4 +26,3 @@ videokit/videokit
 
 # Claude Code
 CLAUDE.md
-videokit/videokit

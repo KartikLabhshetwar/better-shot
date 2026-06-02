@@ -4,24 +4,20 @@ import AppKit
 
 enum AnnotationDrawing {
 
-    static func draw(_ items: [AnnotationItem], in ctx: CGContext, imageRect: CGRect, sourceImage: CGImage?) {
+    static func draw(_ items: [AnnotationItem], in ctx: CGContext, canvasSize: CGSize, sourceImage: CGImage?) {
+        let canvasRect = CGRect(origin: .zero, size: canvasSize)
         for item in items {
             ctx.saveGState()
-            drawItem(item, in: ctx, imageRect: imageRect, sourceImage: sourceImage)
+            drawItem(item, in: ctx, canvasRect: canvasRect, sourceImage: sourceImage)
             ctx.restoreGState()
         }
     }
 
-    private static func drawItem(_ item: AnnotationItem, in ctx: CGContext, imageRect: CGRect, sourceImage: CGImage?) {
+    private static func drawItem(_ item: AnnotationItem, in ctx: CGContext, canvasRect: CGRect, sourceImage: CGImage?) {
         let color = item.swatch.cgColor
         let lw = item.strokeWidth
 
-        let rect = CGRect(
-            x: imageRect.minX + item.rect.origin.x * imageRect.width,
-            y: imageRect.minY + (1 - item.rect.origin.y - item.rect.height) * imageRect.height,
-            width: item.rect.width * imageRect.width,
-            height: item.rect.height * imageRect.height
-        )
+        let rect = denormRect(item.rect, in: canvasRect)
 
         switch item.tool {
         case .rectangle:
@@ -42,8 +38,8 @@ enum AnnotationDrawing {
 
         case .line:
             guard item.points.count >= 2 else { return }
-            let p0 = denorm(item.points[0], in: imageRect)
-            let p1 = denorm(item.points[1], in: imageRect)
+            let p0 = denormPoint(item.points[0], in: canvasRect)
+            let p1 = denormPoint(item.points[1], in: canvasRect)
             ctx.setStrokeColor(color)
             ctx.setLineWidth(lw)
             ctx.setLineCap(.round)
@@ -53,8 +49,8 @@ enum AnnotationDrawing {
 
         case .arrow:
             guard item.points.count >= 2 else { return }
-            let p0 = denorm(item.points[0], in: imageRect)
-            let p1 = denorm(item.points[1], in: imageRect)
+            let p0 = denormPoint(item.points[0], in: canvasRect)
+            let p1 = denormPoint(item.points[1], in: canvasRect)
             ctx.setStrokeColor(color)
             ctx.setLineWidth(lw)
             ctx.setLineCap(.round)
@@ -77,7 +73,7 @@ enum AnnotationDrawing {
             ctx.setLineWidth(lw)
             ctx.setLineCap(.round)
             ctx.setLineJoin(.round)
-            let pts = item.points.map { denorm($0, in: imageRect) }
+            let pts = item.points.map { denormPoint($0, in: canvasRect) }
             ctx.move(to: pts[0])
             for i in 1..<pts.count {
                 if i < pts.count - 1 {
@@ -119,10 +115,18 @@ enum AnnotationDrawing {
             NSGraphicsContext.restoreGraphicsState()
 
         case .pixelate:
-            guard let sourceImage, let cropped = sourceImage.cropping(to: rect) else { return }
+            guard let sourceImage else { return }
+            let pixelRect = CGRect(
+                x: rect.origin.x,
+                y: rect.origin.y,
+                width: rect.width,
+                height: rect.height
+            )
+            guard pixelRect.width > 0, pixelRect.height > 0,
+                  let cropped = sourceImage.cropping(to: pixelRect) else { return }
             let blockSize = max(2, Int(item.redactionDensity))
-            let smallW = max(1, Int(rect.width) / blockSize)
-            let smallH = max(1, Int(rect.height) / blockSize)
+            let smallW = max(1, Int(pixelRect.width) / blockSize)
+            let smallH = max(1, Int(pixelRect.height) / blockSize)
             let cs = CGColorSpaceCreateDeviceRGB()
             guard let smallCtx = CGContext(data: nil, width: smallW, height: smallH, bitsPerComponent: 8, bytesPerRow: 0, space: cs,
                 bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue) else { return }
@@ -130,28 +134,46 @@ enum AnnotationDrawing {
             smallCtx.draw(cropped, in: CGRect(x: 0, y: 0, width: smallW, height: smallH))
             guard let pixelated = smallCtx.makeImage() else { return }
             ctx.interpolationQuality = .none
-            ctx.draw(pixelated, in: rect)
+            ctx.draw(pixelated, in: pixelRect)
             ctx.interpolationQuality = .default
 
         case .blur:
-            guard let sourceImage, let cropped = sourceImage.cropping(to: rect) else { return }
+            guard let sourceImage else { return }
+            let pixelRect = CGRect(
+                x: rect.origin.x,
+                y: rect.origin.y,
+                width: rect.width,
+                height: rect.height
+            )
+            guard pixelRect.width > 0, pixelRect.height > 0,
+                  let cropped = sourceImage.cropping(to: pixelRect) else { return }
             let ciImage = CIImage(cgImage: cropped)
             guard let filter = CIFilter(name: "CIGaussianBlur") else { return }
             filter.setValue(ciImage, forKey: kCIInputImageKey)
             filter.setValue(12.0, forKey: kCIInputRadiusKey)
             let ciCtx = CIContext()
             guard let output = filter.outputImage, let blurred = ciCtx.createCGImage(output, from: ciImage.extent) else { return }
-            ctx.draw(blurred, in: rect)
+            ctx.draw(blurred, in: pixelRect)
 
         case .select:
             break
         }
     }
 
-    private static func denorm(_ point: CGPoint, in imageRect: CGRect) -> CGPoint {
+    // All coordinates are stored normalized (0..1). Convert to pixel coords.
+    private static func denormPoint(_ point: CGPoint, in rect: CGRect) -> CGPoint {
         CGPoint(
-            x: imageRect.minX + point.x * imageRect.width,
-            y: imageRect.minY + (1 - point.y) * imageRect.height
+            x: rect.minX + point.x * rect.width,
+            y: rect.minY + (1 - point.y) * rect.height
+        )
+    }
+
+    private static func denormRect(_ normalized: CGRect, in canvas: CGRect) -> CGRect {
+        CGRect(
+            x: canvas.minX + normalized.origin.x * canvas.width,
+            y: canvas.minY + (1 - normalized.origin.y - normalized.height) * canvas.height,
+            width: normalized.width * canvas.width,
+            height: normalized.height * canvas.height
         )
     }
 }

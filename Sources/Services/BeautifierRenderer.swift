@@ -66,7 +66,7 @@ enum BeautifierRenderer {
 
         if !annotations.isEmpty {
             ctx.saveGState()
-            AnnotationDrawing.draw(annotations, in: ctx, imageRect: imageRect, sourceImage: image)
+            AnnotationDrawing.draw(annotations, in: ctx, canvasSize: CGSize(width: canvasW, height: canvasH), sourceImage: image)
             ctx.restoreGState()
         }
 

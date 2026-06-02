@@ -37,34 +37,6 @@ struct MenuBarContentView: View {
 
             Divider()
 
-            // Screen recording
-            Menu {
-                Button {
-                    Task { await CaptureOrchestrator.shared.startRecordingFullscreen() }
-                } label: {
-                    Label("Full Screen", systemImage: "desktopcomputer")
-                }
-
-                Button {
-                    Task { await CaptureOrchestrator.shared.startRecordingWindow() }
-                } label: {
-                    Label("Window", systemImage: "macwindow")
-                }
-            } label: {
-                Label("Record Screen", systemImage: "record.circle")
-            }
-
-            if ScreenRecorder.shared.isRecording {
-                Button {
-                    Task { await CaptureOrchestrator.shared.toggleRecording() }
-                } label: {
-                    Label("Stop Recording", systemImage: "stop.circle.fill")
-                }
-                .keyboardShortcut("6", modifiers: [.command, .shift])
-            }
-
-            Divider()
-
             // Recent captures
             if !HistoryStore.shared.records.isEmpty {
                 Menu("Recent") {

@@ -29,20 +29,11 @@ targets:
         PRODUCT_NAME: BetterShot
         INFOPLIST_FILE: Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: Resources/BetterShot.entitlements
-        MARKETING_VERSION: "0.2.0"
-        CURRENT_PROJECT_VERSION: "2"
+        MARKETING_VERSION: "0.3.0"
+        CURRENT_PROJECT_VERSION: "3"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_HARDENED_RUNTIME: true
         COMBINE_HIDPI_IMAGES: true
         LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
-    postCompileScripts:
-      - script: |
-          cp "${SRCROOT}/videokit/videokit" "${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/MacOS/videokit"
-          if [ -n "${EXPANDED_CODE_SIGN_IDENTITY}" ] && [ "${EXPANDED_CODE_SIGN_IDENTITY}" != "-" ]; then
-            /usr/bin/codesign --force --options runtime --timestamp --sign "${EXPANDED_CODE_SIGN_IDENTITY}" "${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/MacOS/videokit"
-          else
-            /usr/bin/codesign --force --sign - "${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/Contents/MacOS/videokit"
-          fi
-        name: Bundle videokit
     entitlements:
       path: Resources/BetterShot.entitlements

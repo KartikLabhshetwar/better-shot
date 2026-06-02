@@ -5,6 +5,31 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-06-03
+
+### Added
+
+- **In-app update checker**: Check for Updates button in Preferences > About that queries GitHub releases API and links to the latest download
+- **Version tracking**: `version.json` file at project root for release management
+- **Rebuilt annotation tools**: Rectangle, filled rect, ellipse, line, arrow, freehand, numbered badges, text, pixelate, and blur — all with proper coordinate mapping that correctly handles the aspect-fit image display area
+
+### Fixed
+
+- **Menu bar icon**: Replaced generic circle template icon with the actual BetterShot app icon (orange ring) using original rendering
+- **Keyboard shortcut override**: Fixed the accessibility permission flow — the CGEvent tap now only registers after accessibility permission is confirmed, with polling to detect when the user grants permission. Previously the tap was registered before permission was granted, silently failing and letting native macOS screenshot shortcuts fire instead
+- **Annotation coordinate system**: Gesture tracking now normalizes against the actual image display rect (accounting for aspect-fit letterboxing), not the full view bounds
+
+### Removed
+
+- **Screen recording**: Removed ScreenRecorder, VideoProcessor, RecordingControlPanel, and the bundled videokit binary — video features will return in a future release
+- **Layout section**: Removed alignment grid and aspect ratio picker from the editor inspector (non-functional in previous release)
+
+### Changed
+
+- Version bumped to 0.3.0
+- Deployment target remains macOS 14.0
+- Simplified BetterShotDelegate — removed all video recording callback and frame extraction code
+
 ## [0.2.0] - 2026-06-02
 
 ### Added
