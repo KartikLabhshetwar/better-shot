@@ -5,65 +5,88 @@ struct MenuBarContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Screenshot capture actions
-            Group {
+            if let lastRecord = HistoryStore.shared.records.first {
                 Button {
-                    Task { await CaptureOrchestrator.shared.performCapture(.region) }
+                    let url = HistoryStore.shared.urlForRecord(lastRecord)
+                    EditorWindowController.shared.open(url: url)
                 } label: {
-                    Label("Capture Region", systemImage: "rectangle.dashed")
+                    Label("Open Last Capture", systemImage: "photo")
                 }
-                .keyboardShortcut("4", modifiers: [.command, .shift])
-
-                Button {
-                    Task { await CaptureOrchestrator.shared.performCapture(.fullscreen) }
-                } label: {
-                    Label("Capture Screen", systemImage: "desktopcomputer")
-                }
-                .keyboardShortcut("3", modifiers: [.command, .shift])
-
-                Button {
-                    Task { await CaptureOrchestrator.shared.performCapture(.window) }
-                } label: {
-                    Label("Capture Window", systemImage: "macwindow")
-                }
-                .keyboardShortcut("5", modifiers: [.command, .shift])
-
-                Button {
-                    Task { await CaptureOrchestrator.shared.performCapture(.ocr) }
-                } label: {
-                    Label("OCR Region", systemImage: "doc.text.viewfinder")
-                }
-            }
-
-            Divider()
-
-            // Recent captures
-            if !HistoryStore.shared.records.isEmpty {
-                Menu("Recent") {
-                    ForEach(HistoryStore.shared.records.prefix(5)) { record in
-                        Button(record.filename) {
-                            let url = HistoryStore.shared.urlForRecord(record)
-                            EditorWindowController.shared.open(url: url)
-                        }
-                    }
-                }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
 
                 Divider()
             }
 
-            // Settings & Quit
-            Button("Preferences...") {
-                openSettings()
+            Button {
+                Task { await CaptureOrchestrator.shared.performCapture(.region) }
+            } label: {
+                Label("Region", systemImage: "rectangle.dashed")
             }
-            .keyboardShortcut(",", modifiers: .command)
+            .keyboardShortcut("4", modifiers: [.command, .shift])
 
-            Button("Check for Updates...") {
-                Task { await AppUpdater.shared.checkForUpdates() }
+            Button {
+                Task { await CaptureOrchestrator.shared.performCapture(.fullscreen) }
+            } label: {
+                Label("Full Screen", systemImage: "desktopcomputer")
+            }
+            .keyboardShortcut("3", modifiers: [.command, .shift])
+
+            Button {
+                Task { await CaptureOrchestrator.shared.performCapture(.window) }
+            } label: {
+                Label("Window", systemImage: "macwindow")
+            }
+            .keyboardShortcut("5", modifiers: [.command, .shift])
+
+            Divider()
+
+            Button {
+                Task { await CaptureOrchestrator.shared.performCapture(.ocr) }
+            } label: {
+                Label("Copy Text (OCR)", systemImage: "doc.text.viewfinder")
+            }
+            .keyboardShortcut("o", modifiers: [.command, .shift])
+
+            Button {
+                Task { await CaptureOrchestrator.shared.performCapture(.colorPicker) }
+            } label: {
+                Label("Pick Color", systemImage: "eyedropper")
+            }
+            .keyboardShortcut("c", modifiers: [.command, .shift])
+
+            if PinnedScreenshotController.shared.hasPinnedWindows {
+                Divider()
+
+                Button {
+                    PinnedScreenshotController.shared.unpinAll()
+                } label: {
+                    Label("Unpin All", systemImage: "pin.slash")
+                }
+            }
+
+            if HistoryStore.shared.records.count > 1 {
+                Divider()
+
+                Menu("Recent Captures") {
+                    ForEach(HistoryStore.shared.records.prefix(8)) { record in
+                        Button {
+                            let url = HistoryStore.shared.urlForRecord(record)
+                            EditorWindowController.shared.open(url: url)
+                        } label: {
+                            Text(record.filename)
+                        }
+                    }
+                }
             }
 
             Divider()
 
-            Button("Quit BetterShot") {
+            Button("Settings...") {
+                openSettings()
+            }
+            .keyboardShortcut(",", modifiers: .command)
+
+            Button("Quit") {
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q", modifiers: .command)

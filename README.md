@@ -7,13 +7,15 @@
 
 ## Features
 
-**Capture** — Region (`⌘⇧4`), fullscreen (`⌘⇧3`), window (`⌘⇧5`), OCR text extraction (`⌘⇧O`), screen recording (`⌘⇧6`).
+**Capture** — Region (`⌘⇧4`), fullscreen (`⌘⇧3`), window (`⌘⇧5`), repeat last region (`⌃⌘⇧4`). Multi-monitor support.
 
-**Edit** — Background library (wallpapers, gradients, solid colors), shadow, corner radius, padding, alignment.
+**Tools** — OCR text + QR code extraction (`⌘⇧O`), color picker with hex copy (`⌘⇧C`), delayed capture with countdown overlay.
 
-**Annotate** — Rectangle, ellipse, line, arrow, freehand, text, numbered badges, pixelate, blur.
+**Edit** — Background library (wallpapers, gradients, solid colors), shadow, corner radius, padding, aspect ratio (16:9, 4:3, 1:1, 9:16), 9-point alignment grid. Save settings as default.
 
-**Workflow** — Auto-apply default background, floating preview overlay, copy to clipboard, menu bar app.
+**Annotate** — Rectangle, filled rectangle, ellipse, line, arrow (curved), freehand, text, numbered badges, pixelate, blur, spotlight. Option+drag to duplicate. Full keyboard shortcuts.
+
+**Workflow** — Auto-apply default background, floating preview overlay with pin/annotate/copy actions, pinned always-on-top screenshots, toast notifications on export/copy, menu bar app.
 
 ## Install
 
@@ -29,9 +31,10 @@
 ```bash
 git clone https://github.com/KartikLabhshetwar/better-shot.git
 cd better-shot
+xcodebuild -scheme BetterShot -configuration Release build
 ```
 
-Open `BetterShot.xcodeproj` in Xcode, then **Product → Build** (`⌘B`).
+Or open `BetterShot.xcodeproj` in Xcode and **Product > Build** (`⌘B`).
 
 **Requirements**: macOS 14.0+, Xcode 15+
 
@@ -39,10 +42,10 @@ Open `BetterShot.xcodeproj` in Xcode, then **Product → Build** (`⌘B`).
 
 BetterShot needs two macOS permissions:
 
-1. **Screen Recording** — System Settings → Privacy & Security → Screen Recording → enable BetterShot
-2. **Accessibility** — System Settings → Privacy & Security → Accessibility → enable BetterShot
+1. **Screen Recording** — System Settings > Privacy & Security > Screen Recording > enable BetterShot
+2. **Accessibility** — System Settings > Privacy & Security > Accessibility > enable BetterShot
 
-Screen Recording is required for ScreenCaptureKit to capture screen content. Accessibility is required for keyboard shortcuts to override the default macOS screenshot tool (`⌘⇧3/4/5`).
+Screen Recording is required for ScreenCaptureKit to capture screen content. Accessibility is required for keyboard shortcuts to override the default macOS screenshot tool.
 
 ## Usage
 
@@ -58,28 +61,45 @@ Screen Recording is required for ScreenCaptureKit to capture screen content. Acc
 | Capture Region | `⌘⇧4` |
 | Capture Fullscreen | `⌘⇧3` |
 | Capture Window | `⌘⇧5` |
-| OCR Region | `⌘⇧O` |
-| Screen Recording | `⌘⇧6` |
-| Cancel | `Esc` |
+| Repeat Last Region | `⌃⌘⇧4` |
+| OCR + QR Scan | `⌘⇧O` |
+| Pick Color | `⌘⇧C` |
 
-| Editor | Shortcut |
+| Editor Tool | Key |
 |---|---|
-| Save | `⌘S` |
+| Select | `V` |
+| Rectangle | `R` |
+| Filled Rectangle | `F` |
+| Ellipse | `O` |
+| Line | `L` |
+| Arrow | `A` |
+| Freehand | `D` |
+| Numbered Circle | `N` |
+| Pixelate | `P` |
+| Blur | `B` |
+| Spotlight | `G` |
+| Text | `T` |
+
+| Editor Action | Shortcut |
+|---|---|
+| Save/Export | `⌘S` |
 | Copy to Clipboard | `⇧⌘C` |
 | Undo | `⌘Z` |
 | Redo | `⇧⌘Z` |
 | Delete Annotation | `Delete` |
+| Select All | `⌘A` |
 | Close Editor | `Esc` |
 
 ## Architecture
 
 Native Swift/SwiftUI app. No Electron, no web views.
 
-- **ScreenCaptureKit** — all screenshot and recording capture (`SCScreenshotManager`, `SCStream`)
-- **CoreGraphics** — image compositing, annotation rendering
-- **Vision** — OCR text extraction
-- **AVFoundation** — screen recording export (HEVC)
-- **Carbon** — global keyboard shortcut registration
+- **ScreenCaptureKit** — all screenshot capture (`SCScreenshotManager`)
+- **CoreGraphics** — image compositing, annotation rendering, beautifier pipeline
+- **CoreImage** — Gaussian blur with edge-padding for redaction
+- **Vision** — OCR text extraction + QR/barcode detection
+- **AppKit** — `NSColorSampler` for color picking, `NSPanel` for floating previews and pins
+- **Carbon** — global keyboard shortcut registration via CGEvent tap
 
 ## Contributing
 

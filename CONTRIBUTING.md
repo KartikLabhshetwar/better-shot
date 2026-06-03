@@ -52,37 +52,47 @@ Or just hit Cmd+B in Xcode.
 better-shot/
 ├── Sources/
 │   ├── App/
-│   │   └── BetterShotDelegate.swift      # App delegate, menu bar setup
+│   │   ├── BetterShotApp.swift            # @main entry point, MenuBarExtra
+│   │   └── BetterShotDelegate.swift       # App delegate, permission polling
 │   ├── Capture/
-│   │   ├── CaptureOrchestrator.swift      # Coordinates capture flows
-│   │   └── ScreenCapture.swift            # ScreenCaptureKit integration
+│   │   ├── CaptureOrchestrator.swift      # Coordinates all capture flows
+│   │   ├── ScreenCapture.swift            # ScreenCaptureKit integration, multi-monitor
+│   │   ├── RegionSelectionOverlay.swift   # Fullscreen region selection with crosshair
+│   │   ├── WindowPickerOverlay.swift      # Window picker for window capture
+│   │   ├── ColorPickerOverlay.swift       # NSColorSampler wrapper + hex HUD
+│   │   └── CountdownOverlay.swift         # Self-timer countdown animation
 │   ├── Editor/
 │   │   ├── EditorModel.swift              # Editor state, annotation interaction pipeline
 │   │   ├── EditorCanvasView.swift         # Live annotation canvas with drag gestures
-│   │   ├── EditorInspectorView.swift      # Side panel: tools, style, text, background, effects
+│   │   ├── EditorInspectorView.swift      # Side panel: tools, style, text, layout, background, effects
 │   │   ├── EditorWindowView.swift         # Root editor window (canvas + inspector + toolbar)
 │   │   ├── EditorWindowController.swift   # NSWindow management
-│   │   ├── AnnotationItemView.swift       # SwiftUI rendering for each annotation
+│   │   ├── AnnotationItemView.swift       # SwiftUI rendering for each annotation type
 │   │   ├── AnnotationDrawing.swift        # CoreGraphics renderer for final export
-│   │   ├── AnnotationRedactionImageProcessor.swift  # Pixelate/blur preview generation
-│   │   ├── AnnotationKeyboard.swift       # Keyboard shortcuts (Delete, Cmd+Z, tool keys)
+│   │   ├── AnnotationRedactionImageProcessor.swift  # Pixelate/blur preview with NSCache
+│   │   ├── AnnotationKeyboard.swift       # Keyboard shortcuts (tool keys, delete, undo/redo)
 │   │   └── AnnotationEditorInteractionState.swift   # Interaction enums, undo/redo history
 │   ├── Models/
 │   │   ├── AnnotationItem.swift           # AnnotationItem, AnnotationTool, AnnotationSwatch, geometry
-│   │   ├── BackgroundStyle.swift          # Background style enum and presets
+│   │   ├── BackgroundStyle.swift          # Background style, ImageAlignment, CanvasAspectRatio
 │   │   ├── AppPreferences.swift           # User preferences (save dir, format, shortcuts)
 │   │   ├── BundledBackgrounds.swift       # Bundled wallpaper/gradient assets
-│   │   └── CaptureRecord.swift            # Capture history records
+│   │   └── CaptureRecord.swift            # Capture history records, BeautifierConfig
+│   ├── Preview/
+│   │   ├── PreviewOverlay.swift           # Floating preview card after capture
+│   │   └── PinnedScreenshot.swift         # Always-on-top pinned screenshot windows
+│   ├── History/
+│   │   └── HistoryStore.swift             # JSON persistence in Application Support
 │   ├── Services/
-│   │   ├── BeautifierRenderer.swift       # CoreGraphics background + shadow + annotation compositing
-│   │   ├── ShortcutService.swift          # Global keyboard shortcut registration
+│   │   ├── BeautifierRenderer.swift       # Background + shadow + annotation compositing
+│   │   ├── ShortcutService.swift          # CGEvent tap for global shortcuts
 │   │   └── AppUpdater.swift               # GitHub releases update checker
 │   ├── Settings/
-│   │   └── PreferencesView.swift          # Settings window
+│   │   └── PreferencesView.swift          # Settings window (General, Capture, History, About)
 │   └── Views/
 │       └── MenuBarContentView.swift       # Menu bar dropdown UI
 ├── Resources/
-│   ├── Assets.xcassets/                   # App icon, menu bar icon
+│   ├── Assets.xcassets/                   # App icon, menu bar template icon
 │   ├── Backgrounds/                       # Bundled wallpaper images
 │   ├── Info.plist
 │   └── BetterShot.entitlements
@@ -159,11 +169,12 @@ EditorModel (state)
 ### Modifying the Inspector
 
 The inspector is defined in `Sources/Editor/EditorInspectorView.swift`. Sections:
-- Tools grid (annotation tool picker)
-- Style (color, stroke, redaction density)
-- Text (font, size, bold/italic/underline, alignment)
+- Tools grid (annotation tool picker — 12 tools)
+- Style (color, stroke, redaction/spotlight density)
+- Text (font family, size, bold/italic/underline, alignment)
+- Effects (padding, corner radius, shadow sliders, save as default)
+- Layout (aspect ratio dropdown, 3x3 alignment grid)
 - Background (solid colors, gradients, bundled images, custom wallpaper)
-- Effects (padding, corner radius, shadow sliders)
 
 ## Pull Request Process
 

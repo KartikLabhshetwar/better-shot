@@ -22,7 +22,7 @@ final class HistoryStore {
 
     // MARK: - Import
 
-    func importCapture(from tempURL: URL) -> CaptureRecord? {
+    func importCapture(from tempURL: URL, deleteSource: Bool = true) -> CaptureRecord? {
         let ext = tempURL.pathExtension.isEmpty ? "png" : tempURL.pathExtension
         let filename = "bettershot_\(Int(Date().timeIntervalSince1970 * 1000)).\(ext)"
         let destURL = storageDir.appendingPathComponent(filename)
@@ -49,7 +49,9 @@ final class HistoryStore {
         records.insert(record, at: 0)
         saveRecords()
 
-        try? FileManager.default.removeItem(at: tempURL)
+        if deleteSource {
+            try? FileManager.default.removeItem(at: tempURL)
+        }
 
         return record
     }

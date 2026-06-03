@@ -4,6 +4,7 @@ import SwiftUI
 struct AnnotationItemView: View {
     let item: AnnotationItem
     let image: NSImage
+    let sourceImage: CGImage?
     let originalImageSize: CGSize
     let imageFrame: CGRect
     let isSelected: Bool
@@ -23,6 +24,7 @@ struct AnnotationItemView: View {
             if item.tool.isRedactionTool {
                 RedactionPreview(
                     image: image,
+                    sourceImage: sourceImage,
                     item: item,
                     originalImageSize: originalImageSize,
                     imageFrame: imageFrame,
@@ -546,6 +548,7 @@ extension NSCursor {
 
 private struct RedactionPreview: View {
     let image: NSImage
+    let sourceImage: CGImage?
     let item: AnnotationItem
     let originalImageSize: CGSize
     let imageFrame: CGRect
@@ -553,20 +556,39 @@ private struct RedactionPreview: View {
     let allowsCaching: Bool
 
     var body: some View {
-        if let redactedImage = RedactionImageProcessor.previewImage(
-            source: image,
-            tool: item.tool,
-            density: item.redactionDensity,
-            normalizedBounds: item.bounds,
-            originalImageSize: originalImageSize,
-            allowsCaching: allowsCaching
-        ) {
+        if let redactedImage = redactedPreview {
             Image(nsImage: redactedImage)
                 .interpolation(item.tool == .pixelate ? .none : .medium)
                 .resizable()
                 .frame(width: max(viewBounds.width, 1), height: max(viewBounds.height, 1))
                 .position(x: viewBounds.midX, y: viewBounds.midY)
         }
+    }
+
+    private var redactedPreview: NSImage? {
+        if let sourceImage {
+            return RedactionImageProcessor.previewImageFromCGImage(
+                source: sourceImage,
+                tool: item.tool,
+                density: item.redactionDensity,
+                normalizedBounds: item.bounds,
+                viewScale: viewScale,
+                allowsCaching: allowsCaching
+            )
+        }
+        return RedactionImageProcessor.previewImage(
+            source: image,
+            tool: item.tool,
+            density: item.redactionDensity,
+            normalizedBounds: item.bounds,
+            originalImageSize: originalImageSize,
+            allowsCaching: allowsCaching
+        )
+    }
+
+    private var viewScale: CGFloat {
+        guard originalImageSize.width > 0 else { return 1 }
+        return imageFrame.width / originalImageSize.width
     }
 }
 

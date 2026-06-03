@@ -37,6 +37,7 @@ struct EditorCanvasView: View {
                         AnnotationItemView(
                             item: item,
                             image: model.previewImage ?? NSImage(),
+                            sourceImage: model.sourceImage,
                             originalImageSize: model.imageSize,
                             imageFrame: sourceImageFrame,
                             isSelected: model.selectedItemIDs.contains(item.id),
@@ -49,7 +50,7 @@ struct EditorCanvasView: View {
                             ),
                             onCommitText: model.commitTextEditing,
                             onTextSizeChange: { size in
-                                model.setTextViewContentSize(size, for: item.id, imageFrame: sourceImageFrame, allowedBounds: model.annotationBounds(for: sourceImageFrame, boundaryFrame: sourceImageFrame))
+                                model.setTextViewContentSize(size, for: item.id, imageFrame: sourceImageFrame, allowedBounds: model.annotationBounds(for: sourceImageFrame, boundaryFrame: imageFrame))
                             }
                         )
                     }
@@ -58,6 +59,7 @@ struct EditorCanvasView: View {
                         AnnotationItemView(
                             item: draftItem,
                             image: model.previewImage ?? NSImage(),
+                            sourceImage: model.sourceImage,
                             originalImageSize: model.imageSize,
                             imageFrame: sourceImageFrame,
                             isSelected: false,
@@ -84,7 +86,7 @@ struct EditorCanvasView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(Rectangle())
-                .gesture(interactionGesture(imageFrame: sourceImageFrame))
+                .gesture(interactionGesture(imageFrame: sourceImageFrame, boundaryFrame: imageFrame))
                 .onContinuousHover { phase in
                     switch phase {
                     case .active(let location):
@@ -112,10 +114,14 @@ struct EditorCanvasView: View {
         }
     }
 
+    @State private var lastRenderedConfig: BeautifierConfig?
+
     private func scheduleRender() {
         renderTask?.cancel()
         let isDragging = model.isSliderDragging
-        let delay: UInt64 = isDragging ? 50 : 30
+        let config = model.config
+        if !isDragging, config == lastRenderedConfig { return }
+        let delay: UInt64 = isDragging ? 80 : 50
         renderTask = Task {
             try? await Task.sleep(for: .milliseconds(delay))
             guard !Task.isCancelled else { return }
@@ -128,6 +134,7 @@ struct EditorCanvasView: View {
 
             guard !Task.isCancelled, let cgImage = result else { return }
             renderedPreview = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+            lastRenderedConfig = config
         }
     }
 
@@ -167,18 +174,18 @@ struct EditorCanvasView: View {
         )
     }
 
-    private func interactionGesture(imageFrame: CGRect) -> some Gesture {
+    private func interactionGesture(imageFrame: CGRect, boundaryFrame: CGRect) -> some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .local)
             .onChanged { value in
                 if !hasActiveInteraction {
                     hasActiveInteraction = true
-                    model.beginInteraction(at: value.startLocation, imageFrame: imageFrame, boundaryFrame: imageFrame)
+                    model.beginInteraction(at: value.startLocation, imageFrame: imageFrame, boundaryFrame: boundaryFrame)
                 }
-                model.updateInteraction(to: value.location, imageFrame: imageFrame, boundaryFrame: imageFrame)
+                model.updateInteraction(to: value.location, imageFrame: imageFrame, boundaryFrame: boundaryFrame)
                 updateCursor(at: value.location, imageFrame: imageFrame)
             }
             .onEnded { value in
-                model.endInteraction(at: value.location, imageFrame: imageFrame, boundaryFrame: imageFrame)
+                model.endInteraction(at: value.location, imageFrame: imageFrame, boundaryFrame: boundaryFrame)
                 hasActiveInteraction = false
                 updateCursor(at: value.location, imageFrame: imageFrame)
             }
@@ -238,7 +245,7 @@ struct EditorCanvasView: View {
 }
 
 private func renderPreview(image: CGImage, config: BeautifierConfig, lowQuality: Bool = false) -> CGImage? {
-    let maxDim: CGFloat = lowQuality ? 1200 : 2400
+    let maxDim: CGFloat = lowQuality ? 900 : 1800
     let imgW = CGFloat(image.width)
     let imgH = CGFloat(image.height)
     let scale: CGFloat = max(imgW, imgH) > maxDim ? maxDim / max(imgW, imgH) : 1.0
@@ -315,5 +322,6 @@ struct TransparencyGrid: View {
                 }
             }
         }
+        .drawingGroup()
     }
 }

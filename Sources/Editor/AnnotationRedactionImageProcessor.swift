@@ -64,6 +64,53 @@ enum RedactionImageProcessor {
         return image
     }
 
+    static func previewImageFromCGImage(
+        source: CGImage,
+        tool: AnnotationTool,
+        density: CGFloat,
+        normalizedBounds: CGRect,
+        viewScale: CGFloat,
+        allowsCaching: Bool = true
+    ) -> NSImage? {
+        guard tool.isRedactionTool else { return nil }
+        guard let cropRect = pixelRect(for: normalizedBounds, in: source) else { return nil }
+
+        let quantizedDensity = Int((density * 100).rounded())
+        let cacheKey = [
+            "cg-\(source.width)x\(source.height)",
+            tool.rawValue,
+            "\(quantizedDensity)",
+            "\(Int((viewScale * 1000).rounded()))",
+            "\(Int(cropRect.minX))",
+            "\(Int(cropRect.minY))",
+            "\(Int(cropRect.width))",
+            "\(Int(cropRect.height))"
+        ].joined(separator: "-") as NSString
+        if allowsCaching, let cachedImage = cache.object(forKey: cacheKey) {
+            return cachedImage
+        }
+
+        let scale = max(viewScale, 0.01)
+        let image: NSImage? = autoreleasepool {
+            switch tool {
+            case .pixelate:
+                makePixelatedImage(source: source, cropRect: cropRect, density: density, scale: scale)
+            case .blur:
+                makeBlurredImage(source: source, cropRect: cropRect, density: density, scale: scale)
+            default:
+                nil
+            }
+        }
+
+        if allowsCaching, let image {
+            let cost = image.pixelCost
+            if cost <= maximumCachedPreviewCost {
+                cache.setObject(image, forKey: cacheKey, cost: cost)
+            }
+        }
+        return image
+    }
+
     static func removeAllCachedPreviewImages() {
         cache.removeAllObjects()
         ciContext.clearCaches()

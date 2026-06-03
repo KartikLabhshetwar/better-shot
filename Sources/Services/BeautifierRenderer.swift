@@ -25,7 +25,7 @@ enum BeautifierRenderer {
         let totalHPad = canvasW - imgW
         let totalVPad = canvasH - imgH
         let imgX = config.alignment.xFactor * totalHPad
-        let imgY = config.alignment.yFactor * totalVPad
+        let imgY = (1 - config.alignment.yFactor) * totalVPad
 
         let baseRadius = config.cornerRadius * shortEdge
         let m = config.alignment.cornerMultipliers
@@ -66,7 +66,13 @@ enum BeautifierRenderer {
 
         if !annotations.isEmpty {
             ctx.saveGState()
-            AnnotationDrawing.draw(annotations, in: ctx, canvasSize: CGSize(width: canvasW, height: canvasH), sourceImage: image)
+            AnnotationDrawing.draw(
+                annotations,
+                in: ctx,
+                imageRect: imageRect,
+                fullCanvasRect: canvasRect,
+                sourceImage: image
+            )
             ctx.restoreGState()
         }
 

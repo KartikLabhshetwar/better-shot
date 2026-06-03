@@ -10,6 +10,7 @@ final class EditorModel {
     var imageSize: CGSize = .zero
     var config = BeautifierConfig.default
     var isSliderDragging = false
+    var toastMessage: String?
 
     // Annotation state
     var items: [AnnotationItem] = []
@@ -362,6 +363,9 @@ final class EditorModel {
             selectedItemIDs.remove(editingTextItemID)
         }
         self.editingTextItemID = nil
+        if selectedTool == .text {
+            isTextPlacementArmed = true
+        }
     }
 
     func hoveredAnnotation(at location: CGPoint, imageFrame: CGRect, boundaryFrame: CGRect) -> AnnotationItem? {
@@ -458,6 +462,41 @@ final class EditorModel {
         updateItem(id: selectedItemID) { item in item.textAlignment = alignment }
     }
 
+    // MARK: - Paste Image Overlay
+
+    func pasteImageOverlay() {
+        let pb = NSPasteboard.general
+        guard let nsImage = pb.readObjects(forClasses: [NSImage.self], options: nil)?.first as? NSImage else { return }
+        var rect = CGRect(origin: .zero, size: nsImage.size)
+        guard let pastedCGImage = nsImage.cgImage(forProposedRect: &rect, context: nil, hints: nil),
+              let source = sourceImage else { return }
+
+        let srcW = CGFloat(source.width)
+        let srcH = CGFloat(source.height)
+        let pasteW = CGFloat(pastedCGImage.width)
+        let pasteH = CGFloat(pastedCGImage.height)
+
+        let scale = min(1.0, min(srcW * 0.8 / pasteW, srcH * 0.8 / pasteH))
+        let drawW = pasteW * scale
+        let drawH = pasteH * scale
+        let drawX = (srcW - drawW) / 2
+        let drawY = (srcH - drawH) / 2
+
+        let colorSpace = source.colorSpace ?? CGColorSpaceCreateDeviceRGB()
+        guard let ctx = CGContext(
+            data: nil, width: Int(srcW), height: Int(srcH),
+            bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        ) else { return }
+
+        ctx.draw(source, in: CGRect(x: 0, y: 0, width: srcW, height: srcH))
+        ctx.draw(pastedCGImage, in: CGRect(x: drawX, y: drawY, width: drawW, height: drawH))
+
+        guard let composited = ctx.makeImage() else { return }
+        sourceImage = composited
+        previewImage = NSImage(cgImage: composited, size: NSSize(width: composited.width, height: composited.height))
+    }
+
     // MARK: - Render
 
     func renderFinal() -> CGImage? {
@@ -468,6 +507,7 @@ final class EditorModel {
     func saveConfigAsDefault() {
         if let data = try? JSONEncoder().encode(config) {
             UserDefaults.standard.set(data, forKey: "bs_defaultBeautifierConfig")
+            toastMessage = "Saved as default"
         }
     }
 
@@ -520,6 +560,19 @@ final class EditorModel {
         } else if item.tool != .text, let resizeHandle = hitTestResizeHandle(point, in: imageFrame, item: item) {
             interaction = .resizing(id: item.id, handle: resizeHandle, originalItem: item)
             statePath = AnnotationToolState.resizing.path(for: selectedTool)
+        } else if isOptionPressed {
+            let duplicate = AnnotationItem(
+                tool: item.tool, rect: item.rect, points: item.points,
+                swatch: item.swatch, strokeWidth: item.strokeWidth,
+                redactionDensity: item.redactionDensity, text: item.text,
+                textLineHeight: item.textLineHeight, fontName: item.fontName,
+                isBold: item.isBold, isItalic: item.isItalic,
+                isUnderline: item.isUnderline, textAlignment: item.textAlignment
+            )
+            items.append(duplicate)
+            selectedItemID = duplicate.id
+            interaction = .moving(id: duplicate.id, startPoint: point, originalItem: duplicate)
+            statePath = AnnotationToolState.translating.path(for: selectedTool)
         } else {
             interaction = .moving(id: item.id, startPoint: point, originalItem: item)
             statePath = AnnotationToolState.translating.path(for: selectedTool)
@@ -626,12 +679,16 @@ final class EditorModel {
     }
 
     private func hitTestResizeHandle(_ point: CGPoint, in imageFrame: CGRect, item: AnnotationItem) -> AnnotationResizeHandle? {
-        let xTolerance = 12 / max(imageFrame.width, 1)
-        let yTolerance = 12 / max(imageFrame.height, 1)
+        let xTolerance = 14 / max(imageFrame.width, 1)
+        let yTolerance = 14 / max(imageFrame.height, 1)
         if item.tool.usesEndpoints {
+            let curveXTolerance = 18 / max(imageFrame.width, 1)
+            let curveYTolerance = 18 / max(imageFrame.height, 1)
             return AnnotationResizeHandle.handles(for: item.tool).first { handle in
                 guard let endpoint = handle.point(in: item) else { return false }
-                return abs(point.x - endpoint.x) <= xTolerance && abs(point.y - endpoint.y) <= yTolerance
+                let xt = handle == .control ? curveXTolerance : xTolerance
+                let yt = handle == .control ? curveYTolerance : yTolerance
+                return abs(point.x - endpoint.x) <= xt && abs(point.y - endpoint.y) <= yt
             }
         }
         return AnnotationResizeHandle.boxCases.first { handle in
@@ -685,6 +742,7 @@ final class EditorModel {
     }
 
     private var isAspectRatioLocked: Bool { NSEvent.modifierFlags.contains(.shift) }
+    private var isOptionPressed: Bool { NSEvent.modifierFlags.contains(.option) }
     private var isMultiSelectionModifierPressed: Bool {
         let flags = NSEvent.modifierFlags
         return flags.contains(.shift) || flags.contains(.command)

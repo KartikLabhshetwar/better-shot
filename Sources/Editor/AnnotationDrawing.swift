@@ -7,8 +7,7 @@ enum AnnotationDrawing {
 
     private static let ciContext = CIContext(options: [.cacheIntermediates: false])
 
-    static func draw(_ items: [AnnotationItem], in ctx: CGContext, canvasSize: CGSize, sourceImage: CGImage?) {
-        let canvasRect = CGRect(origin: .zero, size: canvasSize)
+    static func draw(_ items: [AnnotationItem], in ctx: CGContext, imageRect: CGRect, fullCanvasRect: CGRect, sourceImage: CGImage?) {
         ctx.setLineCap(.round)
         ctx.setLineJoin(.round)
 
@@ -20,7 +19,7 @@ enum AnnotationDrawing {
                 ctx.setStrokeColor(item.swatch.nsColor.cgColor)
                 ctx.setFillColor(item.swatch.nsColor.cgColor)
 
-                let lineWidth = renderedLineWidth(for: item, imageSize: canvasRect.size)
+                let lineWidth = renderedLineWidth(for: item, imageSize: imageRect.size)
                 ctx.setLineWidth(lineWidth)
 
                 switch item.tool {
@@ -28,10 +27,10 @@ enum AnnotationDrawing {
                     return
 
                 case .rectangle:
-                    ctx.stroke(renderedRect(item.bounds, in: canvasRect))
+                    ctx.stroke(renderedRect(item.bounds, in: imageRect))
 
                 case .filledRectangle:
-                    let rect = renderedRect(item.bounds, in: canvasRect)
+                    let rect = renderedRect(item.bounds, in: imageRect)
                     ctx.addPath(CGPath(
                         roundedRect: rect,
                         cornerWidth: AnnotationFilledRectangleMetrics.cornerRadius(for: rect),
@@ -41,18 +40,18 @@ enum AnnotationDrawing {
                     ctx.fillPath()
 
                 case .ellipse:
-                    ctx.strokeEllipse(in: renderedRect(item.bounds, in: canvasRect))
+                    ctx.strokeEllipse(in: renderedRect(item.bounds, in: imageRect))
 
                 case .numberedCircle:
-                    drawNumberedCircle(item, in: renderedRect(item.bounds, in: canvasRect), context: ctx)
+                    drawNumberedCircle(item, in: renderedRect(item.bounds, in: imageRect), context: ctx)
 
                 case .pixelate:
                     guard let canvasSnapshot else { return }
                     applyPixelation(
-                        in: renderedRect(item.bounds, in: canvasRect),
+                        in: renderedRect(item.bounds, in: imageRect),
                         canvasSnapshot: canvasSnapshot,
                         context: ctx,
-                        canvasSize: canvasSize,
+                        canvasSize: fullCanvasRect.size,
                         colorSpace: CGColorSpaceCreateDeviceRGB(),
                         density: item.redactionDensity
                     )
@@ -60,19 +59,19 @@ enum AnnotationDrawing {
                 case .blur:
                     guard let canvasSnapshot else { return }
                     applyBlur(
-                        in: renderedRect(item.bounds, in: canvasRect),
+                        in: renderedRect(item.bounds, in: imageRect),
                         canvasSnapshot: canvasSnapshot,
                         context: ctx,
-                        canvasSize: canvasSize,
+                        canvasSize: fullCanvasRect.size,
                         density: item.redactionDensity
                     )
 
                 case .spotlight:
-                    let targetRect = renderedRect(item.bounds, in: canvasRect)
+                    let targetRect = renderedRect(item.bounds, in: imageRect)
                     let overlayColor = CGColor(gray: 0, alpha: item.redactionDensity)
                     ctx.saveGState()
                     let fullPath = CGMutablePath()
-                    fullPath.addRect(canvasRect)
+                    fullPath.addRect(fullCanvasRect)
                     fullPath.addRect(targetRect)
                     ctx.addPath(fullPath)
                     ctx.setFillColor(overlayColor)
@@ -80,39 +79,44 @@ enum AnnotationDrawing {
                     ctx.restoreGState()
 
                 case .text:
-                    drawText(item, in: renderedRect(item.bounds, in: canvasRect), imageHeight: canvasRect.height, context: ctx)
+                    drawText(item, in: renderedRect(item.bounds, in: imageRect), imageHeight: imageRect.height, context: ctx)
 
                 case .line:
                     guard let first = item.points.first,
                           let last = item.points.last else { return }
-                    let start = renderedPoint(first, in: canvasRect)
-                    let end = renderedPoint(last, in: canvasRect)
+                    let start = renderedPoint(first, in: imageRect)
+                    let end = renderedPoint(last, in: imageRect)
                     ctx.beginPath()
                     ctx.move(to: start)
                     ctx.addLine(to: end)
                     ctx.strokePath()
 
                 case .freehand:
-                    drawFreehand(points: item.points, imageRect: canvasRect, context: ctx)
+                    drawFreehand(points: item.points, imageRect: imageRect, context: ctx)
 
                 case .arrow:
                     guard let first = item.points.first,
                           let control = item.controlPoint,
                           let last = item.points.last,
                           let geometry = AnnotationArrowGeometry(
-                            start: renderedPoint(first, in: canvasRect),
-                            control: renderedPoint(control, in: canvasRect),
-                            end: renderedPoint(last, in: canvasRect),
+                            start: renderedPoint(first, in: imageRect),
+                            control: renderedPoint(control, in: imageRect),
+                            end: renderedPoint(last, in: imageRect),
                             lineWidth: lineWidth
                           ) else { return }
                     ctx.beginPath()
-                    ctx.move(to: renderedPoint(first, in: canvasRect))
+                    ctx.move(to: renderedPoint(first, in: imageRect))
                     ctx.addQuadCurve(to: geometry.tip, control: geometry.shaftControl)
                     ctx.strokePath()
                     drawArrowHead(geometry, context: ctx)
                 }
             }
         }
+    }
+
+    static func draw(_ items: [AnnotationItem], in ctx: CGContext, canvasSize: CGSize, sourceImage: CGImage?) {
+        let rect = CGRect(origin: .zero, size: canvasSize)
+        draw(items, in: ctx, imageRect: rect, fullCanvasRect: rect, sourceImage: sourceImage)
     }
 
     private static func renderedRect(_ rect: CGRect, in imageRect: CGRect) -> CGRect {

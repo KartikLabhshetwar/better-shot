@@ -21,16 +21,20 @@ final class CaptureOrchestrator {
             await captureAndProcess { try await ScreenCapture.shared.captureWindow() }
         case .ocr:
             await performOCR()
+        case .colorPicker:
+            await performColorPick()
+        case .repeatRegion:
+            await captureAndProcess { try await ScreenCapture.shared.repeatRegionCapture() }
         }
     }
 
     // MARK: - Private
 
     private func captureAndProcess(_ capture: () async throws -> URL?) async {
-        // Wait for self-timer if configured
+        // Show countdown overlay for self-timer, then proceed with capture
         let delay = AppPreferences.selfTimerDelay
         if delay != .off {
-            try? await Task.sleep(for: .seconds(delay.rawValue))
+            await CountdownOverlay.shared.showCountdown(seconds: delay.rawValue)
         }
 
         do {
@@ -58,6 +62,16 @@ final class CaptureOrchestrator {
         } catch {
             print("Capture failed: \(error.localizedDescription)")
         }
+    }
+
+
+    private func performColorPick() async {
+        let overlay = ColorPickerOverlay()
+        guard let hex = await overlay.pickColor() else { return }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(hex, forType: .string)
+        ScreenCapture.shared.playShutterSound()
     }
 
     private func performOCR() async {

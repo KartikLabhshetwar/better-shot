@@ -170,6 +170,13 @@ struct PreviewCardView: View {
                     cornerButton("pencil.circle.fill") {
                         overlay.openAnnotateEditor()
                     }
+                    // Pin screenshot
+                    cornerButton("pin.circle.fill") {
+                        if let url = overlay.currentURL {
+                            PinnedScreenshotController.shared.pin(url: url)
+                        }
+                        overlay.dismiss()
+                    }
                     Spacer()
                 }
             }

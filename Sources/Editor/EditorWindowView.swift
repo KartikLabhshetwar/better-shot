@@ -14,6 +14,24 @@ struct EditorWindowView: View {
             EditorInspectorView(model: model)
                 .frame(width: 280)
         }
+        .overlay(alignment: .bottom) {
+            if let message = model.toastMessage {
+                Text(message)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(.black.opacity(0.75), in: Capsule())
+                    .padding(.bottom, 24)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .onAppear {
+                        Task {
+                            try? await Task.sleep(for: .seconds(1.5))
+                            withAnimation { model.toastMessage = nil }
+                        }
+                    }
+            }
+        }
         .background {
             AnnotationKeyCommandHandler(
                 onDelete: { model.deleteSelectedAnnotation() },
@@ -102,6 +120,8 @@ struct EditorWindowView: View {
             }
         }
 
+        withAnimation { model.toastMessage = "Exported" }
+        try? await Task.sleep(for: .seconds(1.0))
         EditorWindowController.shared.close()
     }
 
@@ -112,5 +132,6 @@ struct EditorWindowView: View {
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.writeObjects([nsImage])
+        withAnimation { model.toastMessage = "Copied to clipboard" }
     }
 }

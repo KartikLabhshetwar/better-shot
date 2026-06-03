@@ -213,6 +213,7 @@ enum CanvasAspectRatio: String, Codable, CaseIterable {
     case fourThree = "4:3"
     case threeTwo = "3:2"
     case sixteenNine = "16:9"
+    case nineSixteen = "9:16"
 
     var numericValue: CGFloat? {
         switch self {
@@ -221,6 +222,7 @@ enum CanvasAspectRatio: String, Codable, CaseIterable {
         case .fourThree: return 4.0 / 3.0
         case .threeTwo: return 3.0 / 2.0
         case .sixteenNine: return 16.0 / 9.0
+        case .nineSixteen: return 9.0 / 16.0
         }
     }
 }

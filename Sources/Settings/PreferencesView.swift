@@ -36,12 +36,43 @@ struct GeneralSettingsTab: View {
     @AppStorage("bs_playSound") private var playSound = true
     @AppStorage("bs_showOverlay") private var showOverlay = true
     @AppStorage("bs_autoApplyBackground") private var autoApply = false
+    @AppStorage("bs_exportFormat") private var exportFormatRaw: String = ExportFormat.png.rawValue
+    @AppStorage("bs_exportQuality") private var exportQuality: Double = 0.9
+
+    private var exportFormat: Binding<ExportFormat> {
+        Binding(
+            get: { ExportFormat(rawValue: exportFormatRaw) ?? .png },
+            set: { exportFormatRaw = $0.rawValue }
+        )
+    }
+
+    private var saveDirDisplayName: String {
+        let url = URL(fileURLWithPath: saveDir)
+        return url.lastPathComponent
+    }
 
     var body: some View {
         Form {
             Section("Save") {
-                TextField("Save directory", text: $saveDir)
-                    .textFieldStyle(.roundedBorder)
+                HStack {
+                    Text("Save to")
+                    Spacer()
+                    Text(saveDirDisplayName)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                    Button("Choose...") {
+                        let panel = NSOpenPanel()
+                        panel.canChooseFiles = false
+                        panel.canChooseDirectories = true
+                        panel.allowsMultipleSelection = false
+                        panel.directoryURL = URL(fileURLWithPath: saveDir)
+                        if panel.runModal() == .OK, let url = panel.url {
+                            saveDir = url.path
+                        }
+                    }
+                    .controlSize(.small)
+                }
 
                 Toggle("Copy to clipboard after saving", isOn: $copyAfterSave)
             }
@@ -53,26 +84,16 @@ struct GeneralSettingsTab: View {
             }
 
             Section("Export") {
-                Picker("Format", selection: Binding(
-                    get: { AppPreferences.exportFormat },
-                    set: { AppPreferences.exportFormat = $0 }
-                )) {
+                Picker("Format", selection: exportFormat) {
                     ForEach(ExportFormat.allCases, id: \.self) { format in
                         Text(format.rawValue.uppercased()).tag(format)
                     }
                 }
                 .pickerStyle(.segmented)
 
-                if AppPreferences.exportFormat == .jpeg {
-                    Slider(
-                        value: Binding(
-                            get: { AppPreferences.exportQuality },
-                            set: { AppPreferences.exportQuality = $0 }
-                        ),
-                        in: 0.1...1.0,
-                        step: 0.05
-                    ) {
-                        Text("Quality: \(Int(AppPreferences.exportQuality * 100))%")
+                if exportFormatRaw == ExportFormat.jpeg.rawValue {
+                    Slider(value: $exportQuality, in: 0.1...1.0, step: 0.05) {
+                        Text("Quality: \(Int(exportQuality * 100))%")
                     }
                 }
             }
@@ -85,13 +106,28 @@ struct GeneralSettingsTab: View {
 // MARK: - Capture Settings
 
 struct CaptureSettingsTab: View {
+    @AppStorage("bs_selfTimerDelay") private var selfTimerRaw: Int = 0
+    @AppStorage("bs_overlayPosition") private var overlayPositionRaw: String = OverlayPosition.bottomRight.rawValue
+    @AppStorage("bs_overlayDismissDelay") private var overlayDismissDelay: Double = 5.0
+
+    private var selfTimerDelay: Binding<SelfTimerDelay> {
+        Binding(
+            get: { SelfTimerDelay(rawValue: selfTimerRaw) ?? .off },
+            set: { selfTimerRaw = $0.rawValue }
+        )
+    }
+
+    private var overlayPosition: Binding<OverlayPosition> {
+        Binding(
+            get: { OverlayPosition(rawValue: overlayPositionRaw) ?? .bottomRight },
+            set: { overlayPositionRaw = $0.rawValue }
+        )
+    }
+
     var body: some View {
         Form {
             Section("Self Timer") {
-                Picker("Delay", selection: Binding(
-                    get: { AppPreferences.selfTimerDelay },
-                    set: { AppPreferences.selfTimerDelay = $0 }
-                )) {
+                Picker("Delay", selection: selfTimerDelay) {
                     ForEach(SelfTimerDelay.allCases, id: \.self) { delay in
                         Text(delay.label).tag(delay)
                     }
@@ -105,24 +141,20 @@ struct CaptureSettingsTab: View {
                     ShortcutRow(label: "Fullscreen", action: .fullscreen)
                     ShortcutRow(label: "Window", action: .window)
                     ShortcutRow(label: "OCR Region", action: .ocr)
+                    ShortcutRow(label: "Color Picker", action: .colorPicker)
+                    ShortcutRow(label: "Repeat Region", action: .repeatRegion)
                 }
             }
 
             Section("Overlay") {
-                Picker("Position", selection: Binding(
-                    get: { AppPreferences.overlayPosition },
-                    set: { AppPreferences.overlayPosition = $0 }
-                )) {
+                Picker("Position", selection: overlayPosition) {
                     Text("Bottom Right").tag(OverlayPosition.bottomRight)
                     Text("Bottom Left").tag(OverlayPosition.bottomLeft)
                 }
 
                 Stepper(
-                    "Dismiss after \(Int(AppPreferences.overlayDismissDelay))s",
-                    value: Binding(
-                        get: { AppPreferences.overlayDismissDelay },
-                        set: { AppPreferences.overlayDismissDelay = $0 }
-                    ),
+                    "Dismiss after \(Int(overlayDismissDelay))s",
+                    value: $overlayDismissDelay,
                     in: 2...30,
                     step: 1
                 )
@@ -176,6 +208,8 @@ struct ShortcutRow: View {
         case .fullscreen: return .defaultFullscreen
         case .window: return .defaultWindow
         case .ocr: return .defaultOCR
+        case .colorPicker: return .defaultColorPicker
+        case .repeatRegion: return .defaultRepeatRegion
         }
     }
 

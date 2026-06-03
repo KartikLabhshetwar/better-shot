@@ -9,6 +9,7 @@ final class ScreenCapture {
     static let shared = ScreenCapture()
 
     private(set) var isCapturing = false
+    private(set) var lastRegionSelection: RegionSelection?
 
     private init() {}
 
@@ -22,7 +23,7 @@ final class ScreenCapture {
         try? await Task.sleep(for: .milliseconds(200))
 
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-        guard let display = content.displays.first else { return nil }
+        guard let display = displayUnderCursor(from: content.displays) ?? content.displays.first else { return nil }
 
         let ownBundleID = Bundle.main.bundleIdentifier ?? ""
         let excludedWindows = content.windows.filter { $0.owningApplication?.bundleIdentifier == ownBundleID }
@@ -58,6 +59,7 @@ final class ScreenCapture {
         let overlay = RegionSelectionOverlay()
         guard let selection = await overlay.selectRegion() else { return nil }
         guard selection.pointsRect.width > 1, selection.pointsRect.height > 1 else { return nil }
+        lastRegionSelection = selection
 
         // Wait for overlay windows to fully dismiss from the window server
         try? await Task.sleep(for: .milliseconds(400))
@@ -68,7 +70,7 @@ final class ScreenCapture {
             let displayRect = CGRect(x: display.frame.origin.x, y: display.frame.origin.y,
                                      width: display.frame.width, height: display.frame.height)
             return displayRect.intersects(selection.pointsRect)
-        }) ?? content.displays.first else { return nil }
+        }) ?? displayUnderCursor(from: content.displays) ?? content.displays.first else { return nil }
 
         let ownBundleID = Bundle.main.bundleIdentifier ?? ""
         let excludedWindows = content.windows.filter { $0.owningApplication?.bundleIdentifier == ownBundleID }
@@ -97,6 +99,61 @@ final class ScreenCapture {
             height: selection.pointsRect.height
         )
 
+        let cropRect = CGRect(
+            x: localPoints.origin.x * scale,
+            y: localPoints.origin.y * scale,
+            width: localPoints.width * scale,
+            height: localPoints.height * scale
+        ).integral
+
+        guard let croppedImage = fullImage.cropping(to: cropRect) else { return nil }
+
+        let tempPath = makeTempPath()
+        let url = URL(fileURLWithPath: tempPath)
+        guard saveCGImage(croppedImage, to: url) else { return nil }
+        return url
+    }
+
+    // MARK: - Repeat Region (reuse last selection)
+
+    func repeatRegionCapture() async throws -> URL? {
+        guard let selection = lastRegionSelection else { return try await captureRegion() }
+        guard !isCapturing else { return nil }
+        isCapturing = true
+        defer { isCapturing = false }
+
+        try? await Task.sleep(for: .milliseconds(200))
+
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        guard let display = content.displays.first(where: { display in
+            let displayRect = CGRect(x: display.frame.origin.x, y: display.frame.origin.y,
+                                     width: display.frame.width, height: display.frame.height)
+            return displayRect.intersects(selection.pointsRect)
+        }) ?? displayUnderCursor(from: content.displays) ?? content.displays.first else { return nil }
+
+        let ownBundleID = Bundle.main.bundleIdentifier ?? ""
+        let excludedWindows = content.windows.filter { $0.owningApplication?.bundleIdentifier == ownBundleID }
+        let filter = SCContentFilter(display: display, excludingWindows: excludedWindows)
+        let scale = CGFloat(filter.pointPixelScale)
+
+        let config = SCStreamConfiguration()
+        config.captureResolution = .best
+        config.width = Int(CGFloat(display.width) * scale)
+        config.height = Int(CGFloat(display.height) * scale)
+        config.pixelFormat = kCVPixelFormatType_32BGRA
+        config.showsCursor = false
+        config.ignoreShadowsDisplay = true
+        config.ignoreGlobalClipDisplay = true
+
+        let fullImage = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+
+        let displayOrigin = display.frame.origin
+        let localPoints = CGRect(
+            x: selection.pointsRect.origin.x - displayOrigin.x,
+            y: selection.pointsRect.origin.y - displayOrigin.y,
+            width: selection.pointsRect.width,
+            height: selection.pointsRect.height
+        )
         let cropRect = CGRect(
             x: localPoints.origin.x * scale,
             y: localPoints.origin.y * scale,
@@ -177,28 +234,43 @@ final class ScreenCapture {
             return nil
         }
 
-        return try await performOCR(on: cgImage)
+        return try await recognizeContent(in: cgImage)
     }
 
-    private func performOCR(on image: CGImage) async throws -> String {
+    private func recognizeContent(in image: CGImage) async throws -> String {
         return try await withCheckedThrowingContinuation { continuation in
-            let request = VNRecognizeTextRequest { request, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                let observations = request.results as? [VNRecognizedTextObservation] ?? []
-                let text = observations
-                    .compactMap { $0.topCandidates(1).first?.string }
-                    .joined(separator: "\n")
-                continuation.resume(returning: text)
-            }
-            request.recognitionLevel = .accurate
-            request.usesLanguageCorrection = true
+            let textRequest = VNRecognizeTextRequest()
+            textRequest.recognitionLevel = .accurate
+            textRequest.usesLanguageCorrection = true
+
+            let barcodeRequest = VNDetectBarcodesRequest()
 
             let handler = VNImageRequestHandler(cgImage: image)
             do {
-                try handler.perform([request])
+                try handler.perform([textRequest, barcodeRequest])
+
+                var parts: [String] = []
+
+                // QR/Barcode results first
+                if let barcodeResults = barcodeRequest.results {
+                    for barcode in barcodeResults {
+                        if let payload = barcode.payloadStringValue, !payload.isEmpty {
+                            parts.append(payload)
+                        }
+                    }
+                }
+
+                // Text results
+                if let textResults = textRequest.results {
+                    let text = textResults
+                        .compactMap { $0.topCandidates(1).first?.string }
+                        .joined(separator: "\n")
+                    if !text.isEmpty {
+                        parts.append(text)
+                    }
+                }
+
+                continuation.resume(returning: parts.joined(separator: "\n"))
             } catch {
                 continuation.resume(throwing: error)
             }
@@ -230,5 +302,17 @@ final class ScreenCapture {
         ) else { return false }
         CGImageDestinationAddImage(destination, image, nil)
         return CGImageDestinationFinalize(destination)
+    }
+
+    private func displayUnderCursor(from displays: [SCDisplay]) -> SCDisplay? {
+        var mousePoint = CGPoint.zero
+        let event = CGEvent(source: nil)
+        if let event {
+            mousePoint = event.location
+        }
+
+        return displays.first { display in
+            CGDisplayBounds(display.displayID).contains(mousePoint)
+        }
     }
 }
