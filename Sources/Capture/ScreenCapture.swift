@@ -176,8 +176,6 @@ final class ScreenCapture {
         isCapturing = true
         defer { isCapturing = false }
 
-        try? await Task.sleep(for: .milliseconds(200))
-
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         let ownBundleID = Bundle.main.bundleIdentifier ?? ""
         let capturable = content.windows.filter {
@@ -192,14 +190,19 @@ final class ScreenCapture {
         let picker = WindowPickerOverlay(windows: capturable)
         guard let selected = await picker.pickWindow() else { return nil }
 
-        try? await Task.sleep(for: .milliseconds(250))
+        try? await Task.sleep(for: .milliseconds(350))
 
-        let filter = SCContentFilter(desktopIndependentWindow: selected)
+        let freshContent = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        let freshWindow = freshContent.windows.first { $0.windowID == selected.windowID }
+        let targetWindow = freshWindow ?? selected
+
+        let filter = SCContentFilter(desktopIndependentWindow: targetWindow)
 
         let scale = CGFloat(filter.pointPixelScale)
         let contentSize = filter.contentRect.size
         let w = Int(contentSize.width * scale)
         let h = Int(contentSize.height * scale)
+        guard w > 0, h > 0 else { return nil }
 
         let config = SCStreamConfiguration()
         config.width = w % 2 == 0 ? w : w + 1

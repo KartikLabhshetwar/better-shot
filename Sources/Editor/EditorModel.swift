@@ -100,7 +100,10 @@ final class EditorModel {
         imageSize = CGSize(width: image.width, height: image.height)
         previewImage = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
 
-        if let data = UserDefaults.standard.data(forKey: "bs_defaultBeautifierConfig"),
+        let hasAlpha = image.alphaInfo != .none && image.alphaInfo != .noneSkipLast && image.alphaInfo != .noneSkipFirst
+        if hasAlpha {
+            config = BeautifierConfig()
+        } else if let data = UserDefaults.standard.data(forKey: "bs_defaultBeautifierConfig"),
            let saved = try? JSONDecoder().decode(BeautifierConfig.self, from: data) {
             config = saved
         }

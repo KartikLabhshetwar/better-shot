@@ -23,7 +23,7 @@ final class WindowPickerOverlay {
 
     private func showOverlays() {
         for screen in NSScreen.screens {
-            let window = NSWindow(
+            let window = PickerWindow(
                 contentRect: screen.frame,
                 styleMask: .borderless,
                 backing: .buffered,
@@ -76,6 +76,14 @@ final class WindowPickerOverlay {
         }
         overlayWindows.removeAll()
     }
+}
+
+// MARK: - Picker Window (borderless windows need canBecomeKey override)
+
+private final class PickerWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+    override func cursorUpdate(with event: NSEvent) {}
 }
 
 // MARK: - Picker View
@@ -162,18 +170,20 @@ private final class WindowPickerView: NSView {
     }
 
     override func mouseMoved(with event: NSEvent) {
-        let loc = convert(event.locationInWindow, from: nil)
-        let primaryHeight = NSScreen.screens.first?.frame.height ?? screen.frame.height
+        let cgPoint: CGPoint
+        if let cgEvent = CGEvent(source: nil) {
+            cgPoint = cgEvent.location
+        } else {
+            let loc = convert(event.locationInWindow, from: nil)
+            let primaryHeight = NSScreen.screens.first?.frame.height ?? screen.frame.height
+            cgPoint = CGPoint(
+                x: screen.frame.origin.x + loc.x,
+                y: primaryHeight - (screen.frame.origin.y + loc.y)
+            )
+        }
 
-        // Convert view point to global top-left coords
-        let globalX = screen.frame.origin.x + loc.x
-        let globalY = primaryHeight - (screen.frame.origin.y + loc.y)
-
-        // Find the topmost (frontmost) window under the cursor
         let hit = scWindows.first { w in
-            let f = w.frame
-            return globalX >= f.origin.x && globalX <= f.origin.x + f.width
-                && globalY >= f.origin.y && globalY <= f.origin.y + f.height
+            w.frame.contains(cgPoint)
         }
 
         if hoveredWindow?.windowID != hit?.windowID {
