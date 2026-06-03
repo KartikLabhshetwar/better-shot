@@ -24,5 +24,11 @@ Package.resolved
 !.vscode/extensions.json
 .idea
 
+# Release builds
+release/
+build-arm64/
+build-x86_64/
+*.dmg
+
 # Claude Code
 CLAUDE.md
