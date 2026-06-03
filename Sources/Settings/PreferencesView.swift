@@ -245,10 +245,11 @@ struct ShortcutRow: View {
 
 struct HistoryTab: View {
     var body: some View {
-        List {
-            if HistoryStore.shared.records.isEmpty {
-                ContentUnavailableView("No captures yet", systemImage: "photo.on.rectangle.angled")
-            } else {
+        if HistoryStore.shared.records.isEmpty {
+            ContentUnavailableView("No captures yet", systemImage: "photo.on.rectangle.angled")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            List {
                 ForEach(HistoryStore.shared.records) { record in
                     HStack(spacing: 12) {
                         if let thumb = HistoryStore.shared.thumbnail(for: record, maxSize: 80) {
@@ -348,10 +349,53 @@ struct AboutTab: View {
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.green)
 
-                Button("Download Update") {
-                    updater.openDownload(url)
+                Button("Download & Install") {
+                    Task { await updater.downloadAndInstall(version: newVersion, url: url) }
                 }
                 .buttonStyle(.borderedProminent)
+            }
+
+        case .downloading(let progress):
+            VStack(spacing: 8) {
+                ProgressView(value: progress)
+                    .progressViewStyle(.linear)
+                    .frame(width: 200)
+
+                Text("Downloading update… \(Int(progress * 100))%")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Button("Cancel") {
+                    updater.cancelDownload()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+
+        case .readyToInstall(let newVersion, let dmgPath):
+            VStack(spacing: 8) {
+                Text("Version \(newVersion) downloaded")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.green)
+
+                Text("The app will quit and relaunch after installing.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Button("Install & Relaunch") {
+                    Task { await updater.installUpdate(dmgPath: dmgPath) }
+                }
+                .buttonStyle(.borderedProminent)
+            }
+
+        case .installing:
+            VStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+
+                Text("Installing update…")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
         case .upToDate:
@@ -361,7 +405,7 @@ struct AboutTab: View {
 
         case .failed(let message):
             VStack(spacing: 6) {
-                Text("Update check failed: \(message)")
+                Text("Update failed: \(message)")
                     .font(.caption)
                     .foregroundStyle(.red)
 

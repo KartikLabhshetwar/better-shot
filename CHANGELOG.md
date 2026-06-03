@@ -5,6 +5,17 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-06-03
+
+### Added
+
+- **In-app auto-update**: Updates now download the DMG in-app with a progress bar, mount it, replace the running app, and relaunch — no more opening Chrome to download manually. New states: downloading (with cancel), ready to install, installing.
+- **Makefile**: `make build`, `make run`, `make dmg`, `make release`, `make clean`, `make lint`, `make test-build`, `make version` for local development and testing without opening Xcode.
+
+### Fixed
+
+- **History tab empty state not centered**: `ContentUnavailableView` was inside a `List`, constraining it to a row. Moved it outside the `List` with `frame(maxWidth: .infinity, maxHeight: .infinity)` so it centers properly in the tab.
+
 ## [0.3.1] - 2026-06-03
 
 ### Fixed

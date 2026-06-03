@@ -31,10 +31,22 @@
 ```bash
 git clone https://github.com/KartikLabhshetwar/better-shot.git
 cd better-shot
-xcodebuild -scheme BetterShot -configuration Release build
+make build    # Debug build
+make run      # Build and launch
 ```
 
 Or open `BetterShot.xcodeproj` in Xcode and **Product > Build** (`⌘B`).
+
+| Command | Description |
+|---|---|
+| `make build` | Debug build |
+| `make release` | Release build (unsigned) |
+| `make run` | Build and launch |
+| `make dmg` | Create unsigned DMG for local testing |
+| `make clean` | Remove build artifacts |
+| `make lint` | Check for compiler warnings |
+| `make test-build` | Full clean + release build |
+| `make version` | Print current version |
 
 **Requirements**: macOS 14.0+, Xcode 15+
 
