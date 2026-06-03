@@ -123,14 +123,18 @@ final class AnnotationKeyCommandHandlerView: NSView {
         }
 
         switch character {
+        case "v": return .select
         case "r": return .rectangle
+        case "f": return .filledRectangle
         case "o": return .ellipse
-        case "t": return .text
         case "l": return .line
         case "a": return .arrow
+        case "d": return .freehand
+        case "n": return .numberedCircle
         case "p": return .pixelate
         case "b": return .blur
-        case "1": return .numberedCircle
+        case "g": return .spotlight
+        case "t": return .text
         case "h": return .select
         default: return nil
         }

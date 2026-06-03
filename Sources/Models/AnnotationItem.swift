@@ -337,7 +337,7 @@ struct AnnotationItem: Identifiable, Equatable {
                 rect.union(CGRect(origin: point, size: .zero))
             }
             return bounds.standardized
-        case .rectangle, .filledRectangle, .ellipse, .numberedCircle, .pixelate, .blur, .text:
+        case .rectangle, .filledRectangle, .ellipse, .numberedCircle, .pixelate, .blur, .spotlight, .text:
             return rect.standardized
         }
     }
@@ -393,7 +393,7 @@ struct AnnotationItem: Identifiable, Equatable {
         case .freehand:
             guard points.count >= 2 else { return false }
             return pathLength(points) >= minimumSize
-        case .rectangle, .filledRectangle, .ellipse, .numberedCircle, .pixelate, .blur:
+        case .rectangle, .filledRectangle, .ellipse, .numberedCircle, .pixelate, .blur, .spotlight:
             return bounds.width >= minimumSize && bounds.height >= minimumSize
         case .text:
             return bounds.width >= minimumSize
@@ -433,7 +433,7 @@ struct AnnotationItem: Identifiable, Equatable {
 
             return distance(from: point, toQuadraticFrom: start, control: controlPoint, to: end) <= tolerance
 
-        case .rectangle, .filledRectangle, .pixelate, .blur, .text:
+        case .rectangle, .filledRectangle, .pixelate, .blur, .spotlight, .text:
             return bounds.insetBy(dx: -tolerance, dy: -tolerance).contains(point)
 
         case .ellipse, .numberedCircle:
@@ -558,8 +558,8 @@ struct AnnotationItem: Identifiable, Equatable {
         var shortestDistance = CGFloat.greatestFiniteMagnitude
         var previous = start
 
-        for step in 1...32 {
-            let t = CGFloat(step) / 32
+        for step in 1...16 {
+            let t = CGFloat(step) / 16
             let current = quadraticPoint(start: start, control: control, end: end, t: t)
             shortestDistance = min(shortestDistance, distance(from: point, toSegmentFrom: previous, to: current))
             previous = current
@@ -596,6 +596,7 @@ enum AnnotationTool: String, CaseIterable, Identifiable, Codable {
     case numberedCircle
     case pixelate
     case blur
+    case spotlight
     case text
 
     var id: String { rawValue }
@@ -612,6 +613,7 @@ enum AnnotationTool: String, CaseIterable, Identifiable, Codable {
         case .numberedCircle: "Numbered circle"
         case .pixelate: "Pixelate"
         case .blur: "Blur"
+        case .spotlight: "Spotlight"
         case .text: "Text"
         }
     }
@@ -628,6 +630,7 @@ enum AnnotationTool: String, CaseIterable, Identifiable, Codable {
         case .numberedCircle: "1.circle.fill"
         case .pixelate: "app.background.dotted"
         case .blur: "drop.fill"
+        case .spotlight: "light.max"
         case .text: "textformat"
         }
     }
@@ -644,9 +647,13 @@ enum AnnotationTool: String, CaseIterable, Identifiable, Codable {
         self == .pixelate || self == .blur
     }
 
+    var isSpotlightTool: Bool {
+        self == .spotlight
+    }
+
     var supportsAspectLock: Bool {
         switch self {
-        case .rectangle, .filledRectangle, .ellipse:
+        case .rectangle, .filledRectangle, .ellipse, .spotlight:
             true
         case .select, .line, .arrow, .freehand, .numberedCircle, .pixelate, .blur, .text:
             false

@@ -80,9 +80,9 @@ final class EditorModel {
 
     var isRedactionStyleAvailable: Bool {
         if selectedItems.isEmpty {
-            return inspectedTool?.isRedactionTool == true
+            return inspectedTool?.isRedactionTool == true || inspectedTool == .spotlight
         }
-        return selectedItems.contains { $0.tool.isRedactionTool }
+        return selectedItems.contains { $0.tool.isRedactionTool || $0.tool == .spotlight }
     }
 
     var isTextStyleAvailable: Bool {
@@ -556,7 +556,7 @@ final class EditorModel {
         case .select: return
         case .text: itemRect = defaultTextRect(at: point, lineHeight: textLineHeight, within: allowedBounds)
         case .numberedCircle: itemRect = AnnotationNumberedCircleMetrics.defaultRect(centeredAt: point, imageSize: imageSize, within: allowedBounds)
-        case .rectangle, .filledRectangle, .ellipse, .line, .arrow, .freehand, .pixelate, .blur:
+        case .rectangle, .filledRectangle, .ellipse, .line, .arrow, .freehand, .pixelate, .blur, .spotlight:
             itemRect = CGRect(origin: point, size: .zero)
         }
         let itemText = selectedTool == .numberedCircle ? "\(nextNumberedCircleValue)" : ""
@@ -586,7 +586,7 @@ final class EditorModel {
             draftItem.rect = boundingRect(for: draftItem.points)
         case .numberedCircle:
             draftItem.rect = AnnotationNumberedCircleMetrics.defaultRect(centeredAt: startPoint, imageSize: imageSize, within: allowedBounds)
-        case .rectangle, .filledRectangle, .ellipse, .pixelate, .blur:
+        case .rectangle, .filledRectangle, .ellipse, .pixelate, .blur, .spotlight:
             let aspectRatio = selectedTool.supportsAspectLock && lockAspectRatio ? squareAspectRatio : nil
             draftItem.rect = rect(from: startPoint, to: point, aspectRatio: aspectRatio)
         case .text:
@@ -763,7 +763,7 @@ final class EditorModel {
         case .line: [point, point]
         case .arrow: [point, point, point]
         case .freehand: [point]
-        case .rectangle, .filledRectangle, .ellipse, .numberedCircle, .pixelate, .blur, .text: []
+        case .rectangle, .filledRectangle, .ellipse, .numberedCircle, .pixelate, .blur, .spotlight, .text: []
         }
     }
 

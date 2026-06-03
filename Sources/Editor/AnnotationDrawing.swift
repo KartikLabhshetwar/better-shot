@@ -11,6 +11,10 @@ enum AnnotationDrawing {
         let canvasRect = CGRect(origin: .zero, size: canvasSize)
         ctx.setLineCap(.round)
         ctx.setLineJoin(.round)
+
+        let hasRedaction = items.contains { $0.tool.isRedactionTool }
+        let canvasSnapshot: CGImage? = hasRedaction ? ctx.makeImage() : nil
+
         for item in items {
             autoreleasepool {
                 ctx.setStrokeColor(item.swatch.nsColor.cgColor)
@@ -43,9 +47,10 @@ enum AnnotationDrawing {
                     drawNumberedCircle(item, in: renderedRect(item.bounds, in: canvasRect), context: ctx)
 
                 case .pixelate:
-                    guard let sourceImage else { return }
+                    guard let canvasSnapshot else { return }
                     applyPixelation(
                         in: renderedRect(item.bounds, in: canvasRect),
+                        canvasSnapshot: canvasSnapshot,
                         context: ctx,
                         canvasSize: canvasSize,
                         colorSpace: CGColorSpaceCreateDeviceRGB(),
@@ -53,13 +58,26 @@ enum AnnotationDrawing {
                     )
 
                 case .blur:
-                    guard let sourceImage else { return }
+                    guard let canvasSnapshot else { return }
                     applyBlur(
                         in: renderedRect(item.bounds, in: canvasRect),
+                        canvasSnapshot: canvasSnapshot,
                         context: ctx,
                         canvasSize: canvasSize,
                         density: item.redactionDensity
                     )
+
+                case .spotlight:
+                    let targetRect = renderedRect(item.bounds, in: canvasRect)
+                    let overlayColor = CGColor(gray: 0, alpha: item.redactionDensity)
+                    ctx.saveGState()
+                    let fullPath = CGMutablePath()
+                    fullPath.addRect(canvasRect)
+                    fullPath.addRect(targetRect)
+                    ctx.addPath(fullPath)
+                    ctx.setFillColor(overlayColor)
+                    ctx.fillPath(using: .evenOdd)
+                    ctx.restoreGState()
 
                 case .text:
                     drawText(item, in: renderedRect(item.bounds, in: canvasRect), imageHeight: canvasRect.height, context: ctx)
@@ -220,6 +238,7 @@ enum AnnotationDrawing {
 
     private static func applyPixelation(
         in rect: CGRect,
+        canvasSnapshot: CGImage,
         context: CGContext,
         canvasSize: CGSize,
         colorSpace: CGColorSpace,
@@ -228,8 +247,7 @@ enum AnnotationDrawing {
         let targetRect = rect.integral.intersection(CGRect(origin: .zero, size: canvasSize))
         guard targetRect.width >= 1,
               targetRect.height >= 1,
-              let currentImage = context.makeImage(),
-              let croppedImage = currentImage.cropping(to: imageCropRect(for: targetRect, imageHeight: CGFloat(currentImage.height))) else {
+              let croppedImage = canvasSnapshot.cropping(to: imageCropRect(for: targetRect, imageHeight: CGFloat(canvasSnapshot.height))) else {
             return
         }
 
@@ -256,6 +274,7 @@ enum AnnotationDrawing {
 
     private static func applyBlur(
         in rect: CGRect,
+        canvasSnapshot: CGImage,
         context: CGContext,
         canvasSize: CGSize,
         density: CGFloat
@@ -263,18 +282,39 @@ enum AnnotationDrawing {
         let targetRect = rect.integral.intersection(CGRect(origin: .zero, size: canvasSize))
         guard targetRect.width >= 1,
               targetRect.height >= 1,
-              let currentImage = context.makeImage(),
-              let croppedImage = currentImage.cropping(to: imageCropRect(for: targetRect, imageHeight: CGFloat(currentImage.height))) else {
+              let croppedImage = canvasSnapshot.cropping(to: imageCropRect(for: targetRect, imageHeight: CGFloat(canvasSnapshot.height))) else {
             return
         }
 
-        let inputImage = CIImage(cgImage: croppedImage)
+        let radius = RedactionImageProcessor.blurRadius(for: density)
+        let fullImageRect = CGRect(x: 0, y: 0, width: canvasSnapshot.width, height: canvasSnapshot.height)
+        let cropRectInImage = imageCropRect(for: targetRect, imageHeight: CGFloat(canvasSnapshot.height))
+        let paddedCropRect = cropRectInImage
+            .insetBy(dx: -ceil(radius * 2), dy: -ceil(radius * 2))
+            .intersection(fullImageRect)
+            .integral
+
+        let paddedImage: CGImage
+        if let padded = canvasSnapshot.cropping(to: paddedCropRect) {
+            paddedImage = padded
+        } else {
+            paddedImage = croppedImage
+        }
+
+        let inputImage = CIImage(cgImage: paddedImage)
         let filter = CIFilter.gaussianBlur()
         filter.inputImage = inputImage.clampedToExtent()
-        filter.radius = Float(RedactionImageProcessor.blurRadius(for: density))
+        filter.radius = Float(radius)
+
+        let outputRect = CGRect(
+            x: cropRectInImage.minX - paddedCropRect.minX,
+            y: cropRectInImage.minY - paddedCropRect.minY,
+            width: cropRectInImage.width,
+            height: cropRectInImage.height
+        )
 
         guard let outputImage = filter.outputImage,
-              let blurredImage = ciContext.createCGImage(outputImage, from: inputImage.extent) else {
+              let blurredImage = ciContext.createCGImage(outputImage, from: outputRect) else {
             return
         }
 
@@ -282,6 +322,7 @@ enum AnnotationDrawing {
         context.clip(to: targetRect)
         context.draw(blurredImage, in: targetRect)
         context.restoreGState()
+        ciContext.clearCaches()
     }
 
     private static func renderedLineWidth(for item: AnnotationItem, imageSize: CGSize) -> CGFloat {

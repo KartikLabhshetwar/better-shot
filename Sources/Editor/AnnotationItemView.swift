@@ -29,6 +29,12 @@ struct AnnotationItemView: View {
                     viewBounds: viewBounds,
                     allowsCaching: allowsRedactionPreviewCaching
                 )
+            } else if item.tool == .spotlight {
+                SpotlightPreview(
+                    item: item,
+                    imageFrame: imageFrame,
+                    viewBounds: viewBounds
+                )
             } else if item.tool.isFilledShape {
                 itemPath
                     .fill(fillStyle)
@@ -77,7 +83,7 @@ struct AnnotationItemView: View {
                 cornerRadius: AnnotationFilledRectangleMetrics.cornerRadius(for: rect)
             )
 
-        case .pixelate, .blur:
+        case .pixelate, .blur, .spotlight:
             return Path(rect)
 
         case .numberedCircle:
@@ -456,6 +462,10 @@ private struct AnnotationTextBoxView: NSViewRepresentable {
             attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
         }
 
+        let fontChanged = textView.font != font
+        let colorChanged = textView.textColor != textColor
+        let alignmentChanged = textView.alignment != alignment
+
         textView.font = font
         textView.textColor = textColor
         textView.alignment = alignment
@@ -463,7 +473,7 @@ private struct AnnotationTextBoxView: NSViewRepresentable {
         textView.typingAttributes = attributes
         textView.textContainer?.lineBreakMode = .byClipping
 
-        guard textView.string.isEmpty == false else { return }
+        guard !textView.string.isEmpty, fontChanged || colorChanged || alignmentChanged else { return }
 
         let selectedRanges = textView.selectedRanges
         textView.textStorage?.setAttributes(
@@ -612,4 +622,28 @@ private struct CurveControlHandle: View {
 
 private enum AnnotationSelectionStyle {
     static let color = Color.accentColor.opacity(0.5)
+}
+
+private struct SpotlightPreview: View {
+    let item: AnnotationItem
+    let imageFrame: CGRect
+    let viewBounds: CGRect
+
+    var body: some View {
+        Canvas { context, size in
+            let overlayRect = CGRect(origin: .zero, size: size)
+            var overlayPath = Path(overlayRect)
+            let cutoutRect = CGRect(
+                x: viewBounds.minX - imageFrame.minX,
+                y: viewBounds.minY - imageFrame.minY,
+                width: viewBounds.width,
+                height: viewBounds.height
+            )
+            overlayPath.addRect(cutoutRect)
+            context.fill(overlayPath, with: .color(.black.opacity(Double(item.redactionDensity))), style: FillStyle(eoFill: true))
+        }
+        .frame(width: imageFrame.width, height: imageFrame.height)
+        .position(x: imageFrame.midX, y: imageFrame.midY)
+        .allowsHitTesting(false)
+    }
 }
