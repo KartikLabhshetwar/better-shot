@@ -8,6 +8,7 @@
 #   make lint         — Swift compiler warnings check
 #   make test-build   — Full clean + release build to verify everything compiles
 #   make version      — Print current version
+#   make ship         — Signed release: build, sign, notarize, DMG (both architectures)
 
 SCHEME       = BetterShot
 PROJECT      = BetterShot.xcodeproj
@@ -20,7 +21,7 @@ VERSION     := $(shell python3 -c "import json; print(json.load(open('version.js
 DMG_NAME     = BetterShot-$(VERSION).dmg
 DMG_DIR      = release
 
-.PHONY: build release run dmg clean lint test-build version help
+.PHONY: build release run dmg clean lint test-build version ship help
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -78,6 +79,9 @@ lint: ## Check for compiler warnings
 
 test-build: clean release ## Full clean + release build
 	@echo "==> Test build passed."
+
+ship: ## Signed release: build, sign, notarize, DMG (both architectures)
+	@bash scripts/release.sh
 
 version: ## Print current version
 	@echo "$(VERSION)"
