@@ -41,8 +41,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         window = nil
-        if EditorWindowController.shared.hasOpenWindows == false {
-            NSApp.setActivationPolicy(.accessory)
+        DispatchQueue.main.async {
+            if EditorWindowController.shared.hasOpenWindows == false {
+                NSApp.setActivationPolicy(.accessory)
+            }
         }
     }
 

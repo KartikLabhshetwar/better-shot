@@ -69,17 +69,16 @@ final class MenuBarPopoverController: NSObject {
         isOpen = false
         stopEventMonitor()
 
+        let closingPanel = panel
+        self.panel = nil
+
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.12
             ctx.allowsImplicitAnimation = true
-            panel.animator().alphaValue = 0
-        }, completionHandler: { [weak self] in
-            Task { @MainActor in
-                guard self?.isOpen != true else { return }
-                panel.orderOut(nil)
-                self?.panel?.contentView = nil
-                self?.panel = nil
-            }
+            closingPanel.animator().alphaValue = 0
+        }, completionHandler: {
+            closingPanel.orderOut(nil)
+            closingPanel.contentView = nil
         })
     }
 
@@ -112,7 +111,7 @@ final class MenuBarPopoverController: NSObject {
 
     private func startEventMonitor() {
         eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            Task { @MainActor in
+            DispatchQueue.main.async {
                 self?.closePopover()
             }
         }

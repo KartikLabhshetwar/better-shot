@@ -58,7 +58,6 @@ struct GeneralSettingsTab: View {
     @AppStorage("bs_saveDirectory") private var saveDir = NSHomeDirectory() + "/Desktop"
     @AppStorage("bs_copyAfterSave") private var copyAfterSave = true
     @AppStorage("bs_playSound") private var playSound = true
-    @AppStorage("bs_showOverlay") private var showOverlay = true
     @AppStorage("bs_exportFormat") private var exportFormatRaw: String = ExportFormat.png.rawValue
     @AppStorage("bs_exportQuality") private var exportQuality: Double = 0.9
 
@@ -104,7 +103,6 @@ struct GeneralSettingsTab: View {
 
             Section("Capture") {
                 Toggle("Play shutter sound", isOn: $playSound)
-                Toggle("Show floating preview after capture", isOn: $showOverlay)
             }
 
             Section("Default Effects") {
@@ -507,20 +505,11 @@ private struct DefaultConfigPreview: View {
 
 struct CaptureSettingsTab: View {
     @AppStorage("bs_selfTimerDelay") private var selfTimerRaw: Int = 0
-    @AppStorage("bs_overlayPosition") private var overlayPositionRaw: String = OverlayPosition.bottomRight.rawValue
-    @AppStorage("bs_overlayDismissDelay") private var overlayDismissDelay: Double = 5.0
 
     private var selfTimerDelay: Binding<SelfTimerDelay> {
         Binding(
             get: { SelfTimerDelay(rawValue: selfTimerRaw) ?? .off },
             set: { selfTimerRaw = $0.rawValue }
-        )
-    }
-
-    private var overlayPosition: Binding<OverlayPosition> {
-        Binding(
-            get: { OverlayPosition(rawValue: overlayPositionRaw) ?? .bottomRight },
-            set: { overlayPositionRaw = $0.rawValue }
         )
     }
 
@@ -542,20 +531,6 @@ struct CaptureSettingsTab: View {
                     ShortcutRow(label: "OCR Region", action: .ocr)
                     ShortcutRow(label: "Color Picker", action: .colorPicker)
                 }
-            }
-
-            Section("Overlay") {
-                Picker("Position", selection: overlayPosition) {
-                    Text("Bottom Right").tag(OverlayPosition.bottomRight)
-                    Text("Bottom Left").tag(OverlayPosition.bottomLeft)
-                }
-
-                Stepper(
-                    "Dismiss after \(Int(overlayDismissDelay))s",
-                    value: $overlayDismissDelay,
-                    in: 2...30,
-                    step: 1
-                )
             }
         }
         .formStyle(.grouped)
@@ -794,7 +769,7 @@ struct AboutTab: View {
     private let updater = AppUpdater.shared
 
     private var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.3"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.4"
     }
     private var build: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"

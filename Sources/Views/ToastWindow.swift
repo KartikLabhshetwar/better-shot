@@ -10,8 +10,11 @@ final class ToastWindow {
 
     private init() {}
 
+    private var panelGeneration: UInt = 0
+
     func show(title: String = "Saved", message: String, icon: NSImage? = nil, systemIcon: String? = nil, duration: TimeInterval = 2.5) {
         dismiss(animated: false)
+        panelGeneration &+= 1
 
         let toastView = ToastContentView(title: title, message: message, icon: icon, systemIcon: systemIcon)
         let hostingView = NSHostingView(rootView: toastView)
@@ -66,14 +69,16 @@ final class ToastWindow {
         }
 
         if animated {
+            let gen = panelGeneration
             NSAnimationContext.runAnimationGroup({ ctx in
                 ctx.duration = 0.2
                 ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
                 panel.animator().alphaValue = 0
-            }, completionHandler: {
-                Task { @MainActor [weak self] in
-                    panel.orderOut(nil)
-                    self?.panel = nil
+            }, completionHandler: { [weak self] in
+                panel.orderOut(nil)
+                Task { @MainActor in
+                    guard let self, self.panelGeneration == gen else { return }
+                    self.panel = nil
                 }
             })
         } else {

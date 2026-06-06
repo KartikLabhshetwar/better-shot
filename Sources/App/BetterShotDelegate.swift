@@ -10,6 +10,10 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
 
         MenuBarPopoverController.shared.setup()
 
+        Task {
+            await AppUpdater.shared.checkForUpdatesQuietly()
+        }
+
         if ShortcutService.hasAccessibilityPermission {
             ShortcutService.shared.registerAll()
 

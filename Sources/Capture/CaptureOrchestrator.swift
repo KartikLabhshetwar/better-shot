@@ -64,12 +64,7 @@ final class CaptureOrchestrator {
 
             guard let capturedURL = lastCaptureURL else { return }
 
-            switch AppPreferences.screenshotMode {
-            case .editor:
-                EditorWindowController.shared.open(url: capturedURL)
-            case .gallery:
-                await galleryApplyAndSave(capturedURL)
-            }
+            await galleryApplyAndSave(capturedURL)
         } catch {
             print("Capture failed: \(error.localizedDescription)")
         }
@@ -122,14 +117,15 @@ final class CaptureOrchestrator {
             copyToClipboard(savedURL)
         }
 
-        if let savedURL, AppPreferences.showOverlayAfterCapture {
-            PreviewOverlay.shared.show(url: savedURL)
-        }
-
         if savedURL != nil {
             let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage
-            ToastWindow.shared.show(message: "Screenshot saved to gallery!", icon: appIcon)
+            ToastWindow.shared.show(
+                message: AppPreferences.copyAfterSave ? "Screenshot saved & copied!" : "Screenshot saved!",
+                icon: appIcon
+            )
         }
+
+        PreviewOverlay.shared.show(url: url)
     }
 
     private func saveImage(_ cgImage: CGImage) -> URL? {

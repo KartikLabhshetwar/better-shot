@@ -28,7 +28,46 @@ final class AppUpdater {
 
     private var downloadTask: URLSessionDownloadTask?
 
+    private(set) var latestAvailableVersion: String?
+
     private init() {}
+
+    func checkForUpdatesQuietly() async {
+        let urlString = "https://api.github.com/repos/\(owner)/\(repo)/releases/latest"
+        guard let url = URL(string: urlString) else { return }
+
+        var request = URLRequest(url: url)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 15
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200,
+                  let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let tagName = json["tag_name"] as? String else { return }
+
+            let latestVersion = tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
+
+            if isNewer(latestVersion, than: currentVersion) {
+                latestAvailableVersion = latestVersion
+                let assets = json["assets"] as? [[String: Any]] ?? []
+                let arch = Self.currentArchitecture
+                let dmgAsset = assets.first { ($0["name"] as? String)?.contains(arch) == true && ($0["name"] as? String)?.hasSuffix(".dmg") == true }
+                    ?? assets.first { ($0["name"] as? String)?.hasSuffix(".dmg") == true }
+
+                if let assetURLString = dmgAsset?["browser_download_url"] as? String,
+                   let assetURL = URL(string: assetURLString) {
+                    state = .available(version: latestVersion, url: assetURL)
+                    ToastWindow.shared.show(
+                        title: "Update Available",
+                        message: "Version \(latestVersion) is available",
+                        systemIcon: "arrow.down.circle"
+                    )
+                }
+            }
+        } catch {}
+    }
 
     func checkForUpdates() async {
         state = .checking

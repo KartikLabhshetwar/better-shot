@@ -15,6 +15,9 @@ final class PreviewOverlay {
     private init() {}
 
     func show(url: URL) {
+        dismissTask?.cancel()
+        dismissTask = nil
+
         currentURL = url
         isVisible = true
 

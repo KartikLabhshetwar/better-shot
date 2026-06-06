@@ -59,7 +59,6 @@ private struct PopoverArrow: Shape {
 
 struct MenuBarContentView: View {
     var dismissPopover: @MainActor () -> Void
-    @State private var screenshotMode = AppPreferences.screenshotMode
 
     var body: some View {
         VStack(spacing: 0) {
@@ -67,12 +66,6 @@ struct MenuBarContentView: View {
                 .padding(.horizontal, 10)
                 .padding(.top, 10)
                 .padding(.bottom, 8)
-
-            TrayDivider()
-
-            screenshotModeRow
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
 
             TrayDivider()
 
@@ -130,28 +123,6 @@ struct MenuBarContentView: View {
         }
     }
 
-    // MARK: - Screenshot Mode
-
-    private var screenshotModeRow: some View {
-        HStack(spacing: 0) {
-            Text("Screenshot mode")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-
-            Spacer()
-
-            Picker("", selection: $screenshotMode) {
-                Text("Editor").tag(ScreenshotMode.editor)
-                Text("Gallery").tag(ScreenshotMode.gallery)
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 140)
-            .onChange(of: screenshotMode) { _, newValue in
-                AppPreferences.screenshotMode = newValue
-            }
-        }
-    }
-
     // MARK: - Utility Grid
 
     private var utilityGrid: some View {
@@ -174,7 +145,7 @@ struct MenuBarContentView: View {
                         Button {
                             dismissPopover()
                             let url = HistoryStore.shared.urlForRecord(record)
-                            PreviewOverlay.shared.show(url: url)
+                            EditorWindowController.shared.open(url: url)
                         } label: {
                             Label(record.filename, systemImage: "photo")
                         }
@@ -210,10 +181,18 @@ struct MenuBarContentView: View {
     // MARK: - Version
 
     private var versionLabel: some View {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.3"
-        return Text("Version \(version)")
-            .font(.system(size: 10))
-            .foregroundStyle(.quaternary)
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.4"
+        return HStack(spacing: 4) {
+            Text("Version \(version)")
+                .font(.system(size: 10))
+                .foregroundStyle(.quaternary)
+
+            if AppUpdater.shared.latestAvailableVersion != nil {
+                Circle()
+                    .fill(.blue)
+                    .frame(width: 6, height: 6)
+            }
+        }
     }
 
     // MARK: - Actions

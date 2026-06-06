@@ -53,14 +53,18 @@ final class EditorWindowController {
         }
 
         if windows.isEmpty {
-            NSApp.setActivationPolicy(.accessory)
+            DispatchQueue.main.async {
+                NSApp.setActivationPolicy(.accessory)
+            }
         }
     }
 
     func windowDidClose(_ window: NSWindow) {
         windows.removeAll { $0 === window }
         if windows.isEmpty {
-            NSApp.setActivationPolicy(.accessory)
+            DispatchQueue.main.async {
+                NSApp.setActivationPolicy(.accessory)
+            }
         }
     }
 
@@ -97,7 +101,7 @@ private final class EditorWindowDelegate: NSObject, NSWindowDelegate, @unchecked
 
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }
-        Task { @MainActor in
+        DispatchQueue.main.async {
             EditorWindowController.shared.windowDidClose(window)
         }
     }

@@ -8,6 +8,7 @@ final class ShortcutService {
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
+    private static var cachedShortcuts: [(Action, Shortcut)] = []
 
     var isRegistered: Bool { eventTap != nil }
 
@@ -66,7 +67,19 @@ final class ShortcutService {
 
         self.eventTap = tap
         self.runLoopSource = source
+        Self.cacheShortcuts()
         print("BetterShot: Event tap registered successfully — keyboard shortcuts active")
+    }
+
+    private static func cacheShortcuts() {
+        let service = ShortcutService.shared
+        cachedShortcuts = [
+            (.region, service.loadShortcut(for: .region) ?? .defaultRegion),
+            (.fullscreen, service.loadShortcut(for: .fullscreen) ?? .defaultFullscreen),
+            (.ocr, service.loadShortcut(for: .ocr) ?? .defaultOCR),
+            (.colorPicker, service.loadShortcut(for: .colorPicker) ?? .defaultColorPicker),
+            (.repeatRegion, service.loadShortcut(for: .repeatRegion) ?? .defaultRepeatRegion),
+        ]
     }
 
     func unregisterAll() {
@@ -87,6 +100,7 @@ final class ShortcutService {
         if let data = try? JSONEncoder().encode(shortcut) {
             UserDefaults.standard.set(data, forKey: key)
         }
+        Self.cacheShortcuts()
     }
 
     func loadShortcut(for action: Action) -> Shortcut? {
@@ -126,24 +140,13 @@ final class ShortcutService {
         let keyCode = UInt32(event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags
 
-        // Convert CGEventFlags to Carbon modifier mask for comparison
         var carbonMods: UInt32 = 0
         if flags.contains(.maskCommand) { carbonMods |= UInt32(cmdKey) }
         if flags.contains(.maskShift) { carbonMods |= UInt32(shiftKey) }
         if flags.contains(.maskAlternate) { carbonMods |= UInt32(optionKey) }
         if flags.contains(.maskControl) { carbonMods |= UInt32(controlKey) }
 
-        let service = ShortcutService.shared
-
-        let shortcuts: [(Action, Shortcut)] = [
-            (.region, service.loadShortcut(for: .region) ?? .defaultRegion),
-            (.fullscreen, service.loadShortcut(for: .fullscreen) ?? .defaultFullscreen),
-            (.ocr, service.loadShortcut(for: .ocr) ?? .defaultOCR),
-            (.colorPicker, service.loadShortcut(for: .colorPicker) ?? .defaultColorPicker),
-            (.repeatRegion, service.loadShortcut(for: .repeatRegion) ?? .defaultRepeatRegion),
-        ]
-
-        for (action, shortcut) in shortcuts {
+        for (action, shortcut) in cachedShortcuts {
             guard shortcut.enabled else { continue }
             if keyCode == shortcut.keyCode && carbonMods == shortcut.modifiers {
                 Task { @MainActor in

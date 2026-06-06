@@ -5,6 +5,40 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4] - 2026-06-06
+
+### Added
+
+- **Automatic update check on launch**: App checks GitHub releases on startup and shows a toast notification when a new version is available. A blue dot badge appears next to the version label in the menu bar
+- **Smart toast after capture**: Toast now shows "Screenshot saved & copied!" when clipboard copy is enabled, or "Screenshot saved!" otherwise
+
+### Changed
+
+- **Simplified capture flow**: Screenshots now always apply default settings (background, padding, corner radius, shadow) and save directly to the gallery. No more editor-first or preview-first workflow — just capture, auto-beautify, and save
+- **Removed screenshot mode picker**: The Editor/Gallery segmented control is removed from the menu bar. Default effects configured in Settings are always applied automatically
+- **Preview panel restored**: Both a toast notification and the floating preview panel now appear after taking a screenshot
+- **Removed overlay settings**: Overlay position and dismiss delay settings removed from Capture settings since the floating preview is no longer shown after capture
+- **Recent captures open in editor**: Clicking a recent capture in the menu bar now opens it in the editor instead of showing a floating preview
+- Version bumped to 0.3.4 (build 7)
+
+### Fixed
+
+- **Crash on window close**: Fixed `EXC_BREAKPOINT` crash in `_postWindowNeedsUpdateConstraints` caused by `setActivationPolicy(.accessory)` triggering layout updates on a window mid-teardown. Deferred activation policy change to the next run loop iteration for editor, settings, and toast windows
+- **Double background on editor open**: Fixed beautifier config being applied twice when opening an already-beautified screenshot in the editor. The capture flow now saves beautified output to the save directory while history retains the raw capture, so the editor always works with raw images
+- **Race condition fixes across the codebase**: Fixed multiple race conditions that could cause crashes:
+  - Menu bar popover: eliminated Task wrapper in close animation, captured panel reference before nil'ing to prevent use-after-free
+  - Editor window delegate: replaced `Task { @MainActor }` with `DispatchQueue.main.async` for deterministic ordering during window teardown
+  - Shortcut service: cached shortcuts on main thread to prevent `@MainActor`-isolated property access from CGEvent tap callback thread
+  - Toast window: added generation counter to prevent stale animated-dismiss completion handlers from nil'ing a newly created panel
+  - Countdown overlay: added cancellation guard against concurrent `showCountdown` calls that could stack overlapping countdowns
+  - Preview overlay: cancel pending dismiss task at the start of `show()` to prevent a stale dismiss from hiding a freshly shown preview
+  - Menu bar event monitor: replaced `Task { @MainActor }` with `DispatchQueue.main.async` for consistent dispatch ordering
+
+### Removed
+
+- **Screenshot mode preference** (`ScreenshotMode` enum): No longer needed since capture always uses gallery mode with auto-applied defaults
+- **"Show floating preview after capture" toggle**: Removed from General settings
+
 ## [0.3.3] - 2026-06-06
 
 ### Added
