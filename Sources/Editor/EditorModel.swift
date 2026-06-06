@@ -99,9 +99,9 @@ final class EditorModel {
         imageSize = CGSize(width: image.width, height: image.height)
         previewImage = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
 
-        let isAutoApplied = CaptureOrchestrator.shared.autoAppliedURLs.contains(url)
-        let hasAlpha = image.alphaInfo != .none && image.alphaInfo != .noneSkipLast && image.alphaInfo != .noneSkipFirst
-        if isAutoApplied || hasAlpha {
+        let urlPath = url.standardizedFileURL.path
+        let isAutoApplied = CaptureOrchestrator.shared.autoAppliedURLs.contains(where: { $0.standardizedFileURL.path == urlPath })
+        if isAutoApplied {
             config = BeautifierConfig()
         } else {
             config = AppPreferences.defaultBeautifierConfig

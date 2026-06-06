@@ -17,6 +17,6 @@
   },
   "properties" : {
     "preserves-vector-representation" : false,
-    "template-rendering-intent" : "original"
+    "template-rendering-intent" : "template"
   }
 }

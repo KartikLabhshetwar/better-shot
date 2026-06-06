@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Menu bar icon redesigned**: Converted to a proper template image (black on transparent) that automatically renders white in dark mode and black in light mode, matching native macOS menu bar icon behavior. Icon now fills the full menu bar height instead of being undersized
 - **Menu bar redesigned**: Window-style popover with 2-column grid buttons (Region, Screen, Window, Pick Color), utility grid (OCR, Recent Captures), and footer grid (Settings, Quit). Shortcut badges on each button. Replaces the native NSMenu style
 - **About page redesigned**: Left-aligned sectioned layout (Updates, Project, Credits) with horizontal icon+title header. Includes GitHub and X links
 - **Settings window enlarged**: 680×560 (was 620×440) so Default Effects preview and sliders are visible without scrolling
