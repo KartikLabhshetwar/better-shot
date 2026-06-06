@@ -47,7 +47,7 @@ final class PreviewOverlay {
 
     private func createPanel() {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 180, height: 150),
+            contentRect: NSRect(x: 0, y: 0, width: 160, height: 130),
             styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -70,7 +70,7 @@ final class PreviewOverlay {
         guard let panel, let screen = NSScreen.main else { return }
 
         let screenFrame = screen.visibleFrame
-        let panelSize = CGSize(width: 280, height: 220)
+        let panelSize = CGSize(width: 200, height: 170)
 
         let x: CGFloat
         let y: CGFloat
@@ -103,7 +103,7 @@ struct PreviewCardView: View {
     let overlay: PreviewOverlay
     @State private var isHovered = false
 
-    private let cardSize = CGSize(width: 165, height: 124)
+    private let cardSize = CGSize(width: 130, height: 98)
 
     var body: some View {
         Group {
@@ -120,13 +120,13 @@ struct PreviewCardView: View {
                             .transition(.opacity.animation(.easeInOut(duration: 0.15)))
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
                 )
-                .shadow(color: .black.opacity(0.35), radius: 20, y: 8)
-                .shadow(color: .black.opacity(0.15), radius: 6, y: 3)
+                .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
+                .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
                 .onHover { hovering in
                     withAnimation(.easeInOut(duration: 0.15)) {
                         isHovered = hovering
@@ -139,9 +139,9 @@ struct PreviewCardView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-        .padding(.trailing, 28)
-        .padding(.bottom, 32)
-        .frame(width: 280, height: 220)
+        .padding(.trailing, 20)
+        .padding(.bottom, 24)
+        .frame(width: 200, height: 170)
     }
 
     @ViewBuilder
@@ -187,7 +187,7 @@ struct PreviewCardView: View {
                     Spacer()
                 }
             }
-            .padding(8)
+            .padding(6)
 
             // Center pill actions
             HStack(spacing: 6) {
@@ -209,7 +209,7 @@ struct PreviewCardView: View {
             Image(systemName: systemName)
                 .symbolRenderingMode(.palette)
                 .foregroundStyle(.white, .white.opacity(0.25))
-                .font(.title2)
+                .font(.system(size: 16))
         }
         .buttonStyle(.plain)
     }
@@ -217,10 +217,10 @@ struct PreviewCardView: View {
     private func pillButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.primary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
                 .background(.white.opacity(0.85), in: Capsule())
         }
         .buttonStyle(.plain)

@@ -83,7 +83,7 @@ Resources/
 User presses ⌘⇧4
   → ShortcutService (CGEvent tap intercepts the keypress)
   → CaptureOrchestrator.performCapture(.region)
-  → ScreenCapture.captureRegion() (ScreenCaptureKit)
+  → ScreenCapture.captureRegion() (native screencapture CLI)
   → HistoryStore.importCapture() (saves to Application Support)
   → PreviewOverlay.show() (floating card appears)
   → User clicks preview → EditorWindowController.open()

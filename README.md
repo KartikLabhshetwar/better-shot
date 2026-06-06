@@ -16,12 +16,12 @@ An open-source alternative to CleanShot X. Native Swift app for macOS — fast, 
 |---|---|
 | Region screenshot | `⌘⇧4` |
 | Fullscreen screenshot | `⌘⇧3` |
-| Window screenshot | `⌘⇧5` |
+| Window screenshot | Menu bar only |
 | Repeat last region | `⌃⌘⇧4` |
 | OCR text + QR scan | `⌘⇧O` |
 | Color picker (hex) | `⌘⇧C` |
 
-All shortcuts are customizable in Settings > Capture.
+Region, fullscreen, and window capture all use the native macOS `screencapture` CLI for maximum reliability. Keyboard shortcuts are customizable in Settings > Capture.
 
 ### Edit
 
@@ -129,11 +129,10 @@ Native Swift 6 / SwiftUI. No Electron, no web views, no external dependencies.
 
 | Framework | Used for |
 |---|---|
-| ScreenCaptureKit | All screenshot capture |
 | CoreGraphics | Image compositing, annotation rendering, beautifier pipeline |
 | CoreImage | Gaussian blur for redaction |
 | Vision | OCR text extraction + QR/barcode detection |
-| AppKit | Color sampling, floating panels, pinned windows |
+| AppKit | Color sampling, floating panels, pinned windows, capture via CLI |
 | Carbon | Global keyboard shortcuts via CGEvent tap |
 
 ## Contributing

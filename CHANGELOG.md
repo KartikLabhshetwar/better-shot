@@ -12,25 +12,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings sidebar navigation**: Redesigned preferences from top tabs to a left sidebar with right content panel
 - **Keyboard shortcut recorder**: Click any shortcut badge to record a new key combination (press Escape to cancel)
 - **Default effects configuration**: Padding, corner radius, shadow, and background are now configurable directly in Settings and persist across sessions
-- **Click preview to open editor**: Clicking the floating preview overlay opens the editor, matching CleanShot X behavior
+- **Click preview to open editor**: Clicking the floating preview overlay opens the editor
+- **Window capture**: Click-to-select window capture available from the menu bar
 
 ### Fixed
 
 - **History icon disappearing**: Menu bar "Recent Captures" and dividers no longer vanish when capture history is empty
-- **Menu bar cleanup**: Removed redundant "Open Last Capture" (covered by Recent Captures), renamed "Settings..." to "Settings"
 - **About tab**: Removed build number from version display, updated tagline
-- **Background picker in settings**: Cleaner grid layout with proper "None" swatch (strikethrough icon), tooltips on all swatches, separated Default Effects and Default Background into distinct sections
-- **Background label**: Shows category name instead of raw filename for bundled images
-- **Preview click-to-edit**: Clicking anywhere on the floating preview (including the hovered overlay area) now opens the editor
-- **Custom background image**: Fixed file picker for custom wallpaper backgrounds in editor; shows thumbnail and filename when a custom image is selected
+- **Background picker in settings**: Cleaner grid layout with proper "None" swatch (strikethrough icon), tooltips on all swatches
+- **Preview click-to-edit**: Clicking anywhere on the floating preview (including the hover overlay) now opens the editor
+- **Custom background image**: Fixed file picker for custom wallpaper backgrounds in editor
 
 ### Changed
 
+- **Capture engine rewritten**: Region, fullscreen, and window capture now use the native macOS `screencapture` CLI for maximum reliability across all displays and configurations. Replaced ScreenCaptureKit-based capture pipeline.
+- **Preview panel made compact**: Reduced floating preview card size and hover overlay for a less intrusive capture experience
+- **Menu bar redesigned**: Cleaner layout with grouped sections, removed redundant items, window capture available without a keyboard shortcut
 - Default beautifier config now uses a centralized `AppPreferences.defaultBeautifierConfig` accessor across editor, settings, and auto-apply
 
 ### Removed
 
-- **Bundled background images from editor**: Removed Wallpapers, bundled Gradients images, and macOS image sections from the editor background picker. Only solid colors, code-generated gradients, and custom image remain.
+- **Bundled background images**: Removed Wallpapers and Gradients image assets from the editor. Only solid colors, code-generated gradients, macOS assets, and custom images remain
 
 ## [0.3.2] - 2026-06-03
 
