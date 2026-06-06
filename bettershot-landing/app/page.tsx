@@ -4,7 +4,7 @@ import { ArrowUpRight } from "lucide-react"
 import { DownloadDropdown } from "@/components/download-dropdown"
 import { getLatestRelease } from "@/lib/downloads"
 import { StarCount } from "@/components/star-count"
-import { EditorPlayer } from "@/components/editor-demo"
+import { EditorPreview } from "@/components/editor-demo"
 
 export default async function Home() {
   const release = await getLatestRelease()
@@ -77,7 +77,7 @@ export default async function Home() {
         {/* Screenshot preview */}
         <section className="max-w-[880px] mx-auto px-6 pb-24">
           <div className="rounded-xl border border-[#111]/[0.06] bg-[#111]/[0.02] p-2 overflow-hidden">
-            <EditorPlayer />
+            <EditorPreview />
           </div>
         </section>
 
