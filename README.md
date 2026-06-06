@@ -25,14 +25,14 @@ Region, fullscreen, and window capture all use the native macOS `screencapture` 
 
 ### Edit
 
-- **Backgrounds** — Solid colors, gradients, bundled wallpapers, or your own image
-- **Effects** — Padding, corner radius, shadow strength
+- **Backgrounds** — Solid colors, gradients, bundled macOS wallpapers, or your own image
+- **Effects** — Padding, corner radius, shadow strength — all rendered live with SwiftUI-native layers
 - **Layout** — Aspect ratio (Auto, 1:1, 4:3, 3:2, 16:9, 9:16), 9-point alignment grid
-- **Save as default** — Set your preferred effects and background once, applied to every new capture
+- **Defaults in Settings** — Configure your preferred effects and background in Settings with a live preview
 
 ### Annotate
 
-Rectangles, filled rectangles, ellipses, lines, curved arrows, freehand, text, numbered badges, pixelate, blur, and spotlight. Each has a single-key shortcut in the editor (`R`, `F`, `O`, `L`, `A`, `D`, `T`, `N`, `P`, `B`, `G`).
+Rectangles, filled rectangles, ellipses, lines, curved arrows, freehand, text, numbered badges, blur, and spotlight. Each has a single-key shortcut in the editor (`R`, `F`, `O`, `L`, `A`, `D`, `T`, `N`, `B`, `G`).
 
 ### Workflow
 
@@ -91,7 +91,6 @@ Screen Recording lets the app capture your screen. Accessibility lets it overrid
 | Freehand | `D` |
 | Text | `T` |
 | Numbered circle | `N` |
-| Pixelate | `P` |
 | Blur | `B` |
 | Spotlight | `G` |
 | Save / Export | `⌘S` |
@@ -105,10 +104,10 @@ Screen Recording lets the app capture your screen. Accessibility lets it overrid
 
 Open from the menu bar > **Settings** (or `⌘,`).
 
-- **General** — Save location, clipboard behavior, default effects (padding, radius, shadow, background), export format
+- **General** — Save location, clipboard behavior, default effects with live preview (padding, radius, shadow, background including macOS wallpapers and custom images), export format
 - **Capture** — Self-timer delay, keyboard shortcuts (click any shortcut to re-record it), overlay position and dismiss timing
 - **History** — Browse and delete past captures
-- **About** — Version info and in-app update checker
+- **About** — Version info, in-app update checker, project links (GitHub, X)
 
 ## Make commands
 

@@ -30,7 +30,7 @@ final class EditorModel {
     var editingTextItemID: AnnotationItem.ID?
     var isTextPlacementArmed = false
     var selectionRect: CGRect?
-    var selectedTool: AnnotationTool = .rectangle
+    var selectedTool: AnnotationTool = .select
     var selectedSwatch: AnnotationSwatch = .red
     var strokeWidth: CGFloat = 4
     var redactionDensity: CGFloat = 0.55

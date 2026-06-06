@@ -12,26 +12,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings sidebar navigation**: Redesigned preferences from top tabs to a left sidebar with right content panel
 - **Keyboard shortcut recorder**: Click any shortcut badge to record a new key combination (press Escape to cancel)
 - **Default effects configuration**: Padding, corner radius, shadow, and background are now configurable directly in Settings and persist across sessions
+- **Live settings preview**: Default Effects section shows a real-time mini preview of how screenshots will look with current padding, corner radius, shadow, and background
+- **macOS wallpapers in settings**: Default Background picker now includes bundled macOS wallpaper thumbnails alongside solid colors and gradients
+- **Custom image backgrounds in settings**: "Custom Image..." button in Default Background picker lets you choose any image file as your default background
 - **Click preview to open editor**: Clicking the floating preview overlay opens the editor
 - **Window capture**: Click-to-select window capture available from the menu bar
 
 ### Fixed
 
+- **Blur/pixelation invisible in editor**: Fixed `viewScale ≈ 0.16` being multiplied into blur radius and pixel block size, making effects sub-pixel in the canvas preview. Blur radius no longer scales; pixelation computes blocks from view dimensions
+- **Spotlight annotation drift**: Canvas preview used `imageFrame` for overlay extent but export used `fullCanvasRect`. Fixed by passing `canvasFrame` through to SpotlightPreview
+- **Laggy editor sliders**: Replaced CGContext-based preview render loop with SwiftUI-native layers (CanvasBackgroundView, CanvasScreenshotView), eliminating re-render on every slider change
+- **OCR not firing from menu bar**: `dismiss()` was cancelling the async capture task. Fixed by using `Task.detached` so capture survives popover teardown
+- **Settings not opening from menu bar**: Replaced unreliable `NSApp.sendAction(Selector(...))` with `@Environment(\.openSettings)` called before dismiss
 - **History icon disappearing**: Menu bar "Recent Captures" and dividers no longer vanish when capture history is empty
-- **About tab**: Removed build number from version display, updated tagline
-- **Background picker in settings**: Cleaner grid layout with proper "None" swatch (strikethrough icon), tooltips on all swatches
+- **Background picker in settings**: Cleaner grid layout with proper "None" swatch (strikethrough icon)
 - **Preview click-to-edit**: Clicking anywhere on the floating preview (including the hover overlay) now opens the editor
 - **Custom background image**: Fixed file picker for custom wallpaper backgrounds in editor
+- **GitHub link in About tab**: Corrected URL to `KartikLabhshetwar/better-shot`
 
 ### Changed
 
-- **Capture engine rewritten**: Region, fullscreen, and window capture now use the native macOS `screencapture` CLI for maximum reliability across all displays and configurations. Replaced ScreenCaptureKit-based capture pipeline.
-- **Preview panel made compact**: Reduced floating preview card size and hover overlay for a less intrusive capture experience
-- **Menu bar redesigned**: Cleaner layout with grouped sections, removed redundant items, window capture available without a keyboard shortcut
+- **Menu bar redesigned**: Window-style popover with 2-column grid buttons (Region, Screen, Window, Pick Color), utility grid (OCR, Recent Captures), and footer grid (Settings, Quit). Shortcut badges on each button. Replaces the native NSMenu style
+- **About page redesigned**: Left-aligned sectioned layout (Updates, Project, Credits) with horizontal icon+title header. Includes GitHub and X links
+- **Settings window enlarged**: 680×560 (was 620×440) so Default Effects preview and sliders are visible without scrolling
+- **Editor canvas rewritten**: SwiftUI-native rendering with `CanvasBackgroundView` and `CanvasScreenshotView` instead of CGContext re-renders. `UnevenRoundedRectangle` for per-corner radius clipping
+- **Capture engine rewritten**: Region, fullscreen, and window capture now use the native macOS `screencapture` CLI for maximum reliability across all displays and configurations
+- **Layout section improved**: Single "Ratio" row with dropdown, larger alignment grid with 28pt cells and hover highlights
 - Default beautifier config now uses a centralized `AppPreferences.defaultBeautifierConfig` accessor across editor, settings, and auto-apply
 
 ### Removed
 
+- **Pixelate annotation tool**: Removed from the toolbar (blur tool remains). Keyboard shortcut `P` removed
+- **"Save as Default" button**: Removed from editor Effects section; defaults are now managed in Settings
 - **Bundled background images**: Removed Wallpapers and Gradients image assets from the editor. Only solid colors, code-generated gradients, macOS assets, and custom images remain
 
 ## [0.3.2] - 2026-06-03
