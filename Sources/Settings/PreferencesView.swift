@@ -56,7 +56,6 @@ struct GeneralSettingsTab: View {
     @AppStorage("bs_copyAfterSave") private var copyAfterSave = true
     @AppStorage("bs_playSound") private var playSound = true
     @AppStorage("bs_showOverlay") private var showOverlay = true
-    @AppStorage("bs_autoApplyBackground") private var autoApply = false
     @AppStorage("bs_exportFormat") private var exportFormatRaw: String = ExportFormat.png.rawValue
     @AppStorage("bs_exportQuality") private var exportQuality: Double = 0.9
 
@@ -103,7 +102,6 @@ struct GeneralSettingsTab: View {
             Section("Capture") {
                 Toggle("Play shutter sound", isOn: $playSound)
                 Toggle("Show floating preview after capture", isOn: $showOverlay)
-                Toggle("Auto-apply default background", isOn: $autoApply)
             }
 
             Section("Default Effects") {
@@ -540,7 +538,6 @@ struct CaptureSettingsTab: View {
                     ShortcutRow(label: "Fullscreen", action: .fullscreen)
                     ShortcutRow(label: "OCR Region", action: .ocr)
                     ShortcutRow(label: "Color Picker", action: .colorPicker)
-                    ShortcutRow(label: "Repeat Region", action: .repeatRegion)
                 }
             }
 
@@ -824,7 +821,7 @@ struct AboutTab: View {
                         Text("BetterShot")
                             .font(.system(size: 20, weight: .bold))
 
-                        Text("Version \(version) (\(build))")
+                        Text("Version \(version)")
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
 

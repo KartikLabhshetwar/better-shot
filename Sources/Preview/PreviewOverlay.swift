@@ -161,7 +161,13 @@ struct PreviewCardView: View {
                     // Delete
                     cornerButton("trash.circle.fill") {
                         if let url = overlay.currentURL {
-                            try? FileManager.default.removeItem(at: url)
+                            if let record = HistoryStore.shared.records.first(where: {
+                                HistoryStore.shared.urlForRecord($0) == url
+                            }) {
+                                HistoryStore.shared.deleteRecord(record)
+                            } else {
+                                try? FileManager.default.removeItem(at: url)
+                            }
                         }
                         overlay.dismiss()
                     }

@@ -7,6 +7,8 @@ final class EditorWindowController {
 
     private var windows: [NSWindow] = []
 
+    var hasOpenWindows: Bool { !windows.isEmpty }
+
     private init() {}
 
     func open(url: URL) {
@@ -27,6 +29,7 @@ final class EditorWindowController {
         win.title = url.deletingPathExtension().lastPathComponent
         win.isReleasedWhenClosed = false
         win.delegate = EditorWindowDelegate.shared
+        win.collectionBehavior = [.moveToActiveSpace]
 
         centerOnActiveScreen(win)
 

@@ -8,7 +8,6 @@ final class CaptureOrchestrator {
     static let shared = CaptureOrchestrator()
 
     private(set) var lastCaptureURL: URL?
-    private(set) var autoAppliedURLs: Set<URL> = []
     private var captureInProgress = false
     private var pendingCaptures: [ShortcutService.Action] = []
 
@@ -48,7 +47,6 @@ final class CaptureOrchestrator {
     // MARK: - Private
 
     private func captureAndProcess(_ capture: () async throws -> URL?) async {
-        // Show countdown overlay for self-timer, then proceed with capture
         let delay = AppPreferences.selfTimerDelay
         if delay != .off {
             await CountdownOverlay.shared.showCountdown(seconds: delay.rawValue)
@@ -59,22 +57,18 @@ final class CaptureOrchestrator {
 
             ScreenCapture.shared.playShutterSound()
 
-            // Import to history
             let record = HistoryStore.shared.importCapture(from: url)
             if let record {
                 lastCaptureURL = HistoryStore.shared.urlForRecord(record)
             }
 
-            if AppPreferences.autoApplyBackground {
-                // Auto-apply default background and save
-                if let capturedURL = lastCaptureURL {
-                    await autoApplyAndSave(capturedURL)
-                }
-            } else if AppPreferences.showOverlayAfterCapture {
-                // Show floating preview
-                if let capturedURL = lastCaptureURL {
-                    PreviewOverlay.shared.show(url: capturedURL)
-                }
+            guard let capturedURL = lastCaptureURL else { return }
+
+            switch AppPreferences.screenshotMode {
+            case .editor:
+                EditorWindowController.shared.open(url: capturedURL)
+            case .gallery:
+                await galleryApplyAndSave(capturedURL)
             }
         } catch {
             print("Capture failed: \(error.localizedDescription)")
@@ -89,6 +83,11 @@ final class CaptureOrchestrator {
         pasteboard.clearContents()
         pasteboard.setString(hex, forType: .string)
         ScreenCapture.shared.playShutterSound()
+        ToastWindow.shared.show(
+            title: "Copied",
+            message: "\(hex) copied to clipboard",
+            systemIcon: "eyedropper"
+        )
     }
 
     private func performOCR() async {
@@ -98,16 +97,21 @@ final class CaptureOrchestrator {
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
             ScreenCapture.shared.playShutterSound()
+            ToastWindow.shared.show(
+                title: "Copied",
+                message: "Text copied to clipboard",
+                systemIcon: "doc.text.viewfinder"
+            )
         } catch {
             print("OCR failed: \(error.localizedDescription)")
         }
     }
 
-    private func autoApplyAndSave(_ url: URL) async {
+    private func galleryApplyAndSave(_ url: URL) async {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return }
 
-        let config = loadDefaultBeautifierConfig()
+        let config = AppPreferences.defaultBeautifierConfig
         let rendered = BeautifierRenderer.render(image: cgImage, config: config)
 
         guard let rendered else { return }
@@ -118,16 +122,14 @@ final class CaptureOrchestrator {
             copyToClipboard(savedURL)
         }
 
-        if let savedURL {
-            autoAppliedURLs.insert(savedURL)
-            if AppPreferences.showOverlayAfterCapture {
-                PreviewOverlay.shared.show(url: savedURL)
-            }
+        if let savedURL, AppPreferences.showOverlayAfterCapture {
+            PreviewOverlay.shared.show(url: savedURL)
         }
-    }
 
-    private func loadDefaultBeautifierConfig() -> BeautifierConfig {
-        AppPreferences.defaultBeautifierConfig
+        if savedURL != nil {
+            let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage
+            ToastWindow.shared.show(message: "Screenshot saved to gallery!", icon: appIcon)
+        }
     }
 
     private func saveImage(_ cgImage: CGImage) -> URL? {

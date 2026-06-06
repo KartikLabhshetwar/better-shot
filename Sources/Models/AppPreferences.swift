@@ -7,7 +7,7 @@ enum AppPreferences {
     private static let copyAfterSaveKey = "bs_copyAfterSave"
     private static let playSoundKey = "bs_playSound"
     private static let showOverlayKey = "bs_showOverlay"
-    private static let autoApplyKey = "bs_autoApplyBackground"
+    private static let screenshotModeKey = "bs_screenshotMode"
     private static let overlayPositionKey = "bs_overlayPosition"
     private static let overlayDismissDelayKey = "bs_overlayDismissDelay"
     private static let exportFormatKey = "bs_exportFormat"
@@ -35,9 +35,13 @@ enum AppPreferences {
         set { UserDefaults.standard.set(newValue, forKey: showOverlayKey) }
     }
 
-    static var autoApplyBackground: Bool {
-        get { UserDefaults.standard.bool(forKey: autoApplyKey) }
-        set { UserDefaults.standard.set(newValue, forKey: autoApplyKey) }
+    static var screenshotMode: ScreenshotMode {
+        get {
+            guard let raw = UserDefaults.standard.string(forKey: screenshotModeKey),
+                  let mode = ScreenshotMode(rawValue: raw) else { return .editor }
+            return mode
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: screenshotModeKey) }
     }
 
     // MARK: - Overlay
@@ -122,6 +126,18 @@ enum ExportFormat: String, CaseIterable {
         switch self {
         case .png: return "png"
         case .jpeg: return "jpg"
+        }
+    }
+}
+
+enum ScreenshotMode: String, CaseIterable {
+    case editor
+    case gallery
+
+    var label: String {
+        switch self {
+        case .editor: return "Editor"
+        case .gallery: return "Gallery"
         }
     }
 }

@@ -99,13 +99,7 @@ final class EditorModel {
         imageSize = CGSize(width: image.width, height: image.height)
         previewImage = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
 
-        let urlPath = url.standardizedFileURL.path
-        let isAutoApplied = CaptureOrchestrator.shared.autoAppliedURLs.contains(where: { $0.standardizedFileURL.path == urlPath })
-        if isAutoApplied {
-            config = BeautifierConfig()
-        } else {
-            config = AppPreferences.defaultBeautifierConfig
-        }
+        config = AppPreferences.defaultBeautifierConfig
 
         items = []
         draftItem = nil

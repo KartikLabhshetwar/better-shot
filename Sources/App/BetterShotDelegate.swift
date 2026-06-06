@@ -8,6 +8,8 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
         NSApp.appearance = NSAppearance(named: .aqua)
         NSApp.setActivationPolicy(.accessory)
 
+        MenuBarPopoverController.shared.setup()
+
         if ShortcutService.hasAccessibilityPermission {
             ShortcutService.shared.registerAll()
 
