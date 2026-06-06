@@ -107,12 +107,7 @@ final class CaptureOrchestrator {
     }
 
     private func loadDefaultBeautifierConfig() -> BeautifierConfig {
-        guard let data = UserDefaults.standard.data(forKey: "bs_defaultBeautifierConfig"),
-              let config = try? JSONDecoder().decode(BeautifierConfig.self, from: data)
-        else {
-            return .default
-        }
-        return config
+        AppPreferences.defaultBeautifierConfig
     }
 
     private func saveImage(_ cgImage: CGImage) -> URL? {

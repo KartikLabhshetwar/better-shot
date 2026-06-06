@@ -132,6 +132,11 @@ struct PreviewCardView: View {
                         isHovered = hovering
                     }
                 }
+                .onTapGesture {
+                    if !isHovered {
+                        overlay.openAnnotateEditor()
+                    }
+                }
                 .draggable(image)
             }
         }

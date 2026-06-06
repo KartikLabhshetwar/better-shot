@@ -84,6 +84,21 @@ enum AppPreferences {
         }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: selfTimerKey) }
     }
+
+    // MARK: - Default Beautifier Config
+    static var defaultBeautifierConfig: BeautifierConfig {
+        get {
+            guard let data = UserDefaults.standard.data(forKey: "bs_defaultBeautifierConfig"),
+                  let config = try? JSONDecoder().decode(BeautifierConfig.self, from: data)
+            else { return .default }
+            return config
+        }
+        set {
+            if let data = try? JSONEncoder().encode(newValue) {
+                UserDefaults.standard.set(data, forKey: "bs_defaultBeautifierConfig")
+            }
+        }
+    }
 }
 
 // MARK: - Enums

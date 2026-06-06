@@ -5,18 +5,6 @@ struct MenuBarContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if let lastRecord = HistoryStore.shared.records.first {
-                Button {
-                    let url = HistoryStore.shared.urlForRecord(lastRecord)
-                    EditorWindowController.shared.open(url: url)
-                } label: {
-                    Label("Open Last Capture", systemImage: "photo")
-                }
-                .keyboardShortcut("e", modifiers: [.command, .shift])
-
-                Divider()
-            }
-
             Button {
                 Task { await CaptureOrchestrator.shared.performCapture(.region) }
             } label: {
@@ -64,10 +52,12 @@ struct MenuBarContentView: View {
                 }
             }
 
-            if HistoryStore.shared.records.count > 1 {
-                Divider()
+            Divider()
 
-                Menu("Recent Captures") {
+            Menu("Recent Captures") {
+                if HistoryStore.shared.records.isEmpty {
+                    Text("No captures yet")
+                } else {
                     ForEach(HistoryStore.shared.records.prefix(8)) { record in
                         Button {
                             let url = HistoryStore.shared.urlForRecord(record)
@@ -81,7 +71,7 @@ struct MenuBarContentView: View {
 
             Divider()
 
-            Button("Settings...") {
+            Button("Settings") {
                 openSettings()
             }
             .keyboardShortcut(",", modifiers: .command)

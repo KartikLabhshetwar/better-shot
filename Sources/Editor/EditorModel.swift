@@ -103,9 +103,8 @@ final class EditorModel {
         let hasAlpha = image.alphaInfo != .none && image.alphaInfo != .noneSkipLast && image.alphaInfo != .noneSkipFirst
         if hasAlpha {
             config = BeautifierConfig()
-        } else if let data = UserDefaults.standard.data(forKey: "bs_defaultBeautifierConfig"),
-           let saved = try? JSONDecoder().decode(BeautifierConfig.self, from: data) {
-            config = saved
+        } else {
+            config = AppPreferences.defaultBeautifierConfig
         }
 
         items = []
@@ -508,10 +507,8 @@ final class EditorModel {
     }
 
     func saveConfigAsDefault() {
-        if let data = try? JSONEncoder().encode(config) {
-            UserDefaults.standard.set(data, forKey: "bs_defaultBeautifierConfig")
-            toastMessage = "Saved as default"
-        }
+        AppPreferences.defaultBeautifierConfig = config
+        toastMessage = "Saved as default"
     }
 
     // MARK: - Private Interaction Helpers
