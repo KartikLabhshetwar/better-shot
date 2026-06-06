@@ -22,7 +22,6 @@ final class ShortcutService {
 
         static let defaultRegion = Shortcut(keyCode: UInt32(kVK_ANSI_4), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultFullscreen = Shortcut(keyCode: UInt32(kVK_ANSI_3), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
-        static let defaultWindow = Shortcut(keyCode: UInt32(kVK_ANSI_5), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultOCR = Shortcut(keyCode: UInt32(kVK_ANSI_O), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultColorPicker = Shortcut(keyCode: UInt32(kVK_ANSI_C), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultRepeatRegion = Shortcut(keyCode: UInt32(kVK_ANSI_4), modifiers: UInt32(cmdKey | shiftKey | controlKey), enabled: true)
@@ -31,7 +30,6 @@ final class ShortcutService {
     enum Action: UInt32, CaseIterable {
         case region = 1
         case fullscreen = 2
-        case window = 3
         case ocr = 4
         case colorPicker = 5
         case repeatRegion = 7
@@ -139,7 +137,6 @@ final class ShortcutService {
         let shortcuts: [(Action, Shortcut)] = [
             (.region, service.loadShortcut(for: .region) ?? .defaultRegion),
             (.fullscreen, service.loadShortcut(for: .fullscreen) ?? .defaultFullscreen),
-            (.window, service.loadShortcut(for: .window) ?? .defaultWindow),
             (.ocr, service.loadShortcut(for: .ocr) ?? .defaultOCR),
             (.colorPicker, service.loadShortcut(for: .colorPicker) ?? .defaultColorPicker),
             (.repeatRegion, service.loadShortcut(for: .repeatRegion) ?? .defaultRepeatRegion),

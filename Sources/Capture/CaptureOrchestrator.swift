@@ -17,8 +17,6 @@ final class CaptureOrchestrator {
             await captureAndProcess { try await ScreenCapture.shared.captureRegion() }
         case .fullscreen:
             await captureAndProcess { try await ScreenCapture.shared.captureFullscreen() }
-        case .window:
-            await captureAndProcess { try await ScreenCapture.shared.captureWindow() }
         case .ocr:
             await performOCR()
         case .colorPicker:

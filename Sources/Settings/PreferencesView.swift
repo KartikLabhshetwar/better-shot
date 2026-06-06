@@ -305,7 +305,6 @@ struct CaptureSettingsTab: View {
                 VStack(alignment: .leading, spacing: 8) {
                     ShortcutRow(label: "Region", action: .region)
                     ShortcutRow(label: "Fullscreen", action: .fullscreen)
-                    ShortcutRow(label: "Window", action: .window)
                     ShortcutRow(label: "OCR Region", action: .ocr)
                     ShortcutRow(label: "Color Picker", action: .colorPicker)
                     ShortcutRow(label: "Repeat Region", action: .repeatRegion)
@@ -403,7 +402,6 @@ struct ShortcutRow: View {
         switch action {
         case .region: return .defaultRegion
         case .fullscreen: return .defaultFullscreen
-        case .window: return .defaultWindow
         case .ocr: return .defaultOCR
         case .colorPicker: return .defaultColorPicker
         case .repeatRegion: return .defaultRepeatRegion

@@ -19,13 +19,6 @@ struct MenuBarContentView: View {
             }
             .keyboardShortcut("3", modifiers: [.command, .shift])
 
-            Button {
-                Task { await CaptureOrchestrator.shared.performCapture(.window) }
-            } label: {
-                Label("Window", systemImage: "macwindow")
-            }
-            .keyboardShortcut("5", modifiers: [.command, .shift])
-
             Divider()
 
             Button {
