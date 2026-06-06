@@ -23,14 +23,16 @@ struct PreferencesView: View {
     @State private var selectedSection: SettingsSection = .general
 
     var body: some View {
-        NavigationSplitView {
+        HStack(spacing: 0) {
             List(SettingsSection.allCases, selection: $selectedSection) { section in
                 Label(section.rawValue, systemImage: section.icon)
                     .tag(section)
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 150, ideal: 170, max: 200)
-        } detail: {
+            .frame(width: 170)
+
+            Divider()
+
             Group {
                 switch selectedSection {
                 case .general:
@@ -45,7 +47,8 @@ struct PreferencesView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: 680, height: 560)
+        .frame(minWidth: 680, minHeight: 560)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

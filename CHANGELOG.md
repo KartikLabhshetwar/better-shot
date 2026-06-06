@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Custom image backgrounds in settings**: "Custom Image..." button in Default Background picker lets you choose any image file as your default background
 - **Click preview to open editor**: Clicking the floating preview overlay opens the editor
 - **Window capture**: Click-to-select window capture available from the menu bar
+- **OCR toast notification**: After OCR copies text to clipboard, a toast confirms "Text copied to clipboard"
+- **Color picker toast notification**: After color picker copies hex to clipboard, a toast confirms "#HEXCODE copied to clipboard"
+- **Custom menu bar popover**: Replaced SwiftUI `MenuBarExtra` with a custom `NSPanel`-based popover with arrow, smooth spring animation, and click-outside-to-dismiss
 
 ### Fixed
 
@@ -24,7 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Spotlight annotation drift**: Canvas preview used `imageFrame` for overlay extent but export used `fullCanvasRect`. Fixed by passing `canvasFrame` through to SpotlightPreview
 - **Laggy editor sliders**: Replaced CGContext-based preview render loop with SwiftUI-native layers (CanvasBackgroundView, CanvasScreenshotView), eliminating re-render on every slider change
 - **OCR not firing from menu bar**: `dismiss()` was cancelling the async capture task. Fixed by using `Task.detached` so capture survives popover teardown
-- **Settings not opening from menu bar**: Replaced unreliable `NSApp.sendAction(Selector(...))` with `@Environment(\.openSettings)` called before dismiss
+- **Settings not opening from menu bar**: `@Environment(\.openSettings)` doesn't work from a custom `NSPanel` outside SwiftUI's scene system. Created `SettingsWindowController` that directly manages an `NSWindow` with `PreferencesView`, matching the `EditorWindowController` pattern
+- **Editor opens on wrong screen/Space**: `NSApp.activate(ignoringOtherApps:)` would switch macOS Spaces to where the app was last active (typically Desktop). Added `.moveToActiveSpace` collection behavior to editor and settings windows so they appear on the user's current Space
+- **Settings sidebar toggle on wrong side**: Sidebar toggle button appeared on the right side of the title bar when hosted in `NSHostingView`. Fixed by adding an `NSToolbar` with `.toggleSidebar` item to the settings window
 - **History icon disappearing**: Menu bar "Recent Captures" and dividers no longer vanish when capture history is empty
 - **Background picker in settings**: Cleaner grid layout with proper "None" swatch (strikethrough icon)
 - **Preview click-to-edit**: Clicking anywhere on the floating preview (including the hover overlay) now opens the editor
@@ -34,9 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Menu bar icon redesigned**: Converted to a proper template image (black on transparent) that automatically renders white in dark mode and black in light mode, matching native macOS menu bar icon behavior. Icon now fills the full menu bar height instead of being undersized
-- **Menu bar redesigned**: Window-style popover with 2-column grid buttons (Region, Screen, Window, Pick Color), utility grid (OCR, Recent Captures), and footer grid (Settings, Quit). Shortcut badges on each button. Replaces the native NSMenu style
+- **Menu bar redesigned**: Custom `NSPanel` popover with arrow, 2-column grid buttons (Region, Screen, Window, Pick Color), screenshot mode toggle (Editor/Gallery), utility grid (OCR, Recent Captures), and footer grid (Settings, Quit). Shortcut badges on each button
 - **About page redesigned**: Left-aligned sectioned layout (Updates, Project, Credits) with horizontal icon+title header. Includes GitHub and X links
 - **Settings window enlarged**: 680×560 (was 620×440) so Default Effects preview and sliders are visible without scrolling
+- **Settings window title**: Shortened to "Settings" (was "BetterShot Settings") to prevent title bar truncation
+- **Toast notifications generalized**: `ToastWindow` now accepts a custom title (was hardcoded "Saved") and supports SF Symbol icons alongside app icons
+- **Color picker feedback**: Replaced the cursor-anchored dark HUD panel with a standard toast notification matching the app's toast style
 - **Editor canvas rewritten**: SwiftUI-native rendering with `CanvasBackgroundView` and `CanvasScreenshotView` instead of CGContext re-renders. `UnevenRoundedRectangle` for per-corner radius clipping
 - **Capture engine rewritten**: Region, fullscreen, and window capture now use the native macOS `screencapture` CLI for maximum reliability across all displays and configurations
 - **Layout section improved**: Single "Ratio" row with dropdown, larger alignment grid with 28pt cells and hover highlights
@@ -47,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pixelate annotation tool**: Removed from the toolbar (blur tool remains). Keyboard shortcut `P` removed
 - **"Save as Default" button**: Removed from editor Effects section; defaults are now managed in Settings
 - **Bundled background images**: Removed Wallpapers and Gradients image assets from the editor. Only solid colors, code-generated gradients, macOS assets, and custom images remain
+- **Repeat Region shortcut from settings**: Removed from the Keyboard Shortcuts section in Capture settings
 
 ## [0.3.2] - 2026-06-03
 

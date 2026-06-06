@@ -17,11 +17,10 @@ An open-source alternative to CleanShot X. Native Swift app for macOS — fast, 
 | Region screenshot | `⌘⇧4` |
 | Fullscreen screenshot | `⌘⇧3` |
 | Window screenshot | Menu bar only |
-| Repeat last region | `⌃⌘⇧4` |
 | OCR text + QR scan | `⌘⇧O` |
 | Color picker (hex) | `⌘⇧C` |
 
-Region, fullscreen, and window capture all use the native macOS `screencapture` CLI for maximum reliability. Keyboard shortcuts are customizable in Settings > Capture.
+Region, fullscreen, and window capture all use the native macOS `screencapture` CLI for maximum reliability. OCR and color picker show a toast notification confirming the result was copied to clipboard. Keyboard shortcuts are customizable in Settings > Capture.
 
 ### Edit
 
@@ -40,6 +39,7 @@ Rectangles, filled rectangles, ellipses, lines, curved arrows, freehand, text, n
 - **Pin screenshots** — Pin any capture as an always-on-top floating window
 - **Auto-apply** — Automatically apply your default background on every capture
 - **Self-timer** — Countdown overlay before capture (3s, 5s, 10s)
+- **Toast notifications** — Confirmation toasts for OCR ("Text copied to clipboard"), color picker ("#HEX copied to clipboard"), and gallery saves
 - **In-app updates** — Check, download, and install updates without leaving the app
 
 ## Install

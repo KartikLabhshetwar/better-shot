@@ -71,7 +71,9 @@ final class AppUpdater {
 
             if isNewer(latestVersion, than: currentVersion) {
                 let assets = json["assets"] as? [[String: Any]] ?? []
-                let dmgAsset = assets.first { ($0["name"] as? String)?.hasSuffix(".dmg") == true }
+                let arch = Self.currentArchitecture
+                let dmgAsset = assets.first { ($0["name"] as? String)?.contains(arch) == true && ($0["name"] as? String)?.hasSuffix(".dmg") == true }
+                    ?? assets.first { ($0["name"] as? String)?.hasSuffix(".dmg") == true }
 
                 if let assetURLString = dmgAsset?["browser_download_url"] as? String,
                    let assetURL = URL(string: assetURLString) {
@@ -182,32 +184,46 @@ final class AppUpdater {
     }
 
     private func mountDMG(at path: URL) async throws -> String {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
-        process.arguments = ["attach", path.path, "-nobrowse", "-readonly", "-plist"]
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+                process.arguments = ["attach", path.path, "-nobrowse", "-readonly", "-plist"]
 
-        let pipe = Pipe()
-        process.standardOutput = pipe
+                let pipe = Pipe()
+                process.standardOutput = pipe
 
-        try process.run()
-        process.waitUntilExit()
+                do {
+                    try process.run()
+                } catch {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                process.waitUntilExit()
 
-        guard process.terminationStatus == 0 else {
-            throw NSError(domain: "AppUpdater", code: 1, userInfo: [
-                NSLocalizedDescriptionKey: "Failed to mount DMG (exit code \(process.terminationStatus))"
-            ])
+                guard process.terminationStatus == 0 else {
+                    continuation.resume(throwing: NSError(domain: "AppUpdater", code: 1, userInfo: [
+                        NSLocalizedDescriptionKey: "Failed to mount DMG (exit code \(process.terminationStatus))"
+                    ]))
+                    return
+                }
+
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                do {
+                    guard let plist = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+                          let entities = plist["system-entities"] as? [[String: Any]],
+                          let mountPoint = entities.first(where: { $0["mount-point"] != nil })?["mount-point"] as? String else {
+                        continuation.resume(throwing: NSError(domain: "AppUpdater", code: 2, userInfo: [
+                            NSLocalizedDescriptionKey: "Could not find mount point"
+                        ]))
+                        return
+                    }
+                    continuation.resume(returning: mountPoint)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
         }
-
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        guard let plist = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
-              let entities = plist["system-entities"] as? [[String: Any]],
-              let mountPoint = entities.first(where: { $0["mount-point"] != nil })?["mount-point"] as? String else {
-            throw NSError(domain: "AppUpdater", code: 2, userInfo: [
-                NSLocalizedDescriptionKey: "Could not find mount point"
-            ])
-        }
-
-        return mountPoint
     }
 
     private func relaunchApp(at appURL: URL) {
@@ -219,6 +235,14 @@ final class AppUpdater {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             NSApp.terminate(nil)
         }
+    }
+
+    private static var currentArchitecture: String {
+        #if arch(arm64)
+        return "arm64"
+        #else
+        return "x86_64"
+        #endif
     }
 
     private func isNewer(_ candidate: String, than current: String) -> Bool {

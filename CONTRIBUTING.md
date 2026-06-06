@@ -51,8 +51,8 @@ Sources/
   Preview/               Floating preview overlay and pinned screenshots
   History/               Capture history (JSON in Application Support)
   Services/              Beautifier renderer, keyboard shortcuts, app updater
-  Settings/              Preferences window (sidebar navigation)
-  Views/                 Menu bar dropdown
+  Settings/              Preferences window (sidebar navigation) and settings window controller
+  Views/                 Menu bar popover, toast notifications
 Resources/
   Assets.xcassets/       App icon, menu bar icon
   Backgrounds/           Bundled wallpaper and gradient images
@@ -73,6 +73,9 @@ Resources/
 | `ShortcutService.swift` | Global keyboard shortcuts via CGEvent tap |
 | `PreviewOverlay.swift` | Floating preview card after capture |
 | `PreferencesView.swift` | Settings window with sidebar navigation |
+| `SettingsWindowController.swift` | Creates and manages the settings NSWindow (mirrors EditorWindowController) |
+| `MenuBarPopoverController.swift` | Custom NSPanel-based menu bar popover with arrow and click-outside dismiss |
+| `ToastWindow.swift` | Floating toast notifications (save confirmation, OCR/color picker feedback) |
 | `AppPreferences.swift` | All UserDefaults-backed preferences |
 
 ## How the code works
@@ -103,7 +106,11 @@ Annotations use **normalized coordinates** (0.0 to 1.0) so they're resolution-in
 
 ### Settings
 
-The settings window uses `NavigationSplitView` with a left sidebar (General, Capture, History, About) and right content panel. Preferences are stored via `@AppStorage` and the centralized `AppPreferences` enum.
+The settings window is managed by `SettingsWindowController`, which creates an `NSWindow` hosting `PreferencesView` in an `NSHostingView`. This mirrors the `EditorWindowController` pattern. The view uses `NavigationSplitView` with a left sidebar (General, Capture, History, About) and right content panel. Preferences are stored via `@AppStorage` and the centralized `AppPreferences` enum.
+
+### Menu bar
+
+The menu bar popover is managed by `MenuBarPopoverController`, which creates a custom `NSPanel` (not SwiftUI's `MenuBarExtra`) for full control over appearance and animation. The panel hosts `MenuBarPanelView` with an arrow indicator and spring animation.
 
 ## Common tasks
 

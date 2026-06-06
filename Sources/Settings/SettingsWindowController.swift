@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 @MainActor
-final class SettingsWindowController: NSObject, NSWindowDelegate, NSToolbarDelegate {
+final class SettingsWindowController: NSObject, NSWindowDelegate {
     static let shared = SettingsWindowController()
 
     private var window: NSWindow?
@@ -20,7 +20,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
 
         let win = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 680, height: 560),
-            styleMask: [.titled, .closable, .resizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
@@ -29,13 +29,6 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
         win.isReleasedWhenClosed = false
         win.delegate = self
         win.collectionBehavior = [.moveToActiveSpace]
-
-        let toolbar = NSToolbar(identifier: "SettingsToolbar")
-        toolbar.delegate = self
-        toolbar.displayMode = .iconOnly
-        win.toolbar = toolbar
-        win.toolbarStyle = .unified
-        win.titlebarSeparatorStyle = .line
 
         centerOnCurrentScreen(win)
 
@@ -52,25 +45,6 @@ final class SettingsWindowController: NSObject, NSWindowDelegate, NSToolbarDeleg
             NSApp.setActivationPolicy(.accessory)
         }
     }
-
-    // MARK: - NSToolbarDelegate
-
-    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
-        if itemIdentifier == .toggleSidebar {
-            return NSToolbarItem(itemIdentifier: .toggleSidebar)
-        }
-        return nil
-    }
-
-    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.toggleSidebar]
-    }
-
-    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.toggleSidebar]
-    }
-
-    // MARK: - Private
 
     private func centerOnCurrentScreen(_ window: NSWindow) {
         let mouseLocation = NSEvent.mouseLocation
