@@ -7,12 +7,12 @@ struct EditorWindowView: View {
 
     var body: some View {
         HSplitView {
+            EditorInspectorView(model: model)
+                .frame(width: 280)
+
             EditorCanvasView(model: model)
                 .frame(minWidth: 500, minHeight: 400)
                 .background(Color(nsColor: .windowBackgroundColor))
-
-            EditorInspectorView(model: model)
-                .frame(width: 280)
         }
         .overlay(alignment: .bottom) {
             if let message = model.toastMessage {

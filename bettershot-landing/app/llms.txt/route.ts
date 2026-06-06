@@ -3,36 +3,55 @@ export const dynamic = "force-static"
 export async function GET() {
   const llmsContent = `# Better Shot
 
-> An open-source alternative to CleanShot X for macOS. Capture, edit, and enhance your screenshots with professional quality.
+> An open-source alternative to CleanShot X for macOS. Capture, annotate, and beautify screenshots — local-first, no account, no cloud, no telemetry.
 
-Better Shot is a free, open-source screenshot tool designed for macOS users who want a powerful yet accessible solution for capturing, annotating, and sharing screenshots. Built with modern web technologies and packaged as a native macOS application, Better Shot provides professional-grade features without the premium price tag.
-
-The application offers comprehensive screenshot capabilities including region selection, full-screen capture, window capture, and timed captures. Users can enhance their screenshots with built-in editing tools, annotations, background effects, and various styling options.
+Better Shot is a free, native macOS screenshot tool built with Swift 6 and SwiftUI. It lives in the menu bar and provides professional-grade capture, annotation, and beautification without subscriptions or cloud dependencies.
 
 ## Core Resources
 
-[Homepage]: https://bettershot.site - Main landing page with product information, features, and download links
-
-[GitHub Repository]: https://github.com/KartikLabhshetwar/better-shot - Source code, documentation, and issue tracking
-
-[Documentation]: https://github.com/KartikLabhshetwar/better-shot - Technical documentation and development guides
+[Homepage]: https://bettershot.site - Landing page with features, screenshots, and download links
+[GitHub Repository]: https://github.com/KartikLabhshetwar/better-shot - Source code, issues, and releases
+[Contributing Guide]: https://github.com/KartikLabhshetwar/better-shot/blob/main/CONTRIBUTING.md - Setup, architecture, and contribution guidelines
 
 ## Key Features
 
-- **Screenshot Capture**: Region, full-screen, window, and timed capture modes
-- **Image Editing**: Built-in annotation tools, effects, and styling options
-- **Background Effects**: Multiple background options and customization
-- **Open Source**: Free and open-source under permissive license
-- **Native macOS**: Optimized for macOS with native performance
+### Capture
+- Region, fullscreen, and window screenshot via native macOS screencapture CLI
+- OCR text extraction + QR code / barcode detection (Apple Vision framework)
+- Color picker — sample any on-screen pixel, copies hex to clipboard
+- Self-timer countdown overlay (3s, 5s, 10s)
+- Customizable global keyboard shortcuts (⌘⇧3, ⌘⇧4, ⌘⇧5, ⌘⇧O, ⌘⇧C)
+
+### Beautify
+- Backgrounds: 12 solid color presets, 16 gradient presets, bundled macOS wallpapers, custom images
+- Effects: padding, corner radius, shadow strength — all rendered live
+- Layout: aspect ratio (Auto, 1:1, 4:3, 3:2, 16:9, 9:16), 9-point alignment grid with smart corner radius
+- Export as PNG or JPEG with configurable quality
+
+### Annotate
+- Tools: rectangle, filled rectangle, ellipse, line, curved arrow, freehand, text, numbered badge, blur, spotlight
+- Single-key shortcuts for each tool (R, F, O, L, A, D, T, N, B, G)
+- Text annotations with font selection, size, bold, italic, underline, alignment
+- Blur/pixelate redaction with adjustable density
+
+### Workflow
+- Floating preview overlay after capture — click to open editor
+- Pin screenshots as always-on-top floating windows
+- Capture history — browse and re-open past captures
+- In-app updates — check, download, and install from the About tab
+- Toast notifications for save, copy, OCR, and color picker feedback
+- Configurable overlay position and auto-dismiss timing
 
 ## Technical Details
 
-Better Shot is built using:
-- React and TypeScript for the user interface
-- Tauri for native macOS application packaging
-- Modern web technologies for cross-platform compatibility
-
-The project welcomes contributions from the open-source community and is actively maintained.
+- **Language**: Swift 6 with strict concurrency
+- **UI Framework**: SwiftUI with AppKit integration
+- **Frameworks**: CoreGraphics (compositing), CoreImage (blur), Vision (OCR/QR), AppKit (capture/panels), Carbon (global shortcuts)
+- **Architecture**: Menu bar app using custom NSPanel popover, not MenuBarExtra
+- **Data**: All preferences via UserDefaults, capture history stored as JSON in Application Support
+- **No external dependencies**: No Electron, no web views, no third-party packages
+- **Install**: Homebrew (\`brew install --cask bettershot\`) or direct DMG download (Apple Silicon + Intel)
+- **License**: BSD 3-Clause
 `
 
   return new Response(llmsContent, {

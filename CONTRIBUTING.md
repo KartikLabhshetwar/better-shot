@@ -66,7 +66,7 @@ Resources/
 |---|---|
 | `EditorModel.swift` | All editor state: annotation interactions, undo/redo, config |
 | `EditorCanvasView.swift` | Live canvas rendering with drag gestures |
-| `EditorInspectorView.swift` | Side panel: tools, colors, text, effects, backgrounds |
+| `EditorInspectorView.swift` | Left panel: tools, colors, text, effects, backgrounds |
 | `AnnotationDrawing.swift` | CoreGraphics renderer for final image export |
 | `BeautifierRenderer.swift` | Composites background + shadow + radius + annotations |
 | `CaptureOrchestrator.swift` | Coordinates capture pipeline: capture > sound > history > preview |
@@ -96,9 +96,9 @@ User presses ⌘⇧4
 
 ```
 EditorModel (all state)
+  ├── EditorInspectorView   Left panel: tools, style, text, effects, layout, background
   ├── EditorCanvasView      Renders image + live annotation views, handles gestures
   │     └── AnnotationItemView   One per annotation (shapes, text, redaction)
-  ├── EditorInspectorView   Side panel: tools, style, text, effects, layout, background
   └── AnnotationKeyboard    Keyboard shortcuts for tools and actions
 ```
 
@@ -106,7 +106,7 @@ Annotations use **normalized coordinates** (0.0 to 1.0) so they're resolution-in
 
 ### Settings
 
-The settings window is managed by `SettingsWindowController`, which creates an `NSWindow` hosting `PreferencesView` in an `NSHostingView`. This mirrors the `EditorWindowController` pattern. The view uses `NavigationSplitView` with a left sidebar (General, Capture, History, About) and right content panel. Preferences are stored via `@AppStorage` and the centralized `AppPreferences` enum.
+The settings window is managed by `SettingsWindowController`, which creates an `NSWindow` hosting `PreferencesView` in an `NSHostingView`. This mirrors the `EditorWindowController` pattern. The view uses a sidebar list (General, Capture, History, About) and a content panel. Preferences are stored via `@AppStorage` and the centralized `AppPreferences` enum.
 
 ### Menu bar
 
@@ -160,7 +160,7 @@ Use short, descriptive messages:
 ```
 feat: add blur strength slider to redaction tools
 fix: window capture failing on secondary monitors
-chore: bump version to 0.3.3
+chore: update dependencies
 ```
 
 ## Versioning

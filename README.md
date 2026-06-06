@@ -1,6 +1,5 @@
 # BetterShot
 
-[![Version](https://img.shields.io/badge/version-0.3.3-blue.svg)](https://github.com/KartikLabhshetwar/better-shot/releases)
 [![macOS](https://img.shields.io/badge/macOS-14.0+-black.svg)](https://github.com/KartikLabhshetwar/better-shot)
 [![License](https://img.shields.io/badge/license-BSD%203--Clause-green.svg)](LICENSE)
 [![X (Twitter)](https://img.shields.io/badge/X-%231DA1F2.svg?style=flat&logo=X&logoColor=white)](https://x.com/code_kartik)
@@ -16,38 +15,47 @@ An open-source alternative to CleanShot X. Native Swift app for macOS — fast, 
 |---|---|
 | Region screenshot | `⌘⇧4` |
 | Fullscreen screenshot | `⌘⇧3` |
-| Window screenshot | Menu bar only |
-| OCR text + QR scan | `⌘⇧O` |
+| Window screenshot | `⌘⇧5` |
+| OCR text + QR/barcode scan | `⌘⇧O` |
 | Color picker (hex) | `⌘⇧C` |
 
-Region, fullscreen, and window capture all use the native macOS `screencapture` CLI for maximum reliability. OCR and color picker show a toast notification confirming the result was copied to clipboard. Keyboard shortcuts are customizable in Settings > Capture.
+Region, fullscreen, and window capture all use the native macOS `screencapture` CLI for maximum reliability. OCR extracts text and detects QR codes/barcodes in a single pass. Color picker samples any on-screen pixel and copies the hex value. All shortcuts are customizable in Settings > Capture.
 
-### Edit
+### Beautify
 
-- **Backgrounds** — Solid colors, gradients, bundled macOS wallpapers, or your own image
-- **Effects** — Padding, corner radius, shadow strength — all rendered live with SwiftUI-native layers
-- **Layout** — Aspect ratio (Auto, 1:1, 4:3, 3:2, 16:9, 9:16), 9-point alignment grid
-- **Defaults in Settings** — Configure your preferred effects and background in Settings with a live preview
+- **Backgrounds** — 12 solid color presets, 16 gradient presets, bundled macOS wallpapers, or your own image
+- **Effects** — Padding, corner radius, shadow strength — all rendered live
+- **Layout** — Aspect ratio (Auto, 1:1, 4:3, 3:2, 16:9, 9:16), 9-point alignment grid with smart corner radius
+- **Defaults** — Configure your preferred effects and background in Settings with a live preview
+- **Export** — PNG or JPEG with configurable quality
 
 ### Annotate
 
-Rectangles, filled rectangles, ellipses, lines, curved arrows, freehand, text, numbered badges, blur, and spotlight. Each has a single-key shortcut in the editor (`R`, `F`, `O`, `L`, `A`, `D`, `T`, `N`, `B`, `G`).
+Rectangles, filled rectangles, ellipses, lines, curved arrows, freehand, text, numbered badges, blur, and spotlight. Each has a single-key shortcut in the editor (`R`, `F`, `O`, `L`, `A`, `D`, `T`, `N`, `B`, `G`). Text annotations support font selection, size, bold, italic, underline, and alignment.
 
 ### Workflow
 
-- **Click-to-edit** — Click the floating preview to open the editor (like CleanShot X)
-- **Pin screenshots** — Pin any capture as an always-on-top floating window
+- **Click-to-edit** — Click the floating preview to open the editor
+- **Pin screenshots** — Pin any capture as an always-on-top floating window, unpin all from the menu bar
 - **Auto-apply** — Automatically apply your default background on every capture
 - **Self-timer** — Countdown overlay before capture (3s, 5s, 10s)
-- **Toast notifications** — Confirmation toasts for OCR ("Text copied to clipboard"), color picker ("#HEX copied to clipboard"), and gallery saves
+- **Capture history** — Browse and re-open past captures from the menu bar or Settings
+- **Toast notifications** — Confirmation toasts for OCR, color picker, and gallery saves
 - **In-app updates** — Check, download, and install updates without leaving the app
+- **Configurable overlay** — Choose preview position and auto-dismiss timing
 
 ## Install
+
+### Homebrew
+
+```bash
+brew install --cask bettershot
+```
 
 ### Download
 
 1. Go to [Releases](https://github.com/KartikLabhshetwar/better-shot/releases)
-2. Download `BetterShot-0.3.3.dmg`
+2. Download the latest `.dmg` for your architecture (Apple Silicon or Intel)
 3. Open the DMG, drag BetterShot to Applications
 4. Launch and grant permissions when prompted
 

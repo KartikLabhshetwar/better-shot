@@ -145,7 +145,7 @@ struct MenuBarContentView: View {
                         Button {
                             dismissPopover()
                             let url = HistoryStore.shared.urlForRecord(record)
-                            EditorWindowController.shared.open(url: url)
+                            PreviewOverlay.shared.show(url: url)
                         } label: {
                             Label(record.filename, systemImage: "photo")
                         }

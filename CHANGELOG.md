@@ -5,6 +5,18 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.5] - 2026-06-06
+
+### Changed
+
+- **Inspector panel moved to the left**: The editor inspector (tools, style, effects, background) is now on the left side of the editor window, canvas on the right
+- **Recent captures open preview instead of editor**: Clicking a recent capture in the menu bar now shows the floating preview panel instead of opening the editor directly, matching the normal capture flow
+- **README updated**: Removed hardcoded version numbers, added Homebrew install instructions, updated feature descriptions to reflect all current capabilities
+- **Landing page updated**: Added color picker, self-timer, QR/barcode scanning, spotlight, customizable shortcuts, workflow extras section, and Homebrew install to the landing page. Removed version number from hero badge
+- **CONTRIBUTING.md updated**: Editor flow diagram and key files table updated to reflect left-side inspector panel
+- **llms.txt rewritten**: Replaced incorrect tech stack (React/Tauri/TypeScript) with accurate Swift 6/SwiftUI architecture and complete feature listing
+- Version bumped to 0.3.5 (build 8)
+
 ## [0.3.4] - 2026-06-06
 
 ### Added

@@ -39,7 +39,7 @@ export default async function Home() {
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[#111]/[0.06] bg-[#111]/[0.02] mb-8">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             <span className="text-[11px] font-medium text-[#111]/35 tracking-wide uppercase">
-              v{release.version} — Free &amp; open source
+              Free &amp; open source
             </span>
           </div>
 
@@ -68,6 +68,8 @@ export default async function Home() {
             <span>macOS 14+</span>
             <span className="h-3 w-px bg-[#111]/8" />
             <span>Apple Silicon &amp; Intel</span>
+            <span className="h-3 w-px bg-[#111]/8" />
+            <span>Homebrew</span>
           </div>
         </section>
 
@@ -94,29 +96,49 @@ export default async function Home() {
               title="Capture"
               items={[
                 "Region, fullscreen, window",
-                "Override ⌘⇧3/4/5 shortcuts",
-                "Floating preview overlay",
-                "OCR text extraction",
+                "OCR text + QR/barcode scanning",
+                "Color picker (hex to clipboard)",
+                "Self-timer countdown (3s/5s/10s)",
+                "Customizable keyboard shortcuts",
               ]}
             />
             <Feature
               title="Annotate"
               items={[
-                "Arrows, shapes, freehand",
-                "Text with full font control",
+                "Arrows, shapes, freehand drawing",
+                "Text with font, size, bold, italic",
                 "Pixelate & blur redaction",
                 "Numbered callout badges",
+                "Spotlight to highlight regions",
               ]}
             />
             <Feature
               title="Beautify"
               items={[
-                "Backgrounds & gradients",
+                "12 solid colors, 16 gradient presets",
+                "Bundled macOS wallpapers",
                 "Padding, shadow, corner radius",
-                "Bundled wallpapers",
+                "Aspect ratio & 9-point alignment",
                 "Export as PNG or JPEG",
               ]}
             />
+          </div>
+        </section>
+
+        {/* Workflow extras */}
+        <section className="max-w-[960px] mx-auto px-6 pb-20">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {[
+              { label: "Click-to-edit", desc: "Floating preview opens the editor" },
+              { label: "Pin screenshots", desc: "Always-on-top floating windows" },
+              { label: "Capture history", desc: "Browse and re-open past captures" },
+              { label: "In-app updates", desc: "Download and install without leaving the app" },
+            ].map((item) => (
+              <div key={item.label} className="text-center">
+                <p className="text-[13px] font-medium text-[#111]/50">{item.label}</p>
+                <p className="text-[11px] text-[#111]/25 mt-1 leading-[1.5]">{item.desc}</p>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -129,7 +151,8 @@ export default async function Home() {
             <Shortcut label="Capture region" keys={["⌘", "⇧", "4"]} />
             <Shortcut label="Capture screen" keys={["⌘", "⇧", "3"]} />
             <Shortcut label="Capture window" keys={["⌘", "⇧", "5"]} />
-            <Shortcut label="OCR region" keys={["⌘", "⇧", "O"]} />
+            <Shortcut label="OCR + QR scan" keys={["⌘", "⇧", "O"]} />
+            <Shortcut label="Color picker" keys={["⌘", "⇧", "C"]} />
           </div>
         </section>
 
@@ -139,7 +162,12 @@ export default async function Home() {
             <p className="text-[15px] text-[#111]/30 mb-6 text-pretty">
               No account. No subscription. Just a better screenshot tool.
             </p>
-            <DownloadDropdown release={release} source="cta" />
+            <div className="flex flex-col items-center gap-4">
+              <DownloadDropdown release={release} source="cta" />
+              <p className="text-[12px] text-[#111]/20 font-mono">
+                brew install --cask bettershot
+              </p>
+            </div>
           </div>
         </section>
       </main>
