@@ -29,12 +29,13 @@ final class EditorWindowController {
         win.title = url.deletingPathExtension().lastPathComponent
         win.isReleasedWhenClosed = false
         win.delegate = EditorWindowDelegate.shared
-        win.collectionBehavior = [.moveToActiveSpace]
+        win.collectionBehavior = [.transient, .moveToActiveSpace]
 
         centerOnActiveScreen(win)
 
         windows.append(win)
 
+        win.orderFrontRegardless()
         NSApp.setActivationPolicy(.regular)
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)

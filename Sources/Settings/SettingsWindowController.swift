@@ -11,8 +11,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     func open() {
         if let existing = window, existing.isVisible {
-            existing.makeKeyAndOrderFront(nil)
+            existing.orderFrontRegardless()
             NSApp.activate(ignoringOtherApps: true)
+            existing.makeKeyAndOrderFront(nil)
             return
         }
 
@@ -28,12 +29,13 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         win.title = "Settings"
         win.isReleasedWhenClosed = false
         win.delegate = self
-        win.collectionBehavior = [.moveToActiveSpace]
+        win.collectionBehavior = [.transient, .moveToActiveSpace]
 
         centerOnCurrentScreen(win)
 
         window = win
 
+        win.orderFrontRegardless()
         NSApp.setActivationPolicy(.regular)
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)

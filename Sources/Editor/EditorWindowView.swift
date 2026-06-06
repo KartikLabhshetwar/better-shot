@@ -112,6 +112,11 @@ struct EditorWindowView: View {
         CGImageDestinationAddImage(dest, rendered, options as CFDictionary)
         guard CGImageDestinationFinalize(dest) else { return }
 
+        if let sourceURL = model.sourceURL {
+            let baseURL = CaptureOrchestrator.baseImageURL(for: url)
+            try? FileManager.default.copyItem(at: sourceURL, to: baseURL)
+        }
+
         if AppPreferences.copyAfterSave {
             let pb = NSPasteboard.general
             pb.clearContents()

@@ -39,12 +39,6 @@ final class ScreenCapture {
         return URL(fileURLWithPath: tempPath)
     }
 
-    // MARK: - Repeat Region (reuse last selection — falls back to region)
-
-    func repeatRegionCapture() async throws -> URL? {
-        try await captureRegion()
-    }
-
     // MARK: - Window (CLI screencapture -w)
 
     func captureWindow(includeShadow: Bool = false) async throws -> URL? {

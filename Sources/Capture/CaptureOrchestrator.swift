@@ -39,8 +39,6 @@ final class CaptureOrchestrator {
             await performOCR()
         case .colorPicker:
             await performColorPick()
-        case .repeatRegion:
-            await captureAndProcess { try await ScreenCapture.shared.repeatRegionCapture() }
         }
     }
 
@@ -113,6 +111,10 @@ final class CaptureOrchestrator {
 
         let savedURL = saveImage(rendered)
 
+        if let savedURL {
+            saveBaseImage(rawURL: url, alongside: savedURL)
+        }
+
         if AppPreferences.copyAfterSave, let savedURL {
             copyToClipboard(savedURL)
         }
@@ -149,6 +151,25 @@ final class CaptureOrchestrator {
         CGImageDestinationAddImage(destination, cgImage, options as CFDictionary)
 
         guard CGImageDestinationFinalize(destination) else { return nil }
+        return url
+    }
+
+    private func saveBaseImage(rawURL: URL, alongside beautifiedURL: URL) {
+        let baseURL = Self.baseImageURL(for: beautifiedURL)
+        try? FileManager.default.copyItem(at: rawURL, to: baseURL)
+    }
+
+    static func baseImageURL(for url: URL) -> URL {
+        let dir = url.deletingLastPathComponent()
+        let name = url.deletingPathExtension().lastPathComponent
+        return dir.appendingPathComponent("\(name).base.png")
+    }
+
+    static func resolveRawSource(for url: URL) -> URL {
+        let baseURL = baseImageURL(for: url)
+        if FileManager.default.fileExists(atPath: baseURL.path) {
+            return baseURL
+        }
         return url
     }
 

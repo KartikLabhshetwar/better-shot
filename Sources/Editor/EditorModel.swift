@@ -92,8 +92,9 @@ final class EditorModel {
     // MARK: - Load
 
     func loadImage(from url: URL) {
-        sourceURL = url
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+        let rawURL = CaptureOrchestrator.resolveRawSource(for: url)
+        sourceURL = rawURL
+        guard let source = CGImageSourceCreateWithURL(rawURL as CFURL, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return }
         sourceImage = image
         imageSize = CGSize(width: image.width, height: image.height)

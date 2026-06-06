@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Crash on window close**: Fixed `EXC_BREAKPOINT` crash in `_postWindowNeedsUpdateConstraints` caused by `setActivationPolicy(.accessory)` triggering layout updates on a window mid-teardown. Deferred activation policy change to the next run loop iteration for editor, settings, and toast windows
-- **Double background on editor open**: Fixed beautifier config being applied twice when opening an already-beautified screenshot in the editor. The capture flow now saves beautified output to the save directory while history retains the raw capture, so the editor always works with raw images
+- **Double background on editor open**: A `.base.png` copy of the raw capture is saved alongside every beautified output. The editor now resolves to the base image before loading, making it architecturally impossible to apply background/padding/shadow twice, regardless of which URL is passed to the editor
 - **Race condition fixes across the codebase**: Fixed multiple race conditions that could cause crashes:
   - Menu bar popover: eliminated Task wrapper in close animation, captured panel reference before nil'ing to prevent use-after-free
   - Editor window delegate: replaced `Task { @MainActor }` with `DispatchQueue.main.async` for deterministic ordering during window teardown

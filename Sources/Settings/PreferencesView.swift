@@ -613,7 +613,6 @@ struct ShortcutRow: View {
         case .window: return ShortcutService.Shortcut(keyCode: 0, modifiers: 0, enabled: false)
         case .ocr: return .defaultOCR
         case .colorPicker: return .defaultColorPicker
-        case .repeatRegion: return .defaultRepeatRegion
         }
     }
 
