@@ -27,14 +27,6 @@ export const metadata: Metadata = {
       "Free, open-source screenshot tool for macOS. Capture, annotate, and beautify screenshots with a single shortcut.",
     url: "https://bettershot.site",
     siteName: "Better Shot",
-    images: [
-      {
-        url: "/og.png",
-        width: 1200,
-        height: 630,
-        alt: "Better Shot — Screenshot tool for macOS",
-      },
-    ],
     locale: "en_US",
     type: "website",
   },
@@ -43,7 +35,6 @@ export const metadata: Metadata = {
     title: "Better Shot — Screenshot tool for macOS",
     description:
       "Free, open-source screenshot tool for macOS. Capture, annotate, and beautify screenshots with a single shortcut.",
-    images: ["/og.png"],
     creator: "@code_kartik",
   },
   robots: {

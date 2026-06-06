@@ -4,6 +4,7 @@ import { ArrowUpRight } from "lucide-react"
 import { DownloadDropdown } from "@/components/download-dropdown"
 import { getLatestRelease } from "@/lib/downloads"
 import { StarCount } from "@/components/star-count"
+import { EditorPlayer } from "@/components/editor-demo"
 
 export default async function Home() {
   const release = await getLatestRelease()
@@ -76,14 +77,7 @@ export default async function Home() {
         {/* Screenshot preview */}
         <section className="max-w-[880px] mx-auto px-6 pb-24">
           <div className="rounded-xl border border-[#111]/[0.06] bg-[#111]/[0.02] p-2 overflow-hidden">
-            <Image
-              src="/hero.png"
-              alt="BetterShot editor showing a beautified screenshot"
-              width={1720}
-              height={1080}
-              className="w-full rounded-lg"
-              priority
-            />
+            <EditorPlayer />
           </div>
         </section>
 
