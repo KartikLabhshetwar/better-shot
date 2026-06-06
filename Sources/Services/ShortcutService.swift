@@ -30,6 +30,7 @@ final class ShortcutService {
     enum Action: UInt32, CaseIterable {
         case region = 1
         case fullscreen = 2
+        case window = 3
         case ocr = 4
         case colorPicker = 5
         case repeatRegion = 7

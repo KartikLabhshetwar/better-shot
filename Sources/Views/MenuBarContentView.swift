@@ -24,6 +24,12 @@ struct MenuBarContentView: View {
                 ) {
                     Task { await CaptureOrchestrator.shared.performCapture(.fullscreen) }
                 }
+
+                Button {
+                    Task { await CaptureOrchestrator.shared.performCapture(.window) }
+                } label: {
+                    Label("Window", systemImage: "macwindow")
+                }
             }
 
             MenuBarSeparator()
