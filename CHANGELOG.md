@@ -5,6 +5,23 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6] - 2026-06-06
+
+### Added
+
+- **Preview overlay settings restored**: Position (bottom-right/bottom-left) and auto-dismiss delay (2–15s) are back in Capture settings
+- **Reset shortcuts button**: "Reset to Defaults" button in Capture settings restores all keyboard shortcuts to their defaults
+- **Shortcut recorder fix**: Recorder now temporarily disables the CGEvent tap so system shortcuts like ⌘⇧4 can be captured without triggering the native macOS screenshot. Uses a local event monitor instead of `keyDown`
+
+### Fixed
+
+- **Scrollbar hidden in settings**: Removed visible scrollbar from the settings content area
+- **Editor & Settings Space switching**: `orderFrontRegardless` before the activation policy change prevents macOS from switching to Desktop
+
+### Changed
+
+- Version bumped to 0.3.6 (build 9)
+
 ## [0.3.5] - 2026-06-06
 
 ### Changed

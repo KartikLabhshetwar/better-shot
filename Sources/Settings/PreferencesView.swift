@@ -33,17 +33,19 @@ struct PreferencesView: View {
 
             Divider()
 
-            Group {
-                switch selectedSection {
-                case .general:
-                    GeneralSettingsTab()
-                case .capture:
-                    CaptureSettingsTab()
-                case .history:
-                    HistoryTab()
-                case .about:
-                    AboutTab()
-                }
+            ZStack {
+                GeneralSettingsTab()
+                    .opacity(selectedSection == .general ? 1 : 0)
+                    .allowsHitTesting(selectedSection == .general)
+                CaptureSettingsTab()
+                    .opacity(selectedSection == .capture ? 1 : 0)
+                    .allowsHitTesting(selectedSection == .capture)
+                HistoryTab()
+                    .opacity(selectedSection == .history ? 1 : 0)
+                    .allowsHitTesting(selectedSection == .history)
+                AboutTab()
+                    .opacity(selectedSection == .about ? 1 : 0)
+                    .allowsHitTesting(selectedSection == .about)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -126,6 +128,13 @@ struct GeneralSettingsTab: View {
 
             Section {
                 DefaultBackgroundPicker(selectedStyle: $defaultConfig.style)
+
+                Button("Reset Effects to Defaults") {
+                    defaultConfig = .default
+                    AppPreferences.defaultBeautifierConfig = .default
+                }
+                .controlSize(.small)
+                .foregroundStyle(.secondary)
             } header: {
                 HStack {
                     Text("Default Background")
@@ -150,6 +159,20 @@ struct GeneralSettingsTab: View {
                         Text("Quality: \(Int(exportQuality * 100))%")
                     }
                 }
+            }
+
+            Section {
+                Button("Reset All General Settings to Defaults") {
+                    saveDir = NSHomeDirectory() + "/Desktop"
+                    copyAfterSave = true
+                    playSound = true
+                    exportFormatRaw = ExportFormat.png.rawValue
+                    exportQuality = 0.9
+                    defaultConfig = .default
+                    AppPreferences.defaultBeautifierConfig = .default
+                }
+                .controlSize(.small)
+                .foregroundStyle(.red)
             }
         }
         .formStyle(.grouped)
@@ -505,11 +528,21 @@ private struct DefaultConfigPreview: View {
 
 struct CaptureSettingsTab: View {
     @AppStorage("bs_selfTimerDelay") private var selfTimerRaw: Int = 0
+    @AppStorage("bs_overlayPosition") private var overlayPositionRaw: String = OverlayPosition.bottomRight.rawValue
+    @AppStorage("bs_overlayDismissDelay") private var overlayDismissDelay: Double = 5.0
+    @State private var shortcutResetID = UUID()
 
     private var selfTimerDelay: Binding<SelfTimerDelay> {
         Binding(
             get: { SelfTimerDelay(rawValue: selfTimerRaw) ?? .off },
             set: { selfTimerRaw = $0.rawValue }
+        )
+    }
+
+    private var overlayPosition: Binding<OverlayPosition> {
+        Binding(
+            get: { OverlayPosition(rawValue: overlayPositionRaw) ?? .bottomRight },
+            set: { overlayPositionRaw = $0.rawValue }
         )
     }
 
@@ -524,6 +557,23 @@ struct CaptureSettingsTab: View {
                 .pickerStyle(.segmented)
             }
 
+            Section("Preview Overlay") {
+                Picker("Position", selection: overlayPosition) {
+                    Text("Bottom Right").tag(OverlayPosition.bottomRight)
+                    Text("Bottom Left").tag(OverlayPosition.bottomLeft)
+                }
+
+                HStack {
+                    Text("Dismiss after")
+                    Spacer()
+                    Text("\(Int(overlayDismissDelay))s")
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
+                Slider(value: $overlayDismissDelay, in: 2...15, step: 1)
+                    .controlSize(.small)
+            }
+
             Section("Keyboard Shortcuts") {
                 VStack(alignment: .leading, spacing: 8) {
                     ShortcutRow(label: "Region", action: .region)
@@ -531,6 +581,49 @@ struct CaptureSettingsTab: View {
                     ShortcutRow(label: "OCR Region", action: .ocr)
                     ShortcutRow(label: "Color Picker", action: .colorPicker)
                 }
+                .id(shortcutResetID)
+
+                Button("Reset Shortcuts to Defaults") {
+                    for action in ShortcutService.Action.allCases {
+                        let def: ShortcutService.Shortcut? = switch action {
+                        case .region: .defaultRegion
+                        case .fullscreen: .defaultFullscreen
+                        case .ocr: .defaultOCR
+                        case .colorPicker: .defaultColorPicker
+                        case .window: nil
+                        }
+                        if let def {
+                            ShortcutService.shared.saveShortcut(def, for: action)
+                        }
+                    }
+                    ShortcutService.shared.registerAll()
+                    shortcutResetID = UUID()
+                }
+                .controlSize(.small)
+            }
+
+            Section {
+                Button("Reset All Capture Settings to Defaults") {
+                    selfTimerRaw = 0
+                    overlayPositionRaw = OverlayPosition.bottomRight.rawValue
+                    overlayDismissDelay = 5.0
+                    for action in ShortcutService.Action.allCases {
+                        let def: ShortcutService.Shortcut? = switch action {
+                        case .region: .defaultRegion
+                        case .fullscreen: .defaultFullscreen
+                        case .ocr: .defaultOCR
+                        case .colorPicker: .defaultColorPicker
+                        case .window: nil
+                        }
+                        if let def {
+                            ShortcutService.shared.saveShortcut(def, for: action)
+                        }
+                    }
+                    ShortcutService.shared.registerAll()
+                    shortcutResetID = UUID()
+                }
+                .controlSize(.small)
+                .foregroundStyle(.red)
             }
         }
         .formStyle(.grouped)
@@ -638,6 +731,7 @@ struct ShortcutRecorderView: NSViewRepresentable {
         let view = ShortcutRecorderNSView()
         view.onRecord = onRecord
         view.onCancel = onCancel
+        ShortcutService.shared.unregisterAll()
         DispatchQueue.main.async {
             view.window?.makeFirstResponder(view)
         }
@@ -645,13 +739,59 @@ struct ShortcutRecorderView: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: ShortcutRecorderNSView, context: Context) {}
+
+    static func dismantleNSView(_ nsView: ShortcutRecorderNSView, coordinator: ()) {
+        nsView.removeMonitor()
+        ShortcutService.shared.registerAll()
+    }
 }
 
 final class ShortcutRecorderNSView: NSView {
     var onRecord: ((UInt32, UInt32) -> Void)?
     var onCancel: (() -> Void)?
+    private var eventMonitor: Any?
 
     override var acceptsFirstResponder: Bool { true }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window != nil {
+            installMonitor()
+        }
+    }
+
+    private func installMonitor() {
+        guard eventMonitor == nil else { return }
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+
+            let keyCode = UInt32(event.keyCode)
+
+            if keyCode == 53 {
+                self.onCancel?()
+                return nil
+            }
+
+            let flags = event.modifierFlags
+            var carbonMods: UInt32 = 0
+            if flags.contains(.command) { carbonMods |= UInt32(cmdKey) }
+            if flags.contains(.shift) { carbonMods |= UInt32(shiftKey) }
+            if flags.contains(.option) { carbonMods |= UInt32(optionKey) }
+            if flags.contains(.control) { carbonMods |= UInt32(controlKey) }
+
+            guard carbonMods != 0 else { return event }
+
+            self.onRecord?(keyCode, carbonMods)
+            return nil
+        }
+    }
+
+    func removeMonitor() {
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
+        }
+    }
 
     override func draw(_ dirtyRect: NSRect) {
         let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 4, yRadius: 4)
@@ -674,26 +814,7 @@ final class ShortcutRecorderNSView: NSView {
         text.draw(at: point, withAttributes: attrs)
     }
 
-    override func keyDown(with event: NSEvent) {
-        let keyCode = UInt32(event.keyCode)
-
-        if keyCode == 53 {
-            onCancel?()
-            return
-        }
-
-        let flags = event.modifierFlags
-        var carbonMods: UInt32 = 0
-        if flags.contains(.command) { carbonMods |= UInt32(cmdKey) }
-        if flags.contains(.shift) { carbonMods |= UInt32(shiftKey) }
-        if flags.contains(.option) { carbonMods |= UInt32(optionKey) }
-        if flags.contains(.control) { carbonMods |= UInt32(controlKey) }
-
-        guard carbonMods != 0 else { return }
-
-        onRecord?(keyCode, carbonMods)
-    }
-
+    override func keyDown(with event: NSEvent) {}
     override func flagsChanged(with event: NSEvent) {}
 }
 
@@ -716,6 +837,8 @@ private func keyCodeToString(_ code: UInt32) -> String {
 // MARK: - History
 
 struct HistoryTab: View {
+    @State private var thumbnails: [String: NSImage] = [:]
+
     var body: some View {
         if HistoryStore.shared.records.isEmpty {
             ContentUnavailableView("No captures yet", systemImage: "photo.on.rectangle.angled")
@@ -724,12 +847,19 @@ struct HistoryTab: View {
             List {
                 ForEach(HistoryStore.shared.records) { record in
                     HStack(spacing: 12) {
-                        if let thumb = HistoryStore.shared.thumbnail(for: record, maxSize: 80) {
+                        if let thumb = thumbnails[record.id.uuidString] {
                             Image(nsImage: thumb)
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
                                 .frame(width: 64, height: 48)
                                 .clipShape(RoundedRectangle(cornerRadius: 4))
+                        } else {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(.quaternary)
+                                .frame(width: 64, height: 48)
+                                .onAppear {
+                                    loadThumbnail(for: record)
+                                }
                         }
 
                         VStack(alignment: .leading, spacing: 2) {
@@ -747,6 +877,7 @@ struct HistoryTab: View {
                         Spacer()
 
                         Button {
+                            thumbnails.removeValue(forKey: record.id.uuidString)
                             HistoryStore.shared.deleteRecord(record)
                         } label: {
                             Image(systemName: "trash")
@@ -756,6 +887,17 @@ struct HistoryTab: View {
                         .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 2)
+                }
+            }
+        }
+    }
+
+    private func loadThumbnail(for record: CaptureRecord) {
+        Task.detached {
+            let thumb = await HistoryStore.shared.thumbnail(for: record, maxSize: 80)
+            await MainActor.run {
+                if let thumb {
+                    thumbnails[record.id.uuidString] = thumb
                 }
             }
         }

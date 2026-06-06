@@ -7,8 +7,7 @@ enum BundledBackgrounds {
         let filename: String
 
         var image: NSImage? {
-            guard let url else { return nil }
-            return NSImage(contentsOf: url)
+            ImageCache.shared.image(for: self)
         }
 
         var url: URL? {
@@ -18,6 +17,18 @@ enum BundledBackgrounds {
                 .appendingPathComponent(filename)
             guard FileManager.default.fileExists(atPath: fileURL.path) else { return nil }
             return fileURL
+        }
+    }
+
+    final class ImageCache: @unchecked Sendable {
+        static let shared = ImageCache()
+        private var cache: [String: NSImage] = [:]
+
+        func image(for asset: ImageAsset) -> NSImage? {
+            if let cached = cache[asset.id] { return cached }
+            guard let url = asset.url, let img = NSImage(contentsOf: url) else { return nil }
+            cache[asset.id] = img
+            return img
         }
     }
 
