@@ -133,9 +133,7 @@ struct PreviewCardView: View {
                     }
                 }
                 .onTapGesture {
-                    if !isHovered {
-                        overlay.openAnnotateEditor()
-                    }
+                    overlay.openAnnotateEditor()
                 }
                 .draggable(image)
             }
@@ -150,6 +148,10 @@ struct PreviewCardView: View {
     private func hoverOverlay(image: NSImage) -> some View {
         ZStack {
             Color.black.opacity(0.45)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    overlay.openAnnotateEditor()
+                }
 
             // Corner actions
             VStack {

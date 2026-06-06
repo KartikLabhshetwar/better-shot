@@ -20,11 +20,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Menu bar cleanup**: Removed redundant "Open Last Capture" (covered by Recent Captures), renamed "Settings..." to "Settings"
 - **About tab**: Removed build number from version display, updated tagline
 - **Background picker in settings**: Cleaner grid layout with proper "None" swatch (strikethrough icon), tooltips on all swatches, separated Default Effects and Default Background into distinct sections
-- **Background label**: Shows category name (e.g. "macOS") instead of raw filename for bundled images
+- **Background label**: Shows category name instead of raw filename for bundled images
+- **Preview click-to-edit**: Clicking anywhere on the floating preview (including the hovered overlay area) now opens the editor
+- **Custom background image**: Fixed file picker for custom wallpaper backgrounds in editor; shows thumbnail and filename when a custom image is selected
 
 ### Changed
 
 - Default beautifier config now uses a centralized `AppPreferences.defaultBeautifierConfig` accessor across editor, settings, and auto-apply
+
+### Removed
+
+- **Bundled background images from editor**: Removed Wallpapers, bundled Gradients images, and macOS image sections from the editor background picker. Only solid colors, code-generated gradients, and custom image remain.
 
 ## [0.3.2] - 2026-06-03
 

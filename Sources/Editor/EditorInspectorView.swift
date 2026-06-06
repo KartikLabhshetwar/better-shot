@@ -742,6 +742,8 @@ private struct AlignmentGridPicker: View {
 struct BackgroundPickerSection: View {
     @Bindable var model: EditorModel
 
+    private let swatchColumns = Array(repeating: GridItem(.fixed(28), spacing: 6), count: 7)
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             InspectorSectionHeader("BACKGROUND")
@@ -750,111 +752,171 @@ struct BackgroundPickerSection: View {
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
 
-            LazyVGrid(columns: Array(repeating: GridItem(.fixed(28), spacing: 6), count: 7), spacing: 6) {
+            LazyVGrid(columns: swatchColumns, spacing: 6) {
+                noneButton
+
                 ForEach(SolidColor.presets) { color in
-                    let isSelected: Bool = {
-                        if case .solid(let c) = model.config.style { return c.id == color.id }
-                        return false
-                    }()
-
-                    Button {
-                        model.updateConfig { $0.style = .solid(color) }
-                    } label: {
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(color.color)
-                            .frame(width: 28, height: 28)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                    .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: isSelected ? 2 : 0.5)
-                            )
-                    }
-                    .buttonStyle(.plain)
+                    solidButton(color)
                 }
-
-                Button {
-                    model.updateConfig { $0.style = .none }
-                } label: {
-                    TransparencyGrid()
-                        .frame(width: 28, height: 28)
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .strokeBorder(
-                                    model.config.style == .none ? Color.accentColor : Color.primary.opacity(0.12),
-                                    lineWidth: model.config.style == .none ? 2 : 0.5
-                                )
-                        )
-                }
-                .buttonStyle(.plain)
             }
 
             Text("Gradients")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
 
-            LazyVGrid(columns: Array(repeating: GridItem(.fixed(28), spacing: 6), count: 7), spacing: 6) {
+            LazyVGrid(columns: swatchColumns, spacing: 6) {
                 ForEach(GradientPreset.presets) { preset in
-                    let isSelected: Bool = {
-                        if case .gradient(let g) = model.config.style { return g.id == preset.id }
-                        return false
-                    }()
-
-                    Button {
-                        model.updateConfig { $0.style = .gradient(preset) }
-                    } label: {
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(preset.swiftUIGradient)
-                            .frame(width: 28, height: 28)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                    .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: isSelected ? 2 : 0.5)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .help(preset.name)
+                    gradientButton(preset)
                 }
             }
 
-            ForEach(BundledBackgrounds.Category.allCases, id: \.self) { category in
-                let assets = assetsForCategory(category)
-                if !assets.isEmpty {
-                    Text(category.displayName)
+            Text("macOS")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(48), spacing: 6), count: 4), spacing: 6) {
+                ForEach(BundledBackgrounds.macAssets) { asset in
+                    bundledImageButton(asset)
+                }
+            }
+
+            customImageSection
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 14)
+    }
+
+    private var noneButton: some View {
+        Button {
+            model.updateConfig { $0.style = .none }
+        } label: {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.white)
+                    .frame(width: 28, height: 28)
+                Path { path in
+                    path.move(to: CGPoint(x: 26, y: 2))
+                    path.addLine(to: CGPoint(x: 2, y: 26))
+                }
+                .stroke(Color.red.opacity(0.6), lineWidth: 1.5)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(
+                        model.config.style == .none ? Color.accentColor : Color.primary.opacity(0.12),
+                        lineWidth: model.config.style == .none ? 2 : 0.5
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .help("No background")
+    }
+
+    private func solidButton(_ color: SolidColor) -> some View {
+        let isSelected: Bool = {
+            if case .solid(let c) = model.config.style { return c.id == color.id }
+            return false
+        }()
+
+        return Button {
+            model.updateConfig { $0.style = .solid(color) }
+        } label: {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(color.color)
+                .frame(width: 28, height: 28)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: isSelected ? 2 : 0.5)
+                )
+        }
+        .buttonStyle(.plain)
+        .help(color.name)
+    }
+
+    private func gradientButton(_ preset: GradientPreset) -> some View {
+        let isSelected: Bool = {
+            if case .gradient(let g) = model.config.style { return g.id == preset.id }
+            return false
+        }()
+
+        return Button {
+            model.updateConfig { $0.style = .gradient(preset) }
+        } label: {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(preset.swiftUIGradient)
+                .frame(width: 28, height: 28)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: isSelected ? 2 : 0.5)
+                )
+        }
+        .buttonStyle(.plain)
+        .help(preset.name)
+    }
+
+    private func bundledImageButton(_ asset: BundledBackgrounds.ImageAsset) -> some View {
+        let isSelected: Bool = {
+            if case .bundledImage(let id) = model.config.style { return id == asset.id }
+            return false
+        }()
+
+        return Button {
+            model.updateConfig { $0.style = .bundledImage(asset.id) }
+        } label: {
+            Group {
+                if let image = asset.image {
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else {
+                    Rectangle().fill(.quaternary)
+                }
+            }
+            .frame(width: 48, height: 36)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: isSelected ? 2 : 0.5)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var customImageSection: some View {
+        if case .wallpaper(let source) = model.config.style {
+            HStack(spacing: 6) {
+                if let img = NSImage(contentsOfFile: source.path) {
+                    Image(nsImage: img)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 28, height: 28)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .strokeBorder(Color.accentColor, lineWidth: 2)
+                        )
+                }
+
+                Text(URL(fileURLWithPath: source.path).lastPathComponent)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                Spacer()
+
+                Button {
+                    pickCustomWallpaper()
+                } label: {
+                    Text("Change")
                         .font(.caption2)
-                        .foregroundStyle(.tertiary)
-
-                    LazyVGrid(columns: Array(repeating: GridItem(.fixed(48), spacing: 6), count: 4), spacing: 6) {
-                        ForEach(assets) { asset in
-                            let isSelected: Bool = {
-                                if case .bundledImage(let id) = model.config.style { return id == asset.id }
-                                return false
-                            }()
-
-                            Button {
-                                model.updateConfig { $0.style = .bundledImage(asset.id) }
-                            } label: {
-                                Group {
-                                    if let image = asset.image {
-                                        Image(nsImage: image)
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                    } else {
-                                        Rectangle().fill(.quaternary)
-                                    }
-                                }
-                                .frame(width: 48, height: 36)
-                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                        .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: isSelected ? 2 : 0.5)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .help(asset.filename)
-                        }
-                    }
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
             }
-
+        } else {
             Button {
                 pickCustomWallpaper()
             } label: {
@@ -873,16 +935,6 @@ struct BackgroundPickerSection: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 14)
-    }
-
-    private func assetsForCategory(_ category: BundledBackgrounds.Category) -> [BundledBackgrounds.ImageAsset] {
-        switch category {
-        case .wallpapers: return BundledBackgrounds.wallpapers
-        case .gradients: return BundledBackgrounds.gradients
-        case .mac: return BundledBackgrounds.macAssets
-        }
     }
 
     private func pickCustomWallpaper() {
@@ -890,9 +942,11 @@ struct BackgroundPickerSection: View {
         panel.allowedContentTypes = [.image, .png, .jpeg]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        if panel.runModal() == .OK, let url = panel.url {
-            model.updateConfig { $0.style = .wallpaper(WallpaperSource(path: url.path)) }
-        }
+        panel.canCreateDirectories = false
+        panel.title = "Choose Background Image"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let path = url.path
+        model.updateConfig { $0.style = .wallpaper(WallpaperSource(path: path)) }
     }
 }
 

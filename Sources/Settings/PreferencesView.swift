@@ -173,11 +173,7 @@ struct GeneralSettingsTab: View {
         case .solid(let c): return c.name
         case .gradient(let g): return g.name
         case .wallpaper: return "Custom Image"
-        case .bundledImage(let id):
-            if let asset = BundledBackgrounds.asset(byID: id) {
-                return asset.category.displayName
-            }
-            return "Bundled"
+        case .bundledImage: return "macOS Wallpaper"
         }
     }
 }

@@ -7,7 +7,7 @@ enum BackgroundStyle: Codable, Equatable, Hashable {
     case solid(SolidColor)
     case gradient(GradientPreset)
     case wallpaper(WallpaperSource)
-    case bundledImage(String) // ID from BundledBackgrounds
+    case bundledImage(String)
 }
 
 // MARK: - Solid Colors (12 presets matching a rich palette)
