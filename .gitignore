@@ -30,5 +30,8 @@ build-arm64/
 build-x86_64/
 *.dmg
 
+# Local scripts
+scripts/
+
 # Claude Code
 CLAUDE.md

@@ -112,6 +112,8 @@ struct MenuBarContentView: View {
                     shortcut: ",",
                     modifiers: .command
                 ) {
+                    NSApp.setActivationPolicy(.regular)
+                    NSApp.activate(ignoringOtherApps: true)
                     openSettings()
                 }
 

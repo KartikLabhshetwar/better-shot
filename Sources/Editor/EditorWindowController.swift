@@ -5,22 +5,12 @@ import SwiftUI
 final class EditorWindowController {
     static let shared = EditorWindowController()
 
-    private var window: NSWindow?
-    private var currentURL: CurrentURL?
+    private var windows: [NSWindow] = []
 
     private init() {}
 
     func open(url: URL) {
-        if let window, window.isVisible {
-            currentURL?.url = url
-            window.makeKeyAndOrderFront(nil)
-            NSApp.setActivationPolicy(.regular)
-            NSApp.activate(ignoringOtherApps: true)
-            return
-        }
-
         let urlHolder = CurrentURL(url: url)
-        currentURL = urlHolder
 
         let hostingView = NSHostingView(rootView:
             EditorWindowView(urlHolder: urlHolder)
@@ -34,24 +24,41 @@ final class EditorWindowController {
             defer: false
         )
         win.contentView = hostingView
-        win.title = "BetterShot"
+        win.title = url.deletingPathExtension().lastPathComponent
         win.isReleasedWhenClosed = false
-        win.delegate = WindowCloseDelegate.shared
+        win.delegate = EditorWindowDelegate.shared
 
         centerOnActiveScreen(win)
+
+        windows.append(win)
 
         NSApp.setActivationPolicy(.regular)
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-
-        self.window = win
     }
 
-    func close() {
-        window?.close()
-        window = nil
-        currentURL = nil
-        NSApp.setActivationPolicy(.accessory)
+    func close(window: NSWindow? = nil) {
+        if let window {
+            windows.removeAll { $0 === window }
+            window.close()
+        } else {
+            let windowToClose = NSApp.keyWindow ?? windows.last
+            if let windowToClose {
+                windows.removeAll { $0 === windowToClose }
+                windowToClose.close()
+            }
+        }
+
+        if windows.isEmpty {
+            NSApp.setActivationPolicy(.accessory)
+        }
+    }
+
+    func windowDidClose(_ window: NSWindow) {
+        windows.removeAll { $0 === window }
+        if windows.isEmpty {
+            NSApp.setActivationPolicy(.accessory)
+        }
     }
 
     private func centerOnActiveScreen(_ window: NSWindow) {
@@ -82,12 +89,13 @@ final class CurrentURL {
     }
 }
 
-private final class WindowCloseDelegate: NSObject, NSWindowDelegate, @unchecked Sendable {
-    static let shared = WindowCloseDelegate()
+private final class EditorWindowDelegate: NSObject, NSWindowDelegate, @unchecked Sendable {
+    static let shared = EditorWindowDelegate()
 
     func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
         Task { @MainActor in
-            EditorWindowController.shared.close()
+            EditorWindowController.shared.windowDidClose(window)
         }
     }
 }

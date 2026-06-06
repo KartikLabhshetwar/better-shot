@@ -67,7 +67,9 @@ final class PreviewOverlay {
     }
 
     private func positionPanel() {
-        guard let panel, let screen = NSScreen.main else { return }
+        let mouseLocation = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { $0.frame.contains(mouseLocation) } ?? NSScreen.main
+        guard let panel, let screen else { return }
 
         let screenFrame = screen.visibleFrame
         let panelSize = CGSize(width: 200, height: 170)

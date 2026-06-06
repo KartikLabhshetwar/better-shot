@@ -8,10 +8,27 @@ final class CaptureOrchestrator {
     static let shared = CaptureOrchestrator()
 
     private(set) var lastCaptureURL: URL?
+    private(set) var autoAppliedURLs: Set<URL> = []
+    private var captureInProgress = false
+    private var pendingCaptures: [ShortcutService.Action] = []
 
     private init() {}
 
     func performCapture(_ action: ShortcutService.Action) async {
+        if captureInProgress {
+            pendingCaptures.append(action)
+            return
+        }
+        captureInProgress = true
+        await executeCapture(action)
+        while let next = pendingCaptures.first {
+            pendingCaptures.removeFirst()
+            await executeCapture(next)
+        }
+        captureInProgress = false
+    }
+
+    private func executeCapture(_ action: ShortcutService.Action) async {
         switch action {
         case .region:
             await captureAndProcess { try await ScreenCapture.shared.captureRegion() }
@@ -101,8 +118,11 @@ final class CaptureOrchestrator {
             copyToClipboard(savedURL)
         }
 
-        if let savedURL, AppPreferences.showOverlayAfterCapture {
-            PreviewOverlay.shared.show(url: savedURL)
+        if let savedURL {
+            autoAppliedURLs.insert(savedURL)
+            if AppPreferences.showOverlayAfterCapture {
+                PreviewOverlay.shared.show(url: savedURL)
+            }
         }
     }
 

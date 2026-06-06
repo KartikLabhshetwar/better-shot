@@ -62,7 +62,7 @@ struct EditorWindowView: View {
                 Spacer()
 
                 Button("Cancel") {
-                    EditorWindowController.shared.close()
+                    NSApp.keyWindow?.close()
                 }
                 .keyboardShortcut(.escape, modifiers: [])
 
@@ -122,7 +122,7 @@ struct EditorWindowView: View {
 
         withAnimation { model.toastMessage = "Exported" }
         try? await Task.sleep(for: .seconds(1.0))
-        EditorWindowController.shared.close()
+        NSApp.keyWindow?.close()
     }
 
     private func copyToClipboard() async {
