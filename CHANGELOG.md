@@ -9,9 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Reset to Defaults in Settings**: Added reset buttons throughout settings — "Reset Effects to Defaults" in Default Background section, "Reset All General Settings to Defaults" at the bottom of General tab, "Reset Shortcuts to Defaults" in Keyboard Shortcuts section, and "Reset All Capture Settings to Defaults" at the bottom of Capture tab
 - **Preview overlay settings restored**: Position (bottom-right/bottom-left) and auto-dismiss delay (2–15s) are back in Capture settings
-- **Reset shortcuts button**: "Reset to Defaults" button in Capture settings restores all keyboard shortcuts to their defaults
 - **Shortcut recorder fix**: Recorder now temporarily disables the CGEvent tap so system shortcuts like ⌘⇧4 can be captured without triggering the native macOS screenshot. Uses a local event monitor instead of `keyDown`
+
+### Improved
+
+- **Tab state preserved in settings**: Settings tabs now use ZStack with opacity toggling instead of Group/switch, preserving state when switching between tabs
+- **Async history thumbnails**: History tab loads thumbnails asynchronously to avoid blocking the UI on large capture histories
 
 ### Fixed
 
