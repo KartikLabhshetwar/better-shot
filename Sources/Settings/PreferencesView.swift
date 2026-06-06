@@ -134,6 +134,11 @@ struct GeneralSettingsTab: View {
                 }
             }
 
+            Section("Preview") {
+                DefaultConfigPreview(config: defaultConfig)
+                    .frame(height: 140)
+            }
+
             Section("Export") {
                 Picker("Format", selection: exportFormat) {
                     ForEach(ExportFormat.allCases, id: \.self) { format in
@@ -199,6 +204,14 @@ private struct DefaultBackgroundPicker: View {
                     gradientButton(preset)
                 }
             }
+
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(38), spacing: 5), count: 6), spacing: 5) {
+                ForEach(BundledBackgrounds.macAssets) { asset in
+                    bundledImageButton(asset)
+                }
+            }
+
+            customImageRow
         }
     }
 
@@ -266,6 +279,227 @@ private struct DefaultBackgroundPicker: View {
         }
         .buttonStyle(.plain)
         .help(preset.name)
+    }
+
+    private func bundledImageButton(_ asset: BundledBackgrounds.ImageAsset) -> some View {
+        let isSelected: Bool = {
+            if case .bundledImage(let id) = selectedStyle { return id == asset.id }
+            return false
+        }()
+
+        return Button {
+            selectedStyle = .bundledImage(asset.id)
+        } label: {
+            Group {
+                if let image = asset.image {
+                    Image(nsImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else {
+                    Rectangle().fill(.quaternary)
+                }
+            }
+            .frame(width: 38, height: 28)
+            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: isSelected ? 2 : 0.5)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var customImageRow: some View {
+        if case .wallpaper(let source) = selectedStyle {
+            HStack(spacing: 8) {
+                if let img = NSImage(contentsOfFile: source.path) {
+                    Image(nsImage: img)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 24, height: 24)
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .strokeBorder(Color.accentColor, lineWidth: 2)
+                        )
+                }
+                Text(URL(fileURLWithPath: source.path).lastPathComponent)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer()
+                Button("Change") { pickCustomImage() }
+                    .controlSize(.mini)
+            }
+        } else {
+            Button { pickCustomImage() } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "plus").font(.caption2)
+                    Text("Custom Image...").font(.caption2)
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+    }
+
+    private func pickCustomImage() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image, .png, .jpeg]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.title = "Choose Background Image"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        selectedStyle = .wallpaper(WallpaperSource(path: url.path))
+    }
+}
+
+// MARK: - Default Config Preview
+
+private struct DefaultConfigPreview: View {
+    let config: BeautifierConfig
+
+    var body: some View {
+        GeometryReader { proxy in
+            let mockImageW: CGFloat = 160
+            let mockImageH: CGFloat = 100
+            let shortEdge = min(mockImageW, mockImageH)
+            let pad = shortEdge * config.padding
+
+            var canvasW = mockImageW + pad * 2
+            var canvasH = mockImageH + pad * 2
+            let _ = {
+                if let ratio = config.aspectRatio.numericValue {
+                    let current = canvasW / canvasH
+                    if current < ratio { canvasW = canvasH * ratio }
+                    else { canvasH = canvasW / ratio }
+                }
+            }()
+
+            let canvasSize = CGSize(width: canvasW, height: canvasH)
+            let fitted = aspectFitRect(imageSize: canvasSize, in: proxy.size)
+
+            let totalHPad = canvasW - mockImageW
+            let totalVPad = canvasH - mockImageH
+            let imgX = fitted.minX + config.alignment.xFactor * totalHPad / canvasW * fitted.width
+            let imgY = fitted.minY + config.alignment.yFactor * totalVPad / canvasH * fitted.height
+            let imgW = mockImageW / canvasW * fitted.width
+            let imgH = mockImageH / canvasH * fitted.height
+
+            let cornerRadius = config.cornerRadius * shortEdge * min(fitted.width / canvasW, fitted.height / canvasH)
+            let m = config.alignment.cornerMultipliers
+
+            ZStack {
+                previewBackground(config.style)
+                    .frame(width: fitted.width, height: fitted.height)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                    )
+                    .position(x: fitted.midX, y: fitted.midY)
+
+                mockScreenshot
+                    .clipShape(UnevenRoundedRectangle(
+                        topLeadingRadius: cornerRadius * m.tl,
+                        bottomLeadingRadius: cornerRadius * m.bl,
+                        bottomTrailingRadius: cornerRadius * m.br,
+                        topTrailingRadius: cornerRadius * m.tr,
+                        style: .continuous
+                    ))
+                    .shadow(
+                        color: config.shadowStrength > 0 ? .black.opacity(Double(config.shadowStrength * 0.3)) : .clear,
+                        radius: config.shadowStrength > 0 ? max(2, shortEdge * 0.02 * (1 + config.shadowStrength)) : 0,
+                        x: 0,
+                        y: config.shadowStrength > 0 ? shortEdge * 0.01 * (1 + config.shadowStrength) : 0
+                    )
+                    .frame(width: imgW, height: imgH)
+                    .position(x: imgX + imgW / 2, y: imgY + imgH / 2)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private var mockScreenshot: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(white: 0.96), Color(white: 0.88)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            VStack(spacing: 4) {
+                HStack(spacing: 3) {
+                    Circle().fill(.red.opacity(0.7)).frame(width: 5, height: 5)
+                    Circle().fill(.yellow.opacity(0.7)).frame(width: 5, height: 5)
+                    Circle().fill(.green.opacity(0.7)).frame(width: 5, height: 5)
+                    Spacer()
+                }
+                .padding(.horizontal, 6)
+                .padding(.top, 4)
+
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color(white: 0.82))
+                    .frame(height: 6)
+                    .padding(.horizontal, 8)
+
+                HStack(spacing: 4) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color(white: 0.78))
+                        .frame(width: 30, height: 4)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color(white: 0.84))
+                        .frame(height: 4)
+                }
+                .padding(.horizontal, 8)
+
+                Spacer()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func previewBackground(_ style: BackgroundStyle) -> some View {
+        switch style {
+        case .none:
+            TransparencyGrid()
+        case .solid(let color):
+            Rectangle().fill(color.color)
+        case .gradient(let preset):
+            Rectangle().fill(preset.swiftUIGradient)
+        case .wallpaper(let source):
+            if let nsImage = NSImage(contentsOfFile: source.path) {
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                Rectangle().fill(.quaternary)
+            }
+        case .bundledImage(let assetID):
+            if let asset = BundledBackgrounds.asset(byID: assetID),
+               let nsImage = asset.image {
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                Rectangle().fill(.quaternary)
+            }
+        }
+    }
+
+    private func aspectFitRect(imageSize: CGSize, in containerSize: CGSize) -> CGRect {
+        guard imageSize.width > 0, imageSize.height > 0,
+              containerSize.width > 0, containerSize.height > 0 else { return .zero }
+        let scale = min(containerSize.width / imageSize.width, containerSize.height / imageSize.height)
+        let size = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
+        return CGRect(
+            x: (containerSize.width - size.width) / 2,
+            y: (containerSize.height - size.height) / 2,
+            width: size.width,
+            height: size.height
+        )
     }
 }
 
@@ -567,12 +801,21 @@ struct AboutTab: View {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
     }
 
+    private var appIcon: NSImage? {
+        if let icon = NSImage(named: "AppIcon") {
+            return icon
+        }
+        return NSApp.applicationIconImage
+    }
+
     var body: some View {
         VStack(spacing: 16) {
-            if let appIcon = NSApp.applicationIconImage {
-                Image(nsImage: appIcon)
+            if let icon = appIcon {
+                Image(nsImage: icon)
                     .resizable()
+                    .interpolation(.high)
                     .frame(width: 96, height: 96)
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             }
 
             Text("BetterShot")
@@ -586,6 +829,22 @@ struct AboutTab: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
+
+            HStack(spacing: 16) {
+                Link(destination: URL(string: "https://x.com/code_kartik")!) {
+                    Label("@code_kartik", systemImage: "at")
+                        .font(.caption)
+                }
+
+                Link(destination: URL(string: "https://github.com/KartikLabhshetwar/better-shot")!) {
+                    Label("GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
+                        .font(.caption)
+                }
+            }
+
+            Text("Built by Kartik Labhshetwar")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
 
             updateSection
         }

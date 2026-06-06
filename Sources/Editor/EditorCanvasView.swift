@@ -3,36 +3,72 @@ import SwiftUI
 struct EditorCanvasView: View {
     @Bindable var model: EditorModel
 
-    @State private var renderedPreview: NSImage?
-    @State private var renderTask: Task<Void, Never>?
     @State private var hasActiveInteraction = false
     @State private var hoveredLocation: CGPoint?
     @State private var currentCursor: AnnotationCanvasCursor = .arrow
 
     var body: some View {
         GeometryReader { proxy in
-            if model.sourceImage != nil {
-                let displayImage = renderedPreview ?? model.previewImage
-                let displaySize: CGSize = {
-                    guard let img = displayImage else { return model.imageSize }
-                    return CGSize(width: img.size.width, height: img.size.height)
+            if let sourceImage = model.sourceImage {
+                let imgW = CGFloat(sourceImage.width)
+                let imgH = CGFloat(sourceImage.height)
+                let shortEdge = min(imgW, imgH)
+                let pad = shortEdge * model.config.padding
+
+                var canvasW = imgW + pad * 2
+                var canvasH = imgH + pad * 2
+                let _ = {
+                    if let ratio = model.config.aspectRatio.numericValue {
+                        let current = canvasW / canvasH
+                        if current < ratio { canvasW = canvasH * ratio }
+                        else { canvasH = canvasW / ratio }
+                    }
                 }()
-                let imageFrame = aspectFitRect(imageSize: displaySize, in: proxy.size)
-                let sourceImageFrame = sourceImageFrame(config: model.config, displayFrame: imageFrame, displaySize: displaySize)
+
+                let canvasSize = CGSize(width: canvasW, height: canvasH)
+                let canvasFrame = aspectFitRect(imageSize: canvasSize, in: proxy.size)
+
+                let totalHPad = canvasW - imgW
+                let totalVPad = canvasH - imgH
+                let imgXNorm = model.config.alignment.xFactor * totalHPad / canvasW
+                let imgYNorm = model.config.alignment.yFactor * totalVPad / canvasH
+                let imgWNorm = imgW / canvasW
+                let imgHNorm = imgH / canvasH
+
+                let sourceImageFrame = CGRect(
+                    x: canvasFrame.minX + imgXNorm * canvasFrame.width,
+                    y: canvasFrame.minY + imgYNorm * canvasFrame.height,
+                    width: imgWNorm * canvasFrame.width,
+                    height: imgHNorm * canvasFrame.height
+                )
+
+                let baseRadius = model.config.cornerRadius * shortEdge
+                let m = model.config.alignment.cornerMultipliers
+                let cornerScale = min(canvasFrame.width / canvasW, canvasFrame.height / canvasH)
+                let viewRadii = (
+                    tl: baseRadius * m.tl * cornerScale,
+                    tr: baseRadius * m.tr * cornerScale,
+                    br: baseRadius * m.br * cornerScale,
+                    bl: baseRadius * m.bl * cornerScale
+                )
 
                 ZStack(alignment: .topLeading) {
-                    if case .none = model.config.style, model.config.padding < 0.001 {
-                        TransparencyGrid()
-                    }
+                    // Background layer
+                    CanvasBackgroundView(style: model.config.style)
+                        .frame(width: canvasFrame.width, height: canvasFrame.height)
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                        .position(x: canvasFrame.midX, y: canvasFrame.midY)
 
-                    if let img = displayImage {
-                        Image(nsImage: img)
-                            .resizable()
-                            .interpolation(.high)
-                            .frame(width: imageFrame.width, height: imageFrame.height)
-                            .position(x: imageFrame.midX, y: imageFrame.midY)
-                    }
+                    // Shadow + Screenshot layer
+                    CanvasScreenshotView(
+                        image: sourceImage,
+                        frame: sourceImageFrame,
+                        cornerRadii: viewRadii,
+                        shadowStrength: model.config.shadowStrength,
+                        shortEdge: shortEdge * cornerScale
+                    )
 
+                    // Annotations
                     ForEach(model.items) { item in
                         AnnotationItemView(
                             item: item,
@@ -40,6 +76,7 @@ struct EditorCanvasView: View {
                             sourceImage: model.sourceImage,
                             originalImageSize: model.imageSize,
                             imageFrame: sourceImageFrame,
+                            canvasFrame: canvasFrame,
                             isSelected: model.selectedItemIDs.contains(item.id),
                             showsResizeHandles: model.selectionCount == 1,
                             isEditingText: item.id == model.editingTextItemID,
@@ -50,7 +87,7 @@ struct EditorCanvasView: View {
                             ),
                             onCommitText: model.commitTextEditing,
                             onTextSizeChange: { size in
-                                model.setTextViewContentSize(size, for: item.id, imageFrame: sourceImageFrame, allowedBounds: model.annotationBounds(for: sourceImageFrame, boundaryFrame: imageFrame))
+                                model.setTextViewContentSize(size, for: item.id, imageFrame: sourceImageFrame, allowedBounds: model.annotationBounds(for: sourceImageFrame, boundaryFrame: canvasFrame))
                             }
                         )
                     }
@@ -62,6 +99,7 @@ struct EditorCanvasView: View {
                             sourceImage: model.sourceImage,
                             originalImageSize: model.imageSize,
                             imageFrame: sourceImageFrame,
+                            canvasFrame: canvasFrame,
                             isSelected: false,
                             showsResizeHandles: false,
                             isEditingText: false,
@@ -73,20 +111,18 @@ struct EditorCanvasView: View {
                     }
 
                     if let selectionRect = model.selectionRect {
+                        let viewSel = viewRect(selectionRect, in: sourceImageFrame)
                         AnnotationMarqueeSelectionView()
                             .frame(
-                                width: max(viewRect(selectionRect, in: sourceImageFrame).width, 1),
-                                height: max(viewRect(selectionRect, in: sourceImageFrame).height, 1)
+                                width: max(viewSel.width, 1),
+                                height: max(viewSel.height, 1)
                             )
-                            .position(
-                                x: viewRect(selectionRect, in: sourceImageFrame).midX,
-                                y: viewRect(selectionRect, in: sourceImageFrame).midY
-                            )
+                            .position(x: viewSel.midX, y: viewSel.midY)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(Rectangle())
-                .gesture(interactionGesture(imageFrame: sourceImageFrame, boundaryFrame: imageFrame))
+                .gesture(interactionGesture(imageFrame: sourceImageFrame, boundaryFrame: canvasFrame))
                 .onContinuousHover { phase in
                     switch phase {
                     case .active(let location):
@@ -107,71 +143,6 @@ struct EditorCanvasView: View {
             }
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .onChange(of: model.config, initial: true) { _, _ in scheduleRender() }
-        .onChange(of: model.sourceImage) { _, _ in scheduleRender() }
-        .onChange(of: model.isSliderDragging) { _, isDragging in
-            if !isDragging { scheduleRender() }
-        }
-    }
-
-    @State private var lastRenderedConfig: BeautifierConfig?
-
-    private func scheduleRender() {
-        renderTask?.cancel()
-        let isDragging = model.isSliderDragging
-        let config = model.config
-        if !isDragging, config == lastRenderedConfig { return }
-        let delay: UInt64 = isDragging ? 80 : 50
-        renderTask = Task {
-            try? await Task.sleep(for: .milliseconds(delay))
-            guard !Task.isCancelled else { return }
-            guard let source = model.sourceImage else { return }
-
-            let config = model.config
-            let result = await Task.detached(priority: .userInitiated) {
-                renderPreview(image: source, config: config, lowQuality: isDragging)
-            }.value
-
-            guard !Task.isCancelled, let cgImage = result else { return }
-            renderedPreview = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-            lastRenderedConfig = config
-        }
-    }
-
-    private func sourceImageFrame(config: BeautifierConfig, displayFrame: CGRect, displaySize: CGSize) -> CGRect {
-        guard displaySize.width > 0, displaySize.height > 0 else { return displayFrame }
-
-        let imgW = model.imageSize.width
-        let imgH = model.imageSize.height
-        guard imgW > 0, imgH > 0 else { return displayFrame }
-
-        let shortEdge = min(imgW, imgH)
-        let pad = shortEdge * config.padding
-
-        var canvasW = imgW + pad * 2
-        var canvasH = imgH + pad * 2
-
-        if let ratio = config.aspectRatio.numericValue {
-            let current = canvasW / canvasH
-            if current < ratio { canvasW = canvasH * ratio }
-            else { canvasH = canvasW / ratio }
-        }
-
-        let totalHPad = canvasW - imgW
-        let totalVPad = canvasH - imgH
-        let imgX = config.alignment.xFactor * totalHPad
-        let imgY = config.alignment.yFactor * totalVPad
-
-        let scaleX = displayFrame.width / canvasW
-        let scaleY = displayFrame.height / canvasH
-        let scale = min(scaleX, scaleY)
-
-        return CGRect(
-            x: displayFrame.minX + imgX * (displayFrame.width / canvasW),
-            y: displayFrame.minY + imgY * (displayFrame.height / canvasH),
-            width: imgW * (displayFrame.width / canvasW),
-            height: imgH * (displayFrame.height / canvasH)
-        )
     }
 
     private func interactionGesture(imageFrame: CGRect, boundaryFrame: CGRect) -> some Gesture {
@@ -244,30 +215,94 @@ struct EditorCanvasView: View {
     }
 }
 
-private func renderPreview(image: CGImage, config: BeautifierConfig, lowQuality: Bool = false) -> CGImage? {
-    let maxDim: CGFloat = lowQuality ? 900 : 1800
-    let imgW = CGFloat(image.width)
-    let imgH = CGFloat(image.height)
-    let scale: CGFloat = max(imgW, imgH) > maxDim ? maxDim / max(imgW, imgH) : 1.0
+// MARK: - SwiftUI Background Layer
 
-    var previewImage = image
-    if scale < 1.0 {
-        let newW = Int(imgW * scale)
-        let newH = Int(imgH * scale)
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        guard let ctx = CGContext(
-            data: nil, width: newW, height: newH,
-            bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
-        ) else { return nil }
-        ctx.interpolationQuality = lowQuality ? .medium : .high
-        ctx.draw(image, in: CGRect(x: 0, y: 0, width: newW, height: newH))
-        guard let scaled = ctx.makeImage() else { return nil }
-        previewImage = scaled
+private struct CanvasBackgroundView: View {
+    let style: BackgroundStyle
+
+    var body: some View {
+        switch style {
+        case .none:
+            TransparencyGrid()
+
+        case .solid(let color):
+            Rectangle().fill(color.color)
+
+        case .gradient(let preset):
+            Rectangle().fill(preset.swiftUIGradient)
+
+        case .wallpaper(let source):
+            if let nsImage = NSImage(contentsOfFile: source.path) {
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                Rectangle().fill(.quaternary)
+            }
+
+        case .bundledImage(let assetID):
+            if let asset = BundledBackgrounds.asset(byID: assetID),
+               let nsImage = asset.image {
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                Rectangle().fill(.quaternary)
+            }
+        }
+    }
+}
+
+// MARK: - Screenshot Layer with Shadow and Rounded Corners
+
+private struct CanvasScreenshotView: View {
+    let image: CGImage
+    let frame: CGRect
+    let cornerRadii: (tl: CGFloat, tr: CGFloat, br: CGFloat, bl: CGFloat)
+    let shadowStrength: CGFloat
+    let shortEdge: CGFloat
+
+    private var clipShape: UnevenRoundedRectangle {
+        UnevenRoundedRectangle(
+            topLeadingRadius: cornerRadii.tl,
+            bottomLeadingRadius: cornerRadii.bl,
+            bottomTrailingRadius: cornerRadii.br,
+            topTrailingRadius: cornerRadii.tr,
+            style: .continuous
+        )
     }
 
-    return BeautifierRenderer.render(image: previewImage, config: config)
+    private var shadowRadius: CGFloat {
+        max(2, shortEdge * (0.035 + shadowStrength * 0.035))
+    }
+
+    private var shadowOffset: CGFloat {
+        shortEdge * (0.012 + shadowStrength * 0.018)
+    }
+
+    private var shadowOpacity: Double {
+        Double(shadowStrength * 0.36)
+    }
+
+    var body: some View {
+        let nsImage = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+
+        Image(nsImage: nsImage)
+            .resizable()
+            .interpolation(.high)
+            .clipShape(clipShape)
+            .shadow(
+                color: shadowStrength > 0 ? .black.opacity(shadowOpacity) : .clear,
+                radius: shadowStrength > 0 ? shadowRadius : 0,
+                x: 0,
+                y: shadowStrength > 0 ? shadowOffset : 0
+            )
+            .frame(width: frame.width, height: frame.height)
+            .position(x: frame.midX, y: frame.midY)
+    }
 }
+
+// MARK: - Supporting Types
 
 private enum AnnotationCanvasCursor: Equatable {
     case arrow

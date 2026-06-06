@@ -126,7 +126,15 @@ enum RedactionImageProcessor {
 
         let pixelWidth = croppedImage.width
         let pixelHeight = croppedImage.height
-        let blockSize = max(1, Int(round(pixelBlockSize(for: density) * scale)))
+        let blockSize: Int
+        if scale < 1 {
+            let viewWidth = max(1, CGFloat(pixelWidth) * scale)
+            let baseBlockSize = pixelBlockSize(for: density)
+            let blocksAcross = max(1, Int(round(viewWidth / baseBlockSize)))
+            blockSize = max(1, pixelWidth / blocksAcross)
+        } else {
+            blockSize = max(1, Int(round(pixelBlockSize(for: density) * scale)))
+        }
         let smallWidth = max(1, pixelWidth / blockSize)
         let smallHeight = max(1, pixelHeight / blockSize)
         let colorSpace = croppedImage.colorSpace ?? CGColorSpaceCreateDeviceRGB()
@@ -157,7 +165,7 @@ enum RedactionImageProcessor {
         density: CGFloat,
         scale: CGFloat
     ) -> NSImage? {
-        let radius = blurRadius(for: density) * scale
+        let radius = blurRadius(for: density)
         let fullRect = CGRect(x: 0, y: 0, width: source.width, height: source.height)
         let paddedRect = cropRect
             .insetBy(dx: -ceil(radius * 2), dy: -ceil(radius * 2))

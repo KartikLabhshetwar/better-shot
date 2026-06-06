@@ -163,12 +163,12 @@ private struct AnnotationInspectorToolGrid: View {
     let onSelect: (AnnotationTool) -> Void
 
     private let columns: [GridItem] = Array(
-        repeating: GridItem(.flexible(), spacing: 2), count: 6
+        repeating: GridItem(.flexible(), spacing: 2), count: 5
     )
 
     var body: some View {
         LazyVGrid(columns: columns, spacing: 2) {
-            ForEach(AnnotationTool.allCases) { tool in
+            ForEach(AnnotationTool.toolbarCases) { tool in
                 Button {
                     onSelect(tool)
                 } label: {
@@ -636,16 +636,12 @@ private struct LayoutSection: View {
         VStack(alignment: .leading, spacing: 12) {
             InspectorSectionHeader("LAYOUT")
 
-            VStack(spacing: 4) {
-                HStack {
-                    Text("Aspect Ratio")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                    Spacer()
-                    Text(model.config.aspectRatio.rawValue)
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(.tertiary)
-                }
+            HStack(spacing: 10) {
+                Text("Ratio")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 52, alignment: .leading)
+
                 Menu {
                     ForEach(CanvasAspectRatio.allCases, id: \.self) { ratio in
                         Button {
@@ -685,10 +681,12 @@ private struct LayoutSection: View {
                 .buttonStyle(.plain)
             }
 
-            VStack(spacing: 4) {
-                Text("Alignment")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+            HStack(alignment: .top, spacing: 10) {
+                Text("Align")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 52, alignment: .leading)
+                    .padding(.top, 6)
 
                 AlignmentGridPicker(selection: Binding(
                     get: { model.config.alignment },
@@ -711,28 +709,38 @@ private struct AlignmentGridPicker: View {
     ]
 
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 0) {
             ForEach(Self.rows, id: \.self) { row in
-                HStack(spacing: 2) {
+                HStack(spacing: 0) {
                     ForEach(row, id: \.self) { alignment in
                         Button {
                             selection = alignment
                         } label: {
-                            Circle()
-                                .fill(selection == alignment ? Color.accentColor : Color.primary.opacity(0.25))
-                                .frame(width: selection == alignment ? 10 : 7, height: selection == alignment ? 10 : 7)
-                                .frame(width: 24, height: 24)
-                                .contentShape(Rectangle())
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                    .fill(selection == alignment ? Color.accentColor.opacity(0.12) : .clear)
+
+                                Circle()
+                                    .fill(selection == alignment ? Color.accentColor : Color.primary.opacity(0.22))
+                                    .frame(width: selection == alignment ? 9 : 6, height: selection == alignment ? 9 : 6)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 28)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
                 }
             }
         }
-        .padding(4)
+        .padding(3)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor).opacity(0.3), lineWidth: 0.5)
         )
     }
 }
@@ -965,7 +973,7 @@ struct BeautifierControlsSection: View {
                 value: Binding(get: { model.config.padding }, set: { model.config.padding = $0 }),
                 range: 0.0...0.45,
                 format: { "\(Int($0 * 100))%" },
-                onEditingChanged: { editing in handleSliderEditing(editing) }
+                onEditingChanged: { handleSliderEditing($0) }
             )
 
             LabeledSlider(
@@ -973,7 +981,7 @@ struct BeautifierControlsSection: View {
                 value: Binding(get: { model.config.cornerRadius }, set: { model.config.cornerRadius = $0 }),
                 range: 0.0...0.12,
                 format: { "\(Int($0 * 1000))" },
-                onEditingChanged: { editing in handleSliderEditing(editing) }
+                onEditingChanged: { handleSliderEditing($0) }
             )
 
             LabeledSlider(
@@ -981,29 +989,14 @@ struct BeautifierControlsSection: View {
                 value: Binding(get: { model.config.shadowStrength }, set: { model.config.shadowStrength = $0 }),
                 range: 0.0...1.0,
                 format: { "\(Int($0 * 100))%" },
-                onEditingChanged: { editing in handleSliderEditing(editing) }
+                onEditingChanged: { handleSliderEditing($0) }
             )
-
-            Button {
-                model.saveConfigAsDefault()
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.down.doc").font(.caption2)
-                    Text("Save as Default").font(.caption2)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 14)
     }
 
     private func handleSliderEditing(_ editing: Bool) {
-        model.isSliderDragging = editing
         if editing {
             configBeforeDrag = model.config
         } else if let saved = configBeforeDrag {

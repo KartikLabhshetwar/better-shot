@@ -601,6 +601,10 @@ enum AnnotationTool: String, CaseIterable, Identifiable, Codable {
 
     var id: String { rawValue }
 
+    static var toolbarCases: [AnnotationTool] {
+        allCases.filter { $0 != .pixelate }
+    }
+
     var title: String {
         switch self {
         case .select: "Select"

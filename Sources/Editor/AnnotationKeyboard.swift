@@ -131,7 +131,6 @@ final class AnnotationKeyCommandHandlerView: NSView {
         case "a": return .arrow
         case "d": return .freehand
         case "n": return .numberedCircle
-        case "p": return .pixelate
         case "b": return .blur
         case "g": return .spotlight
         case "t": return .text

@@ -9,7 +9,6 @@ final class EditorModel {
     var previewImage: NSImage?
     var imageSize: CGSize = .zero
     var config = BeautifierConfig.default
-    var isSliderDragging = false
     var toastMessage: String?
 
     // Annotation state

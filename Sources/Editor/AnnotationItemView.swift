@@ -7,6 +7,7 @@ struct AnnotationItemView: View {
     let sourceImage: CGImage?
     let originalImageSize: CGSize
     let imageFrame: CGRect
+    var canvasFrame: CGRect?
     let isSelected: Bool
     let showsResizeHandles: Bool
     let isEditingText: Bool
@@ -35,6 +36,7 @@ struct AnnotationItemView: View {
                 SpotlightPreview(
                     item: item,
                     imageFrame: imageFrame,
+                    canvasFrame: canvasFrame ?? imageFrame,
                     viewBounds: viewBounds
                 )
             } else if item.tool.isFilledShape {
@@ -649,6 +651,7 @@ private enum AnnotationSelectionStyle {
 private struct SpotlightPreview: View {
     let item: AnnotationItem
     let imageFrame: CGRect
+    let canvasFrame: CGRect
     let viewBounds: CGRect
 
     var body: some View {
@@ -656,16 +659,16 @@ private struct SpotlightPreview: View {
             let overlayRect = CGRect(origin: .zero, size: size)
             var overlayPath = Path(overlayRect)
             let cutoutRect = CGRect(
-                x: viewBounds.minX - imageFrame.minX,
-                y: viewBounds.minY - imageFrame.minY,
+                x: viewBounds.minX - canvasFrame.minX,
+                y: viewBounds.minY - canvasFrame.minY,
                 width: viewBounds.width,
                 height: viewBounds.height
             )
             overlayPath.addRect(cutoutRect)
             context.fill(overlayPath, with: .color(.black.opacity(Double(item.redactionDensity))), style: FillStyle(eoFill: true))
         }
-        .frame(width: imageFrame.width, height: imageFrame.height)
-        .position(x: imageFrame.midX, y: imageFrame.midY)
+        .frame(width: canvasFrame.width, height: canvasFrame.height)
+        .position(x: canvasFrame.midX, y: canvasFrame.midY)
         .allowsHitTesting(false)
     }
 }
