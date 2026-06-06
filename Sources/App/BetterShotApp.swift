@@ -9,6 +9,7 @@ struct BetterShotApp: App {
         MenuBarExtra("BetterShot", image: "MenuBarIcon", isInserted: $showMenuBarIcon) {
             MenuBarContentView()
         }
+        .menuBarExtraStyle(.window)
 
         Settings {
             PreferencesView()

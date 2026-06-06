@@ -45,7 +45,7 @@ struct PreferencesView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: 620, height: 440)
+        .frame(width: 680, height: 560)
     }
 }
 
@@ -107,6 +107,10 @@ struct GeneralSettingsTab: View {
             }
 
             Section("Default Effects") {
+                DefaultConfigPreview(config: defaultConfig)
+                    .frame(height: 120)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4))
+
                 defaultSlider(label: "Padding", value: $defaultConfig.padding, range: 0.0...0.45) {
                     "\(Int($0 * 100))%"
                 }
@@ -132,11 +136,6 @@ struct GeneralSettingsTab: View {
                         .foregroundStyle(.secondary)
                         .textCase(.none)
                 }
-            }
-
-            Section("Preview") {
-                DefaultConfigPreview(config: defaultConfig)
-                    .frame(height: 140)
             }
 
             Section("Export") {
@@ -809,128 +808,166 @@ struct AboutTab: View {
     }
 
     var body: some View {
-        VStack(spacing: 16) {
-            if let icon = appIcon {
-                Image(nsImage: icon)
-                    .resizable()
-                    .interpolation(.high)
-                    .frame(width: 96, height: 96)
-                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                // Header: icon + name
+                HStack(spacing: 14) {
+                    if let icon = appIcon {
+                        Image(nsImage: icon)
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: 64, height: 64)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
 
-            Text("BetterShot")
-                .font(.title2.weight(.semibold))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("BetterShot")
+                            .font(.system(size: 20, weight: .bold))
 
-            Text("Version \(version)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                        Text("Version \(version) (\(build))")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
 
-            Text("Open-source screenshot tool for macOS. Fast, native, local-first.")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
+                        Text("A native screenshot and editor tool for macOS.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .padding(.bottom, 20)
 
-            HStack(spacing: 16) {
-                Link(destination: URL(string: "https://x.com/code_kartik")!) {
-                    Label("@code_kartik", systemImage: "at")
-                        .font(.caption)
+                // Updates section
+                aboutSection("Updates") {
+                    updateContent
                 }
 
-                Link(destination: URL(string: "https://github.com/KartikLabhshetwar/better-shot")!) {
-                    Label("GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
-                        .font(.caption)
+                // Project section
+                aboutSection("Project") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("BetterShot is an open-source screenshot tool for capturing, editing and beautifying screenshots on macOS.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .lineSpacing(2)
+
+                        Link("GitHub", destination: URL(string: "https://github.com/KartikLabhshetwar/better-shot")!)
+                            .font(.system(size: 12))
+                    }
+                }
+
+                // Credits section
+                aboutSection("Credits") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Built by Kartik Labhshetwar")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+
+                        Link(destination: URL(string: "https://x.com/code_kartik")!) {
+                            HStack(spacing: 2) {
+                                Text("Follow on X")
+                                    .font(.system(size: 12))
+                                Image(systemName: "arrow.up.right")
+                                    .font(.system(size: 9, weight: .semibold))
+                            }
+                        }
+                    }
                 }
             }
-
-            Text("Built by Kartik Labhshetwar")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-
-            updateSection
+            .padding(24)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func aboutSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .font(.system(size: 13, weight: .bold))
+                .padding(.bottom, 10)
+
+            content()
+                .padding(.leading, 2)
+                .padding(.bottom, 20)
+        }
     }
 
     @ViewBuilder
-    private var updateSection: some View {
+    private var updateContent: some View {
         switch updater.state {
         case .idle:
-            Button("Check for Updates") {
+            Button("Check for Updates...") {
                 Task { await updater.checkForUpdates() }
             }
             .buttonStyle(.bordered)
+            .controlSize(.small)
 
         case .checking:
-            ProgressView()
-                .controlSize(.small)
-            Text("Checking for updates...")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Checking for updates...")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
 
         case .available(let newVersion, let url):
-            VStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text("Version \(newVersion) is available!")
-                    .font(.caption.weight(.medium))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.green)
 
                 Button("Download & Install") {
                     Task { await updater.downloadAndInstall(version: newVersion, url: url) }
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.small)
             }
 
         case .downloading(let progress):
-            VStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 ProgressView(value: progress)
                     .progressViewStyle(.linear)
-                    .frame(width: 200)
+                    .frame(maxWidth: 220)
 
-                Text("Downloading update… \(Int(progress * 100))%")
-                    .font(.caption)
+                Text("Downloading… \(Int(progress * 100))%")
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
 
                 Button("Cancel") {
                     updater.cancelDownload()
                 }
                 .buttonStyle(.bordered)
-                .controlSize(.small)
+                .controlSize(.mini)
             }
 
         case .readyToInstall(let newVersion, let dmgPath):
-            VStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text("Version \(newVersion) downloaded")
-                    .font(.caption.weight(.medium))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.green)
-
-                Text("The app will quit and relaunch after installing.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
 
                 Button("Install & Relaunch") {
                     Task { await updater.installUpdate(dmgPath: dmgPath) }
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.small)
             }
 
         case .installing:
-            VStack(spacing: 8) {
+            HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
-
                 Text("Installing update…")
-                    .font(.caption)
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
 
         case .upToDate:
             Label("You're up to date", systemImage: "checkmark.circle.fill")
-                .font(.caption)
+                .font(.system(size: 12))
                 .foregroundStyle(.green)
 
         case .failed(let message):
-            VStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text("Update failed: \(message)")
-                    .font(.caption)
+                    .font(.system(size: 12))
                     .foregroundStyle(.red)
 
                 Button("Retry") {
