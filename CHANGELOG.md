@@ -5,6 +5,27 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] - 2026-06-06
+
+### Added
+
+- **Settings sidebar navigation**: Redesigned preferences from top tabs to a left sidebar with right content panel
+- **Keyboard shortcut recorder**: Click any shortcut badge to record a new key combination (press Escape to cancel)
+- **Default effects configuration**: Padding, corner radius, shadow, and background are now configurable directly in Settings and persist across sessions
+- **Click preview to open editor**: Clicking the floating preview overlay opens the editor, matching CleanShot X behavior
+
+### Fixed
+
+- **History icon disappearing**: Menu bar "Recent Captures" and dividers no longer vanish when capture history is empty
+- **Menu bar cleanup**: Removed redundant "Open Last Capture" (covered by Recent Captures), renamed "Settings..." to "Settings"
+- **About tab**: Removed build number from version display, updated tagline
+- **Background picker in settings**: Cleaner grid layout with proper "None" swatch (strikethrough icon), tooltips on all swatches, separated Default Effects and Default Background into distinct sections
+- **Background label**: Shows category name (e.g. "macOS") instead of raw filename for bundled images
+
+### Changed
+
+- Default beautifier config now uses a centralized `AppPreferences.defaultBeautifierConfig` accessor across editor, settings, and auto-apply
+
 ## [0.3.2] - 2026-06-03
 
 ### Added

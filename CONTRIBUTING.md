@@ -1,189 +1,173 @@
-# Contributing to Better Shot
+# Contributing to BetterShot
 
-Thank you for your interest in contributing to Better Shot! This document provides guidelines and instructions for contributing to the project.
+Thanks for considering contributing. This guide covers everything you need to get started.
 
-## Getting Started
+## Quick start
 
-1. **Fork the repository** and clone your fork:
+```bash
+# 1. Fork and clone
+git clone https://github.com/YOUR_USERNAME/better-shot.git
+cd better-shot
 
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/better-shot.git
-   cd better-shot
-   ```
+# 2. Build and run
+make run
+```
 
-2. **Install XcodeGen** (used to generate the Xcode project from `project.yml`):
+That's it. The Makefile handles everything. No extra tools needed.
 
-   ```bash
-   brew install xcodegen
-   ```
+> **Alternative**: Open `BetterShot.xcodeproj` in Xcode and press `⌘R`.
 
-3. **Generate the Xcode project:**
+### If you modify `project.yml`
 
-   ```bash
-   xcodegen generate
-   ```
+The Xcode project is generated from `project.yml` using [XcodeGen](https://github.com/yonaskolb/XcodeGen). If you change `project.yml`, regenerate the project:
 
-4. **Open in Xcode:**
+```bash
+brew install xcodegen   # one-time
+xcodegen generate
+```
 
-   ```bash
-   open BetterShot.xcodeproj
-   ```
-
-5. **Grant permissions** when prompted: Screen Recording and Accessibility access are required for capture and global shortcuts.
+Most contributions won't need this.
 
 ### Requirements
 
-- **macOS**: 14.0 or higher
-- **Xcode**: 16.0 or higher
-- **Swift**: 6.0 (strict concurrency)
-- **XcodeGen**: Latest version (`brew install xcodegen`)
+- macOS 14.0+
+- Xcode 16.0+ (Swift 6)
 
-### Building
+### Permissions
 
-```bash
-xcodebuild -project BetterShot.xcodeproj -scheme BetterShot build
-```
+On first launch, grant both:
 
-Or just hit Cmd+B in Xcode.
+1. **Screen Recording** — System Settings > Privacy & Security > Screen Recording
+2. **Accessibility** — System Settings > Privacy & Security > Accessibility
 
-## Project Structure
-
-```text
-better-shot/
-├── Sources/
-│   ├── App/
-│   │   ├── BetterShotApp.swift            # @main entry point, MenuBarExtra
-│   │   └── BetterShotDelegate.swift       # App delegate, permission polling
-│   ├── Capture/
-│   │   ├── CaptureOrchestrator.swift      # Coordinates all capture flows
-│   │   ├── ScreenCapture.swift            # ScreenCaptureKit integration, multi-monitor
-│   │   ├── RegionSelectionOverlay.swift   # Fullscreen region selection with crosshair
-│   │   ├── WindowPickerOverlay.swift      # Window picker for window capture
-│   │   ├── ColorPickerOverlay.swift       # NSColorSampler wrapper + hex HUD
-│   │   └── CountdownOverlay.swift         # Self-timer countdown animation
-│   ├── Editor/
-│   │   ├── EditorModel.swift              # Editor state, annotation interaction pipeline
-│   │   ├── EditorCanvasView.swift         # Live annotation canvas with drag gestures
-│   │   ├── EditorInspectorView.swift      # Side panel: tools, style, text, layout, background, effects
-│   │   ├── EditorWindowView.swift         # Root editor window (canvas + inspector + toolbar)
-│   │   ├── EditorWindowController.swift   # NSWindow management
-│   │   ├── AnnotationItemView.swift       # SwiftUI rendering for each annotation type
-│   │   ├── AnnotationDrawing.swift        # CoreGraphics renderer for final export
-│   │   ├── AnnotationRedactionImageProcessor.swift  # Pixelate/blur preview with NSCache
-│   │   ├── AnnotationKeyboard.swift       # Keyboard shortcuts (tool keys, delete, undo/redo)
-│   │   └── AnnotationEditorInteractionState.swift   # Interaction enums, undo/redo history
-│   ├── Models/
-│   │   ├── AnnotationItem.swift           # AnnotationItem, AnnotationTool, AnnotationSwatch, geometry
-│   │   ├── BackgroundStyle.swift          # Background style, ImageAlignment, CanvasAspectRatio
-│   │   ├── AppPreferences.swift           # User preferences (save dir, format, shortcuts)
-│   │   ├── BundledBackgrounds.swift       # Bundled wallpaper/gradient assets
-│   │   └── CaptureRecord.swift            # Capture history records, BeautifierConfig
-│   ├── Preview/
-│   │   ├── PreviewOverlay.swift           # Floating preview card after capture
-│   │   └── PinnedScreenshot.swift         # Always-on-top pinned screenshot windows
-│   ├── History/
-│   │   └── HistoryStore.swift             # JSON persistence in Application Support
-│   ├── Services/
-│   │   ├── BeautifierRenderer.swift       # Background + shadow + annotation compositing
-│   │   ├── ShortcutService.swift          # CGEvent tap for global shortcuts
-│   │   └── AppUpdater.swift               # GitHub releases update checker
-│   ├── Settings/
-│   │   └── PreferencesView.swift          # Settings window (General, Capture, History, About)
-│   └── Views/
-│       └── MenuBarContentView.swift       # Menu bar dropdown UI
-├── Resources/
-│   ├── Assets.xcassets/                   # App icon, menu bar template icon
-│   ├── Backgrounds/                       # Bundled wallpaper images
-│   ├── Info.plist
-│   └── BetterShot.entitlements
-├── project.yml                            # XcodeGen project definition
-├── version.json                           # Release version tracking
-├── CHANGELOG.md
-└── CONTRIBUTING.md
-```
-
-## Architecture
-
-BetterShot is a native macOS menu bar app built with Swift 6 and SwiftUI.
-
-### Key architectural decisions:
-
-- **Menu bar app**: Runs as an accessory app (no Dock icon) with an NSPopover menu bar dropdown. Switches to regular activation policy when the editor window is open.
-- **Annotation system**: Annotations use normalized coordinates (0..1) for resolution independence. The canvas renders annotations as live SwiftUI views for interactive editing, while `AnnotationDrawing` uses CoreGraphics for final export.
-- **BeautifierRenderer**: Composites background + shadow + corner radius + image + annotations into a final CGImage for export.
-- **Strict concurrency**: Swift 6 concurrency throughout. `@MainActor` on all UI-facing types.
-
-### Editor data flow:
+## Project structure
 
 ```
-EditorModel (state)
-  ├── EditorCanvasView (renders image + annotation views, handles DragGesture)
-  │     ├── AnnotationItemView (per-item SwiftUI view: shapes, text, redaction)
-  │     └── AnnotationMarqueeSelectionView
-  ├── EditorInspectorView (side panel: tools, style, text, background, effects)
-  └── AnnotationKeyCommandHandler (keyboard shortcuts via NSEvent monitor)
+Sources/
+  App/                   App entry point and delegate
+  Capture/               Screenshot capture, region selection, color picker, countdown
+  Editor/                Annotation editor: canvas, inspector panel, tools, rendering
+  Models/                Data types: annotations, backgrounds, preferences, config
+  Preview/               Floating preview overlay and pinned screenshots
+  History/               Capture history (JSON in Application Support)
+  Services/              Beautifier renderer, keyboard shortcuts, app updater
+  Settings/              Preferences window (sidebar navigation)
+  Views/                 Menu bar dropdown
+Resources/
+  Assets.xcassets/       App icon, menu bar icon
+  Backgrounds/           Bundled wallpaper and gradient images
+  Info.plist
+  BetterShot.entitlements
 ```
 
-## Coding Standards
+### Key files
 
-### Swift Guidelines
+| File | What it does |
+|---|---|
+| `EditorModel.swift` | All editor state: annotation interactions, undo/redo, config |
+| `EditorCanvasView.swift` | Live canvas rendering with drag gestures |
+| `EditorInspectorView.swift` | Side panel: tools, colors, text, effects, backgrounds |
+| `AnnotationDrawing.swift` | CoreGraphics renderer for final image export |
+| `BeautifierRenderer.swift` | Composites background + shadow + radius + annotations |
+| `CaptureOrchestrator.swift` | Coordinates capture pipeline: capture > sound > history > preview |
+| `ShortcutService.swift` | Global keyboard shortcuts via CGEvent tap |
+| `PreviewOverlay.swift` | Floating preview card after capture |
+| `PreferencesView.swift` | Settings window with sidebar navigation |
+| `AppPreferences.swift` | All UserDefaults-backed preferences |
 
-- **Swift 6 strict concurrency**: All code must compile with strict concurrency checking
-- **No code comments** unless explaining a non-obvious constraint
-- **`@Observable`** for model classes, `@Bindable` in views
-- **Minimize file size**: Keep files focused; split when it improves clarity
-- **SOLID principles**: Single responsibility, prefer composition
+## How the code works
 
-### Performance
+### Capture flow
 
-- Avoid unnecessary re-renders. Use `@State` and `@Bindable` correctly.
-- Debounce expensive operations (e.g., BeautifierRenderer calls).
-- Use `autoreleasepool` in tight CoreGraphics loops.
-- Cache redaction previews (RedactionImageProcessor uses NSCache).
+```
+User presses ⌘⇧4
+  → ShortcutService (CGEvent tap intercepts the keypress)
+  → CaptureOrchestrator.performCapture(.region)
+  → ScreenCapture.captureRegion() (ScreenCaptureKit)
+  → HistoryStore.importCapture() (saves to Application Support)
+  → PreviewOverlay.show() (floating card appears)
+  → User clicks preview → EditorWindowController.open()
+```
 
-### UI/UX
+### Editor flow
 
-- Follow native macOS patterns (NSPopover for menu bar, NSWindow for editor)
-- Use system colors (`NSColor.controlBackgroundColor`, etc.)
-- Support dark mode automatically
-- Keep the app fast and snappy — no blocking the main thread
+```
+EditorModel (all state)
+  ├── EditorCanvasView      Renders image + live annotation views, handles gestures
+  │     └── AnnotationItemView   One per annotation (shapes, text, redaction)
+  ├── EditorInspectorView   Side panel: tools, style, text, effects, layout, background
+  └── AnnotationKeyboard    Keyboard shortcuts for tools and actions
+```
 
-## Common Tasks
+Annotations use **normalized coordinates** (0.0 to 1.0) so they're resolution-independent. The canvas renders them as SwiftUI views for interactive editing. `AnnotationDrawing` re-renders them with CoreGraphics for the final export.
 
-### Adding a New Annotation Tool
+### Settings
 
-1. Add the case to `AnnotationTool` enum in `Sources/Models/AnnotationItem.swift`
-2. Add `systemImage` and `title` for the tool
-3. Handle rendering in `AnnotationItemView.swift` (live preview)
-4. Handle rendering in `AnnotationDrawing.swift` (export)
-5. Handle draft creation in `EditorModel.beginDraftItem`
-6. Handle draft update in `EditorModel.updateDraftItem`
-7. Add keyboard shortcut in `AnnotationKeyboard.swift`
+The settings window uses `NavigationSplitView` with a left sidebar (General, Capture, History, About) and right content panel. Preferences are stored via `@AppStorage` and the centralized `AppPreferences` enum.
 
-### Adding a New Background Style
+## Common tasks
 
-1. Add the case to `BackgroundStyle` enum in `Sources/Models/BackgroundStyle.swift`
+### Adding a new annotation tool
+
+1. Add the case to `AnnotationTool` in `Models/AnnotationItem.swift`
+2. Set its `systemImage` and `title`
+3. Add live rendering in `Editor/AnnotationItemView.swift`
+4. Add export rendering in `Editor/AnnotationDrawing.swift`
+5. Handle creation in `EditorModel.beginDraftItem`
+6. Handle updates in `EditorModel.updateDraftItem`
+7. Add keyboard shortcut in `Editor/AnnotationKeyboard.swift`
+
+### Adding a new background type
+
+1. Add the case to `BackgroundStyle` in `Models/BackgroundStyle.swift`
 2. Handle rendering in `BeautifierRenderer.drawBackground`
-3. Add UI in `BackgroundPickerSection` in `EditorInspectorView.swift`
+3. Add picker UI in `BackgroundPickerSection` in `EditorInspectorView.swift`
+4. Add picker UI in `DefaultBackgroundPicker` in `PreferencesView.swift`
 
-### Modifying the Inspector
+### Adding a new preference
 
-The inspector is defined in `Sources/Editor/EditorInspectorView.swift`. Sections:
-- Tools grid (annotation tool picker — 12 tools)
-- Style (color, stroke, redaction/spotlight density)
-- Text (font family, size, bold/italic/underline, alignment)
-- Effects (padding, corner radius, shadow sliders, save as default)
-- Layout (aspect ratio dropdown, 3x3 alignment grid)
-- Background (solid colors, gradients, bundled images, custom wallpaper)
+1. Add the `@AppStorage` key and property in `Models/AppPreferences.swift`
+2. Add the UI control in the appropriate section of `Settings/PreferencesView.swift`
 
-## Pull Request Process
+## Code style
 
-1. Create a feature branch: `git checkout -b feat/feature-name`
-2. Make focused changes (one feature or fix per PR)
-3. Ensure it builds: `xcodebuild -scheme BetterShot build`
-4. Test manually in the app
-5. Submit PR with a clear title and description
+- **Swift 6 strict concurrency** — all code must compile without concurrency warnings
+- **`@Observable`** for model classes, `@Bindable` in views
+- **No comments** unless explaining something non-obvious (a hidden constraint, a workaround)
+- **No abstractions for their own sake** — three similar lines is better than a premature helper
+- **System colors** — use `NSColor.controlBackgroundColor`, `.separatorColor`, etc. for native look
+- **Main actor** — all UI types are `@MainActor`
+
+## Submitting a pull request
+
+1. Create a branch: `git checkout -b feat/what-it-does` or `fix/what-it-fixes`
+2. Keep changes focused — one feature or fix per PR
+3. Make sure it builds: `make build`
+4. Test manually in the app: `make run`
+5. Write a clear PR title and description
+
+### Commit messages
+
+Use short, descriptive messages:
+
+```
+feat: add blur strength slider to redaction tools
+fix: window capture failing on secondary monitors
+chore: bump version to 0.3.3
+```
+
+## Versioning
+
+Version is tracked in three places (keep them in sync):
+
+| File | Fields |
+|---|---|
+| `version.json` | `version`, `build` |
+| `project.yml` | `MARKETING_VERSION`, `CURRENT_PROJECT_VERSION` |
+| `BetterShot.xcodeproj/project.pbxproj` | `MARKETING_VERSION`, `CURRENT_PROJECT_VERSION` (both Debug and Release) |
+
+The `CHANGELOG.md` documents what changed in each version.
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the same license as the project.
+By contributing, you agree that your contributions will be licensed under the project's [BSD 3-Clause License](LICENSE).

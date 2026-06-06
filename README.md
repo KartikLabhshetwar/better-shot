@@ -1,127 +1,150 @@
-# Better Shot
+# BetterShot
 
-[![X (Twitter)](https://img.shields.io/badge/X-%231DA1F2.svg?style=for-the-badge&logo=X&logoColor=white)](https://x.com/code_kartik)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-%23FFDD00.svg?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/code_kartik)
+[![Version](https://img.shields.io/badge/version-0.3.3-blue.svg)](https://github.com/KartikLabhshetwar/better-shot/releases)
+[![macOS](https://img.shields.io/badge/macOS-14.0+-black.svg)](https://github.com/KartikLabhshetwar/better-shot)
+[![License](https://img.shields.io/badge/license-BSD%203--Clause-green.svg)](LICENSE)
+[![X (Twitter)](https://img.shields.io/badge/X-%231DA1F2.svg?style=flat&logo=X&logoColor=white)](https://x.com/code_kartik)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-%23FFDD00.svg?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/code_kartik)
 
-> An open-source alternative to CleanShot X. Native Swift app — fast, lightweight, local-first.
+An open-source alternative to CleanShot X. Native Swift app for macOS — fast, lightweight, local-first. No subscriptions, no cloud, no telemetry.
 
-## Features
+## What it does
 
-**Capture** — Region (`⌘⇧4`), fullscreen (`⌘⇧3`), window (`⌘⇧5`), repeat last region (`⌃⌘⇧4`). Multi-monitor support.
+### Capture
 
-**Tools** — OCR text + QR code extraction (`⌘⇧O`), color picker with hex copy (`⌘⇧C`), delayed capture with countdown overlay.
+| Action | Shortcut |
+|---|---|
+| Region screenshot | `⌘⇧4` |
+| Fullscreen screenshot | `⌘⇧3` |
+| Window screenshot | `⌘⇧5` |
+| Repeat last region | `⌃⌘⇧4` |
+| OCR text + QR scan | `⌘⇧O` |
+| Color picker (hex) | `⌘⇧C` |
 
-**Edit** — Background library (wallpapers, gradients, solid colors), shadow, corner radius, padding, aspect ratio (16:9, 4:3, 1:1, 9:16), 9-point alignment grid. Save settings as default.
+All shortcuts are customizable in Settings > Capture.
 
-**Annotate** — Rectangle, filled rectangle, ellipse, line, arrow (curved), freehand, text, numbered badges, pixelate, blur, spotlight. Option+drag to duplicate. Full keyboard shortcuts.
+### Edit
 
-**Workflow** — Auto-apply default background, floating preview overlay with pin/annotate/copy actions, pinned always-on-top screenshots, toast notifications on export/copy, menu bar app.
+- **Backgrounds** — Solid colors, gradients, bundled wallpapers, or your own image
+- **Effects** — Padding, corner radius, shadow strength
+- **Layout** — Aspect ratio (Auto, 1:1, 4:3, 3:2, 16:9, 9:16), 9-point alignment grid
+- **Save as default** — Set your preferred effects and background once, applied to every new capture
+
+### Annotate
+
+Rectangles, filled rectangles, ellipses, lines, curved arrows, freehand, text, numbered badges, pixelate, blur, and spotlight. Each has a single-key shortcut in the editor (`R`, `F`, `O`, `L`, `A`, `D`, `T`, `N`, `P`, `B`, `G`).
+
+### Workflow
+
+- **Click-to-edit** — Click the floating preview to open the editor (like CleanShot X)
+- **Pin screenshots** — Pin any capture as an always-on-top floating window
+- **Auto-apply** — Automatically apply your default background on every capture
+- **Self-timer** — Countdown overlay before capture (3s, 5s, 10s)
+- **In-app updates** — Check, download, and install updates without leaving the app
 
 ## Install
 
 ### Download
 
 1. Go to [Releases](https://github.com/KartikLabhshetwar/better-shot/releases)
-2. Download `BetterShot.dmg`
+2. Download `BetterShot-0.3.3.dmg`
 3. Open the DMG, drag BetterShot to Applications
-4. Launch and grant permissions when prompted (see below)
+4. Launch and grant permissions when prompted
 
 ### Build from source
 
 ```bash
 git clone https://github.com/KartikLabhshetwar/better-shot.git
 cd better-shot
-make build    # Debug build
-make run      # Build and launch
+make run
 ```
 
-Or open `BetterShot.xcodeproj` in Xcode and **Product > Build** (`⌘B`).
+This builds a debug version and launches it. See [all make commands](#make-commands) below.
 
-| Command | Description |
+### Permissions
+
+BetterShot needs two macOS permissions on first launch:
+
+1. **Screen Recording** — System Settings > Privacy & Security > Screen Recording
+2. **Accessibility** — System Settings > Privacy & Security > Accessibility
+
+Screen Recording lets the app capture your screen. Accessibility lets it override the default macOS screenshot shortcuts with its own.
+
+## Usage
+
+1. Launch BetterShot — it appears in your **menu bar** (top right of screen)
+2. Use a keyboard shortcut or click a capture action from the menu
+3. The floating preview appears — **click it to open the editor**
+4. Adjust background, effects, and add annotations
+5. `⌘S` to save, `⇧⌘C` to copy to clipboard
+
+### Editor shortcuts
+
+| Action | Key |
+|---|---|
+| Select tool | `V` |
+| Rectangle | `R` |
+| Filled rectangle | `F` |
+| Ellipse | `O` |
+| Line | `L` |
+| Arrow | `A` |
+| Freehand | `D` |
+| Text | `T` |
+| Numbered circle | `N` |
+| Pixelate | `P` |
+| Blur | `B` |
+| Spotlight | `G` |
+| Save / Export | `⌘S` |
+| Copy to clipboard | `⇧⌘C` |
+| Undo / Redo | `⌘Z` / `⇧⌘Z` |
+| Delete annotation | `Delete` |
+| Select all | `⌘A` |
+| Close editor | `Esc` |
+
+### Settings
+
+Open from the menu bar > **Settings** (or `⌘,`).
+
+- **General** — Save location, clipboard behavior, default effects (padding, radius, shadow, background), export format
+- **Capture** — Self-timer delay, keyboard shortcuts (click any shortcut to re-record it), overlay position and dismiss timing
+- **History** — Browse and delete past captures
+- **About** — Version info and in-app update checker
+
+## Make commands
+
+| Command | What it does |
 |---|---|
 | `make build` | Debug build |
 | `make release` | Release build (unsigned) |
 | `make run` | Build and launch |
-| `make dmg` | Create unsigned DMG for local testing |
+| `make dmg` | Create DMG for local testing |
 | `make clean` | Remove build artifacts |
 | `make lint` | Check for compiler warnings |
 | `make test-build` | Full clean + release build |
 | `make version` | Print current version |
 
-**Requirements**: macOS 14.0+, Xcode 15+
-
-### Required permissions
-
-BetterShot needs two macOS permissions:
-
-1. **Screen Recording** — System Settings > Privacy & Security > Screen Recording > enable BetterShot
-2. **Accessibility** — System Settings > Privacy & Security > Accessibility > enable BetterShot
-
-Screen Recording is required for ScreenCaptureKit to capture screen content. Accessibility is required for keyboard shortcuts to override the default macOS screenshot tool.
-
-## Usage
-
-1. Launch BetterShot — it appears in your menu bar
-2. Use a keyboard shortcut or click a menu bar action
-3. Edit the screenshot (background, shadow, annotations)
-4. `⌘S` to save, `⇧⌘C` to copy to clipboard
-
-### Keyboard shortcuts
-
-| Action | Shortcut |
-|---|---|
-| Capture Region | `⌘⇧4` |
-| Capture Fullscreen | `⌘⇧3` |
-| Capture Window | `⌘⇧5` |
-| Repeat Last Region | `⌃⌘⇧4` |
-| OCR + QR Scan | `⌘⇧O` |
-| Pick Color | `⌘⇧C` |
-
-| Editor Tool | Key |
-|---|---|
-| Select | `V` |
-| Rectangle | `R` |
-| Filled Rectangle | `F` |
-| Ellipse | `O` |
-| Line | `L` |
-| Arrow | `A` |
-| Freehand | `D` |
-| Numbered Circle | `N` |
-| Pixelate | `P` |
-| Blur | `B` |
-| Spotlight | `G` |
-| Text | `T` |
-
-| Editor Action | Shortcut |
-|---|---|
-| Save/Export | `⌘S` |
-| Copy to Clipboard | `⇧⌘C` |
-| Undo | `⌘Z` |
-| Redo | `⇧⌘Z` |
-| Delete Annotation | `Delete` |
-| Select All | `⌘A` |
-| Close Editor | `Esc` |
-
 ## Architecture
 
-Native Swift/SwiftUI app. No Electron, no web views.
+Native Swift 6 / SwiftUI. No Electron, no web views, no external dependencies.
 
-- **ScreenCaptureKit** — all screenshot capture (`SCScreenshotManager`)
-- **CoreGraphics** — image compositing, annotation rendering, beautifier pipeline
-- **CoreImage** — Gaussian blur with edge-padding for redaction
-- **Vision** — OCR text extraction + QR/barcode detection
-- **AppKit** — `NSColorSampler` for color picking, `NSPanel` for floating previews and pins
-- **Carbon** — global keyboard shortcut registration via CGEvent tap
+| Framework | Used for |
+|---|---|
+| ScreenCaptureKit | All screenshot capture |
+| CoreGraphics | Image compositing, annotation rendering, beautifier pipeline |
+| CoreImage | Gaussian blur for redaction |
+| Vision | OCR text extraction + QR/barcode detection |
+| AppKit | Color sampling, floating panels, pinned windows |
+| Carbon | Global keyboard shortcuts via CGEvent tap |
 
 ## Contributing
 
-Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, project structure, and coding guidelines.
 
 ## License
 
-BSD 3-Clause — see [LICENSE](LICENSE).
+BSD 3-Clause. See [LICENSE](LICENSE).
 
-## Star history
+## Star History
 
 <a href="https://www.star-history.com/#KartikLabhshetwar/better-shot&type=date&legend=top-left">
  <picture>
