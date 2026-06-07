@@ -39,7 +39,7 @@ struct RecordingStatusBarView: View {
                     Task {
                         RecordingStatusBarController.shared.dismiss()
                         if let url = await recorder.stopRecording() {
-                            let record = HistoryStore.shared.importCapture(from: url, deleteSource: true, kind: .recording)
+                            let record = HistoryStore.shared.importCapture(from: url, deleteSource: false, kind: .recording)
                             if let record {
                                 let storeURL = HistoryStore.shared.urlForRecord(record)
                                 PreviewOverlay.shared.show(url: storeURL)

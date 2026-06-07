@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Screen recording**: Record your screen as MP4 video with ScreenCaptureKit. Includes a floating status bar with timer, pause/resume, stop, and discard controls. Access via the new "Record" button in the menu bar or `⌘⇧2`
+- **Restart recording**: New restart button in the recording status bar — cancels the current recording and immediately starts a new one
+- **Recording pill redesign**: Minimal icon-only controls (pause, stop, restart, discard) with solid dark background, proper SwiftUI observation for live timer updates, and auto-sized panel
 - **Video editor with effects**: Full video editor with padding, corner radius, shadow, and background picker (solid colors, gradients, macOS wallpapers, custom images) — matching the image editor's inspector sidebar. Trim timeline with thumbnail strip, transport controls, and export with effects baked in
 - **Recording settings tab**: Dedicated settings panel for recording preferences — FPS (24/30/60), show cursor, capture audio, and open editor after recording toggles
 - **Record Screen keyboard shortcut** (`⌘⇧2`): Configurable global hotkey for screen recording, shown in Capture settings alongside screenshot shortcuts
@@ -25,14 +27,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Race condition: `BundledBackgrounds.ImageCache`**: Added `NSLock` to the `@unchecked Sendable` image cache dictionary — concurrent access from multiple threads could crash
+- **Race condition: `ShortcutService.cachedShortcuts`**: Protected the static shortcut cache with `NSLock` — the CGEvent tap callback reads it from an arbitrary thread while the main actor writes it
+- **Race condition: `RecordingSession.appendVideoSample`**: Moved `writer.startSession(atSourceTime:)` outside the lock to avoid calling AVAssetWriter while holding the lock
+- **Race condition: `ScreenRecordingManager` stop/cancel**: Added `.stopping` state guard so concurrent stop calls (e.g. user taps stop while stream error fires) can't both proceed
+- **Memory leak: `RecordingStatusBarController`**: Panel was never set to `nil` on dismiss, leaking the NSPanel and its SwiftUI view hierarchy
+- **Memory leak: `PreviewOverlay`**: Panel was never released on dismiss, accumulating stale panels
+- **Memory leak: `VideoEditorModel.generateThumbnails`**: Changed `Task.detached` to use `[weak self]` to prevent retaining the model after window close
+- **Recording timer stuck at 00:00**: `ScreenRecordingManager.shared` was stored as `let` (plain constant) — SwiftUI's `@Observable` tracking requires `@State` to trigger re-renders
+- **Recording pill invisible/clipped**: Panel used a hardcoded `contentRect` that didn't match SwiftUI content size. Now uses `hostingView.fittingSize` for exact sizing
+- **Recording saved to wrong location**: Raw video now stays in the user's save directory after stopping — `importCapture` uses `deleteSource: false` so the file isn't moved away
+- **Filename collision on rapid capture**: `HistoryStore.importCapture` now appends a UUID suffix when a file with the same millisecond timestamp already exists
+- **Orphaned files on delete**: `deleteRecord` and `deleteAllRecords` now clean up beautified files and base images, not just the raw capture
+- **Crash on headless display**: `CountdownOverlay` accessed `NSScreen.screens[0]` without bounds checking — changed to safe `.first` with guard
+- **Zero-duration thumbnail generation**: `VideoEditorModel.generateThumbnails` now guards against `duration == 0` to prevent generating 20 useless thumbnails at time zero
 - **Windows open on wrong screen**: Editor, video editor, settings, preview overlay, recording status bar, toast, and pinned screenshots now open on the same screen where the menu bar icon was clicked. Previously, all windows sampled `NSEvent.mouseLocation` after the popover dismissed (too late) or hardcoded `NSScreen.main`, causing them to appear on the primary display instead of the active one. The originating screen is now captured from the status bar button before dismissal and threaded through to all window controllers
 - **Recording pill visible in recordings**: The floating recording status bar (timer, pause, stop, discard) was being captured in screen recordings. Fixed by setting `sharingType = .none` on the panel so ScreenCaptureKit excludes it from capture
 - **Export deletes files from save directory**: Exporting from the screenshot or video editor was deleting the exported file from the save directory via `importCapture(deleteSource: true)` and a redundant `removeItem` call. Now only the old history store record is cleaned up — the exported file stays in the save directory
-- **Duplicate raw recording in save directory**: After stopping a recording, both the save directory and history store contained a copy of the raw video. Raw recordings are now imported to the history store with `deleteSource: true` so only one copy exists until the user exports
 - **Recent recordings open editor directly**: Clicking a recording in the Recent menu now shows the floating preview overlay (with edit, pin, copy, dismiss actions) instead of jumping straight into the video editor, matching how recent screenshots behave
 - **Annotation export positioning**: Annotations (arrows, rectangles, text, all tools) now render at the correct position in the exported image, matching the canvas preview. The export renderer previously used independent Y-axis math from the SwiftUI canvas. Fixed by flipping the CG context to Y-down for annotation rendering, using the same coordinate formulas as the canvas preview
 - **Annotations mispositioned with crop**: When crop was active, annotations were rendered using coordinates normalized to the original image size, but the renderer was given the cropped image. Annotations are now remapped from original-image to cropped-image coordinate space before export
-- **Auto-apply effects to recordings**: Recordings now automatically apply the user's default beautifier config (background, padding, corner radius, shadow) on capture, matching how screenshots behave. The processed video is stored and shown in the preview overlay
 - **Duplicate file on Desktop**: Screenshots no longer create a visible `.base` companion file on the Desktop. The raw source image used for re-editing is now stored internally in Application Support, so only the beautified screenshot appears in the save directory
 - **Video export missing background**: Background was invisible in exported videos because `AVMutableVideoCompositionInstruction.backgroundColor` defaulted to opaque black, covering the background layer. Fixed by setting it to clear and applying corner radius via `CAShapeLayer` mask on the video layer
 - **Video editor not loading default effects**: Video editor now loads user-configured defaults from `AppPreferences.defaultBeautifierConfig` on open, matching the image editor behavior
@@ -40,8 +54,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Video trim handles**: Fixed coordinate space bug where trim handle drag gestures used the handle's local 8px frame instead of the timeline's coordinate space, making handles unresponsive or inaccurate
 - **Recording dimensions in history**: Videos tab now shows correct pixel dimensions instead of "0 x 0" — video track dimensions are read via AVFoundation on import
 
+### Removed
+
+- **Auto-export with effects on recording stop**: Removed `VideoEditorModel.autoExportWithDefaults` — recordings are now saved as raw video immediately. Effects (background, padding, corner radius, shadow) are only applied when the user explicitly exports from the video editor. This eliminates the long delay between stopping a recording and seeing the preview
+- **Dead code cleanup**: Removed `CountdownOverlay.activeCountdownTask` (was assigned then immediately awaited — served no purpose)
+
 ### Changed
 
+- **Recording pill UI**: Icon-only buttons (no text labels), solid `Color(white: 0.1)` background instead of `.ultraThinMaterial`, forced dark color scheme, hover-only button highlights
 - Version bumped to 0.3.7 (build 10)
 
 ## [0.3.6] - 2026-06-06

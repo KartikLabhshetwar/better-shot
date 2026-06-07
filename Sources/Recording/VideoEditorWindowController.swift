@@ -53,8 +53,8 @@ final class VideoEditorWindowController: NSObject, NSWindowDelegate {
 
     private func centerOnActiveScreen(_ window: NSWindow, preferring preferred: NSScreen? = nil) {
         let mouseLocation = NSEvent.mouseLocation
-        let targetScreen = preferred
-            ?? NSScreen.screens.first { $0.frame.contains(mouseLocation) }
+        let targetScreen = NSScreen.screens.first { $0.frame.contains(mouseLocation) }
+            ?? preferred
             ?? NSScreen.main
             ?? NSScreen.screens.first
 
