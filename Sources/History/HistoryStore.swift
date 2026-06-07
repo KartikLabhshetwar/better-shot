@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import AVFoundation
 
 /// Persists capture history as a JSON file in Application Support.
 @MainActor
@@ -22,7 +23,7 @@ final class HistoryStore {
 
     // MARK: - Import
 
-    func importCapture(from tempURL: URL, deleteSource: Bool = true) -> CaptureRecord? {
+    func importCapture(from tempURL: URL, deleteSource: Bool = true, kind: CaptureKind = .screenshot) -> CaptureRecord? {
         let ext = tempURL.pathExtension.isEmpty ? "png" : tempURL.pathExtension
         let filename = "bettershot_\(Int(Date().timeIntervalSince1970 * 1000)).\(ext)"
         let destURL = storageDir.appendingPathComponent(filename)
@@ -44,7 +45,8 @@ final class HistoryStore {
         let record = CaptureRecord(
             filename: filename,
             pixelWidth: width,
-            pixelHeight: height
+            pixelHeight: height,
+            kind: kind
         )
         records.insert(record, at: 0)
         saveRecords()
@@ -56,14 +58,37 @@ final class HistoryStore {
         return record
     }
 
+    // MARK: - Update
+
+    func setBeautifiedPath(_ path: String, for recordID: UUID) {
+        guard let index = records.firstIndex(where: { $0.id == recordID }) else { return }
+        records[index].beautifiedPath = path
+        saveRecords()
+    }
+
     // MARK: - Access
 
     func urlForRecord(_ record: CaptureRecord) -> URL {
         storageDir.appendingPathComponent(record.filename)
     }
 
+    func displayURLForRecord(_ record: CaptureRecord) -> URL {
+        if let path = record.beautifiedPath {
+            let url = URL(fileURLWithPath: path)
+            if FileManager.default.fileExists(atPath: url.path) {
+                return url
+            }
+        }
+        return urlForRecord(record)
+    }
+
     func thumbnail(for record: CaptureRecord, maxSize: CGFloat = 120) -> NSImage? {
-        let url = urlForRecord(record)
+        let url = displayURLForRecord(record)
+
+        if record.kind == .recording {
+            return videoThumbnail(url: url, maxSize: maxSize)
+        }
+
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
 
         let options: [CFString: Any] = [
@@ -74,6 +99,15 @@ final class HistoryStore {
 
         guard let thumb = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
         return NSImage(cgImage: thumb, size: NSSize(width: thumb.width, height: thumb.height))
+    }
+
+    nonisolated func videoThumbnail(url: URL, maxSize: CGFloat = 120) -> NSImage? {
+        let asset = AVURLAsset(url: url)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: maxSize, height: maxSize)
+        guard let cgImage = try? generator.copyCGImage(at: .zero, actualTime: nil) else { return nil }
+        return NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
     }
 
     // MARK: - Delete

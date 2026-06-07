@@ -34,11 +34,7 @@ struct RecordingStatusBarView: View {
                 Task {
                     RecordingStatusBarController.shared.dismiss()
                     if let url = await recorder.stopRecording() {
-                        let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage
-                        ToastWindow.shared.show(
-                            message: "Recording saved!",
-                            icon: appIcon
-                        )
+                        _ = HistoryStore.shared.importCapture(from: url, deleteSource: false, kind: .recording)
                         PreviewOverlay.shared.show(url: url)
                     }
                 }
@@ -107,7 +103,7 @@ final class RecordingStatusBarController {
         guard let panel, let screen = NSScreen.main else { return }
         let screenFrame = screen.visibleFrame
         let x = screenFrame.midX - panel.frame.width / 2
-        let y = screenFrame.maxY - panel.frame.height - 8
+        let y = screenFrame.minY + 12
         panel.setFrameOrigin(NSPoint(x: x, y: y))
         panel.orderFront(nil)
     }

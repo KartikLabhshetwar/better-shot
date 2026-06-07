@@ -46,6 +46,10 @@
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* ScreenRecordingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7A8B9C0D1E2F /* ScreenRecordingManager.swift */; };
 		B2C3D4E5F6A7B8C9D0E1F2A3 /* RecordingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B3C4D5E6F7A8B9C0D1E2F3A /* RecordingSession.swift */; };
 		C3D4E5F6A7B8C9D0E1F2A3B4 /* RecordingStatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C4D5E6F7A8B9C0D1E2F3A4B /* RecordingStatusBar.swift */; };
+		D4E5F6A7B8C9D0E1F2A3B4C5 /* VideoEditorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5E6F7A8B9C0D1E2F3A4B5C /* VideoEditorModel.swift */; };
+		E5F6A7B8C9D0E1F2A3B4C5D6 /* VideoEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E6F7A8B9C0D1E2F3A4B5C6D /* VideoEditorView.swift */; };
+		F6A7B8C9D0E1F2A3B4C5D6E7 /* VideoEditorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F7A8B9C0D1E2F3A4B5C6D7E /* VideoEditorWindowController.swift */; };
+		7A8B9C0D1E2F3A4B5C6D7E8F /* WindowRecordingPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B9C0D1E2F3A4B5C6D7E8F9A /* WindowRecordingPicker.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -89,6 +93,10 @@
 		1A2B3C4D5E6F7A8B9C0D1E2F /* ScreenRecordingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenRecordingManager.swift; sourceTree = "<group>"; };
 		2B3C4D5E6F7A8B9C0D1E2F3A /* RecordingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSession.swift; sourceTree = "<group>"; };
 		3C4D5E6F7A8B9C0D1E2F3A4B /* RecordingStatusBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStatusBar.swift; sourceTree = "<group>"; };
+		4D5E6F7A8B9C0D1E2F3A4B5C /* VideoEditorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoEditorModel.swift; sourceTree = "<group>"; };
+		5E6F7A8B9C0D1E2F3A4B5C6D /* VideoEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoEditorView.swift; sourceTree = "<group>"; };
+		6F7A8B9C0D1E2F3A4B5C6D7E /* VideoEditorWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoEditorWindowController.swift; sourceTree = "<group>"; };
+		8B9C0D1E2F3A4B5C6D7E8F9A /* WindowRecordingPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowRecordingPicker.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -203,6 +211,10 @@
 				2B3C4D5E6F7A8B9C0D1E2F3A /* RecordingSession.swift */,
 				3C4D5E6F7A8B9C0D1E2F3A4B /* RecordingStatusBar.swift */,
 				1A2B3C4D5E6F7A8B9C0D1E2F /* ScreenRecordingManager.swift */,
+				4D5E6F7A8B9C0D1E2F3A4B5C /* VideoEditorModel.swift */,
+				5E6F7A8B9C0D1E2F3A4B5C6D /* VideoEditorView.swift */,
+				6F7A8B9C0D1E2F3A4B5C6D7E /* VideoEditorWindowController.swift */,
+				8B9C0D1E2F3A4B5C6D7E8F9A /* WindowRecordingPicker.swift */,
 			);
 			path = Recording;
 			sourceTree = "<group>";
@@ -345,6 +357,10 @@
 				A1B2C3D4E5F6A7B8C9D0E1F2 /* ScreenRecordingManager.swift in Sources */,
 				B2C3D4E5F6A7B8C9D0E1F2A3 /* RecordingSession.swift in Sources */,
 				C3D4E5F6A7B8C9D0E1F2A3B4 /* RecordingStatusBar.swift in Sources */,
+				D4E5F6A7B8C9D0E1F2A3B4C5 /* VideoEditorModel.swift in Sources */,
+				E5F6A7B8C9D0E1F2A3B4C5D6 /* VideoEditorView.swift in Sources */,
+				F6A7B8C9D0E1F2A3B4C5D6E7 /* VideoEditorWindowController.swift in Sources */,
+				7A8B9C0D1E2F3A4B5C6D7E8F /* WindowRecordingPicker.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

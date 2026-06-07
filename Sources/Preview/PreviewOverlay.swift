@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import SwiftUI
 
 /// Shows a floating preview card after capture. Uses a borderless NSPanel.
@@ -45,7 +46,12 @@ final class PreviewOverlay {
     func openAnnotateEditor() {
         guard let url = currentURL else { return }
         dismiss()
-        EditorWindowController.shared.open(url: url)
+        let ext = url.pathExtension.lowercased()
+        if ext == "mov" || ext == "mp4" {
+            VideoEditorWindowController.shared.open(url: url)
+        } else {
+            EditorWindowController.shared.open(url: url)
+        }
     }
 
     private func createPanel() {
@@ -107,18 +113,31 @@ final class PreviewOverlay {
 struct PreviewCardView: View {
     let overlay: PreviewOverlay
     @State private var isHovered = false
+    @State private var thumbnail: NSImage?
 
     private let cardSize = CGSize(width: 130, height: 98)
 
+    private var isVideo: Bool {
+        guard let ext = overlay.currentURL?.pathExtension.lowercased() else { return false }
+        return ext == "mov" || ext == "mp4"
+    }
+
     var body: some View {
         Group {
-            if let url = overlay.currentURL, let image = NSImage(contentsOf: url) {
+            if let image = thumbnail {
                 ZStack {
                     Image(nsImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(width: cardSize.width, height: cardSize.height)
                         .clipped()
+
+                    if isVideo {
+                        Image(systemName: "play.circle.fill")
+                            .font(.system(size: 28))
+                            .foregroundStyle(.white.opacity(0.9))
+                            .shadow(radius: 4)
+                    }
 
                     if isHovered {
                         hoverOverlay(image: image)
@@ -140,13 +159,48 @@ struct PreviewCardView: View {
                 .onTapGesture {
                     overlay.openAnnotateEditor()
                 }
-                .draggable(image)
+                .onDrag {
+                    if let url = overlay.currentURL {
+                        return NSItemProvider(object: url as NSURL)
+                    }
+                    return NSItemProvider(object: image)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
         .padding(.trailing, 20)
         .padding(.bottom, 24)
         .frame(width: 200, height: 170)
+        .onChange(of: overlay.currentURL) { _, newURL in
+            loadThumbnail(from: newURL)
+        }
+        .onAppear {
+            loadThumbnail(from: overlay.currentURL)
+        }
+    }
+
+    private func loadThumbnail(from url: URL?) {
+        guard let url else {
+            thumbnail = nil
+            return
+        }
+
+        let ext = url.pathExtension.lowercased()
+        if ext == "mov" || ext == "mp4" {
+            Task.detached {
+                let asset = AVURLAsset(url: url)
+                let generator = AVAssetImageGenerator(asset: asset)
+                generator.appliesPreferredTrackTransform = true
+                generator.maximumSize = CGSize(width: 260, height: 196)
+                if let result = try? await generator.image(at: .zero) {
+                    let cgImage = result.image
+                    let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+                    await MainActor.run { thumbnail = nsImage }
+                }
+            }
+        } else {
+            thumbnail = NSImage(contentsOf: url)
+        }
     }
 
     @ViewBuilder
@@ -188,6 +242,7 @@ struct PreviewCardView: View {
                     cornerButton("pencil.circle.fill") {
                         overlay.openAnnotateEditor()
                     }
+                    Spacer()
                     // Pin screenshot
                     cornerButton("pin.circle.fill") {
                         if let url = overlay.currentURL {
@@ -195,7 +250,6 @@ struct PreviewCardView: View {
                         }
                         overlay.dismiss()
                     }
-                    Spacer()
                 }
             }
             .padding(6)

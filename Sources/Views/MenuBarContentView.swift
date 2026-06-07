@@ -121,17 +121,33 @@ struct MenuBarContentView: View {
                 dismissAndRun(.colorPicker)
             }
 
-            TrayGridButton(title: "Record", icon: "record.circle") {
+            TrayGridButton(title: "Record", icon: "record.circle", shortcut: "\u{21e7}\u{2318}2") {
                 dismissPopover()
                 Task.detached {
                     try? await Task.sleep(nanoseconds: 200_000_000)
                     await startRecording()
                 }
             }
+
+            TrayGridButton(title: "Record Window", icon: "macwindow.on.rectangle") {
+                dismissPopover()
+                Task.detached {
+                    try? await Task.sleep(nanoseconds: 200_000_000)
+                    await startWindowRecording()
+                }
+            }
         }
     }
 
     // MARK: - Utility Grid
+
+    private var recentScreenshots: [CaptureRecord] {
+        HistoryStore.shared.records.filter { $0.kind == .screenshot }
+    }
+
+    private var recentRecordings: [CaptureRecord] {
+        HistoryStore.shared.records.filter { $0.kind == .recording }
+    }
 
     private var utilityGrid: some View {
         let columns = [
@@ -145,27 +161,60 @@ struct MenuBarContentView: View {
             }
 
             Menu {
-                if HistoryStore.shared.records.isEmpty {
-                    Text("No captures yet")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(HistoryStore.shared.records.prefix(8)) { record in
-                        Button {
-                            dismissPopover()
-                            let url = HistoryStore.shared.urlForRecord(record)
-                            PreviewOverlay.shared.show(url: url)
+                Menu {
+                    if recentScreenshots.isEmpty {
+                        Text("No screenshots yet")
+                    } else {
+                        ForEach(recentScreenshots.prefix(8)) { record in
+                            Button {
+                                dismissPopover()
+                                let url = HistoryStore.shared.displayURLForRecord(record)
+                                PreviewOverlay.shared.show(url: url)
+                            } label: {
+                                Label(record.filename, systemImage: "photo")
+                            }
+                        }
+
+                        Divider()
+
+                        Button(role: .destructive) {
+                            HistoryStore.shared.records
+                                .filter { $0.kind == .screenshot }
+                                .forEach { HistoryStore.shared.deleteRecord($0) }
                         } label: {
-                            Label(record.filename, systemImage: "photo")
+                            Label("Clear Screenshots", systemImage: "trash")
                         }
                     }
+                } label: {
+                    Label("Screenshots", systemImage: "photo.on.rectangle")
+                }
 
-                    Divider()
+                Menu {
+                    if recentRecordings.isEmpty {
+                        Text("No recordings yet")
+                    } else {
+                        ForEach(recentRecordings.prefix(8)) { record in
+                            Button {
+                                dismissPopover()
+                                let url = HistoryStore.shared.urlForRecord(record)
+                                VideoEditorWindowController.shared.open(url: url)
+                            } label: {
+                                Label(record.filename, systemImage: "video")
+                            }
+                        }
 
-                    Button(role: .destructive) {
-                        HistoryStore.shared.deleteAllRecords()
-                    } label: {
-                        Label("Clear All", systemImage: "trash")
+                        Divider()
+
+                        Button(role: .destructive) {
+                            HistoryStore.shared.records
+                                .filter { $0.kind == .recording }
+                                .forEach { HistoryStore.shared.deleteRecord($0) }
+                        } label: {
+                            Label("Clear Recordings", systemImage: "trash")
+                        }
                     }
+                } label: {
+                    Label("Recordings", systemImage: "video.circle")
                 }
             } label: {
                 TrayMenuLabel(title: "Recent", icon: "clock.arrow.circlepath")
@@ -235,6 +284,18 @@ struct MenuBarContentView: View {
             }
         } catch {
             print("Recording failed: \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    private func startWindowRecording() async {
+        do {
+            let started = try await ScreenRecordingManager.shared.startWindowRecording()
+            if started {
+                RecordingStatusBarController.shared.show()
+            }
+        } catch {
+            print("Window recording failed: \(error.localizedDescription)")
         }
     }
 }

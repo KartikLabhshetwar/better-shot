@@ -13,6 +13,10 @@ enum AppPreferences {
     private static let exportFormatKey = "bs_exportFormat"
     private static let exportQualityKey = "bs_exportQuality"
     private static let selfTimerKey = "bs_selfTimerDelay"
+    private static let recordingFPSKey = "bs_recordingFPS"
+    private static let recordingShowCursorKey = "bs_recordingShowCursor"
+    private static let recordingCaptureAudioKey = "bs_recordingCaptureAudio"
+    private static let recordingOpenEditorKey = "bs_recordingOpenEditor"
 
     // MARK: - Appearance
     static var appearance: AppAppearance {
@@ -88,6 +92,30 @@ enum AppPreferences {
             return SelfTimerDelay(rawValue: val) ?? .off
         }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: selfTimerKey) }
+    }
+
+    // MARK: - Recording
+    static var recordingFPS: Int {
+        get {
+            let val = UserDefaults.standard.integer(forKey: recordingFPSKey)
+            return val > 0 ? val : 30
+        }
+        set { UserDefaults.standard.set(newValue, forKey: recordingFPSKey) }
+    }
+
+    static var recordingShowCursor: Bool {
+        get { UserDefaults.standard.object(forKey: recordingShowCursorKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: recordingShowCursorKey) }
+    }
+
+    static var recordingCaptureAudio: Bool {
+        get { UserDefaults.standard.object(forKey: recordingCaptureAudioKey) as? Bool ?? false }
+        set { UserDefaults.standard.set(newValue, forKey: recordingCaptureAudioKey) }
+    }
+
+    static var recordingOpenEditor: Bool {
+        get { UserDefaults.standard.object(forKey: recordingOpenEditorKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: recordingOpenEditorKey) }
     }
 
     // MARK: - Default Beautifier Config

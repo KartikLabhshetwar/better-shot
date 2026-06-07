@@ -25,6 +25,7 @@ final class ShortcutService {
         static let defaultFullscreen = Shortcut(keyCode: UInt32(kVK_ANSI_3), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultOCR = Shortcut(keyCode: UInt32(kVK_ANSI_O), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultColorPicker = Shortcut(keyCode: UInt32(kVK_ANSI_C), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
+        static let defaultRecording = Shortcut(keyCode: UInt32(kVK_ANSI_2), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
     }
 
     enum Action: UInt32, CaseIterable {
@@ -33,6 +34,7 @@ final class ShortcutService {
         case window = 3
         case ocr = 4
         case colorPicker = 5
+        case recording = 6
     }
 
     // MARK: - Registration (CGEvent tap — intercepts system shortcuts)
@@ -76,6 +78,7 @@ final class ShortcutService {
             (.fullscreen, service.loadShortcut(for: .fullscreen) ?? .defaultFullscreen),
             (.ocr, service.loadShortcut(for: .ocr) ?? .defaultOCR),
             (.colorPicker, service.loadShortcut(for: .colorPicker) ?? .defaultColorPicker),
+            (.recording, service.loadShortcut(for: .recording) ?? .defaultRecording),
         ]
     }
 
@@ -147,9 +150,18 @@ final class ShortcutService {
             guard shortcut.enabled else { continue }
             if keyCode == shortcut.keyCode && carbonMods == shortcut.modifiers {
                 Task { @MainActor in
-                    await CaptureOrchestrator.shared.performCapture(action)
+                    if action == .recording {
+                        if ScreenRecordingManager.shared.isRecording {
+                            return
+                        }
+                        let started = try? await ScreenRecordingManager.shared.startRecording()
+                        if started == true {
+                            RecordingStatusBarController.shared.show()
+                        }
+                    } else {
+                        await CaptureOrchestrator.shared.performCapture(action)
+                    }
                 }
-                // Return nil to consume the event — prevents macOS screenshot tool from firing
                 return nil
             }
         }

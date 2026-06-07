@@ -4,7 +4,9 @@ import Carbon
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general = "General"
     case capture = "Capture"
+    case recording = "Recording"
     case history = "History"
+    case videos = "Videos"
     case about = "About"
 
     var id: String { rawValue }
@@ -13,7 +15,9 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "gearshape"
         case .capture: return "camera.viewfinder"
-        case .history: return "clock.arrow.trianglehead.counterclockwise.rotate.90"
+        case .recording: return "record.circle"
+        case .history: return "photo.on.rectangle.angled"
+        case .videos: return "video.circle"
         case .about: return "info.circle"
         }
     }
@@ -40,9 +44,15 @@ struct PreferencesView: View {
                 CaptureSettingsTab()
                     .opacity(selectedSection == .capture ? 1 : 0)
                     .allowsHitTesting(selectedSection == .capture)
+                RecordingSettingsTab()
+                    .opacity(selectedSection == .recording ? 1 : 0)
+                    .allowsHitTesting(selectedSection == .recording)
                 HistoryTab()
                     .opacity(selectedSection == .history ? 1 : 0)
                     .allowsHitTesting(selectedSection == .history)
+                VideosTab()
+                    .opacity(selectedSection == .videos ? 1 : 0)
+                    .allowsHitTesting(selectedSection == .videos)
                 AboutTab()
                     .opacity(selectedSection == .about ? 1 : 0)
                     .allowsHitTesting(selectedSection == .about)
@@ -602,6 +612,7 @@ struct CaptureSettingsTab: View {
                     ShortcutRow(label: "Fullscreen", action: .fullscreen)
                     ShortcutRow(label: "OCR Region", action: .ocr)
                     ShortcutRow(label: "Color Picker", action: .colorPicker)
+                    ShortcutRow(label: "Record Screen", action: .recording)
                 }
                 .id(shortcutResetID)
 
@@ -612,6 +623,7 @@ struct CaptureSettingsTab: View {
                         case .fullscreen: .defaultFullscreen
                         case .ocr: .defaultOCR
                         case .colorPicker: .defaultColorPicker
+                        case .recording: .defaultRecording
                         case .window: nil
                         }
                         if let def {
@@ -635,6 +647,7 @@ struct CaptureSettingsTab: View {
                         case .fullscreen: .defaultFullscreen
                         case .ocr: .defaultOCR
                         case .colorPicker: .defaultColorPicker
+                        case .recording: .defaultRecording
                         case .window: nil
                         }
                         if let def {
@@ -643,6 +656,57 @@ struct CaptureSettingsTab: View {
                     }
                     ShortcutService.shared.registerAll()
                     shortcutResetID = UUID()
+                }
+                .controlSize(.small)
+                .foregroundStyle(.red)
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+// MARK: - Recording Settings
+
+struct RecordingSettingsTab: View {
+    @AppStorage("bs_recordingFPS") private var recordingFPS: Int = 30
+    @AppStorage("bs_recordingShowCursor") private var showCursor: Bool = true
+    @AppStorage("bs_recordingCaptureAudio") private var captureAudio: Bool = false
+    @AppStorage("bs_recordingOpenEditor") private var openEditor: Bool = true
+
+    var body: some View {
+        Form {
+            Section("Quality") {
+                Picker("Frame Rate", selection: $recordingFPS) {
+                    Text("24 fps").tag(24)
+                    Text("30 fps").tag(30)
+                    Text("60 fps").tag(60)
+                }
+                .pickerStyle(.segmented)
+
+                Text("Higher frame rates produce smoother video but larger files.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Capture") {
+                Toggle("Show cursor in recording", isOn: $showCursor)
+                Toggle("Capture system audio", isOn: $captureAudio)
+            }
+
+            Section("After Recording") {
+                Toggle("Open editor after stopping", isOn: $openEditor)
+
+                Text("When disabled, recordings are saved directly without opening the trim editor.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Button("Reset All Recording Settings to Defaults") {
+                    recordingFPS = 30
+                    showCursor = true
+                    captureAudio = false
+                    openEditor = true
                 }
                 .controlSize(.small)
                 .foregroundStyle(.red)
@@ -728,6 +792,7 @@ struct ShortcutRow: View {
         case .window: return ShortcutService.Shortcut(keyCode: 0, modifiers: 0, enabled: false)
         case .ocr: return .defaultOCR
         case .colorPicker: return .defaultColorPicker
+        case .recording: return .defaultRecording
         }
     }
 
@@ -856,14 +921,18 @@ private func keyCodeToString(_ code: UInt32) -> String {
     return map[code] ?? "?"
 }
 
-// MARK: - History
+// MARK: - History (Screenshots only)
 
 struct HistoryTab: View {
     @State private var thumbnails: [String: NSImage] = [:]
 
+    private var screenshots: [CaptureRecord] {
+        HistoryStore.shared.records.filter { $0.kind == .screenshot }
+    }
+
     var body: some View {
-        if HistoryStore.shared.records.isEmpty {
-            ContentUnavailableView("No captures yet", systemImage: "photo.on.rectangle.angled")
+        if screenshots.isEmpty {
+            ContentUnavailableView("No screenshots yet", systemImage: "photo.on.rectangle.angled")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             VStack(spacing: 0) {
@@ -871,7 +940,7 @@ struct HistoryTab: View {
                     Spacer()
                     Button(role: .destructive) {
                         thumbnails.removeAll()
-                        HistoryStore.shared.deleteAllRecords()
+                        screenshots.forEach { HistoryStore.shared.deleteRecord($0) }
                     } label: {
                         Label("Clear All", systemImage: "trash")
                             .font(.caption)
@@ -883,7 +952,7 @@ struct HistoryTab: View {
                 }
 
                 List {
-                    ForEach(HistoryStore.shared.records) { record in
+                    ForEach(screenshots) { record in
                         HStack(spacing: 12) {
                             if let thumb = thumbnails[record.id.uuidString] {
                                 Image(nsImage: thumb)
@@ -913,6 +982,124 @@ struct HistoryTab: View {
                             }
 
                             Spacer()
+
+                            Button {
+                                let url = HistoryStore.shared.displayURLForRecord(record)
+                                PreviewOverlay.shared.show(url: url)
+                            } label: {
+                                Image(systemName: "eye")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                            .help("Preview")
+
+                            Button {
+                                thumbnails.removeValue(forKey: record.id.uuidString)
+                                HistoryStore.shared.deleteRecord(record)
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+            }
+        }
+    }
+
+    private func loadThumbnail(for record: CaptureRecord) {
+        Task.detached {
+            let thumb = await HistoryStore.shared.thumbnail(for: record, maxSize: 80)
+            await MainActor.run {
+                if let thumb {
+                    thumbnails[record.id.uuidString] = thumb
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Videos (Recordings only)
+
+struct VideosTab: View {
+    @State private var thumbnails: [String: NSImage] = [:]
+
+    private var recordings: [CaptureRecord] {
+        HistoryStore.shared.records.filter { $0.kind == .recording }
+    }
+
+    var body: some View {
+        if recordings.isEmpty {
+            ContentUnavailableView("No recordings yet", systemImage: "video.circle")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            VStack(spacing: 0) {
+                HStack {
+                    Spacer()
+                    Button(role: .destructive) {
+                        thumbnails.removeAll()
+                        recordings.forEach { HistoryStore.shared.deleteRecord($0) }
+                    } label: {
+                        Label("Clear All", systemImage: "trash")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                }
+
+                List {
+                    ForEach(recordings) { record in
+                        HStack(spacing: 12) {
+                            if let thumb = thumbnails[record.id.uuidString] {
+                                Image(nsImage: thumb)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 64, height: 48)
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                            } else {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(.quaternary)
+                                    .frame(width: 64, height: 48)
+                                    .onAppear {
+                                        loadThumbnail(for: record)
+                                    }
+                            }
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 4) {
+                                    Text(record.filename)
+                                        .font(.caption.weight(.medium))
+                                        .lineLimit(1)
+                                    Image(systemName: "video.fill")
+                                        .font(.system(size: 8))
+                                        .foregroundStyle(.secondary)
+                                }
+                                Text("\(record.pixelWidth) x \(record.pixelHeight)")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                Text(record.createdAt, style: .relative)
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
+
+                            Spacer()
+
+                            Button {
+                                let url = HistoryStore.shared.urlForRecord(record)
+                                VideoEditorWindowController.shared.open(url: url)
+                            } label: {
+                                Image(systemName: "slider.horizontal.3")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                            .help("Open in editor")
 
                             Button {
                                 thumbnails.removeValue(forKey: record.id.uuidString)

@@ -9,13 +9,15 @@ struct CaptureRecord: Identifiable, Codable, Equatable {
     var pixelHeight: Int
     var kind: CaptureKind
     var hasAnnotations: Bool
+    var beautifiedPath: String?
 
     init(
         filename: String,
         pixelWidth: Int,
         pixelHeight: Int,
         kind: CaptureKind = .screenshot,
-        hasAnnotations: Bool = false
+        hasAnnotations: Bool = false,
+        beautifiedPath: String? = nil
     ) {
         self.id = UUID()
         self.createdAt = Date()
@@ -24,6 +26,7 @@ struct CaptureRecord: Identifiable, Codable, Equatable {
         self.pixelHeight = pixelHeight
         self.kind = kind
         self.hasAnnotations = hasAnnotations
+        self.beautifiedPath = beautifiedPath
     }
 }
 

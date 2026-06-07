@@ -33,7 +33,13 @@ final class ScreenRecordingManager: NSObject {
 
     // MARK: - Start
 
-    func startRecording(captureAudio: Bool = false) async throws -> Bool {
+    func startRecording() async throws -> Bool {
+        return try await startRecording(
+            captureAudio: AppPreferences.recordingCaptureAudio
+        )
+    }
+
+    func startRecording(captureAudio: Bool) async throws -> Bool {
         guard state == .idle else { return false }
         state = .preparing
 
@@ -52,13 +58,67 @@ final class ScreenRecordingManager: NSObject {
             exceptingWindows: []
         )
 
+        let captureWidth = display.width * 2
+        let captureHeight = display.height * 2
+
+        return try await beginCapture(
+            filter: filter,
+            width: captureWidth,
+            height: captureHeight,
+            captureAudio: captureAudio
+        )
+    }
+
+    func startWindowRecording() async throws -> Bool {
+        guard state == .idle else { return false }
+        state = .preparing
+
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+
+        let ownBundleID = Bundle.main.bundleIdentifier ?? ""
+        let eligibleWindows = content.windows.filter {
+            $0.isOnScreen
+            && $0.owningApplication?.bundleIdentifier != ownBundleID
+            && $0.frame.width > 0 && $0.frame.height > 0
+        }
+
+        guard !eligibleWindows.isEmpty else {
+            state = .idle
+            return false
+        }
+
+        let picker = WindowPickerOverlay(windows: eligibleWindows)
+        guard let selectedWindow = await picker.pickWindow() else {
+            state = .idle
+            return false
+        }
+
+        let filter = SCContentFilter(desktopIndependentWindow: selectedWindow)
+        let captureWidth = Int(selectedWindow.frame.width) * 2
+        let captureHeight = Int(selectedWindow.frame.height) * 2
+
+        return try await beginCapture(
+            filter: filter,
+            width: captureWidth,
+            height: captureHeight,
+            captureAudio: AppPreferences.recordingCaptureAudio
+        )
+    }
+
+    private func beginCapture(
+        filter: SCContentFilter,
+        width: Int,
+        height: Int,
+        captureAudio: Bool
+    ) async throws -> Bool {
         let config = SCStreamConfiguration()
-        config.width = display.width * 2
-        config.height = display.height * 2
-        config.minimumFrameInterval = CMTime(value: 1, timescale: 30)
+        config.width = width
+        config.height = height
+        let fps = AppPreferences.recordingFPS
+        config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(fps))
         config.pixelFormat = kCVPixelFormatType_32BGRA
         config.queueDepth = 5
-        config.showsCursor = true
+        config.showsCursor = AppPreferences.recordingShowCursor
 
         if captureAudio {
             config.capturesAudio = true
@@ -74,9 +134,9 @@ final class ScreenRecordingManager: NSObject {
 
         let recordingSession = try RecordingSession(
             outputURL: url,
-            width: display.width * 2,
-            height: display.height * 2,
-            fps: 30,
+            width: width,
+            height: height,
+            fps: fps,
             includeAudio: captureAudio
         )
 

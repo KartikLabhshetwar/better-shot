@@ -39,6 +39,8 @@ final class CaptureOrchestrator {
             await performOCR()
         case .colorPicker:
             await performColorPick()
+        case .recording:
+            break
         }
     }
 
@@ -62,7 +64,7 @@ final class CaptureOrchestrator {
 
             guard let capturedURL = lastCaptureURL else { return }
 
-            await galleryApplyAndSave(capturedURL)
+            await galleryApplyAndSave(capturedURL, recordID: record?.id)
         } catch {
             print("Capture failed: \(error.localizedDescription)")
         }
@@ -100,7 +102,7 @@ final class CaptureOrchestrator {
         }
     }
 
-    private func galleryApplyAndSave(_ url: URL) async {
+    private func galleryApplyAndSave(_ url: URL, recordID: UUID? = nil) async {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return }
 
@@ -113,11 +115,17 @@ final class CaptureOrchestrator {
 
         if let savedURL {
             saveBaseImage(rawURL: url, alongside: savedURL)
+
+            if let recordID {
+                HistoryStore.shared.setBeautifiedPath(savedURL.path, for: recordID)
+            }
         }
 
         if AppPreferences.copyAfterSave, let savedURL {
             copyToClipboard(savedURL)
         }
+
+        let displayURL = savedURL ?? url
 
         if savedURL != nil {
             let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage
@@ -127,7 +135,7 @@ final class CaptureOrchestrator {
             )
         }
 
-        PreviewOverlay.shared.show(url: url)
+        PreviewOverlay.shared.show(url: displayURL)
     }
 
     private func saveImage(_ cgImage: CGImage) -> URL? {
