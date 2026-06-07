@@ -129,13 +129,6 @@ struct MenuBarContentView: View {
                 }
             }
 
-            TrayGridButton(title: "Record Window", icon: "macwindow.on.rectangle") {
-                dismissPopover()
-                Task.detached {
-                    try? await Task.sleep(nanoseconds: 200_000_000)
-                    await startWindowRecording()
-                }
-            }
         }
     }
 
@@ -287,17 +280,6 @@ struct MenuBarContentView: View {
         }
     }
 
-    @MainActor
-    private func startWindowRecording() async {
-        do {
-            let started = try await ScreenRecordingManager.shared.startWindowRecording()
-            if started {
-                RecordingStatusBarController.shared.show()
-            }
-        } catch {
-            print("Window recording failed: \(error.localizedDescription)")
-        }
-    }
 }
 
 // MARK: - Grid Button

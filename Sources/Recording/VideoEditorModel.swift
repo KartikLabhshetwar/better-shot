@@ -22,9 +22,11 @@ final class VideoEditorModel {
 
     var sourceURL: URL?
 
+    var isTrimming = false
     var isCropping = false
     var cropRect = CGRect(x: 0, y: 0, width: 1, height: 1)
 
+    var hasTrim: Bool { trimStart > 0.01 || (duration > 0 && trimEnd < duration - 0.01) }
     var hasCrop: Bool { cropRect != CGRect(x: 0, y: 0, width: 1, height: 1) }
 
     private var timeObserver: Any?
@@ -107,7 +109,7 @@ final class VideoEditorModel {
 
         let dir = AppPreferences.saveDirectory
         let stamp = Int(Date().timeIntervalSince1970 * 1000)
-        let outputPath = "\(dir)/bettershot_\(stamp).mov"
+        let outputPath = "\(dir)/bettershot_\(stamp).mp4"
         let outputURL = URL(fileURLWithPath: outputPath)
 
         var exportConfig = config
@@ -126,7 +128,7 @@ final class VideoEditorModel {
         }
 
         session.outputURL = outputURL
-        session.outputFileType = .mov
+        session.outputFileType = .mp4
         session.timeRange = CMTimeRange(
             start: CMTime(seconds: trimStart, preferredTimescale: 600),
             end: CMTime(seconds: trimEnd, preferredTimescale: 600)
@@ -151,10 +153,6 @@ final class VideoEditorModel {
 
         let vidW = fullW * cropRect.width
         let vidH = fullH * cropRect.height
-        let cropOffsetX = fullW * cropRect.origin.x
-        // AVFoundation renders with a flipped Y axis, so the crop Y offset is
-        // measured from the bottom of the frame.
-        let cropOffsetY = fullH * (1.0 - cropRect.origin.y - cropRect.height)
 
         let shortEdge = min(vidW, vidH)
         let pad = shortEdge * config.padding
@@ -192,8 +190,20 @@ final class VideoEditorModel {
 
         let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: compVideoTrack)
 
+        let cropOffsetX = fullW * cropRect.origin.x
+        let cropOffsetY = fullH * cropRect.origin.y
         var finalTransform = transform
-        finalTransform = finalTransform.concatenating(CGAffineTransform(translationX: -cropOffsetX + pad, y: -cropOffsetY + pad))
+        let postCropTranslation: CGAffineTransform
+        if transform == .identity {
+            postCropTranslation = CGAffineTransform(translationX: -cropOffsetX + pad, y: -cropOffsetY + pad)
+        } else {
+            let originAfterTransform = CGPoint(x: cropOffsetX, y: cropOffsetY).applying(transform)
+            let fullOriginAfterTransform = CGPoint.zero.applying(transform)
+            let dx = fullOriginAfterTransform.x - originAfterTransform.x + pad
+            let dy = fullOriginAfterTransform.y - originAfterTransform.y + pad
+            postCropTranslation = CGAffineTransform(translationX: dx, y: dy)
+        }
+        finalTransform = finalTransform.concatenating(postCropTranslation)
         layerInstruction.setTransform(finalTransform, at: .zero)
 
         instruction.layerInstructions = [layerInstruction]
@@ -245,7 +255,7 @@ final class VideoEditorModel {
         }
 
         session.outputURL = outputURL
-        session.outputFileType = .mov
+        session.outputFileType = .mp4
         session.videoComposition = videoComposition
 
         await session.export()

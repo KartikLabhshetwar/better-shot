@@ -69,48 +69,6 @@ final class ScreenRecordingManager: NSObject {
         )
     }
 
-    func startWindowRecording() async throws -> Bool {
-        guard state == .idle else { return false }
-        state = .preparing
-
-        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-
-        let ownBundleID = Bundle.main.bundleIdentifier ?? ""
-        let eligibleWindows = content.windows.filter {
-            $0.isOnScreen
-            && $0.owningApplication?.bundleIdentifier != ownBundleID
-            && $0.frame.width > 0 && $0.frame.height > 0
-        }
-
-        guard !eligibleWindows.isEmpty else {
-            state = .idle
-            return false
-        }
-
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-
-        let picker = WindowPickerOverlay(windows: eligibleWindows)
-        guard let selectedWindow = await picker.pickWindow() else {
-            NSApp.setActivationPolicy(.accessory)
-            state = .idle
-            return false
-        }
-
-        NSApp.setActivationPolicy(.accessory)
-
-        let filter = SCContentFilter(desktopIndependentWindow: selectedWindow)
-        let captureWidth = Int(selectedWindow.frame.width) * 2
-        let captureHeight = Int(selectedWindow.frame.height) * 2
-
-        return try await beginCapture(
-            filter: filter,
-            width: captureWidth,
-            height: captureHeight,
-            captureAudio: AppPreferences.recordingCaptureAudio
-        )
-    }
-
     private func beginCapture(
         filter: SCContentFilter,
         width: Int,
@@ -134,7 +92,7 @@ final class ScreenRecordingManager: NSObject {
 
         let dir = AppPreferences.saveDirectory
         let stamp = Int(Date().timeIntervalSince1970 * 1000)
-        let path = "\(dir)/bettershot_\(stamp).mov"
+        let path = "\(dir)/bettershot_\(stamp).mp4"
         let url = URL(fileURLWithPath: path)
         outputURL = url
 

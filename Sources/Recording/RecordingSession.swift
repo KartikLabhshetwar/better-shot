@@ -18,7 +18,7 @@ final class RecordingSession: @unchecked Sendable {
     }
 
     init(outputURL: URL, width: Int, height: Int, fps: Int, includeAudio: Bool) throws {
-        writer = try AVAssetWriter(outputURL: outputURL, fileType: .mov)
+        writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
 
         let videoSettings: [String: Any] = [
             AVVideoCodecKey: AVVideoCodecType.hevc,

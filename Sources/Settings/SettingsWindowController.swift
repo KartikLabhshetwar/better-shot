@@ -44,7 +44,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         window = nil
         DispatchQueue.main.async {
-            if EditorWindowController.shared.hasOpenWindows == false {
+            if !EditorWindowController.shared.hasOpenWindows
+                && !VideoEditorWindowController.shared.hasOpenWindow {
                 NSApp.setActivationPolicy(.accessory)
             }
         }

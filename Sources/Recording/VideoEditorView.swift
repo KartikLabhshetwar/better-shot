@@ -78,6 +78,10 @@ struct VideoEditorView: View {
     private var videoInspector: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
+                VideoTrimSection(model: model)
+
+                VideoInspectorDivider()
+
                 VideoEffectsSection(model: model)
 
                 VideoInspectorDivider()
@@ -217,20 +221,34 @@ struct VideoEditorView: View {
 
             Spacer()
 
-            Text(model.formattedDuration)
-                .font(.system(size: 12, design: .monospaced))
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .frame(width: 50)
+            if model.hasTrim {
+                Text(model.formattedDuration)
+                    .font(.system(size: 12, design: .monospaced))
+                    .monospacedDigit()
+                    .foregroundStyle(.orange)
+                    .frame(width: 50)
+            } else {
+                Text(model.formattedDuration)
+                    .font(.system(size: 12, design: .monospaced))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .frame(width: 50)
+            }
         }
     }
 
     // MARK: - Timeline
 
+    private let timelineCoordSpace = NamedCoordinateSpace.named("timeline")
+
     private var timelineSection: some View {
         GeometryReader { geo in
             let width = geo.size.width
             let height: CGFloat = 48
+            let startX = trimX(model.trimStart, in: width)
+            let endX = trimX(model.trimEnd, in: width)
+            let handleWidth: CGFloat = model.isTrimming ? 12 : 8
+            let handleColor = model.isTrimming ? Color.orange : Color.yellow
 
             ZStack(alignment: .leading) {
                 HStack(spacing: 0) {
@@ -246,26 +264,61 @@ struct VideoEditorView: View {
 
                 Rectangle()
                     .fill(Color.black.opacity(0.5))
-                    .frame(width: trimX(model.trimStart, in: width))
+                    .frame(width: startX, height: height)
 
                 Rectangle()
                     .fill(Color.black.opacity(0.5))
-                    .frame(width: width - trimX(model.trimEnd, in: width))
-                    .offset(x: trimX(model.trimEnd, in: width))
+                    .frame(width: width - endX, height: height)
+                    .offset(x: endX)
 
-                trimHandle(time: model.trimStart, in: width, isStart: true)
-                trimHandle(time: model.trimEnd, in: width, isStart: false)
+                if model.isTrimming {
+                    Rectangle()
+                        .fill(Color.clear)
+                        .frame(width: max(0, endX - startX), height: height)
+                        .overlay(
+                            Rectangle()
+                                .strokeBorder(Color.orange, lineWidth: 2)
+                        )
+                        .offset(x: startX)
+                        .allowsHitTesting(false)
+                }
+
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(handleColor)
+                    .frame(width: handleWidth, height: 56)
+                    .position(x: startX - handleWidth / 2, y: height / 2)
+                    .gesture(
+                        DragGesture(coordinateSpace: timelineCoordSpace)
+                            .onChanged { value in
+                                let frac = max(0, min(value.location.x / width, 1))
+                                model.setTrimStart(frac * model.duration)
+                            }
+                    )
+
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(handleColor)
+                    .frame(width: handleWidth, height: 56)
+                    .position(x: endX + handleWidth / 2, y: height / 2)
+                    .gesture(
+                        DragGesture(coordinateSpace: timelineCoordSpace)
+                            .onChanged { value in
+                                let frac = max(0, min(value.location.x / width, 1))
+                                model.setTrimEnd(frac * model.duration)
+                            }
+                    )
 
                 Rectangle()
                     .fill(Color.white)
                     .frame(width: 2, height: height + 8)
-                    .offset(x: trimX(model.currentTime, in: width) - 1)
+                    .position(x: trimX(model.currentTime, in: width), y: height / 2)
                     .shadow(radius: 1)
+                    .allowsHitTesting(false)
             }
             .frame(height: height)
+            .coordinateSpace(timelineCoordSpace)
             .contentShape(Rectangle())
             .gesture(
-                DragGesture(minimumDistance: 0)
+                DragGesture(minimumDistance: 0, coordinateSpace: timelineCoordSpace)
                     .onChanged { value in
                         let frac = max(0, min(value.location.x / width, 1))
                         let time = frac * model.duration
@@ -274,26 +327,6 @@ struct VideoEditorView: View {
             )
         }
         .frame(height: 48)
-    }
-
-    private func trimHandle(time: Double, in width: CGFloat, isStart: Bool) -> some View {
-        let x = trimX(time, in: width)
-        return RoundedRectangle(cornerRadius: 2)
-            .fill(Color.yellow)
-            .frame(width: 8, height: 56)
-            .offset(x: isStart ? x - 8 : x)
-            .gesture(
-                DragGesture()
-                    .onChanged { value in
-                        let frac = max(0, min(value.location.x / width, 1))
-                        let newTime = frac * model.duration
-                        if isStart {
-                            model.setTrimStart(newTime)
-                        } else {
-                            model.setTrimEnd(newTime)
-                        }
-                    }
-            )
     }
 
     private func trimX(_ time: Double, in width: CGFloat) -> CGFloat {
@@ -311,12 +344,39 @@ struct VideoEditorView: View {
             }
             .keyboardShortcut(.cancelAction)
 
+            Button {
+                guard let sourceURL = model.sourceURL else { return }
+                if let record = HistoryStore.shared.records.first(where: {
+                    HistoryStore.shared.urlForRecord($0) == sourceURL
+                        || HistoryStore.shared.displayURLForRecord($0) == sourceURL
+                }) {
+                    HistoryStore.shared.deleteRecord(record)
+                }
+                try? FileManager.default.removeItem(at: sourceURL)
+                model.cleanup()
+                NSApp.keyWindow?.close()
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.red)
+            }
+            .buttonStyle(.plain)
+            .help("Delete recording")
+
             Spacer()
 
             Button {
                 Task {
                     model.isExporting = true
-                    if await model.exportTrimmed() != nil {
+                    let sourceURL = model.sourceURL
+                    if let exportedURL = await model.exportTrimmed() {
+                        _ = HistoryStore.shared.importCapture(from: exportedURL, deleteSource: false, kind: .recording)
+                        if let sourceURL,
+                           let oldRecord = HistoryStore.shared.records.first(where: {
+                               HistoryStore.shared.urlForRecord($0).path == sourceURL.path
+                           }) {
+                            HistoryStore.shared.deleteRecord(oldRecord)
+                        }
                         let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage
                         ToastWindow.shared.show(message: "Recording exported!", icon: appIcon)
                         model.cleanup()
@@ -357,6 +417,104 @@ private struct VideoInspectorSectionHeader: View {
 private struct VideoInspectorDivider: View {
     var body: some View {
         Divider().padding(.horizontal, 14)
+    }
+}
+
+private struct VideoTrimSection: View {
+    @Bindable var model: VideoEditorModel
+
+    private func formatTime(_ seconds: Double) -> String {
+        let m = Int(seconds) / 60
+        let s = Int(seconds) % 60
+        let ms = Int((seconds - Double(Int(seconds))) * 100)
+        return String(format: "%02d:%02d.%02d", m, s, ms)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VideoInspectorSectionHeader("TRIM")
+
+            HStack {
+                Button {
+                    model.isTrimming.toggle()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "scissors")
+                            .font(.caption)
+                        Text(model.isTrimming ? "Done" : "Trim")
+                            .font(.caption2)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(model.isTrimming ? AnyShapeStyle(Color.accentColor.opacity(0.15)) : AnyShapeStyle(.quaternary), in: RoundedRectangle(cornerRadius: 6))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .strokeBorder(model.isTrimming ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: model.isTrimming ? 1.5 : 0.5)
+                    )
+                }
+                .buttonStyle(.plain)
+
+                if model.hasTrim {
+                    Button {
+                        model.trimStart = 0
+                        model.trimEnd = model.duration
+                        model.seekTo(0)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.counterclockwise")
+                                .font(.caption)
+                            Text("Reset")
+                                .font(.caption2)
+                        }
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 10)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if model.hasTrim {
+                VStack(spacing: 4) {
+                    HStack {
+                        Text("Start")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        Spacer()
+                        Text(formatTime(model.trimStart))
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text("End")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        Spacer()
+                        Text(formatTime(model.trimEnd))
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text("Duration")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        Spacer()
+                        Text(formatTime(model.trimmedDuration))
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(.orange)
+                    }
+                }
+            }
+
+            if model.isTrimming {
+                Text("Drag the yellow handles on the timeline below to set start and end points.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 14)
     }
 }
 

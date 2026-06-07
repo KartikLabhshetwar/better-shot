@@ -17,16 +17,19 @@ Better Shot is a free, native macOS screenshot tool built with Swift 6 and Swift
 
 ### Capture
 - Region, fullscreen, and window screenshot via native macOS screencapture CLI
+- Screen recording with ScreenCaptureKit — pause, resume, discard controls
+- Configurable recording: FPS (24/30/60), cursor visibility, audio capture
 - OCR text extraction (Apple Vision framework)
 - Color picker — sample any on-screen pixel, copies hex to clipboard
 - Self-timer countdown overlay (3s, 5s, 10s)
-- Customizable global keyboard shortcuts (⌘⇧3, ⌘⇧4, ⌘⇧5, ⌘⇧O, ⌘⇧C)
+- Customizable global keyboard shortcuts (⌘⇧3, ⌘⇧4, ⌘⇧5, ⌘⇧2, ⌘⇧O, ⌘⇧C)
 
 ### Beautify
 - Backgrounds: 12 solid color presets, 16 gradient presets, bundled macOS wallpapers, custom images
 - Effects: padding, corner radius, shadow strength — all rendered live
 - Layout: aspect ratio (Auto, 1:1, 4:3, 3:2, 16:9, 9:16), 9-point alignment grid with smart corner radius
-- Export as PNG or JPEG with configurable quality
+- Video editor: trim, crop, and beautify recordings with the same effects pipeline
+- Export as PNG or JPEG for screenshots, MP4 for recordings
 
 ### Annotate
 - Tools: rectangle, filled rectangle, ellipse, line, curved arrow, freehand, text, numbered badge, blur, spotlight
@@ -46,7 +49,7 @@ Better Shot is a free, native macOS screenshot tool built with Swift 6 and Swift
 
 - **Language**: Swift 6 with strict concurrency
 - **UI Framework**: SwiftUI with AppKit integration
-- **Frameworks**: CoreGraphics (compositing), CoreImage (blur), Vision (OCR), AppKit (capture/panels), Carbon (global shortcuts)
+- **Frameworks**: CoreGraphics (compositing), CoreImage (blur), Vision (OCR), ScreenCaptureKit (recording), AVFoundation (video editing), AppKit (capture/panels), Carbon (global shortcuts)
 - **Architecture**: Menu bar app using custom NSPanel popover, not MenuBarExtra
 - **Data**: All preferences via UserDefaults, capture history stored as JSON in Application Support
 - **No external dependencies**: No Electron, no web views, no third-party packages

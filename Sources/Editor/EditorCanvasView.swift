@@ -91,6 +91,12 @@ struct EditorCanvasView: View {
                             }
                         )
                     }
+                    .allowsHitTesting(!model.isCropping)
+
+                    if model.isCropping {
+                        ImageCropOverlay(cropRect: $model.cropRect, imageSize: CGSize(width: sourceImageFrame.width, height: sourceImageFrame.height))
+                            .position(x: sourceImageFrame.midX, y: sourceImageFrame.midY)
+                    }
 
                     if let draftItem = model.draftItem {
                         AnnotationItemView(
@@ -332,6 +338,171 @@ private struct AnnotationMarqueeSelectionView: View {
                     )
             }
     }
+}
+
+// MARK: - Image Crop Overlay
+
+private struct ImageCropOverlay: View {
+    @Binding var cropRect: CGRect
+    let imageSize: CGSize
+
+    private let handleSize: CGFloat = 10
+    private let minCropFraction: CGFloat = 0.1
+    @State private var startRect: CGRect = .zero
+
+    var body: some View {
+        Canvas { context, size in
+            let crop = pixelRect(in: size)
+
+            var dimPath = Path()
+            dimPath.addRect(CGRect(origin: .zero, size: size))
+            dimPath.addRect(crop)
+            context.fill(dimPath, with: .color(.black.opacity(0.5)), style: FillStyle(eoFill: true))
+
+            let border = crop.insetBy(dx: -1, dy: -1)
+            context.stroke(Path(border), with: .color(.white), lineWidth: 1.5)
+
+            let dashes: [CGFloat] = [4, 4]
+            let thirdW = crop.width / 3
+            let thirdH = crop.height / 3
+            for i in 1...2 {
+                var vLine = Path()
+                vLine.move(to: CGPoint(x: crop.minX + thirdW * CGFloat(i), y: crop.minY))
+                vLine.addLine(to: CGPoint(x: crop.minX + thirdW * CGFloat(i), y: crop.maxY))
+                context.stroke(vLine, with: .color(.white.opacity(0.3)), style: StrokeStyle(lineWidth: 0.5, dash: dashes))
+
+                var hLine = Path()
+                hLine.move(to: CGPoint(x: crop.minX, y: crop.minY + thirdH * CGFloat(i)))
+                hLine.addLine(to: CGPoint(x: crop.maxX, y: crop.minY + thirdH * CGFloat(i)))
+                context.stroke(hLine, with: .color(.white.opacity(0.3)), style: StrokeStyle(lineWidth: 0.5, dash: dashes))
+            }
+        }
+        .allowsHitTesting(false)
+        .frame(width: imageSize.width, height: imageSize.height)
+        .overlay {
+            GeometryReader { geo in
+                let size = geo.size
+                let crop = pixelRect(in: size)
+
+                Rectangle()
+                    .fill(Color.clear)
+                    .contentShape(Rectangle())
+                    .frame(width: crop.width, height: crop.height)
+                    .position(x: crop.midX, y: crop.midY)
+                    .gesture(dragGesture(size: size))
+
+                cornerHandle(at: CGPoint(x: crop.minX, y: crop.minY), corner: .topLeft, size: size)
+                cornerHandle(at: CGPoint(x: crop.maxX, y: crop.minY), corner: .topRight, size: size)
+                cornerHandle(at: CGPoint(x: crop.minX, y: crop.maxY), corner: .bottomLeft, size: size)
+                cornerHandle(at: CGPoint(x: crop.maxX, y: crop.maxY), corner: .bottomRight, size: size)
+
+                edgeHandle(at: CGPoint(x: crop.midX, y: crop.minY), edge: .top, size: size)
+                edgeHandle(at: CGPoint(x: crop.midX, y: crop.maxY), edge: .bottom, size: size)
+                edgeHandle(at: CGPoint(x: crop.minX, y: crop.midY), edge: .left, size: size)
+                edgeHandle(at: CGPoint(x: crop.maxX, y: crop.midY), edge: .right, size: size)
+            }
+            .frame(width: imageSize.width, height: imageSize.height)
+        }
+    }
+
+    private func pixelRect(in size: CGSize) -> CGRect {
+        CGRect(
+            x: cropRect.origin.x * size.width,
+            y: cropRect.origin.y * size.height,
+            width: cropRect.width * size.width,
+            height: cropRect.height * size.height
+        )
+    }
+
+    private func cornerHandle(at point: CGPoint, corner: CropCorner, size: CGSize) -> some View {
+        Circle()
+            .fill(.white)
+            .frame(width: handleSize, height: handleSize)
+            .shadow(color: .black.opacity(0.3), radius: 2)
+            .position(point)
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        let nx = value.location.x / size.width
+                        let ny = value.location.y / size.height
+                        var r = cropRect
+                        switch corner {
+                        case .topLeft:
+                            let newX = min(nx, r.maxX - minCropFraction)
+                            let newY = min(ny, r.maxY - minCropFraction)
+                            r.size.width += r.origin.x - max(0, newX)
+                            r.size.height += r.origin.y - max(0, newY)
+                            r.origin.x = max(0, newX)
+                            r.origin.y = max(0, newY)
+                        case .topRight:
+                            r.size.width = max(minCropFraction, min(1 - r.origin.x, nx - r.origin.x))
+                            let newY = min(ny, r.maxY - minCropFraction)
+                            r.size.height += r.origin.y - max(0, newY)
+                            r.origin.y = max(0, newY)
+                        case .bottomLeft:
+                            let newX = min(nx, r.maxX - minCropFraction)
+                            r.size.width += r.origin.x - max(0, newX)
+                            r.origin.x = max(0, newX)
+                            r.size.height = max(minCropFraction, min(1 - r.origin.y, ny - r.origin.y))
+                        case .bottomRight:
+                            r.size.width = max(minCropFraction, min(1 - r.origin.x, nx - r.origin.x))
+                            r.size.height = max(minCropFraction, min(1 - r.origin.y, ny - r.origin.y))
+                        }
+                        cropRect = r
+                    }
+            )
+    }
+
+    private func edgeHandle(at point: CGPoint, edge: CropEdge, size: CGSize) -> some View {
+        Capsule()
+            .fill(.white)
+            .frame(
+                width: edge == .top || edge == .bottom ? 24 : 6,
+                height: edge == .left || edge == .right ? 24 : 6
+            )
+            .shadow(color: .black.opacity(0.3), radius: 2)
+            .position(point)
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        let nx = value.location.x / size.width
+                        let ny = value.location.y / size.height
+                        var r = cropRect
+                        switch edge {
+                        case .top:
+                            let newY = min(ny, r.maxY - minCropFraction)
+                            r.size.height += r.origin.y - max(0, newY)
+                            r.origin.y = max(0, newY)
+                        case .bottom:
+                            r.size.height = max(minCropFraction, min(1 - r.origin.y, ny - r.origin.y))
+                        case .left:
+                            let newX = min(nx, r.maxX - minCropFraction)
+                            r.size.width += r.origin.x - max(0, newX)
+                            r.origin.x = max(0, newX)
+                        case .right:
+                            r.size.width = max(minCropFraction, min(1 - r.origin.x, nx - r.origin.x))
+                        }
+                        cropRect = r
+                    }
+            )
+    }
+
+    private func dragGesture(size: CGSize) -> some Gesture {
+        DragGesture()
+            .onChanged { value in
+                if startRect == .zero { startRect = cropRect }
+                let dx = value.translation.width / size.width
+                let dy = value.translation.height / size.height
+                var r = startRect
+                r.origin.x = max(0, min(1 - r.width, startRect.origin.x + dx))
+                r.origin.y = max(0, min(1 - r.height, startRect.origin.y + dy))
+                cropRect = r
+            }
+            .onEnded { _ in startRect = .zero }
+    }
+
+    private enum CropCorner { case topLeft, topRight, bottomLeft, bottomRight }
+    private enum CropEdge { case top, bottom, left, right }
 }
 
 struct TransparencyGrid: View {

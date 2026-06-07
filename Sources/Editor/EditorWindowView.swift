@@ -67,6 +67,13 @@ struct EditorWindowView: View {
                 .keyboardShortcut(.escape, modifiers: [])
 
                 Button {
+                    deleteCapture()
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                        .foregroundStyle(.red)
+                }
+
+                Button {
                     Task { await copyToClipboard() }
                 } label: {
                     Label("Copy", systemImage: "doc.on.doc")
@@ -127,6 +134,18 @@ struct EditorWindowView: View {
 
         withAnimation { model.toastMessage = "Exported" }
         try? await Task.sleep(for: .seconds(1.0))
+        NSApp.keyWindow?.close()
+    }
+
+    private func deleteCapture() {
+        let url = urlHolder.url
+        if let record = HistoryStore.shared.records.first(where: {
+            HistoryStore.shared.urlForRecord($0) == url
+                || HistoryStore.shared.displayURLForRecord($0) == url
+        }) {
+            HistoryStore.shared.deleteRecord(record)
+        }
+        try? FileManager.default.removeItem(at: url)
         NSApp.keyWindow?.close()
     }
 

@@ -24,19 +24,19 @@ Region, fullscreen, and window capture all use the native macOS `screencapture` 
 
 ### Screen Recording
 
-- **Record full screen** — Capture your entire display as a MOV video with ScreenCaptureKit
-- **Record a window** — Hover-and-click to select a specific window, same UX as window screenshots
+- **Record full screen** — Capture your entire display as MP4 video with ScreenCaptureKit
 - **Floating status bar** — Timer, pause/resume, stop, and discard controls
-- **Video editor** — Trim, add padding, corner radius, shadow, and background (solid, gradient, wallpaper, custom image)
+- **Video editor** — Trim, crop, add padding, corner radius, shadow, and background (solid, gradient, wallpaper, custom image). Export as MP4
 - **Configurable** — FPS (24/30/60), show cursor, capture audio in Settings > Recording
 
 ### Beautify
 
 - **Backgrounds** — 12 solid color presets, 16 gradient presets, bundled macOS wallpapers, or your own image
 - **Effects** — Padding, corner radius, shadow strength — all rendered live
+- **Crop** — Crop screenshots and recordings with draggable handles, dark mask, and rule-of-thirds grid
 - **Layout** — Aspect ratio (Auto, 1:1, 4:3, 3:2, 16:9, 9:16), 9-point alignment grid with smart corner radius
 - **Defaults** — Configure your preferred effects and background in Settings with a live preview
-- **Export** — PNG or JPEG with configurable quality
+- **Export** — PNG or JPEG for screenshots, MP4 for recordings
 
 ### Annotate
 

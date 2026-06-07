@@ -55,7 +55,9 @@ final class EditorWindowController {
 
         if windows.isEmpty {
             DispatchQueue.main.async {
-                NSApp.setActivationPolicy(.accessory)
+                if !VideoEditorWindowController.shared.hasOpenWindow {
+                    NSApp.setActivationPolicy(.accessory)
+                }
             }
         }
     }
@@ -64,7 +66,9 @@ final class EditorWindowController {
         windows.removeAll { $0 === window }
         if windows.isEmpty {
             DispatchQueue.main.async {
-                NSApp.setActivationPolicy(.accessory)
+                if !VideoEditorWindowController.shared.hasOpenWindow {
+                    NSApp.setActivationPolicy(.accessory)
+                }
             }
         }
     }

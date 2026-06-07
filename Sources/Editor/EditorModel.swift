@@ -42,6 +42,11 @@ final class EditorModel {
     var textIsUnderline: Bool = false
     var textAlignment: NSTextAlignment = .left
 
+    var isCropping = false
+    var cropRect = CGRect(x: 0, y: 0, width: 1, height: 1)
+    var hasCrop: Bool { cropRect != CGRect(x: 0, y: 0, width: 1, height: 1) }
+    func resetCrop() { cropRect = CGRect(x: 0, y: 0, width: 1, height: 1) }
+
     private var interaction: AnnotationInteraction?
     var history = AnnotationHistory()
     private var nextNumberedCircleValue = 1
@@ -498,7 +503,17 @@ final class EditorModel {
 
     func renderFinal() -> CGImage? {
         guard let image = sourceImage else { return nil }
-        return BeautifierRenderer.render(image: image, config: config, annotations: items)
+        let cropped = hasCrop ? cropImage(image) : image
+        return BeautifierRenderer.render(image: cropped, config: config, annotations: items)
+    }
+
+    private func cropImage(_ image: CGImage) -> CGImage {
+        let x = Int(cropRect.origin.x * CGFloat(image.width))
+        let y = Int(cropRect.origin.y * CGFloat(image.height))
+        let w = Int(cropRect.width * CGFloat(image.width))
+        let h = Int(cropRect.height * CGFloat(image.height))
+        let pixelRect = CGRect(x: x, y: y, width: max(1, w), height: max(1, h))
+        return image.cropping(to: pixelRect) ?? image
     }
 
     func saveConfigAsDefault() {

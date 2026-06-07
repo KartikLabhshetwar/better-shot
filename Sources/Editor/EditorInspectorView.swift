@@ -100,6 +100,11 @@ struct EditorInspectorView: View {
 
                     InspectorDivider()
 
+                    // MARK: Crop
+                    ImageCropSection(model: model)
+
+                    InspectorDivider()
+
                     // MARK: Effects
                     BeautifierControlsSection(model: model)
 
@@ -955,6 +960,66 @@ struct BackgroundPickerSection: View {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let path = url.path
         model.updateConfig { $0.style = .wallpaper(WallpaperSource(path: path)) }
+    }
+}
+
+// MARK: - Crop Section
+
+private struct ImageCropSection: View {
+    @Bindable var model: EditorModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            InspectorSectionHeader("CROP")
+
+            HStack {
+                Button {
+                    model.isCropping.toggle()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "crop")
+                            .font(.caption)
+                        Text(model.isCropping ? "Done" : "Crop")
+                            .font(.caption2)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(model.isCropping ? AnyShapeStyle(Color.accentColor.opacity(0.15)) : AnyShapeStyle(.quaternary), in: RoundedRectangle(cornerRadius: 6))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .strokeBorder(model.isCropping ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: model.isCropping ? 1.5 : 0.5)
+                    )
+                }
+                .buttonStyle(.plain)
+
+                if model.hasCrop {
+                    Button {
+                        model.resetCrop()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.counterclockwise")
+                                .font(.caption)
+                            Text("Reset")
+                                .font(.caption2)
+                        }
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 10)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if model.hasCrop {
+                let w = Int(CGFloat(model.sourceImage?.width ?? 0) * model.cropRect.width)
+                let h = Int(CGFloat(model.sourceImage?.height ?? 0) * model.cropRect.height)
+                Text("\(w) × \(h)")
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 14)
     }
 }
 

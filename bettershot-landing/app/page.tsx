@@ -80,70 +80,27 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* Features — linear list */}
-        <section className="max-w-[960px] mx-auto px-6 pb-28">
+        {/* What it does — concise vertical blocks */}
+        <section className="max-w-[600px] mx-auto px-6 pb-28">
           <div className="border-t border-[#111]/[0.06]" />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-0 divide-y md:divide-y-0 md:divide-x divide-[#111]/[0.06]">
-            <Feature
-              title="Capture"
-              items={[
-                "Region, fullscreen, window",
-                "OCR text extraction",
-                "Color picker (hex to clipboard)",
-                "Self-timer countdown (3s/5s/10s)",
-                "Customizable keyboard shortcuts",
-              ]}
+          <div className="space-y-16 pt-16">
+            <FeatureBlock
+              title="Capture everything"
+              description="Region, fullscreen, or window screenshots. Screen recording with pause and resume. OCR text extraction and color picker. All from the menu bar or a keyboard shortcut."
             />
-            <Feature
-              title="Record"
-              items={[
-                "Full screen or single window",
-                "Hover-and-click window picker",
-                "Pause, resume, discard controls",
-                "Configurable FPS (24/30/60)",
-                "Optional cursor & audio capture",
-              ]}
+            <FeatureBlock
+              title="Make it look good"
+              description="Add padding, corner radius, and shadows. Pick from solid colors, gradients, or macOS wallpapers as backgrounds. Crop with draggable handles. Works on both screenshots and recordings."
             />
-            <Feature
-              title="Annotate"
-              items={[
-                "Arrows, shapes, freehand drawing",
-                "Text with font, size, bold, italic",
-                "Pixelate & blur redaction",
-                "Numbered callout badges",
-                "Spotlight to highlight regions",
-              ]}
+            <FeatureBlock
+              title="Annotate with purpose"
+              description="Arrows, shapes, text, numbered badges, blur, and spotlight. Each tool has a single-key shortcut. Text supports font selection, bold, italic, and alignment."
             />
-            <Feature
-              title="Beautify"
-              items={[
-                "Works on screenshots & recordings",
-                "Backgrounds, padding, shadow, radius",
-                "Bundled macOS wallpapers",
-                "Video editor with trim timeline",
-                "Export as PNG, JPEG, or MP4",
-              ]}
+            <FeatureBlock
+              title="Stay in flow"
+              description="Floating preview after every capture. Click to edit, drag into any app. Pin screenshots as always-on-top windows. Auto-apply your default effects on every capture."
             />
-          </div>
-        </section>
-
-        {/* Workflow extras */}
-        <section className="max-w-[960px] mx-auto px-6 pb-20">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-            {[
-              { label: "Click-to-edit", desc: "Floating preview opens the editor" },
-              { label: "Pin screenshots", desc: "Always-on-top floating windows" },
-              { label: "Drag-to-app", desc: "Drag from preview into Figma, Slack, etc." },
-              { label: "Video editor", desc: "Trim, beautify, and export recordings" },
-              { label: "Capture history", desc: "Separate tabs for screenshots & videos" },
-              { label: "In-app updates", desc: "Download and install without leaving the app" },
-            ].map((item) => (
-              <div key={item.label} className="text-center">
-                <p className="text-[13px] font-medium text-[#111]/50">{item.label}</p>
-                <p className="text-[11px] text-[#111]/25 mt-1 leading-[1.5]">{item.desc}</p>
-              </div>
-            ))}
           </div>
         </section>
 
@@ -212,18 +169,11 @@ export default async function Home() {
   )
 }
 
-function Feature({ title, items }: { title: string; items: string[] }) {
+function FeatureBlock({ title, description }: { title: string; description: string }) {
   return (
-    <div className="py-10 md:px-8 first:md:pl-0 last:md:pr-0">
-      <h3 className="text-[13px] font-semibold text-[#111]/60 tracking-[-0.01em] mb-4">{title}</h3>
-      <ul className="space-y-2.5">
-        {items.map((item) => (
-          <li key={item} className="flex items-start gap-2.5">
-            <span className="mt-[7px] h-1 w-1 rounded-full bg-[#111]/15 shrink-0" />
-            <span className="text-[13px] leading-[1.6] text-[#111]/35">{item}</span>
-          </li>
-        ))}
-      </ul>
+    <div>
+      <h3 className="text-[15px] font-semibold text-[#111]/70 tracking-[-0.01em] mb-2">{title}</h3>
+      <p className="text-[14px] leading-[1.7] text-[#111]/35">{description}</p>
     </div>
   )
 }
