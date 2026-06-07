@@ -7,7 +7,7 @@ enum AnnotationDrawing {
 
     private static let ciContext = CIContext(options: [.cacheIntermediates: false])
 
-    static func draw(_ items: [AnnotationItem], in ctx: CGContext, imageRect: CGRect, fullCanvasRect: CGRect, sourceImage: CGImage?) {
+    static func draw(_ items: [AnnotationItem], in ctx: CGContext, imageRect: CGRect, fullCanvasRect: CGRect, sourceImage: CGImage?, flipped: Bool = false) {
         ctx.setLineCap(.round)
         ctx.setLineJoin(.round)
 
@@ -27,10 +27,10 @@ enum AnnotationDrawing {
                     return
 
                 case .rectangle:
-                    ctx.stroke(renderedRect(item.bounds, in: imageRect))
+                    ctx.stroke(renderedRect(item.bounds, in: imageRect, flipped: flipped))
 
                 case .filledRectangle:
-                    let rect = renderedRect(item.bounds, in: imageRect)
+                    let rect = renderedRect(item.bounds, in: imageRect, flipped: flipped)
                     ctx.addPath(CGPath(
                         roundedRect: rect,
                         cornerWidth: AnnotationFilledRectangleMetrics.cornerRadius(for: rect),
@@ -40,34 +40,36 @@ enum AnnotationDrawing {
                     ctx.fillPath()
 
                 case .ellipse:
-                    ctx.strokeEllipse(in: renderedRect(item.bounds, in: imageRect))
+                    ctx.strokeEllipse(in: renderedRect(item.bounds, in: imageRect, flipped: flipped))
 
                 case .numberedCircle:
-                    drawNumberedCircle(item, in: renderedRect(item.bounds, in: imageRect), context: ctx)
+                    drawNumberedCircle(item, in: renderedRect(item.bounds, in: imageRect, flipped: flipped), context: ctx, flipped: flipped)
 
                 case .pixelate:
                     guard let canvasSnapshot else { return }
                     applyPixelation(
-                        in: renderedRect(item.bounds, in: imageRect),
+                        in: renderedRect(item.bounds, in: imageRect, flipped: flipped),
                         canvasSnapshot: canvasSnapshot,
                         context: ctx,
                         canvasSize: fullCanvasRect.size,
                         colorSpace: CGColorSpaceCreateDeviceRGB(),
-                        density: item.redactionDensity
+                        density: item.redactionDensity,
+                        flipped: flipped
                     )
 
                 case .blur:
                     guard let canvasSnapshot else { return }
                     applyBlur(
-                        in: renderedRect(item.bounds, in: imageRect),
+                        in: renderedRect(item.bounds, in: imageRect, flipped: flipped),
                         canvasSnapshot: canvasSnapshot,
                         context: ctx,
                         canvasSize: fullCanvasRect.size,
-                        density: item.redactionDensity
+                        density: item.redactionDensity,
+                        flipped: flipped
                     )
 
                 case .spotlight:
-                    let targetRect = renderedRect(item.bounds, in: imageRect)
+                    let targetRect = renderedRect(item.bounds, in: imageRect, flipped: flipped)
                     let overlayColor = CGColor(gray: 0, alpha: item.redactionDensity)
                     ctx.saveGState()
                     let fullPath = CGMutablePath()
@@ -79,33 +81,33 @@ enum AnnotationDrawing {
                     ctx.restoreGState()
 
                 case .text:
-                    drawText(item, in: renderedRect(item.bounds, in: imageRect), imageHeight: imageRect.height, context: ctx)
+                    drawText(item, in: renderedRect(item.bounds, in: imageRect, flipped: flipped), imageHeight: imageRect.height, context: ctx, flipped: flipped)
 
                 case .line:
                     guard let first = item.points.first,
                           let last = item.points.last else { return }
-                    let start = renderedPoint(first, in: imageRect)
-                    let end = renderedPoint(last, in: imageRect)
+                    let start = renderedPoint(first, in: imageRect, flipped: flipped)
+                    let end = renderedPoint(last, in: imageRect, flipped: flipped)
                     ctx.beginPath()
                     ctx.move(to: start)
                     ctx.addLine(to: end)
                     ctx.strokePath()
 
                 case .freehand:
-                    drawFreehand(points: item.points, imageRect: imageRect, context: ctx)
+                    drawFreehand(points: item.points, imageRect: imageRect, context: ctx, flipped: flipped)
 
                 case .arrow:
                     guard let first = item.points.first,
                           let control = item.controlPoint,
                           let last = item.points.last,
                           let geometry = AnnotationArrowGeometry(
-                            start: renderedPoint(first, in: imageRect),
-                            control: renderedPoint(control, in: imageRect),
-                            end: renderedPoint(last, in: imageRect),
+                            start: renderedPoint(first, in: imageRect, flipped: flipped),
+                            control: renderedPoint(control, in: imageRect, flipped: flipped),
+                            end: renderedPoint(last, in: imageRect, flipped: flipped),
                             lineWidth: lineWidth
                           ) else { return }
                     ctx.beginPath()
-                    ctx.move(to: renderedPoint(first, in: imageRect))
+                    ctx.move(to: renderedPoint(first, in: imageRect, flipped: flipped))
                     ctx.addQuadCurve(to: geometry.tip, control: geometry.shaftControl)
                     ctx.strokePath()
                     drawArrowHead(geometry, context: ctx)
@@ -119,8 +121,16 @@ enum AnnotationDrawing {
         draw(items, in: ctx, imageRect: rect, fullCanvasRect: rect, sourceImage: sourceImage)
     }
 
-    private static func renderedRect(_ rect: CGRect, in imageRect: CGRect) -> CGRect {
-        CGRect(
+    private static func renderedRect(_ rect: CGRect, in imageRect: CGRect, flipped: Bool = false) -> CGRect {
+        if flipped {
+            return CGRect(
+                x: imageRect.minX + rect.minX * imageRect.width,
+                y: imageRect.minY + rect.minY * imageRect.height,
+                width: rect.width * imageRect.width,
+                height: rect.height * imageRect.height
+            )
+        }
+        return CGRect(
             x: imageRect.minX + rect.minX * imageRect.width,
             y: imageRect.minY + (1 - rect.maxY) * imageRect.height,
             width: rect.width * imageRect.width,
@@ -128,8 +138,14 @@ enum AnnotationDrawing {
         )
     }
 
-    private static func renderedPoint(_ point: CGPoint, in imageRect: CGRect) -> CGPoint {
-        CGPoint(
+    private static func renderedPoint(_ point: CGPoint, in imageRect: CGRect, flipped: Bool = false) -> CGPoint {
+        if flipped {
+            return CGPoint(
+                x: imageRect.minX + point.x * imageRect.width,
+                y: imageRect.minY + point.y * imageRect.height
+            )
+        }
+        return CGPoint(
             x: imageRect.minX + point.x * imageRect.width,
             y: imageRect.minY + (1 - point.y) * imageRect.height
         )
@@ -143,7 +159,7 @@ enum AnnotationDrawing {
         context.strokePath()
     }
 
-    private static func drawNumberedCircle(_ item: AnnotationItem, in rect: CGRect, context: CGContext) {
+    private static func drawNumberedCircle(_ item: AnnotationItem, in rect: CGRect, context: CGContext, flipped: Bool = false) {
         let diameter = min(rect.width, rect.height)
         guard diameter > 1 else { return }
 
@@ -180,13 +196,13 @@ enum AnnotationDrawing {
         )
 
         NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: flipped)
         attributedText.draw(with: textRect, options: [.usesLineFragmentOrigin, .usesFontLeading])
         NSGraphicsContext.restoreGraphicsState()
     }
 
-    private static func drawFreehand(points: [CGPoint], imageRect: CGRect, context: CGContext) {
-        let renderedPoints = points.map { renderedPoint($0, in: imageRect) }
+    private static func drawFreehand(points: [CGPoint], imageRect: CGRect, context: CGContext, flipped: Bool = false) {
+        let renderedPoints = points.map { renderedPoint($0, in: imageRect, flipped: flipped) }
         guard let first = renderedPoints.first else { return }
 
         context.beginPath()
@@ -213,7 +229,7 @@ enum AnnotationDrawing {
         CGPoint(x: (lhs.x + rhs.x) / 2, y: (lhs.y + rhs.y) / 2)
     }
 
-    private static func drawText(_ item: AnnotationItem, in rect: CGRect, imageHeight: CGFloat, context: CGContext) {
+    private static func drawText(_ item: AnnotationItem, in rect: CGRect, imageHeight: CGFloat, context: CGContext, flipped: Bool = false) {
         let text = item.text.trimmingCharacters(in: .newlines)
         guard !text.isEmpty, rect.width > 1, rect.height > 1 else { return }
 
@@ -235,7 +251,7 @@ enum AnnotationDrawing {
         let attributedText = NSAttributedString(string: text, attributes: attributes)
 
         NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: flipped)
         attributedText.draw(with: rect, options: [.usesLineFragmentOrigin, .usesFontLeading])
         NSGraphicsContext.restoreGraphicsState()
     }
@@ -246,12 +262,13 @@ enum AnnotationDrawing {
         context: CGContext,
         canvasSize: CGSize,
         colorSpace: CGColorSpace,
-        density: CGFloat
+        density: CGFloat,
+        flipped: Bool = false
     ) {
         let targetRect = rect.integral.intersection(CGRect(origin: .zero, size: canvasSize))
         guard targetRect.width >= 1,
               targetRect.height >= 1,
-              let croppedImage = canvasSnapshot.cropping(to: imageCropRect(for: targetRect, imageHeight: CGFloat(canvasSnapshot.height))) else {
+              let croppedImage = canvasSnapshot.cropping(to: imageCropRect(for: targetRect, imageHeight: CGFloat(canvasSnapshot.height), flipped: flipped)) else {
             return
         }
 
@@ -272,7 +289,13 @@ enum AnnotationDrawing {
         context.saveGState()
         context.clip(to: targetRect)
         context.interpolationQuality = .none
-        context.draw(pixelatedImage, in: targetRect)
+        if flipped {
+            context.translateBy(x: targetRect.minX, y: targetRect.maxY)
+            context.scaleBy(x: 1, y: -1)
+            context.draw(pixelatedImage, in: CGRect(x: 0, y: 0, width: targetRect.width, height: targetRect.height))
+        } else {
+            context.draw(pixelatedImage, in: targetRect)
+        }
         context.restoreGState()
     }
 
@@ -281,18 +304,19 @@ enum AnnotationDrawing {
         canvasSnapshot: CGImage,
         context: CGContext,
         canvasSize: CGSize,
-        density: CGFloat
+        density: CGFloat,
+        flipped: Bool = false
     ) {
         let targetRect = rect.integral.intersection(CGRect(origin: .zero, size: canvasSize))
         guard targetRect.width >= 1,
               targetRect.height >= 1,
-              let croppedImage = canvasSnapshot.cropping(to: imageCropRect(for: targetRect, imageHeight: CGFloat(canvasSnapshot.height))) else {
+              let croppedImage = canvasSnapshot.cropping(to: imageCropRect(for: targetRect, imageHeight: CGFloat(canvasSnapshot.height), flipped: flipped)) else {
             return
         }
 
         let radius = RedactionImageProcessor.blurRadius(for: density)
         let fullImageRect = CGRect(x: 0, y: 0, width: canvasSnapshot.width, height: canvasSnapshot.height)
-        let cropRectInImage = imageCropRect(for: targetRect, imageHeight: CGFloat(canvasSnapshot.height))
+        let cropRectInImage = imageCropRect(for: targetRect, imageHeight: CGFloat(canvasSnapshot.height), flipped: flipped)
         let paddedCropRect = cropRectInImage
             .insetBy(dx: -ceil(radius * 2), dy: -ceil(radius * 2))
             .intersection(fullImageRect)
@@ -324,7 +348,13 @@ enum AnnotationDrawing {
 
         context.saveGState()
         context.clip(to: targetRect)
-        context.draw(blurredImage, in: targetRect)
+        if flipped {
+            context.translateBy(x: targetRect.minX, y: targetRect.maxY)
+            context.scaleBy(x: 1, y: -1)
+            context.draw(blurredImage, in: CGRect(x: 0, y: 0, width: targetRect.width, height: targetRect.height))
+        } else {
+            context.draw(blurredImage, in: targetRect)
+        }
         context.restoreGState()
         ciContext.clearCaches()
     }
@@ -333,8 +363,16 @@ enum AnnotationDrawing {
         max(1.5, item.strokeWidth * max(imageSize.width, imageSize.height) / 900)
     }
 
-    private static func imageCropRect(for contextRect: CGRect, imageHeight: CGFloat) -> CGRect {
-        CGRect(
+    private static func imageCropRect(for contextRect: CGRect, imageHeight: CGFloat, flipped: Bool = false) -> CGRect {
+        if flipped {
+            return CGRect(
+                x: contextRect.minX,
+                y: contextRect.minY,
+                width: contextRect.width,
+                height: contextRect.height
+            ).integral
+        }
+        return CGRect(
             x: contextRect.minX,
             y: imageHeight - contextRect.maxY,
             width: contextRect.width,

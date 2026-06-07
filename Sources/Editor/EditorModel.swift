@@ -504,7 +504,8 @@ final class EditorModel {
     func renderFinal() -> CGImage? {
         guard let image = sourceImage else { return nil }
         let cropped = hasCrop ? cropImage(image) : image
-        return BeautifierRenderer.render(image: cropped, config: config, annotations: items)
+        let remappedAnnotations = hasCrop ? items.map { $0.remapped(from: cropRect) } : items
+        return BeautifierRenderer.render(image: cropped, config: config, annotations: remappedAnnotations)
     }
 
     private func cropImage(_ image: CGImage) -> CGImage {

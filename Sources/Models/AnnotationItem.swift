@@ -583,6 +583,25 @@ struct AnnotationItem: Identifiable, Equatable {
             y: first.y + (second.y - first.y) * t
         )
     }
+
+    func remapped(from cropRect: CGRect) -> AnnotationItem {
+        guard cropRect.width > 0, cropRect.height > 0 else { return self }
+        var item = self
+        item.rect = CGRect(
+            x: (rect.origin.x - cropRect.origin.x) / cropRect.width,
+            y: (rect.origin.y - cropRect.origin.y) / cropRect.height,
+            width: rect.width / cropRect.width,
+            height: rect.height / cropRect.height
+        )
+        item.points = points.map { p in
+            CGPoint(
+                x: (p.x - cropRect.origin.x) / cropRect.width,
+                y: (p.y - cropRect.origin.y) / cropRect.height
+            )
+        }
+        item.textLineHeight = textLineHeight / cropRect.height
+        return item
+    }
 }
 
 enum AnnotationTool: String, CaseIterable, Identifiable, Codable {

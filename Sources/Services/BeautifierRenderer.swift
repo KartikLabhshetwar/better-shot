@@ -66,12 +66,21 @@ enum BeautifierRenderer {
 
         if !annotations.isEmpty {
             ctx.saveGState()
+            let ctxH = CGFloat(Int(canvasH))
+            ctx.translateBy(x: 0, y: ctxH)
+            ctx.scaleBy(x: 1, y: -1)
+
+            let flippedImgY = config.alignment.yFactor * totalVPad
+            let flippedImageRect = CGRect(x: imgX, y: flippedImgY, width: imgW, height: imgH)
+            let flippedCanvasRect = CGRect(x: 0, y: 0, width: canvasW, height: canvasH)
+
             AnnotationDrawing.draw(
                 annotations,
                 in: ctx,
-                imageRect: imageRect,
-                fullCanvasRect: canvasRect,
-                sourceImage: image
+                imageRect: flippedImageRect,
+                fullCanvasRect: flippedCanvasRect,
+                sourceImage: image,
+                flipped: true
             )
             ctx.restoreGState()
         }
