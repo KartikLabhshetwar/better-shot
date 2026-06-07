@@ -5,7 +5,7 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
     private var permissionPollTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.appearance = NSAppearance(named: .aqua)
+        AppPreferences.applyAppearance()
         NSApp.setActivationPolicy(.accessory)
 
         MenuBarPopoverController.shared.setup()

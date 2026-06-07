@@ -57,6 +57,7 @@ struct PreferencesView: View {
 // MARK: - General
 
 struct GeneralSettingsTab: View {
+    @AppStorage("bs_appAppearance") private var appAppearanceRaw: String = AppAppearance.system.rawValue
     @AppStorage("bs_saveDirectory") private var saveDir = NSHomeDirectory() + "/Desktop"
     @AppStorage("bs_copyAfterSave") private var copyAfterSave = true
     @AppStorage("bs_playSound") private var playSound = true
@@ -69,6 +70,16 @@ struct GeneralSettingsTab: View {
         Binding(
             get: { ExportFormat(rawValue: exportFormatRaw) ?? .png },
             set: { exportFormatRaw = $0.rawValue }
+        )
+    }
+
+    private var appAppearance: Binding<AppAppearance> {
+        Binding(
+            get: { AppAppearance(rawValue: appAppearanceRaw) ?? .system },
+            set: { newValue in
+                appAppearanceRaw = newValue.rawValue
+                AppPreferences.applyAppearance()
+            }
         )
     }
 
@@ -101,6 +112,15 @@ struct GeneralSettingsTab: View {
                 }
 
                 Toggle("Copy to clipboard after saving", isOn: $copyAfterSave)
+            }
+
+            Section("Appearance") {
+                Picker("Mode", selection: appAppearance) {
+                    ForEach(AppAppearance.allCases) { appearance in
+                        Text(appearance.label).tag(appearance)
+                    }
+                }
+                .pickerStyle(.segmented)
             }
 
             Section("Capture") {
@@ -163,6 +183,8 @@ struct GeneralSettingsTab: View {
 
             Section {
                 Button("Reset All General Settings to Defaults") {
+                    appAppearanceRaw = AppAppearance.system.rawValue
+                    AppPreferences.applyAppearance()
                     saveDir = NSHomeDirectory() + "/Desktop"
                     copyAfterSave = true
                     playSound = true
