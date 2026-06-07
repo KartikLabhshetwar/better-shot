@@ -17,7 +17,7 @@ Better Shot is a free, native macOS screenshot tool built with Swift 6 and Swift
 
 ### Capture
 - Region, fullscreen, and window screenshot via native macOS screencapture CLI
-- OCR text extraction + QR code / barcode detection (Apple Vision framework)
+- OCR text extraction (Apple Vision framework)
 - Color picker — sample any on-screen pixel, copies hex to clipboard
 - Self-timer countdown overlay (3s, 5s, 10s)
 - Customizable global keyboard shortcuts (⌘⇧3, ⌘⇧4, ⌘⇧5, ⌘⇧O, ⌘⇧C)
@@ -46,7 +46,7 @@ Better Shot is a free, native macOS screenshot tool built with Swift 6 and Swift
 
 - **Language**: Swift 6 with strict concurrency
 - **UI Framework**: SwiftUI with AppKit integration
-- **Frameworks**: CoreGraphics (compositing), CoreImage (blur), Vision (OCR/QR), AppKit (capture/panels), Carbon (global shortcuts)
+- **Frameworks**: CoreGraphics (compositing), CoreImage (blur), Vision (OCR), AppKit (capture/panels), Carbon (global shortcuts)
 - **Architecture**: Menu bar app using custom NSPanel popover, not MenuBarExtra
 - **Data**: All preferences via UserDefaults, capture history stored as JSON in Application Support
 - **No external dependencies**: No Electron, no web views, no third-party packages

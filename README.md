@@ -17,10 +17,10 @@ An open-source alternative to CleanShot X. Native Swift app for macOS — fast, 
 | Fullscreen screenshot | `⌘⇧3` |
 | Window screenshot | `⌘⇧5` |
 | Record screen | `⌘⇧2` |
-| OCR text + QR/barcode scan | `⌘⇧O` |
+| OCR text scan | `⌘⇧O` |
 | Color picker (hex) | `⌘⇧C` |
 
-Region, fullscreen, and window capture all use the native macOS `screencapture` CLI for maximum reliability. OCR extracts text and detects QR codes/barcodes in a single pass. Color picker samples any on-screen pixel and copies the hex value. All shortcuts are customizable in Settings > Capture.
+Region, fullscreen, and window capture all use the native macOS `screencapture` CLI for maximum reliability. OCR extracts text from any region of the screen. Color picker samples any on-screen pixel and copies the hex value. All shortcuts are customizable in Settings > Capture.
 
 ### Screen Recording
 
@@ -151,7 +151,7 @@ Native Swift 6 / SwiftUI. No Electron, no web views, no external dependencies.
 |---|---|
 | CoreGraphics | Image compositing, annotation rendering, beautifier pipeline |
 | CoreImage | Gaussian blur for redaction |
-| Vision | OCR text extraction + QR/barcode detection |
+| Vision | OCR text extraction |
 | ScreenCaptureKit | Screen and window recording |
 | AVFoundation | Video editing, trimming, effect compositing via AVMutableVideoComposition |
 | AppKit | Color sampling, floating panels, pinned windows, capture via CLI |

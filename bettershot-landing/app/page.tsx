@@ -3,14 +3,11 @@ import Link from "next/link"
 import { ArrowUpRight } from "lucide-react"
 import { DownloadDropdown } from "@/components/download-dropdown"
 import { getLatestRelease } from "@/lib/downloads"
-import { getChangelog } from "@/lib/changelog"
 import { StarCount } from "@/components/star-count"
 import { EditorPreview } from "@/components/editor-demo"
 
 export default async function Home() {
   const release = await getLatestRelease()
-  const changelog = getChangelog()
-
   return (
     <div className="min-h-screen w-full bg-[#fafaf9] text-[#111] selection:bg-[#e78a53]/20">
       {/* Nav */}
@@ -92,7 +89,7 @@ export default async function Home() {
               title="Capture"
               items={[
                 "Region, fullscreen, window",
-                "OCR text + QR/barcode scanning",
+                "OCR text extraction",
                 "Color picker (hex to clipboard)",
                 "Self-timer countdown (3s/5s/10s)",
                 "Customizable keyboard shortcuts",
@@ -125,7 +122,7 @@ export default async function Home() {
                 "Backgrounds, padding, shadow, radius",
                 "Bundled macOS wallpapers",
                 "Video editor with trim timeline",
-                "Export as PNG, JPEG, or MOV",
+                "Export as PNG, JPEG, or MP4",
               ]}
             />
           </div>
@@ -160,44 +157,8 @@ export default async function Home() {
             <Shortcut label="Capture screen" keys={["⌘", "⇧", "3"]} />
             <Shortcut label="Capture window" keys={["⌘", "⇧", "5"]} />
             <Shortcut label="Record screen" keys={["⌘", "⇧", "2"]} />
-            <Shortcut label="OCR + QR scan" keys={["⌘", "⇧", "O"]} />
+            <Shortcut label="OCR text scan" keys={["⌘", "⇧", "O"]} />
             <Shortcut label="Color picker" keys={["⌘", "⇧", "C"]} />
-          </div>
-        </section>
-
-        {/* Changelog */}
-        <section className="max-w-[640px] mx-auto px-6 pb-28">
-          <h2 className="text-[13px] font-medium text-[#111]/20 tracking-wide uppercase text-center mb-8">
-            Changelog
-          </h2>
-          <div className="space-y-10">
-            {changelog.map((ver) => (
-              <div key={ver.version}>
-                <div className="flex items-baseline justify-between mb-4 pb-3 border-b border-[#111]/[0.06]">
-                  <span className="text-[13px] font-semibold text-[#111]/60 tracking-[-0.01em]">
-                    v{ver.version}
-                  </span>
-                  <span className="text-[11px] text-[#111]/25 font-mono">{ver.date}</span>
-                </div>
-                <div className="space-y-5">
-                  {ver.sections.map((section) => (
-                    <div key={section.label}>
-                      <p className="text-[11px] font-medium text-[#111]/30 uppercase tracking-wide mb-2">
-                        {section.label}
-                      </p>
-                      <ul className="space-y-1.5">
-                        {section.items.map((item, i) => (
-                          <li key={i} className="flex items-start gap-2.5">
-                            <span className="mt-[7px] h-1 w-1 rounded-full bg-[#111]/15 shrink-0" />
-                            <span className="text-[13px] leading-[1.6] text-[#111]/35">{item}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
           </div>
         </section>
 
@@ -224,6 +185,12 @@ export default async function Home() {
             &copy; {new Date().getFullYear()} Better Shot
           </p>
           <nav className="flex items-center gap-5">
+            <Link
+              href="/changelog"
+              className="text-[11px] text-[#111]/15 hover:text-[#111]/40 transition-colors"
+            >
+              Changelog
+            </Link>
             <a
               href="https://x.com/code_kartik"
               target="_blank"
