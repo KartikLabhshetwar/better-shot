@@ -37,7 +37,15 @@ final class VideoEditorModel {
     var formattedDuration: String { formatTime(trimmedDuration) }
 
     func loadVideo(from url: URL) {
-        sourceURL = url
+        let resolvedURL: URL
+        if let record = HistoryStore.shared.records.first(where: {
+            $0.beautifiedPath != nil && URL(fileURLWithPath: $0.beautifiedPath!) == url
+        }) {
+            resolvedURL = HistoryStore.shared.urlForRecord(record)
+        } else {
+            resolvedURL = url
+        }
+        sourceURL = resolvedURL
         config = AppPreferences.defaultBeautifierConfig
         let asset = AVURLAsset(url: url)
         let item = AVPlayerItem(asset: asset)
@@ -292,6 +300,29 @@ final class VideoEditorModel {
                 layer.contentsGravity = .resizeAspectFill
             }
         }
+    }
+
+    static func autoExportWithDefaults(url: URL) async -> URL? {
+        let model = VideoEditorModel()
+        model.sourceURL = url
+
+        let asset = AVURLAsset(url: url)
+        guard let dur = try? await asset.load(.duration) else { return nil }
+        model.duration = dur.seconds
+        model.trimEnd = dur.seconds
+
+        if let track = try? await asset.loadTracks(withMediaType: .video).first {
+            if let size = try? await track.load(.naturalSize),
+               let transform = try? await track.load(.preferredTransform) {
+                let transformed = size.applying(transform)
+                model.videoWidth = Int(abs(transformed.width))
+                model.videoHeight = Int(abs(transformed.height))
+            }
+        }
+
+        let result = await model.exportTrimmed()
+        model.cleanup()
+        return result
     }
 
     func cleanup() {

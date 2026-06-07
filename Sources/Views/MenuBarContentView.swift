@@ -250,8 +250,8 @@ struct MenuBarContentView: View {
                 recordingItems.append(TrayMenuItem(title: record.filename, icon: "video") { [record] in
                     let screen = originScreen
                     dismissPopover()
-                    let url = HistoryStore.shared.urlForRecord(record)
-                    VideoEditorWindowController.shared.open(url: url, on: screen)
+                    let url = HistoryStore.shared.displayURLForRecord(record)
+                    PreviewOverlay.shared.show(url: url, on: screen)
                 })
             }
             recordingItems.append(.separator())

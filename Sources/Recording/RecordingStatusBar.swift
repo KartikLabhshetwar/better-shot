@@ -61,8 +61,16 @@ struct RecordingStatusBarView: View {
                     Task {
                         RecordingStatusBarController.shared.dismiss()
                         if let url = await recorder.stopRecording() {
-                            _ = HistoryStore.shared.importCapture(from: url, deleteSource: false, kind: .recording)
-                            PreviewOverlay.shared.show(url: url)
+                            let record = HistoryStore.shared.importCapture(from: url, deleteSource: true, kind: .recording)
+                            if let record {
+                                let storeURL = HistoryStore.shared.urlForRecord(record)
+                                if let exportedURL = await VideoEditorModel.autoExportWithDefaults(url: storeURL) {
+                                    HistoryStore.shared.setBeautifiedPath(exportedURL.path, for: record.id)
+                                    PreviewOverlay.shared.show(url: exportedURL)
+                                } else {
+                                    PreviewOverlay.shared.show(url: storeURL)
+                                }
+                            }
                         }
                     }
                 }
