@@ -34,15 +34,14 @@ final class ScreenRecordingManager: NSObject {
     // MARK: - Start
 
     func startRecording() async throws -> Bool {
-        return try await startRecording(
-            captureAudio: AppPreferences.recordingCaptureAudio
-        )
+        return try await startFullScreenRecording()
     }
 
-    func startRecording(captureAudio: Bool) async throws -> Bool {
+    func startFullScreenRecording() async throws -> Bool {
         guard state == .idle else { return false }
         state = .preparing
 
+        let captureAudio = AppPreferences.recordingCaptureAudio
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         guard let display = content.displays.first else {
             state = .idle
@@ -69,15 +68,77 @@ final class ScreenRecordingManager: NSObject {
         )
     }
 
+    func startAreaRecording() async throws -> Bool {
+        guard state == .idle else { return false }
+
+        let overlay = RegionSelectionOverlay()
+        guard let selection = await overlay.selectRegion() else { return false }
+
+        state = .preparing
+        let captureAudio = AppPreferences.recordingCaptureAudio
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        guard let display = content.displays.first else {
+            state = .idle
+            return false
+        }
+
+        let ownBundleID = Bundle.main.bundleIdentifier ?? ""
+        let excludedApps = content.applications.filter { $0.bundleIdentifier == ownBundleID }
+
+        let filter = SCContentFilter(
+            display: display,
+            excludingApplications: excludedApps,
+            exceptingWindows: []
+        )
+
+        let contentRect = try await filter.contentRect
+        let pointPixelScale = try await filter.pointPixelScale
+
+        let screenFrame = NSScreen.screens.first?.frame ?? NSRect(x: 0, y: 0, width: CGFloat(display.width), height: CGFloat(display.height))
+
+        let selRect = selection.pointsRect
+        let clampedX = max(selRect.minX, screenFrame.minX)
+        let clampedY = max(selRect.minY, 0)
+        let clampedMaxX = min(selRect.maxX, screenFrame.maxX)
+        let clampedMaxY = min(selRect.maxY, screenFrame.height)
+
+        let scaleX = contentRect.width / screenFrame.width
+        let scaleY = contentRect.height / screenFrame.height
+
+        let sourceX = contentRect.minX + (clampedX - screenFrame.minX) * scaleX
+        let sourceY = contentRect.minY + clampedY * scaleY
+        let sourceW = (clampedMaxX - clampedX) * scaleX
+        let sourceH = (clampedMaxY - clampedY) * scaleY
+
+        let mappedSourceRect = CGRect(x: sourceX, y: sourceY, width: sourceW, height: sourceH)
+
+        let scale = CGFloat(pointPixelScale)
+        let captureWidth = Int(sourceW * scale)
+        let captureHeight = Int(sourceH * scale)
+
+        return try await beginCapture(
+            filter: filter,
+            width: captureWidth,
+            height: captureHeight,
+            captureAudio: captureAudio,
+            sourceRect: mappedSourceRect
+        )
+    }
+
     private func beginCapture(
         filter: SCContentFilter,
         width: Int,
         height: Int,
-        captureAudio: Bool
+        captureAudio: Bool,
+        sourceRect: CGRect? = nil
     ) async throws -> Bool {
         let config = SCStreamConfiguration()
         config.width = width
         config.height = height
+
+        if let sourceRect {
+            config.sourceRect = sourceRect
+        }
         let fps = AppPreferences.recordingFPS
         config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(fps))
         config.pixelFormat = kCVPixelFormatType_32BGRA

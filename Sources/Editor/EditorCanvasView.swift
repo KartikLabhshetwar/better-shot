@@ -96,6 +96,9 @@ struct EditorCanvasView: View {
                     if model.isCropping {
                         ImageCropOverlay(cropRect: $model.cropRect, imageSize: CGSize(width: sourceImageFrame.width, height: sourceImageFrame.height))
                             .position(x: sourceImageFrame.midX, y: sourceImageFrame.midY)
+                    } else if model.hasCrop {
+                        ImageCropPreview(cropRect: model.cropRect, imageSize: CGSize(width: sourceImageFrame.width, height: sourceImageFrame.height))
+                            .position(x: sourceImageFrame.midX, y: sourceImageFrame.midY)
                     }
 
                     if let draftItem = model.draftItem {
@@ -503,6 +506,34 @@ private struct ImageCropOverlay: View {
 
     private enum CropCorner { case topLeft, topRight, bottomLeft, bottomRight }
     private enum CropEdge { case top, bottom, left, right }
+}
+
+// MARK: - Crop Preview (non-interactive, shows active crop)
+
+private struct ImageCropPreview: View {
+    let cropRect: CGRect
+    let imageSize: CGSize
+
+    var body: some View {
+        Canvas { context, size in
+            let crop = CGRect(
+                x: cropRect.origin.x * size.width,
+                y: cropRect.origin.y * size.height,
+                width: cropRect.width * size.width,
+                height: cropRect.height * size.height
+            )
+
+            var dimPath = Path()
+            dimPath.addRect(CGRect(origin: .zero, size: size))
+            dimPath.addRect(crop)
+            context.fill(dimPath, with: .color(.black.opacity(0.5)), style: FillStyle(eoFill: true))
+
+            let border = crop.insetBy(dx: -1, dy: -1)
+            context.stroke(Path(border), with: .color(.white.opacity(0.5)), lineWidth: 1)
+        }
+        .allowsHitTesting(false)
+        .frame(width: imageSize.width, height: imageSize.height)
+    }
 }
 
 struct TransparencyGrid: View {

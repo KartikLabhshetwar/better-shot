@@ -42,12 +42,38 @@ struct VideoEditorView: View {
                 timelineSection
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
+            }
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Spacer()
 
-                Divider()
+                Button("Cancel") {
+                    model.cleanup()
+                    NSApp.keyWindow?.close()
+                }
+                .keyboardShortcut(.escape, modifiers: [])
 
-                bottomBar
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                Button {
+                    deleteRecording()
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                        .foregroundStyle(.red)
+                }
+
+                Button {
+                    Task { await exportRecording() }
+                } label: {
+                    if model.isExporting {
+                        ProgressView()
+                            .controlSize(.small)
+                            .padding(.horizontal, 8)
+                    } else {
+                        Label("Export", systemImage: "square.and.arrow.down")
+                    }
+                }
+                .disabled(model.isExporting)
+                .keyboardShortcut("s", modifiers: .command)
             }
         }
         .overlay(alignment: .bottom) {
@@ -143,6 +169,8 @@ struct VideoEditorView: View {
 
                         if model.isCropping {
                             VideoCropOverlay(cropRect: $model.cropRect, videoSize: CGSize(width: videoW, height: videoH))
+                        } else if model.hasCrop {
+                            VideoCropPreview(cropRect: model.cropRect, videoSize: CGSize(width: videoW, height: videoH))
                         }
                     }
                 }
@@ -239,164 +267,43 @@ struct VideoEditorView: View {
 
     // MARK: - Timeline
 
-    private let timelineCoordSpace = NamedCoordinateSpace.named("timeline")
-
     private var timelineSection: some View {
-        GeometryReader { geo in
-            let width = geo.size.width
-            let height: CGFloat = 48
-            let startX = trimX(model.trimStart, in: width)
-            let endX = trimX(model.trimEnd, in: width)
-            let handleWidth: CGFloat = model.isTrimming ? 12 : 8
-            let handleColor = model.isTrimming ? Color.orange : Color.yellow
-
-            ZStack(alignment: .leading) {
-                HStack(spacing: 0) {
-                    ForEach(Array(model.thumbnails.enumerated()), id: \.offset) { _, thumb in
-                        Image(nsImage: thumb)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: width / max(1, CGFloat(model.thumbnails.count)), height: height)
-                            .clipped()
-                    }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-
-                Rectangle()
-                    .fill(Color.black.opacity(0.5))
-                    .frame(width: startX, height: height)
-
-                Rectangle()
-                    .fill(Color.black.opacity(0.5))
-                    .frame(width: width - endX, height: height)
-                    .offset(x: endX)
-
-                if model.isTrimming {
-                    Rectangle()
-                        .fill(Color.clear)
-                        .frame(width: max(0, endX - startX), height: height)
-                        .overlay(
-                            Rectangle()
-                                .strokeBorder(Color.orange, lineWidth: 2)
-                        )
-                        .offset(x: startX)
-                        .allowsHitTesting(false)
-                }
-
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(handleColor)
-                    .frame(width: handleWidth, height: 56)
-                    .position(x: startX - handleWidth / 2, y: height / 2)
-                    .gesture(
-                        DragGesture(coordinateSpace: timelineCoordSpace)
-                            .onChanged { value in
-                                let frac = max(0, min(value.location.x / width, 1))
-                                model.setTrimStart(frac * model.duration)
-                            }
-                    )
-
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(handleColor)
-                    .frame(width: handleWidth, height: 56)
-                    .position(x: endX + handleWidth / 2, y: height / 2)
-                    .gesture(
-                        DragGesture(coordinateSpace: timelineCoordSpace)
-                            .onChanged { value in
-                                let frac = max(0, min(value.location.x / width, 1))
-                                model.setTrimEnd(frac * model.duration)
-                            }
-                    )
-
-                Rectangle()
-                    .fill(Color.white)
-                    .frame(width: 2, height: height + 8)
-                    .position(x: trimX(model.currentTime, in: width), y: height / 2)
-                    .shadow(radius: 1)
-                    .allowsHitTesting(false)
-            }
-            .frame(height: height)
-            .coordinateSpace(timelineCoordSpace)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0, coordinateSpace: timelineCoordSpace)
-                    .onChanged { value in
-                        let frac = max(0, min(value.location.x / width, 1))
-                        let time = frac * model.duration
-                        model.seekTo(max(model.trimStart, min(time, model.trimEnd)))
-                    }
-            )
-        }
-        .frame(height: 48)
+        VideoTrimTimelineView(model: model)
+            .frame(height: 54)
     }
 
-    private func trimX(_ time: Double, in width: CGFloat) -> CGFloat {
-        guard model.duration > 0 else { return 0 }
-        return CGFloat(time / model.duration) * width
+    // MARK: - Actions
+
+    private func deleteRecording() {
+        guard let sourceURL = model.sourceURL else { return }
+        if let record = HistoryStore.shared.records.first(where: {
+            HistoryStore.shared.urlForRecord($0) == sourceURL
+                || HistoryStore.shared.displayURLForRecord($0) == sourceURL
+        }) {
+            HistoryStore.shared.deleteRecord(record)
+        }
+        try? FileManager.default.removeItem(at: sourceURL)
+        model.cleanup()
+        NSApp.keyWindow?.close()
     }
 
-    // MARK: - Bottom Bar
-
-    private var bottomBar: some View {
-        HStack {
-            Button("Cancel") {
-                model.cleanup()
-                NSApp.keyWindow?.close()
+    private func exportRecording() async {
+        model.isExporting = true
+        let sourceURL = model.sourceURL
+        if let exportedURL = await model.exportTrimmed() {
+            _ = HistoryStore.shared.importCapture(from: exportedURL, deleteSource: false, kind: .recording)
+            if let sourceURL,
+               let oldRecord = HistoryStore.shared.records.first(where: {
+                   HistoryStore.shared.urlForRecord($0).path == sourceURL.path
+               }) {
+                HistoryStore.shared.deleteRecord(oldRecord)
             }
-            .keyboardShortcut(.cancelAction)
-
-            Button {
-                guard let sourceURL = model.sourceURL else { return }
-                if let record = HistoryStore.shared.records.first(where: {
-                    HistoryStore.shared.urlForRecord($0) == sourceURL
-                        || HistoryStore.shared.displayURLForRecord($0) == sourceURL
-                }) {
-                    HistoryStore.shared.deleteRecord(record)
-                }
-                try? FileManager.default.removeItem(at: sourceURL)
-                model.cleanup()
-                NSApp.keyWindow?.close()
-            } label: {
-                Image(systemName: "trash")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.red)
-            }
-            .buttonStyle(.plain)
-            .help("Delete recording")
-
-            Spacer()
-
-            Button {
-                Task {
-                    model.isExporting = true
-                    let sourceURL = model.sourceURL
-                    if let exportedURL = await model.exportTrimmed() {
-                        _ = HistoryStore.shared.importCapture(from: exportedURL, deleteSource: false, kind: .recording)
-                        if let sourceURL,
-                           let oldRecord = HistoryStore.shared.records.first(where: {
-                               HistoryStore.shared.urlForRecord($0).path == sourceURL.path
-                           }) {
-                            HistoryStore.shared.deleteRecord(oldRecord)
-                        }
-                        let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage
-                        ToastWindow.shared.show(message: "Recording exported!", icon: appIcon)
-                        model.cleanup()
-                        NSApp.keyWindow?.close()
-                    }
-                    model.isExporting = false
-                }
-            } label: {
-                if model.isExporting {
-                    ProgressView()
-                        .controlSize(.small)
-                        .padding(.horizontal, 8)
-                } else {
-                    Text("Export")
-                        .fontWeight(.semibold)
-                }
-            }
-            .disabled(model.isExporting)
-            .keyboardShortcut(.defaultAction)
+            let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage
+            ToastWindow.shared.show(message: "Recording exported!", icon: appIcon)
+            model.cleanup()
+            NSApp.keyWindow?.close()
         }
+        model.isExporting = false
     }
 }
 
@@ -432,28 +339,9 @@ private struct VideoTrimSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VideoInspectorSectionHeader("TRIM")
-
             HStack {
-                Button {
-                    model.isTrimming.toggle()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "scissors")
-                            .font(.caption)
-                        Text(model.isTrimming ? "Done" : "Trim")
-                            .font(.caption2)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-                    .background(model.isTrimming ? AnyShapeStyle(Color.accentColor.opacity(0.15)) : AnyShapeStyle(.quaternary), in: RoundedRectangle(cornerRadius: 6))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .strokeBorder(model.isTrimming ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: model.isTrimming ? 1.5 : 0.5)
-                    )
-                }
-                .buttonStyle(.plain)
-
+                VideoInspectorSectionHeader("TRIM")
+                Spacer()
                 if model.hasTrim {
                     Button {
                         model.trimStart = 0
@@ -466,52 +354,48 @@ private struct VideoTrimSection: View {
                             Text("Reset")
                                 .font(.caption2)
                         }
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 10)
-                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 8)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 5))
                     }
                     .buttonStyle(.plain)
                 }
             }
 
-            if model.hasTrim {
-                VStack(spacing: 4) {
-                    HStack {
-                        Text("Start")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                        Spacer()
-                        Text(formatTime(model.trimStart))
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                    }
-                    HStack {
-                        Text("End")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                        Spacer()
-                        Text(formatTime(model.trimEnd))
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                    }
-                    HStack {
-                        Text("Duration")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                        Spacer()
-                        Text(formatTime(model.trimmedDuration))
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(.orange)
-                    }
+            VStack(spacing: 4) {
+                HStack {
+                    Text("Start")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                    Text(formatTime(model.trimStart))
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(model.hasTrim ? AnyShapeStyle(.secondary) : AnyShapeStyle(.quaternary))
+                }
+                HStack {
+                    Text("End")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                    Text(formatTime(model.trimEnd))
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(model.hasTrim ? AnyShapeStyle(.secondary) : AnyShapeStyle(.quaternary))
+                }
+                HStack {
+                    Text("Duration")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                    Text(formatTime(model.trimmedDuration))
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(model.hasTrim ? AnyShapeStyle(.orange) : AnyShapeStyle(.quaternary))
                 }
             }
 
-            if model.isTrimming {
-                Text("Drag the yellow handles on the timeline below to set start and end points.")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text("Drag the yellow handles on the timeline to trim.")
+                .font(.caption2)
+                .foregroundStyle(.quaternary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 14)
@@ -1001,4 +885,32 @@ private struct VideoCropOverlay: View {
 
     private enum Corner { case topLeft, topRight, bottomLeft, bottomRight }
     private enum Edge { case top, bottom, left, right }
+}
+
+// MARK: - Crop Preview (non-interactive, shows crop when not editing)
+
+private struct VideoCropPreview: View {
+    let cropRect: CGRect
+    let videoSize: CGSize
+
+    var body: some View {
+        Canvas { context, size in
+            let crop = CGRect(
+                x: cropRect.origin.x * size.width,
+                y: cropRect.origin.y * size.height,
+                width: cropRect.width * size.width,
+                height: cropRect.height * size.height
+            )
+
+            var dimPath = Path()
+            dimPath.addRect(CGRect(origin: .zero, size: size))
+            dimPath.addRect(crop)
+            context.fill(dimPath, with: .color(.black.opacity(0.5)), style: FillStyle(eoFill: true))
+
+            let border = crop.insetBy(dx: -1, dy: -1)
+            context.stroke(Path(border), with: .color(.white.opacity(0.5)), lineWidth: 1)
+        }
+        .allowsHitTesting(false)
+        .frame(width: videoSize.width, height: videoSize.height)
+    }
 }

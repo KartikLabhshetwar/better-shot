@@ -122,6 +122,15 @@ struct EditorWindowView: View {
         if let sourceURL = model.sourceURL {
             let baseURL = CaptureOrchestrator.baseImageURL(for: url)
             try? FileManager.default.copyItem(at: sourceURL, to: baseURL)
+
+            if let record = HistoryStore.shared.records.first(where: {
+                HistoryStore.shared.urlForRecord($0) == sourceURL
+                    || HistoryStore.shared.displayURLForRecord($0) == sourceURL
+            }) {
+                HistoryStore.shared.deleteRecord(record)
+            }
+
+            _ = HistoryStore.shared.importCapture(from: url, deleteSource: false, kind: .screenshot)
         }
 
         if AppPreferences.copyAfterSave {

@@ -121,14 +121,22 @@ struct MenuBarContentView: View {
                 dismissAndRun(.colorPicker)
             }
 
-            TrayGridButton(title: "Record", icon: "record.circle", shortcut: "\u{21e7}\u{2318}2") {
-                dismissPopover()
-                Task.detached {
-                    try? await Task.sleep(nanoseconds: 200_000_000)
-                    await startRecording()
-                }
-            }
-
+            TrayGridMenu(title: "Record", icon: "record.circle", menuItems: [
+                TrayMenuItem(title: "Full Screen", icon: "desktopcomputer") {
+                    dismissPopover()
+                    Task.detached {
+                        try? await Task.sleep(nanoseconds: 200_000_000)
+                        await startRecording(mode: .fullScreen)
+                    }
+                },
+                TrayMenuItem(title: "Area", icon: "rectangle.dashed") {
+                    dismissPopover()
+                    Task.detached {
+                        try? await Task.sleep(nanoseconds: 200_000_000)
+                        await startRecording(mode: .area)
+                    }
+                },
+            ])
         }
     }
 
@@ -153,67 +161,7 @@ struct MenuBarContentView: View {
                 dismissAndRun(.ocr)
             }
 
-            Menu {
-                Menu {
-                    if recentScreenshots.isEmpty {
-                        Text("No screenshots yet")
-                    } else {
-                        ForEach(recentScreenshots.prefix(8)) { record in
-                            Button {
-                                dismissPopover()
-                                let url = HistoryStore.shared.displayURLForRecord(record)
-                                PreviewOverlay.shared.show(url: url)
-                            } label: {
-                                Label(record.filename, systemImage: "photo")
-                            }
-                        }
-
-                        Divider()
-
-                        Button(role: .destructive) {
-                            HistoryStore.shared.records
-                                .filter { $0.kind == .screenshot }
-                                .forEach { HistoryStore.shared.deleteRecord($0) }
-                        } label: {
-                            Label("Clear Screenshots", systemImage: "trash")
-                        }
-                    }
-                } label: {
-                    Label("Screenshots", systemImage: "photo.on.rectangle")
-                }
-
-                Menu {
-                    if recentRecordings.isEmpty {
-                        Text("No recordings yet")
-                    } else {
-                        ForEach(recentRecordings.prefix(8)) { record in
-                            Button {
-                                dismissPopover()
-                                let url = HistoryStore.shared.urlForRecord(record)
-                                VideoEditorWindowController.shared.open(url: url)
-                            } label: {
-                                Label(record.filename, systemImage: "video")
-                            }
-                        }
-
-                        Divider()
-
-                        Button(role: .destructive) {
-                            HistoryStore.shared.records
-                                .filter { $0.kind == .recording }
-                                .forEach { HistoryStore.shared.deleteRecord($0) }
-                        } label: {
-                            Label("Clear Recordings", systemImage: "trash")
-                        }
-                    }
-                } label: {
-                    Label("Recordings", systemImage: "video.circle")
-                }
-            } label: {
-                TrayMenuLabel(title: "Recent", icon: "clock.arrow.circlepath")
-            }
-            .menuStyle(.borderlessButton)
-            .buttonStyle(.plain)
+            TrayGridMenu(title: "Recent", icon: "clock.arrow.circlepath", menuItems: recentMenuItems())
         }
     }
 
@@ -263,15 +211,71 @@ struct MenuBarContentView: View {
         }
     }
 
+    private func recentMenuItems() -> [TrayMenuItem] {
+        var items: [TrayMenuItem] = []
+
+        var screenshotItems: [TrayMenuItem] = []
+        if recentScreenshots.isEmpty {
+            screenshotItems.append(TrayMenuItem(title: "No screenshots yet", icon: "photo", action: {}, isDisabled: true))
+        } else {
+            for record in recentScreenshots.prefix(8) {
+                screenshotItems.append(TrayMenuItem(title: record.filename, icon: "photo") { [record] in
+                    dismissPopover()
+                    let url = HistoryStore.shared.displayURLForRecord(record)
+                    PreviewOverlay.shared.show(url: url)
+                })
+            }
+            screenshotItems.append(.separator())
+            screenshotItems.append(TrayMenuItem(title: "Clear Screenshots", icon: "trash", action: {
+                HistoryStore.shared.records
+                    .filter { $0.kind == .screenshot }
+                    .forEach { HistoryStore.shared.deleteRecord($0) }
+            }, isDestructive: true))
+        }
+        items.append(TrayMenuItem(title: "Screenshots", icon: "photo.on.rectangle", action: {}, submenu: screenshotItems))
+
+        var recordingItems: [TrayMenuItem] = []
+        if recentRecordings.isEmpty {
+            recordingItems.append(TrayMenuItem(title: "No recordings yet", icon: "video", action: {}, isDisabled: true))
+        } else {
+            for record in recentRecordings.prefix(8) {
+                recordingItems.append(TrayMenuItem(title: record.filename, icon: "video") { [record] in
+                    dismissPopover()
+                    let url = HistoryStore.shared.urlForRecord(record)
+                    VideoEditorWindowController.shared.open(url: url)
+                })
+            }
+            recordingItems.append(.separator())
+            recordingItems.append(TrayMenuItem(title: "Clear Recordings", icon: "trash", action: {
+                HistoryStore.shared.records
+                    .filter { $0.kind == .recording }
+                    .forEach { HistoryStore.shared.deleteRecord($0) }
+            }, isDestructive: true))
+        }
+        items.append(TrayMenuItem(title: "Recordings", icon: "video.circle", action: {}, submenu: recordingItems))
+
+        return items
+    }
+
     private func openSettings() {
         dismissPopover()
         SettingsWindowController.shared.open()
     }
 
+    private enum RecordingMode {
+        case fullScreen, area
+    }
+
     @MainActor
-    private func startRecording() async {
+    private func startRecording(mode: RecordingMode = .fullScreen) async {
         do {
-            let started = try await ScreenRecordingManager.shared.startRecording()
+            let started: Bool
+            switch mode {
+            case .fullScreen:
+                started = try await ScreenRecordingManager.shared.startFullScreenRecording()
+            case .area:
+                started = try await ScreenRecordingManager.shared.startAreaRecording()
+            }
             if started {
                 RecordingStatusBarController.shared.show()
             }
@@ -325,6 +329,193 @@ struct TrayGridButton: View {
     }
 }
 
+// MARK: - Grid Menu (dropdown matching grid button style via NSMenu)
+
+struct TrayGridMenu: NSViewRepresentable {
+    let title: String
+    let icon: String
+    let menuItems: [TrayMenuItem]
+
+    func makeNSView(context: Context) -> TrayGridMenuButton {
+        let button = TrayGridMenuButton(title: title, icon: icon, menuItems: menuItems)
+        return button
+    }
+
+    func updateNSView(_ nsView: TrayGridMenuButton, context: Context) {
+        nsView.menuItems = menuItems
+    }
+}
+
+struct TrayMenuItem {
+    let title: String
+    let icon: String
+    let action: () -> Void
+    var isDestructive: Bool = false
+    var isSeparator: Bool = false
+    var isDisabled: Bool = false
+    var submenu: [TrayMenuItem]? = nil
+
+    static func separator() -> TrayMenuItem {
+        TrayMenuItem(title: "", icon: "", action: {}, isSeparator: true)
+    }
+}
+
+final class TrayGridMenuButton: NSView {
+    var menuItems: [TrayMenuItem]
+    private let titleText: String
+    private let iconName: String
+    private var isHovered = false
+    private var trackingArea: NSTrackingArea?
+
+    init(title: String, icon: String, menuItems: [TrayMenuItem]) {
+        self.titleText = title
+        self.iconName = icon
+        self.menuItems = menuItems
+        super.init(frame: .zero)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: NSView.noIntrinsicMetric, height: 32)
+    }
+
+    override func updateTrackingAreas() {
+        if let existing = trackingArea { removeTrackingArea(existing) }
+        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways], owner: self)
+        addTrackingArea(area)
+        trackingArea = area
+        super.updateTrackingAreas()
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        isHovered = true
+        needsDisplay = true
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        isHovered = false
+        needsDisplay = true
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        let menu = NSMenu()
+        for item in menuItems {
+            if item.isSeparator {
+                menu.addItem(.separator())
+                continue
+            }
+            if let submenuItems = item.submenu {
+                let parentItem = NSMenuItem(title: item.title, action: nil, keyEquivalent: "")
+                if let img = NSImage(systemSymbolName: item.icon, accessibilityDescription: nil) {
+                    parentItem.image = img
+                }
+                let sub = NSMenu()
+                for subItem in submenuItems {
+                    if subItem.isSeparator {
+                        sub.addItem(.separator())
+                        continue
+                    }
+                    let mi = NSMenuItem(title: subItem.title, action: #selector(menuAction(_:)), keyEquivalent: "")
+                    mi.target = self
+                    mi.representedObject = subItem.action
+                    if let img = NSImage(systemSymbolName: subItem.icon, accessibilityDescription: nil) {
+                        mi.image = img
+                    }
+                    if subItem.isDestructive {
+                        mi.attributedTitle = NSAttributedString(string: subItem.title, attributes: [.foregroundColor: NSColor.systemRed])
+                    }
+                    mi.isEnabled = !subItem.isDisabled
+                    sub.addItem(mi)
+                }
+                parentItem.submenu = sub
+                menu.addItem(parentItem)
+            } else {
+                let mi = NSMenuItem(title: item.title, action: #selector(menuAction(_:)), keyEquivalent: "")
+                mi.target = self
+                mi.representedObject = item.action
+                if let img = NSImage(systemSymbolName: item.icon, accessibilityDescription: nil) {
+                    mi.image = img
+                }
+                if item.isDestructive {
+                    mi.attributedTitle = NSAttributedString(string: item.title, attributes: [.foregroundColor: NSColor.systemRed])
+                }
+                mi.isEnabled = !item.isDisabled
+                menu.addItem(mi)
+            }
+        }
+        let point = NSPoint(x: 0, y: bounds.height + 4)
+        menu.popUp(positioning: nil, at: point, in: self)
+    }
+
+    @objc private func menuAction(_ sender: NSMenuItem) {
+        if let action = sender.representedObject as? () -> Void {
+            action()
+        }
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let bgColor: NSColor = isHovered
+            ? NSColor.labelColor.withAlphaComponent(0.15)
+            : NSColor.labelColor.withAlphaComponent(0.08)
+
+        let path = NSBezierPath(roundedRect: bounds, xRadius: 8, yRadius: 8)
+        bgColor.setFill()
+        path.fill()
+
+        let iconColor = NSColor.labelColor.withAlphaComponent(0.7)
+        let iconConfig = NSImage.SymbolConfiguration(pointSize: 12, weight: .medium)
+
+        let iconX: CGFloat = 8
+        let textX: CGFloat = 30
+        let chevronWidth: CGFloat = 20
+        let centerY = bounds.midY
+
+        if let img = NSImage(systemSymbolName: iconName, accessibilityDescription: nil)?
+            .withSymbolConfiguration(iconConfig) {
+            let tinted = tintImage(img, color: iconColor)
+            let imgSize = tinted.size
+            let imgRect = NSRect(x: iconX, y: centerY - imgSize.height / 2, width: imgSize.width, height: imgSize.height)
+            tinted.draw(in: imgRect)
+        }
+
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 12, weight: .medium),
+            .foregroundColor: NSColor.labelColor,
+        ]
+        let textSize = (titleText as NSString).size(withAttributes: attrs)
+        let textPoint = NSPoint(x: textX, y: centerY - textSize.height / 2)
+        (titleText as NSString).draw(at: textPoint, withAttributes: attrs)
+
+        let chevronColor = NSColor.labelColor.withAlphaComponent(0.25)
+        let chevronConfig = NSImage.SymbolConfiguration(pointSize: 8, weight: .bold)
+        if let chevron = NSImage(systemSymbolName: "chevron.down", accessibilityDescription: nil)?
+            .withSymbolConfiguration(chevronConfig) {
+            let tinted = tintImage(chevron, color: chevronColor)
+            let chevronSize = tinted.size
+            let chevronRect = NSRect(
+                x: bounds.maxX - chevronWidth,
+                y: centerY - chevronSize.height / 2,
+                width: chevronSize.width,
+                height: chevronSize.height
+            )
+            tinted.draw(in: chevronRect)
+        }
+    }
+
+    private func tintImage(_ image: NSImage, color: NSColor) -> NSImage {
+        let tinted = image.copy() as! NSImage
+        tinted.isTemplate = false
+        tinted.lockFocus()
+        color.set()
+        let rect = NSRect(origin: .zero, size: tinted.size)
+        rect.fill(using: .sourceAtop)
+        tinted.unlockFocus()
+        return tinted
+    }
+}
+
 // MARK: - Full Width Button
 
 private struct TrayFullWidthButton: View {
@@ -356,42 +547,6 @@ private struct TrayFullWidthButton: View {
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
-    }
-}
-
-// MARK: - Menu Label (matches grid button style)
-
-struct TrayMenuLabel: View {
-    let title: String
-    let icon: String
-
-    @State private var isHovered = false
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.primary.opacity(0.7))
-                .frame(width: 16)
-
-            Text(title)
-                .font(.system(size: 12, weight: .medium))
-                .lineLimit(1)
-
-            Spacer(minLength: 2)
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 8, weight: .bold))
-                .foregroundStyle(.primary.opacity(0.25))
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isHovered ? Color.primary.opacity(0.15) : Color.primary.opacity(0.08))
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .onHover { isHovered = $0 }
     }
 }
