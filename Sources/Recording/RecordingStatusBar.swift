@@ -1,135 +1,111 @@
 import SwiftUI
 
 struct RecordingStatusBarView: View {
-    let recorder = ScreenRecordingManager.shared
+    @State private var recorder = ScreenRecordingManager.shared
     @State private var isPulsing = false
 
     private var isPaused: Bool { recorder.state == .paused }
 
     var body: some View {
         HStack(spacing: 0) {
-            // Recording indicator + timer
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Circle()
-                    .fill(isPaused ? .orange : .red)
-                    .frame(width: 10, height: 10)
-                    .shadow(color: (isPaused ? Color.orange : Color.red).opacity(0.5), radius: isPulsing ? 6 : 2)
+                    .fill(isPaused ? Color.orange : Color.red)
+                    .frame(width: 8, height: 8)
+                    .shadow(color: (isPaused ? Color.orange : Color.red).opacity(0.5), radius: isPulsing ? 4 : 1)
                     .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: isPulsing)
                     .onAppear { isPulsing = true }
 
                 Text(formatTime(recorder.elapsedSeconds))
-                    .font(.system(size: 18, weight: .medium, design: .monospaced))
+                    .font(.system(size: 13, weight: .medium, design: .monospaced))
                     .monospacedDigit()
-                    .foregroundStyle(.white)
+                    .foregroundColor(.white)
                     .contentTransition(.numericText())
-
-                if isPaused {
-                    Text("PAUSED")
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(1)
-                        .foregroundStyle(.orange)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(.orange.opacity(0.15), in: Capsule())
-                }
+                    .animation(.default, value: recorder.elapsedSeconds)
             }
-            .padding(.leading, 18)
-            .padding(.trailing, 14)
+            .padding(.leading, 14)
+            .padding(.trailing, 10)
 
-            // Separator
-            RoundedRectangle(cornerRadius: 0.5)
-                .fill(.white.opacity(0.1))
-                .frame(width: 1, height: 24)
+            Rectangle()
+                .fill(Color.white.opacity(0.15))
+                .frame(width: 1, height: 18)
 
-            // Controls
-            HStack(spacing: 4) {
-                // Pause / Resume
-                pillButton(
-                    icon: isPaused ? "play.fill" : "pause.fill",
-                    label: isPaused ? "Resume" : "Pause",
-                    color: .white
-                ) {
+            HStack(spacing: 2) {
+                iconButton(icon: isPaused ? "play.fill" : "pause.fill") {
                     recorder.togglePause()
                 }
 
-                // Stop
-                pillButton(
-                    icon: "stop.fill",
-                    label: "Stop",
-                    color: .red
-                ) {
+                iconButton(icon: "stop.fill", tint: .red) {
                     Task {
                         RecordingStatusBarController.shared.dismiss()
                         if let url = await recorder.stopRecording() {
                             let record = HistoryStore.shared.importCapture(from: url, deleteSource: true, kind: .recording)
                             if let record {
                                 let storeURL = HistoryStore.shared.urlForRecord(record)
-                                if let exportedURL = await VideoEditorModel.autoExportWithDefaults(url: storeURL) {
-                                    HistoryStore.shared.setBeautifiedPath(exportedURL.path, for: record.id)
-                                    PreviewOverlay.shared.show(url: exportedURL)
-                                } else {
-                                    PreviewOverlay.shared.show(url: storeURL)
-                                }
+                                PreviewOverlay.shared.show(url: storeURL)
                             }
                         }
                     }
                 }
 
-                // Discard
-                pillButton(
-                    icon: "trash",
-                    label: "Discard",
-                    color: .white.opacity(0.5)
-                ) {
+                iconButton(icon: "arrow.counterclockwise") {
+                    Task {
+                        await recorder.cancelRecording()
+                        let started = try? await recorder.startRecording()
+                        if started != true {
+                            RecordingStatusBarController.shared.dismiss()
+                        }
+                    }
+                }
+
+                iconButton(icon: "xmark") {
                     Task {
                         RecordingStatusBarController.shared.dismiss()
                         await recorder.cancelRecording()
                     }
                 }
             }
-            .padding(.horizontal, 10)
+            .padding(.leading, 6)
+            .padding(.trailing, 8)
         }
-        .frame(height: 48)
-        .background {
+        .fixedSize()
+        .frame(height: 40)
+        .background(
             Capsule()
-                .fill(.black.opacity(0.7))
-                .background(.ultraThinMaterial, in: Capsule())
-                .shadow(color: .black.opacity(0.3), radius: 16, y: 4)
-                .shadow(color: .black.opacity(0.1), radius: 4, y: 1)
-        }
+                .fill(Color(white: 0.1))
+                .shadow(color: .black.opacity(0.4), radius: 10, y: 3)
+        )
     }
 
-    private func pillButton(icon: String, label: String, color: Color, action: @escaping () -> Void) -> some View {
+    private func iconButton(icon: String, tint: Color = Color.white.opacity(0.85), action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 5) {
-                Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
-                Text(label)
-                    .font(.system(size: 12, weight: .medium))
-            }
-            .foregroundStyle(color)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .contentShape(Capsule())
-            .background(
-                Capsule()
-                    .fill(.white.opacity(0.08))
-            )
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(tint)
+                .frame(width: 30, height: 30)
+                .contentShape(Circle())
         }
-        .buttonStyle(.plain)
-        .onHover { hovering in
-            if hovering {
-                NSCursor.pointingHand.push()
-            } else {
-                NSCursor.pop()
-            }
-        }
+        .buttonStyle(RecordingIconButtonStyle())
     }
 
     private func formatTime(_ seconds: Int) -> String {
         let m = seconds / 60
         let s = seconds % 60
         return String(format: "%02d:%02d", m, s)
+    }
+}
+
+private struct RecordingIconButtonStyle: ButtonStyle {
+    @State private var isHovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                Circle()
+                    .fill(Color.white.opacity(isHovered ? 0.12 : 0))
+            )
+            .scaleEffect(configuration.isPressed ? 0.9 : 1)
+            .onHover { isHovered = $0 }
     }
 }
 
@@ -142,8 +118,14 @@ final class RecordingStatusBarController {
 
     func show(on preferredScreen: NSScreen? = nil) {
         if panel == nil {
+            let rootView = RecordingStatusBarView()
+                .environment(\.colorScheme, .dark)
+
+            let hostingView = NSHostingView(rootView: rootView)
+            hostingView.setFrameSize(hostingView.fittingSize)
+
             let panel = NSPanel(
-                contentRect: NSRect(x: 0, y: 0, width: 420, height: 56),
+                contentRect: NSRect(origin: .zero, size: hostingView.fittingSize),
                 styleMask: [.borderless, .nonactivatingPanel],
                 backing: .buffered,
                 defer: false
@@ -156,7 +138,7 @@ final class RecordingStatusBarController {
             panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             panel.isMovableByWindowBackground = true
             panel.sharingType = .none
-            panel.contentView = NSHostingView(rootView: RecordingStatusBarView())
+            panel.contentView = hostingView
             self.panel = panel
         }
 

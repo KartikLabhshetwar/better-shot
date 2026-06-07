@@ -302,30 +302,6 @@ final class VideoEditorModel {
         }
     }
 
-    static func autoExportWithDefaults(url: URL) async -> URL? {
-        let model = VideoEditorModel()
-        model.sourceURL = url
-        model.config = AppPreferences.defaultBeautifierConfig
-
-        let asset = AVURLAsset(url: url)
-        guard let dur = try? await asset.load(.duration) else { return nil }
-        model.duration = dur.seconds
-        model.trimEnd = dur.seconds
-
-        if let track = try? await asset.loadTracks(withMediaType: .video).first {
-            if let size = try? await track.load(.naturalSize),
-               let transform = try? await track.load(.preferredTransform) {
-                let transformed = size.applying(transform)
-                model.videoWidth = Int(abs(transformed.width))
-                model.videoHeight = Int(abs(transformed.height))
-            }
-        }
-
-        let result = await model.exportTrimmed()
-        model.cleanup()
-        return result
-    }
-
     func cleanup() {
         player?.pause()
         if let observer = timeObserver {
