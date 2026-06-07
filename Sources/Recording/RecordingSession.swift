@@ -67,18 +67,23 @@ final class RecordingSession: @unchecked Sendable {
     }
 
     func appendVideoSample(_ sampleBuffer: CMSampleBuffer) {
+        let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        let shouldStartSession: Bool
+
         lock.lock()
         guard _isCapturing else { lock.unlock(); return }
-
-        let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-
         if !_sessionStarted {
             _firstTimestamp = timestamp
             _sessionStarted = true
+            shouldStartSession = true
+        } else {
+            shouldStartSession = false
+        }
+        lock.unlock()
+
+        if shouldStartSession {
             writer.startSession(atSourceTime: timestamp)
         }
-
-        lock.unlock()
 
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer),
               videoInput.isReadyForMoreMediaData else { return }

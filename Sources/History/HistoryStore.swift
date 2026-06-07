@@ -25,8 +25,12 @@ final class HistoryStore {
 
     func importCapture(from tempURL: URL, deleteSource: Bool = true, kind: CaptureKind = .screenshot) -> CaptureRecord? {
         let ext = tempURL.pathExtension.isEmpty ? "png" : tempURL.pathExtension
-        let filename = "bettershot_\(Int(Date().timeIntervalSince1970 * 1000)).\(ext)"
-        let destURL = storageDir.appendingPathComponent(filename)
+        var filename = "bettershot_\(Int(Date().timeIntervalSince1970 * 1000)).\(ext)"
+        var destURL = storageDir.appendingPathComponent(filename)
+        if FileManager.default.fileExists(atPath: destURL.path) {
+            filename = "bettershot_\(Int(Date().timeIntervalSince1970 * 1000))_\(UUID().uuidString.prefix(6)).\(ext)"
+            destURL = storageDir.appendingPathComponent(filename)
+        }
 
         do {
             try FileManager.default.copyItem(at: tempURL, to: destURL)
@@ -122,6 +126,12 @@ final class HistoryStore {
     func deleteRecord(_ record: CaptureRecord) {
         let url = urlForRecord(record)
         try? FileManager.default.removeItem(at: url)
+        if let beautifiedPath = record.beautifiedPath {
+            let beautifiedURL = URL(fileURLWithPath: beautifiedPath)
+            try? FileManager.default.removeItem(at: beautifiedURL)
+            let baseURL = CaptureOrchestrator.baseImageURL(for: beautifiedURL)
+            try? FileManager.default.removeItem(at: baseURL)
+        }
         records.removeAll { $0.id == record.id }
         saveRecords()
     }
@@ -130,6 +140,12 @@ final class HistoryStore {
         for record in records {
             let url = urlForRecord(record)
             try? FileManager.default.removeItem(at: url)
+            if let beautifiedPath = record.beautifiedPath {
+                let beautifiedURL = URL(fileURLWithPath: beautifiedPath)
+                try? FileManager.default.removeItem(at: beautifiedURL)
+                let baseURL = CaptureOrchestrator.baseImageURL(for: beautifiedURL)
+                try? FileManager.default.removeItem(at: baseURL)
+            }
         }
         records.removeAll()
         saveRecords()

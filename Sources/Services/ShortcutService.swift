@@ -8,7 +8,12 @@ final class ShortcutService {
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    private static var cachedShortcuts: [(Action, Shortcut)] = []
+    private static let shortcutLock = NSLock()
+    private static var _cachedShortcuts: [(Action, Shortcut)] = []
+    private static var cachedShortcuts: [(Action, Shortcut)] {
+        get { shortcutLock.withLock { _cachedShortcuts } }
+        set { shortcutLock.withLock { _cachedShortcuts = newValue } }
+    }
 
     var isRegistered: Bool { eventTap != nil }
 

@@ -39,6 +39,7 @@ final class PreviewOverlay {
         dismissTask = nil
 
         panel?.orderOut(nil)
+        panel = nil
         isVisible = false
         currentURL = nil
     }

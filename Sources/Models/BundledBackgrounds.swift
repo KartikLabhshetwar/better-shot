@@ -22,12 +22,17 @@ enum BundledBackgrounds {
 
     final class ImageCache: @unchecked Sendable {
         static let shared = ImageCache()
+        private let lock = NSLock()
         private var cache: [String: NSImage] = [:]
 
         func image(for asset: ImageAsset) -> NSImage? {
-            if let cached = cache[asset.id] { return cached }
+            lock.lock()
+            if let cached = cache[asset.id] { lock.unlock(); return cached }
+            lock.unlock()
             guard let url = asset.url, let img = NSImage(contentsOf: url) else { return nil }
+            lock.lock()
             cache[asset.id] = img
+            lock.unlock()
             return img
         }
     }

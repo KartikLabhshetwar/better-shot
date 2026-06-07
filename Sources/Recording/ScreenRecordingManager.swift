@@ -194,7 +194,7 @@ final class ScreenRecordingManager: NSObject {
     // MARK: - Stop
 
     func stopRecording() async -> URL? {
-        guard isRecording else { return nil }
+        guard isRecording, state != .stopping else { return nil }
         state = .stopping
         stopTimer()
 
@@ -244,7 +244,7 @@ final class ScreenRecordingManager: NSObject {
     // MARK: - Cancel
 
     func cancelRecording() async {
-        guard isRecording || state == .preparing else { return }
+        guard (isRecording || state == .preparing) && state != .stopping else { return }
         stopTimer()
         session?.isCapturing = false
 

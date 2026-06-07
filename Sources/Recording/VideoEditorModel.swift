@@ -338,8 +338,9 @@ final class VideoEditorModel {
     // MARK: - Private
 
     private func setupTimeObserver() {
+        guard let player else { return }
         let interval = CMTime(value: 1, timescale: 30)
-        timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+        timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             Task { @MainActor in
                 guard let self else { return }
                 self.currentTime = time.seconds
@@ -353,7 +354,7 @@ final class VideoEditorModel {
     }
 
     private func generateThumbnails() {
-        guard let sourceURL else { return }
+        guard let sourceURL, duration > 0 else { return }
         let asset = AVURLAsset(url: sourceURL)
         let generator = AVAssetImageGenerator(asset: asset)
         generator.maximumSize = CGSize(width: 120, height: 68)
@@ -362,7 +363,7 @@ final class VideoEditorModel {
         let count = 20
         let step = duration / Double(count)
 
-        Task.detached {
+        Task.detached { [weak self] in
             var images: [NSImage] = []
             for i in 0..<count {
                 let time = CMTime(seconds: step * Double(i), preferredTimescale: 600)
@@ -370,7 +371,7 @@ final class VideoEditorModel {
                     images.append(NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height)))
                 }
             }
-            await MainActor.run { self.thumbnails = images }
+            await MainActor.run { self?.thumbnails = images }
         }
     }
 

@@ -171,5 +171,6 @@ final class RecordingStatusBarController {
 
     func dismiss() {
         panel?.orderOut(nil)
+        panel = nil
     }
 }

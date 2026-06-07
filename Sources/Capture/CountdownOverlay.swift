@@ -40,7 +40,6 @@ final class CountdownOverlay {
 
     private var panel: NSPanel?
     private var model: CountdownModel?
-    private var activeCountdownTask: Task<Void, Never>?
 
     private init() {}
 
@@ -49,7 +48,6 @@ final class CountdownOverlay {
     func showCountdown(seconds: Int) async {
         guard seconds > 0 else { return }
 
-        activeCountdownTask?.cancel()
         dismiss()
 
         let countdownModel = CountdownModel()
@@ -58,27 +56,21 @@ final class CountdownOverlay {
         createPanel(model: countdownModel)
         panel?.orderFront(nil)
 
-        let task = Task { @MainActor in
-            for tick in stride(from: seconds, through: 1, by: -1) {
-                guard !Task.isCancelled else { return }
-                countdownModel.currentNumber = tick
-                countdownModel.scale = 1.0
-                countdownModel.opacity = 1.0
+        for tick in stride(from: seconds, through: 1, by: -1) {
+            countdownModel.currentNumber = tick
+            countdownModel.scale = 1.0
+            countdownModel.opacity = 1.0
 
-                withAnimation(.easeIn(duration: 0.8)) {
-                    countdownModel.scale = 0.6
-                    countdownModel.opacity = 0.0
-                }
-
-                try? await Task.sleep(for: .milliseconds(1000))
+            withAnimation(.easeIn(duration: 0.8)) {
+                countdownModel.scale = 0.6
+                countdownModel.opacity = 0.0
             }
 
-            guard !Task.isCancelled else { return }
-            try? await Task.sleep(for: .milliseconds(100))
-            dismiss()
+            try? await Task.sleep(for: .milliseconds(1000))
         }
-        activeCountdownTask = task
-        await task.value
+
+        try? await Task.sleep(for: .milliseconds(100))
+        dismiss()
     }
 
     func dismiss() {
@@ -90,7 +82,7 @@ final class CountdownOverlay {
     // MARK: - Private
 
     private func createPanel(model: CountdownModel) {
-        let screen = NSScreen.main ?? NSScreen.screens[0]
+        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
         let frame = screen.frame
 
         let newPanel = NSPanel(
