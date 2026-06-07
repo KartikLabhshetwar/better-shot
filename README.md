@@ -16,10 +16,19 @@ An open-source alternative to CleanShot X. Native Swift app for macOS — fast, 
 | Region screenshot | `⌘⇧4` |
 | Fullscreen screenshot | `⌘⇧3` |
 | Window screenshot | `⌘⇧5` |
+| Record screen | `⌘⇧2` |
 | OCR text + QR/barcode scan | `⌘⇧O` |
 | Color picker (hex) | `⌘⇧C` |
 
 Region, fullscreen, and window capture all use the native macOS `screencapture` CLI for maximum reliability. OCR extracts text and detects QR codes/barcodes in a single pass. Color picker samples any on-screen pixel and copies the hex value. All shortcuts are customizable in Settings > Capture.
+
+### Screen Recording
+
+- **Record full screen** — Capture your entire display as a MOV video with ScreenCaptureKit
+- **Record a window** — Hover-and-click to select a specific window, same UX as window screenshots
+- **Floating status bar** — Timer, pause/resume, stop, and discard controls
+- **Video editor** — Trim, add padding, corner radius, shadow, and background (solid, gradient, wallpaper, custom image)
+- **Configurable** — FPS (24/30/60), show cursor, capture audio in Settings > Recording
 
 ### Beautify
 
@@ -35,11 +44,13 @@ Rectangles, filled rectangles, ellipses, lines, curved arrows, freehand, text, n
 
 ### Workflow
 
-- **Click-to-edit** — Click the floating preview to open the editor
+- **Click-to-edit** — Click the floating preview to open the editor (image or video)
+- **Drag-to-app** — Drag from the preview panel directly into Figma, Slack, or any app
 - **Pin screenshots** — Pin any capture as an always-on-top floating window, unpin all from the menu bar
-- **Auto-apply** — Automatically apply your default background on every capture
+- **Auto-apply** — Automatically apply your default background on every capture and recording
 - **Self-timer** — Countdown overlay before capture (3s, 5s, 10s)
-- **Capture history** — Browse and re-open past captures from the menu bar or Settings
+- **Capture history** — Separate tabs for screenshots and recordings in Settings
+- **Recent menu** — Quick access to recent screenshots and recordings from the menu bar
 - **Toast notifications** — Confirmation toasts for OCR, color picker, and gallery saves
 - **In-app updates** — Check, download, and install updates without leaving the app
 - **Configurable overlay** — Choose preview position and auto-dismiss timing
@@ -112,9 +123,11 @@ Screen Recording lets the app capture your screen. Accessibility lets it overrid
 
 Open from the menu bar > **Settings** (or `⌘,`).
 
-- **General** — Save location, clipboard behavior, default effects with live preview (padding, radius, shadow, background including macOS wallpapers and custom images), export format
-- **Capture** — Self-timer delay, keyboard shortcuts (click any shortcut to re-record it), overlay position and dismiss timing
-- **History** — Browse and delete past captures
+- **General** — Save location, clipboard behavior, appearance, default effects with live preview (padding, radius, shadow, background including macOS wallpapers and custom images), export format
+- **Capture** — Self-timer delay, keyboard shortcuts (click any shortcut to re-record it, including record screen), overlay position and dismiss timing
+- **Recording** — FPS (24/30/60), show cursor, capture audio, open editor after recording
+- **History** — Browse and delete past screenshots
+- **Videos** — Browse and delete past recordings, open in video editor
 - **About** — Version info, in-app update checker, project links (GitHub, X)
 
 ## Make commands
@@ -139,6 +152,8 @@ Native Swift 6 / SwiftUI. No Electron, no web views, no external dependencies.
 | CoreGraphics | Image compositing, annotation rendering, beautifier pipeline |
 | CoreImage | Gaussian blur for redaction |
 | Vision | OCR text extraction + QR/barcode detection |
+| ScreenCaptureKit | Screen and window recording |
+| AVFoundation | Video editing, trimming, effect compositing via AVMutableVideoComposition |
 | AppKit | Color sampling, floating panels, pinned windows, capture via CLI |
 | Carbon | Global keyboard shortcuts via CGEvent tap |
 

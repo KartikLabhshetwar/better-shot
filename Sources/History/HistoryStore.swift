@@ -36,8 +36,15 @@ final class HistoryStore {
         }
 
         var width = 0, height = 0
-        if let source = CGImageSourceCreateWithURL(destURL as CFURL, nil),
-           let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] {
+        if kind == .recording {
+            let asset = AVURLAsset(url: destURL)
+            if let track = asset.tracks(withMediaType: .video).first {
+                let size = track.naturalSize.applying(track.preferredTransform)
+                width = Int(abs(size.width))
+                height = Int(abs(size.height))
+            }
+        } else if let source = CGImageSourceCreateWithURL(destURL as CFURL, nil),
+                  let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] {
             width = props[kCGImagePropertyPixelWidth] as? Int ?? 0
             height = props[kCGImagePropertyPixelHeight] as? Int ?? 0
         }

@@ -9,13 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Screen recording**: Record your screen as MOV video with ScreenCaptureKit. Includes a floating status bar with timer, pause/resume, stop, and discard controls. Access via the new "Record" button in the menu bar
+- **Screen recording**: Record your screen as MOV video with ScreenCaptureKit. Includes a floating status bar with timer, pause/resume, stop, and discard controls. Access via the new "Record" button in the menu bar or `⌘⇧2`
+- **Window recording**: Record a specific window. Uses the same hover-and-click window picker as window screenshots. Access via the "Record Window" button in the menu bar
+- **Video editor with effects**: Full video editor with padding, corner radius, shadow, and background picker (solid colors, gradients, macOS wallpapers, custom images) — matching the image editor's inspector sidebar. Trim timeline with thumbnail strip, transport controls, and export with effects baked in
+- **Recording settings tab**: Dedicated settings panel for recording preferences — FPS (24/30/60), show cursor, capture audio, and open editor after recording toggles
+- **Record Screen keyboard shortcut** (`⌘⇧2`): Configurable global hotkey for screen recording, shown in Capture settings alongside screenshot shortcuts
+- **Separate History and Videos tabs**: Screenshots and recordings are now in separate tabs in Settings. History shows only screenshots, Videos shows only recordings — each with their own clear button and appropriate actions (preview for screenshots, open in editor for recordings)
+- **Preview panel for recordings**: After stopping a recording, the floating preview overlay appears (same as screenshots). Click it to open the video editor
+- **Drag-to-app from preview**: Dragging from the floating preview card now provides the actual file URL, enabling drop into apps like Figma, Slack, and Finder
 - **App appearance setting**: Choose between System, Light, and Dark mode in Settings > General > Appearance. The app no longer forces light mode — respects your macOS setting by default
-- **Clear All captures**: Added "Clear All" button to both the Recent menu in the menu bar and the History tab in Settings, allowing deletion of all capture history at once (closes #63)
+- **Recent menu with sub-menus**: Single "Recent" button in the menu bar with nested "Screenshots" and "Recordings" sub-menus, each with their own clear option
 
 ### Fixed
 
 - **Duplicate file on Desktop**: Screenshots no longer create a visible `.base` companion file on the Desktop. The raw source image used for re-editing is now stored internally in Application Support, so only the beautified screenshot appears in the save directory
+- **Video export missing background**: Background was invisible in exported videos because `AVMutableVideoCompositionInstruction.backgroundColor` defaulted to opaque black, covering the background layer. Fixed by setting it to clear and applying corner radius via `CAShapeLayer` mask on the video layer
+- **Video editor not loading default effects**: Video editor now loads user-configured defaults from `AppPreferences.defaultBeautifierConfig` on open, matching the image editor behavior
+- **Window recording not working**: The app runs as `.accessory` (menu bar only), preventing the window picker overlay from receiving mouse events. Fixed by temporarily switching to `.regular` activation policy during window selection
+- **Preview pin button position**: Moved the pin button from bottom-left (next to pencil) to bottom-right corner of the preview overlay
 
 ### Changed
 

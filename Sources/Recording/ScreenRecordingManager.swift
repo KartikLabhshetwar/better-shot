@@ -87,11 +87,17 @@ final class ScreenRecordingManager: NSObject {
             return false
         }
 
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+
         let picker = WindowPickerOverlay(windows: eligibleWindows)
         guard let selectedWindow = await picker.pickWindow() else {
+            NSApp.setActivationPolicy(.accessory)
             state = .idle
             return false
         }
+
+        NSApp.setActivationPolicy(.accessory)
 
         let filter = SCContentFilter(desktopIndependentWindow: selectedWindow)
         let captureWidth = Int(selectedWindow.frame.width) * 2

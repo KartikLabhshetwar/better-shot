@@ -3,11 +3,13 @@ import Link from "next/link"
 import { ArrowUpRight } from "lucide-react"
 import { DownloadDropdown } from "@/components/download-dropdown"
 import { getLatestRelease } from "@/lib/downloads"
+import { getChangelog } from "@/lib/changelog"
 import { StarCount } from "@/components/star-count"
 import { EditorPreview } from "@/components/editor-demo"
 
 export default async function Home() {
   const release = await getLatestRelease()
+  const changelog = getChangelog()
 
   return (
     <div className="min-h-screen w-full bg-[#fafaf9] text-[#111] selection:bg-[#e78a53]/20">
@@ -49,7 +51,7 @@ export default async function Home() {
           </h1>
 
           <p className="text-center text-[15px] leading-[1.7] text-[#111]/40 mt-5 max-w-[400px] text-pretty">
-            Capture, annotate, beautify. A local-first screenshot tool for macOS — no account, no cloud, no tracking.
+            Capture, record, annotate, beautify. A local-first screenshot &amp; recording tool for macOS — no account, no cloud, no tracking.
           </p>
 
           <div className="flex items-center gap-3 mt-10">
@@ -85,7 +87,7 @@ export default async function Home() {
         <section className="max-w-[960px] mx-auto px-6 pb-28">
           <div className="border-t border-[#111]/[0.06]" />
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-0 divide-y md:divide-y-0 md:divide-x divide-[#111]/[0.06]">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-0 divide-y md:divide-y-0 md:divide-x divide-[#111]/[0.06]">
             <Feature
               title="Capture"
               items={[
@@ -94,6 +96,16 @@ export default async function Home() {
                 "Color picker (hex to clipboard)",
                 "Self-timer countdown (3s/5s/10s)",
                 "Customizable keyboard shortcuts",
+              ]}
+            />
+            <Feature
+              title="Record"
+              items={[
+                "Full screen or single window",
+                "Hover-and-click window picker",
+                "Pause, resume, discard controls",
+                "Configurable FPS (24/30/60)",
+                "Optional cursor & audio capture",
               ]}
             />
             <Feature
@@ -109,11 +121,11 @@ export default async function Home() {
             <Feature
               title="Beautify"
               items={[
-                "12 solid colors, 16 gradient presets",
+                "Works on screenshots & recordings",
+                "Backgrounds, padding, shadow, radius",
                 "Bundled macOS wallpapers",
-                "Padding, shadow, corner radius",
-                "Aspect ratio & 9-point alignment",
-                "Export as PNG or JPEG",
+                "Video editor with trim timeline",
+                "Export as PNG, JPEG, or MOV",
               ]}
             />
           </div>
@@ -121,11 +133,13 @@ export default async function Home() {
 
         {/* Workflow extras */}
         <section className="max-w-[960px] mx-auto px-6 pb-20">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
             {[
               { label: "Click-to-edit", desc: "Floating preview opens the editor" },
               { label: "Pin screenshots", desc: "Always-on-top floating windows" },
-              { label: "Capture history", desc: "Browse and re-open past captures" },
+              { label: "Drag-to-app", desc: "Drag from preview into Figma, Slack, etc." },
+              { label: "Video editor", desc: "Trim, beautify, and export recordings" },
+              { label: "Capture history", desc: "Separate tabs for screenshots & videos" },
               { label: "In-app updates", desc: "Download and install without leaving the app" },
             ].map((item) => (
               <div key={item.label} className="text-center">
@@ -145,8 +159,45 @@ export default async function Home() {
             <Shortcut label="Capture region" keys={["⌘", "⇧", "4"]} />
             <Shortcut label="Capture screen" keys={["⌘", "⇧", "3"]} />
             <Shortcut label="Capture window" keys={["⌘", "⇧", "5"]} />
+            <Shortcut label="Record screen" keys={["⌘", "⇧", "2"]} />
             <Shortcut label="OCR + QR scan" keys={["⌘", "⇧", "O"]} />
             <Shortcut label="Color picker" keys={["⌘", "⇧", "C"]} />
+          </div>
+        </section>
+
+        {/* Changelog */}
+        <section className="max-w-[640px] mx-auto px-6 pb-28">
+          <h2 className="text-[13px] font-medium text-[#111]/20 tracking-wide uppercase text-center mb-8">
+            Changelog
+          </h2>
+          <div className="space-y-10">
+            {changelog.map((ver) => (
+              <div key={ver.version}>
+                <div className="flex items-baseline justify-between mb-4 pb-3 border-b border-[#111]/[0.06]">
+                  <span className="text-[13px] font-semibold text-[#111]/60 tracking-[-0.01em]">
+                    v{ver.version}
+                  </span>
+                  <span className="text-[11px] text-[#111]/25 font-mono">{ver.date}</span>
+                </div>
+                <div className="space-y-5">
+                  {ver.sections.map((section) => (
+                    <div key={section.label}>
+                      <p className="text-[11px] font-medium text-[#111]/30 uppercase tracking-wide mb-2">
+                        {section.label}
+                      </p>
+                      <ul className="space-y-1.5">
+                        {section.items.map((item, i) => (
+                          <li key={i} className="flex items-start gap-2.5">
+                            <span className="mt-[7px] h-1 w-1 rounded-full bg-[#111]/15 shrink-0" />
+                            <span className="text-[13px] leading-[1.6] text-[#111]/35">{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </section>
 

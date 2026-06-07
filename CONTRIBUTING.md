@@ -50,6 +50,7 @@ Sources/
   Models/                Data types: annotations, backgrounds, preferences, config
   Preview/               Floating preview overlay and pinned screenshots
   History/               Capture history (JSON in Application Support)
+  Recording/             Screen/window recording, video editor, trim timeline, effects export
   Services/              Beautifier renderer, keyboard shortcuts, app updater
   Settings/              Preferences window (sidebar navigation) and settings window controller
   Views/                 Menu bar popover, toast notifications
@@ -71,8 +72,12 @@ Resources/
 | `BeautifierRenderer.swift` | Composites background + shadow + radius + annotations |
 | `CaptureOrchestrator.swift` | Coordinates capture pipeline: capture > sound > history > preview |
 | `ShortcutService.swift` | Global keyboard shortcuts via CGEvent tap |
-| `PreviewOverlay.swift` | Floating preview card after capture |
-| `PreferencesView.swift` | Settings window with sidebar navigation |
+| `PreviewOverlay.swift` | Floating preview card after capture (screenshots and recordings) |
+| `ScreenRecordingManager.swift` | Screen and window recording via ScreenCaptureKit |
+| `VideoEditorModel.swift` | Video editor state: trim, effects config, export with AVMutableVideoComposition |
+| `VideoEditorView.swift` | Video editor UI: inspector sidebar, preview, timeline, transport controls |
+| `RecordingStatusBar.swift` | Floating recording status bar with timer, pause, stop, discard |
+| `PreferencesView.swift` | Settings window with sidebar navigation (General, Capture, Recording, History, Videos, About) |
 | `SettingsWindowController.swift` | Creates and manages the settings NSWindow (mirrors EditorWindowController) |
 | `MenuBarPopoverController.swift` | Custom NSPanel-based menu bar popover with arrow and click-outside dismiss |
 | `ToastWindow.swift` | Floating toast notifications (save confirmation, OCR/color picker feedback) |
@@ -92,6 +97,21 @@ User presses ⌘⇧4
   → User clicks preview → EditorWindowController.open()
 ```
 
+### Recording flow
+
+```
+User presses ⌘⇧2 (or clicks Record / Record Window)
+  → ShortcutService (CGEvent tap intercepts the keypress)
+  → ScreenRecordingManager.startRecording() (full screen)
+     or .startWindowRecording() (hover-and-click window picker)
+  → RecordingStatusBarController.show() (floating status bar)
+  → User clicks stop → HistoryStore.importCapture(kind: .recording)
+  → PreviewOverlay.show() (floating card with play icon)
+  → User clicks preview → VideoEditorWindowController.open()
+  → User edits effects → VideoEditorModel.exportWithEffects()
+     (AVMutableVideoComposition + Core Animation layers)
+```
+
 ### Editor flow
 
 ```
@@ -106,7 +126,7 @@ Annotations use **normalized coordinates** (0.0 to 1.0) so they're resolution-in
 
 ### Settings
 
-The settings window is managed by `SettingsWindowController`, which creates an `NSWindow` hosting `PreferencesView` in an `NSHostingView`. This mirrors the `EditorWindowController` pattern. The view uses a sidebar list (General, Capture, History, About) and a content panel. Preferences are stored via `@AppStorage` and the centralized `AppPreferences` enum.
+The settings window is managed by `SettingsWindowController`, which creates an `NSWindow` hosting `PreferencesView` in an `NSHostingView`. This mirrors the `EditorWindowController` pattern. The view uses a sidebar list (General, Capture, Recording, History, Videos, About) and a content panel. Preferences are stored via `@AppStorage` and the centralized `AppPreferences` enum. Screenshots and recordings have separate history tabs — History shows only screenshots, Videos shows only recordings.
 
 ### Menu bar
 

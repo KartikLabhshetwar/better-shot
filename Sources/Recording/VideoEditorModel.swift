@@ -22,6 +22,11 @@ final class VideoEditorModel {
 
     var sourceURL: URL?
 
+    var isCropping = false
+    var cropRect = CGRect(x: 0, y: 0, width: 1, height: 1)
+
+    var hasCrop: Bool { cropRect != CGRect(x: 0, y: 0, width: 1, height: 1) }
+
     private var timeObserver: Any?
 
     var trimmedDuration: Double { trimEnd - trimStart }
@@ -31,6 +36,7 @@ final class VideoEditorModel {
 
     func loadVideo(from url: URL) {
         sourceURL = url
+        config = AppPreferences.defaultBeautifierConfig
         let asset = AVURLAsset(url: url)
         let item = AVPlayerItem(asset: asset)
         player = AVPlayer(playerItem: item)
@@ -88,6 +94,8 @@ final class VideoEditorModel {
         if currentTime < trimStart { seekTo(trimStart) }
     }
 
+    func resetCrop() { cropRect = CGRect(x: 0, y: 0, width: 1, height: 1) }
+
     func setTrimEnd(_ value: Double) {
         trimEnd = min(duration, max(value, trimStart + 1.0))
         if currentTime > trimEnd { seekTo(trimEnd) }
@@ -109,7 +117,7 @@ final class VideoEditorModel {
 
         let hasEffects = exportConfig.padding > 0 || exportConfig.cornerRadius > 0 || exportConfig.shadowStrength > 0 || exportConfig.style != .none
 
-        if hasEffects {
+        if hasEffects || hasCrop {
             return await exportWithEffects(asset: asset, outputURL: outputURL, config: exportConfig)
         }
 
@@ -138,8 +146,15 @@ final class VideoEditorModel {
         let naturalSize = (try? await videoTrack.load(.naturalSize)) ?? CGSize(width: 1920, height: 1080)
         let transform = (try? await videoTrack.load(.preferredTransform)) ?? .identity
         let transformed = naturalSize.applying(transform)
-        let vidW = abs(transformed.width)
-        let vidH = abs(transformed.height)
+        let fullW = abs(transformed.width)
+        let fullH = abs(transformed.height)
+
+        let vidW = fullW * cropRect.width
+        let vidH = fullH * cropRect.height
+        let cropOffsetX = fullW * cropRect.origin.x
+        // AVFoundation renders with a flipped Y axis, so the crop Y offset is
+        // measured from the bottom of the frame.
+        let cropOffsetY = fullH * (1.0 - cropRect.origin.y - cropRect.height)
 
         let shortEdge = min(vidW, vidH)
         let pad = shortEdge * config.padding
@@ -173,11 +188,12 @@ final class VideoEditorModel {
 
         let instruction = AVMutableVideoCompositionInstruction()
         instruction.timeRange = CMTimeRange(start: .zero, duration: composition.duration)
+        instruction.backgroundColor = CGColor.clear
 
         let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: compVideoTrack)
 
         var finalTransform = transform
-        finalTransform = finalTransform.concatenating(CGAffineTransform(translationX: pad, y: pad))
+        finalTransform = finalTransform.concatenating(CGAffineTransform(translationX: -cropOffsetX + pad, y: -cropOffsetY + pad))
         layerInstruction.setTransform(finalTransform, at: .zero)
 
         instruction.layerInstructions = [layerInstruction]
@@ -186,14 +202,6 @@ final class VideoEditorModel {
         let bgLayer = CALayer()
         bgLayer.frame = CGRect(x: 0, y: 0, width: canvasW, height: canvasH)
         applyBackgroundToLayer(bgLayer, style: config.style, size: CGSize(width: canvasW, height: canvasH))
-
-        let videoLayer = CALayer()
-        videoLayer.frame = CGRect(x: 0, y: 0, width: canvasW, height: canvasH)
-
-        let overlayLayer = CALayer()
-        overlayLayer.frame = CGRect(x: pad, y: pad, width: vidW, height: vidH)
-        overlayLayer.cornerRadius = cornerRadius
-        overlayLayer.masksToBounds = true
 
         if config.shadowStrength > 0 {
             let shadowContainer = CALayer()
@@ -213,11 +221,19 @@ final class VideoEditorModel {
             bgLayer.addSublayer(shadowContainer)
         }
 
+        let videoLayer = CALayer()
+        videoLayer.frame = CGRect(x: 0, y: 0, width: canvasW, height: canvasH)
+
+        if cornerRadius > 0 {
+            let maskLayer = CAShapeLayer()
+            maskLayer.path = CGPath(roundedRect: CGRect(x: pad, y: pad, width: vidW, height: vidH), cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
+            videoLayer.mask = maskLayer
+        }
+
         let outputLayer = CALayer()
         outputLayer.frame = CGRect(x: 0, y: 0, width: canvasW, height: canvasH)
         outputLayer.addSublayer(bgLayer)
         outputLayer.addSublayer(videoLayer)
-        outputLayer.addSublayer(overlayLayer)
 
         videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(
             postProcessingAsVideoLayer: videoLayer,
