@@ -11,7 +11,7 @@ final class EditorWindowController {
 
     private init() {}
 
-    func open(url: URL) {
+    func open(url: URL, on screen: NSScreen? = nil) {
         let urlHolder = CurrentURL(url: url)
 
         let hostingView = NSHostingView(rootView:
@@ -31,7 +31,7 @@ final class EditorWindowController {
         win.delegate = EditorWindowDelegate.shared
         win.collectionBehavior = [.transient, .moveToActiveSpace]
 
-        centerOnActiveScreen(win)
+        centerOnActiveScreen(win, preferring: screen)
 
         windows.append(win)
 
@@ -73,11 +73,12 @@ final class EditorWindowController {
         }
     }
 
-    private func centerOnActiveScreen(_ window: NSWindow) {
+    private func centerOnActiveScreen(_ window: NSWindow, preferring preferred: NSScreen? = nil) {
         let mouseLocation = NSEvent.mouseLocation
-        let targetScreen = NSScreen.screens.first { screen in
-            screen.frame.contains(mouseLocation)
-        } ?? NSScreen.main ?? NSScreen.screens.first
+        let targetScreen = preferred
+            ?? NSScreen.screens.first { $0.frame.contains(mouseLocation) }
+            ?? NSScreen.main
+            ?? NSScreen.screens.first
 
         guard let screen = targetScreen else { return }
 

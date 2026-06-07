@@ -9,21 +9,25 @@ final class CaptureOrchestrator {
 
     private(set) var lastCaptureURL: URL?
     private var captureInProgress = false
-    private var pendingCaptures: [ShortcutService.Action] = []
+    private var pendingCaptures: [(ShortcutService.Action, NSScreen?)] = []
+    private var captureScreen: NSScreen?
 
     private init() {}
 
-    func performCapture(_ action: ShortcutService.Action) async {
+    func performCapture(_ action: ShortcutService.Action, on screen: NSScreen? = nil) async {
         if captureInProgress {
-            pendingCaptures.append(action)
+            pendingCaptures.append((action, screen))
             return
         }
         captureInProgress = true
+        captureScreen = screen
         await executeCapture(action)
-        while let next = pendingCaptures.first {
+        while let (next, nextScreen) = pendingCaptures.first {
             pendingCaptures.removeFirst()
+            captureScreen = nextScreen
             await executeCapture(next)
         }
+        captureScreen = nil
         captureInProgress = false
     }
 
@@ -81,7 +85,8 @@ final class CaptureOrchestrator {
         ToastWindow.shared.show(
             title: "Copied",
             message: "\(hex) copied to clipboard",
-            systemIcon: "eyedropper"
+            systemIcon: "eyedropper",
+            on: captureScreen
         )
     }
 
@@ -95,7 +100,8 @@ final class CaptureOrchestrator {
             ToastWindow.shared.show(
                 title: "Copied",
                 message: "Text copied to clipboard",
-                systemIcon: "doc.text.viewfinder"
+                systemIcon: "doc.text.viewfinder",
+                on: captureScreen
             )
         } catch {
             print("OCR failed: \(error.localizedDescription)")
@@ -131,11 +137,12 @@ final class CaptureOrchestrator {
             let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage
             ToastWindow.shared.show(
                 message: AppPreferences.copyAfterSave ? "Screenshot saved & copied!" : "Screenshot saved!",
-                icon: appIcon
+                icon: appIcon,
+                on: captureScreen
             )
         }
 
-        PreviewOverlay.shared.show(url: displayURL)
+        PreviewOverlay.shared.show(url: displayURL, on: captureScreen)
     }
 
     private func saveImage(_ cgImage: CGImage) -> URL? {

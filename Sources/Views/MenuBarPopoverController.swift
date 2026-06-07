@@ -10,6 +10,10 @@ final class MenuBarPopoverController: NSObject {
     private(set) var isOpen = false
     private var eventMonitor: Any?
 
+    var originScreen: NSScreen? {
+        statusItem?.button?.window?.screen
+    }
+
     private override init() { super.init() }
 
     func setup() {

@@ -10,7 +10,7 @@ final class VideoEditorWindowController: NSObject, NSWindowDelegate {
 
     private override init() { super.init() }
 
-    func open(url: URL) {
+    func open(url: URL, on screen: NSScreen? = nil) {
         if let existing = window {
             existing.close()
             window = nil
@@ -32,7 +32,7 @@ final class VideoEditorWindowController: NSObject, NSWindowDelegate {
         win.delegate = self
         win.collectionBehavior = [.transient, .moveToActiveSpace]
 
-        centerOnActiveScreen(win)
+        centerOnActiveScreen(win, preferring: screen)
 
         win.orderFrontRegardless()
         NSApp.setActivationPolicy(.regular)
@@ -51,11 +51,12 @@ final class VideoEditorWindowController: NSObject, NSWindowDelegate {
         }
     }
 
-    private func centerOnActiveScreen(_ window: NSWindow) {
+    private func centerOnActiveScreen(_ window: NSWindow, preferring preferred: NSScreen? = nil) {
         let mouseLocation = NSEvent.mouseLocation
-        let targetScreen = NSScreen.screens.first { screen in
-            screen.frame.contains(mouseLocation)
-        } ?? NSScreen.main ?? NSScreen.screens.first
+        let targetScreen = preferred
+            ?? NSScreen.screens.first { $0.frame.contains(mouseLocation) }
+            ?? NSScreen.main
+            ?? NSScreen.screens.first
 
         guard let screen = targetScreen else { return }
 

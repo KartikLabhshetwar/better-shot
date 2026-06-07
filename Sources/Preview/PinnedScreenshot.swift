@@ -15,7 +15,7 @@ final class PinnedScreenshotController {
     }
 
     /// Creates a new borderless, always-on-top floating panel showing the image at `url`.
-    func pin(url: URL) {
+    func pin(url: URL, on preferredScreen: NSScreen? = nil) {
         guard let image = NSImage(contentsOf: url) else { return }
 
         // Compute initial panel size: scale image to max 400pt on longest side.
@@ -57,8 +57,7 @@ final class PinnedScreenshotController {
         )
         panel.contentView = NSHostingView(rootView: contentView)
 
-        // Center on screen, offset slightly so multiple pins don't fully overlap.
-        if let screen = NSScreen.main {
+        if let screen = preferredScreen ?? NSScreen.main {
             let sf = screen.visibleFrame
             let x = sf.midX - panelSize.width / 2 + CGFloat(panels.count) * 20
             let y = sf.midY - panelSize.height / 2 - CGFloat(panels.count) * 20

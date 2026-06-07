@@ -12,14 +12,16 @@ final class PreviewOverlay {
     private(set) var isVisible = false
     private var panel: NSPanel?
     private var dismissTask: Task<Void, Never>?
+    private var targetScreen: NSScreen?
 
     private init() {}
 
-    func show(url: URL) {
+    func show(url: URL, on screen: NSScreen? = nil) {
         dismissTask?.cancel()
         dismissTask = nil
 
         currentURL = url
+        targetScreen = screen
         isVisible = true
 
         if panel == nil {
@@ -45,12 +47,13 @@ final class PreviewOverlay {
 
     func openAnnotateEditor() {
         guard let url = currentURL else { return }
+        let screen = targetScreen
         dismiss()
         let ext = url.pathExtension.lowercased()
         if ext == "mov" || ext == "mp4" {
-            VideoEditorWindowController.shared.open(url: url)
+            VideoEditorWindowController.shared.open(url: url, on: screen)
         } else {
-            EditorWindowController.shared.open(url: url)
+            EditorWindowController.shared.open(url: url, on: screen)
         }
     }
 
@@ -77,7 +80,9 @@ final class PreviewOverlay {
 
     private func positionPanel() {
         let mouseLocation = NSEvent.mouseLocation
-        let screen = NSScreen.screens.first { $0.frame.contains(mouseLocation) } ?? NSScreen.main
+        let screen = targetScreen
+            ?? NSScreen.screens.first { $0.frame.contains(mouseLocation) }
+            ?? NSScreen.main
         guard let panel, let screen else { return }
 
         let screenFrame = screen.visibleFrame

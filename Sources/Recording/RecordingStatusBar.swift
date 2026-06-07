@@ -132,7 +132,7 @@ final class RecordingStatusBarController {
 
     private init() {}
 
-    func show() {
+    func show(on preferredScreen: NSScreen? = nil) {
         if panel == nil {
             let panel = NSPanel(
                 contentRect: NSRect(x: 0, y: 0, width: 420, height: 56),
@@ -147,11 +147,13 @@ final class RecordingStatusBarController {
             panel.hidesOnDeactivate = false
             panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             panel.isMovableByWindowBackground = true
+            panel.sharingType = .none
             panel.contentView = NSHostingView(rootView: RecordingStatusBarView())
             self.panel = panel
         }
 
-        guard let panel, let screen = NSScreen.main else { return }
+        let screen = preferredScreen ?? NSScreen.main
+        guard let panel, let screen else { return }
         let screenFrame = screen.visibleFrame
         let x = screenFrame.midX - panel.frame.width / 2
         let y = screenFrame.minY + 16

@@ -123,17 +123,19 @@ struct MenuBarContentView: View {
 
             TrayGridMenu(title: "Record", icon: "record.circle", menuItems: [
                 TrayMenuItem(title: "Full Screen", icon: "desktopcomputer") {
+                    nonisolated(unsafe) let screen = originScreen
                     dismissPopover()
                     Task.detached {
                         try? await Task.sleep(nanoseconds: 200_000_000)
-                        await startRecording(mode: .fullScreen)
+                        await startRecording(mode: .fullScreen, on: screen)
                     }
                 },
                 TrayMenuItem(title: "Area", icon: "rectangle.dashed") {
+                    nonisolated(unsafe) let screen = originScreen
                     dismissPopover()
                     Task.detached {
                         try? await Task.sleep(nanoseconds: 200_000_000)
-                        await startRecording(mode: .area)
+                        await startRecording(mode: .area, on: screen)
                     }
                 },
             ])
@@ -203,11 +205,16 @@ struct MenuBarContentView: View {
 
     // MARK: - Actions
 
+    private var originScreen: NSScreen? {
+        MenuBarPopoverController.shared.originScreen
+    }
+
     private func dismissAndRun(_ action: ShortcutService.Action) {
+        nonisolated(unsafe) let screen = originScreen
         dismissPopover()
         Task.detached {
             try? await Task.sleep(nanoseconds: 200_000_000)
-            await CaptureOrchestrator.shared.performCapture(action)
+            await CaptureOrchestrator.shared.performCapture(action, on: screen)
         }
     }
 
@@ -220,9 +227,10 @@ struct MenuBarContentView: View {
         } else {
             for record in recentScreenshots.prefix(8) {
                 screenshotItems.append(TrayMenuItem(title: record.filename, icon: "photo") { [record] in
+                    let screen = originScreen
                     dismissPopover()
                     let url = HistoryStore.shared.displayURLForRecord(record)
-                    PreviewOverlay.shared.show(url: url)
+                    PreviewOverlay.shared.show(url: url, on: screen)
                 })
             }
             screenshotItems.append(.separator())
@@ -240,9 +248,10 @@ struct MenuBarContentView: View {
         } else {
             for record in recentRecordings.prefix(8) {
                 recordingItems.append(TrayMenuItem(title: record.filename, icon: "video") { [record] in
+                    let screen = originScreen
                     dismissPopover()
                     let url = HistoryStore.shared.urlForRecord(record)
-                    VideoEditorWindowController.shared.open(url: url)
+                    VideoEditorWindowController.shared.open(url: url, on: screen)
                 })
             }
             recordingItems.append(.separator())
@@ -258,8 +267,9 @@ struct MenuBarContentView: View {
     }
 
     private func openSettings() {
+        let screen = originScreen
         dismissPopover()
-        SettingsWindowController.shared.open()
+        SettingsWindowController.shared.open(on: screen)
     }
 
     private enum RecordingMode {
@@ -267,7 +277,7 @@ struct MenuBarContentView: View {
     }
 
     @MainActor
-    private func startRecording(mode: RecordingMode = .fullScreen) async {
+    private func startRecording(mode: RecordingMode = .fullScreen, on screen: NSScreen? = nil) async {
         do {
             let started: Bool
             switch mode {
@@ -277,7 +287,7 @@ struct MenuBarContentView: View {
                 started = try await ScreenRecordingManager.shared.startAreaRecording()
             }
             if started {
-                RecordingStatusBarController.shared.show()
+                RecordingStatusBarController.shared.show(on: screen)
             }
         } catch {
             print("Recording failed: \(error.localizedDescription)")

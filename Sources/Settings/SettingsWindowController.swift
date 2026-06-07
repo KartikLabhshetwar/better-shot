@@ -9,7 +9,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     private override init() { super.init() }
 
-    func open() {
+    func open(on screen: NSScreen? = nil) {
         if let existing = window, existing.isVisible {
             existing.orderFrontRegardless()
             NSApp.activate(ignoringOtherApps: true)
@@ -31,7 +31,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         win.delegate = self
         win.collectionBehavior = [.transient, .moveToActiveSpace]
 
-        centerOnCurrentScreen(win)
+        centerOnCurrentScreen(win, preferring: screen)
 
         window = win
 
@@ -51,9 +51,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         }
     }
 
-    private func centerOnCurrentScreen(_ window: NSWindow) {
+    private func centerOnCurrentScreen(_ window: NSWindow, preferring preferred: NSScreen? = nil) {
         let mouseLocation = NSEvent.mouseLocation
-        let targetScreen = NSScreen.screens.first { $0.frame.contains(mouseLocation) }
+        let targetScreen = preferred
+            ?? NSScreen.screens.first { $0.frame.contains(mouseLocation) }
             ?? NSScreen.main
             ?? NSScreen.screens.first
 

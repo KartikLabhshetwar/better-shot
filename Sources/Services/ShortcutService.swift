@@ -149,6 +149,7 @@ final class ShortcutService {
         for (action, shortcut) in cachedShortcuts {
             guard shortcut.enabled else { continue }
             if keyCode == shortcut.keyCode && carbonMods == shortcut.modifiers {
+                let mouseScreen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) }
                 Task { @MainActor in
                     if action == .recording {
                         if ScreenRecordingManager.shared.isRecording {
@@ -156,10 +157,10 @@ final class ShortcutService {
                         }
                         let started = try? await ScreenRecordingManager.shared.startRecording()
                         if started == true {
-                            RecordingStatusBarController.shared.show()
+                            RecordingStatusBarController.shared.show(on: mouseScreen)
                         }
                     } else {
-                        await CaptureOrchestrator.shared.performCapture(action)
+                        await CaptureOrchestrator.shared.performCapture(action, on: mouseScreen)
                     }
                 }
                 return nil

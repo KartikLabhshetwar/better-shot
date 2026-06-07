@@ -12,7 +12,7 @@ final class ToastWindow {
 
     private var panelGeneration: UInt = 0
 
-    func show(title: String = "Saved", message: String, icon: NSImage? = nil, systemIcon: String? = nil, duration: TimeInterval = 2.5) {
+    func show(title: String = "Saved", message: String, icon: NSImage? = nil, systemIcon: String? = nil, duration: TimeInterval = 2.5, on preferredScreen: NSScreen? = nil) {
         dismiss(animated: false)
         panelGeneration &+= 1
 
@@ -35,7 +35,7 @@ final class ToastWindow {
         panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+        guard let screen = preferredScreen ?? NSScreen.main ?? NSScreen.screens.first else { return }
         let screenFrame = screen.visibleFrame
         let panelSize = panel.frame.size
         let x = screenFrame.midX - panelSize.width / 2
