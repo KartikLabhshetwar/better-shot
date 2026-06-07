@@ -120,6 +120,14 @@ struct MenuBarContentView: View {
             TrayGridButton(title: "Pick Color", icon: "eyedropper") {
                 dismissAndRun(.colorPicker)
             }
+
+            TrayGridButton(title: "Record", icon: "record.circle") {
+                dismissPopover()
+                Task.detached {
+                    try? await Task.sleep(nanoseconds: 200_000_000)
+                    await startRecording()
+                }
+            }
         }
     }
 
@@ -149,6 +157,14 @@ struct MenuBarContentView: View {
                         } label: {
                             Label(record.filename, systemImage: "photo")
                         }
+                    }
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        HistoryStore.shared.deleteAllRecords()
+                    } label: {
+                        Label("Clear All", systemImage: "trash")
                     }
                 }
             } label: {
@@ -181,7 +197,7 @@ struct MenuBarContentView: View {
     // MARK: - Version
 
     private var versionLabel: some View {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.4"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
         return HStack(spacing: 4) {
             Text("Version \(version)")
                 .font(.system(size: 10))
@@ -208,6 +224,18 @@ struct MenuBarContentView: View {
     private func openSettings() {
         dismissPopover()
         SettingsWindowController.shared.open()
+    }
+
+    @MainActor
+    private func startRecording() async {
+        do {
+            let started = try await ScreenRecordingManager.shared.startRecording()
+            if started {
+                RecordingStatusBarController.shared.show()
+            }
+        } catch {
+            print("Recording failed: \(error.localizedDescription)")
+        }
     }
 }
 

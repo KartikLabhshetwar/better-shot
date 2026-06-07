@@ -57,6 +57,7 @@ struct PreferencesView: View {
 // MARK: - General
 
 struct GeneralSettingsTab: View {
+    @AppStorage("bs_appAppearance") private var appAppearanceRaw: String = AppAppearance.system.rawValue
     @AppStorage("bs_saveDirectory") private var saveDir = NSHomeDirectory() + "/Desktop"
     @AppStorage("bs_copyAfterSave") private var copyAfterSave = true
     @AppStorage("bs_playSound") private var playSound = true
@@ -64,6 +65,16 @@ struct GeneralSettingsTab: View {
     @AppStorage("bs_exportQuality") private var exportQuality: Double = 0.9
 
     @State private var defaultConfig = AppPreferences.defaultBeautifierConfig
+
+    private var appAppearance: Binding<AppAppearance> {
+        Binding(
+            get: { AppAppearance(rawValue: appAppearanceRaw) ?? .system },
+            set: { newValue in
+                appAppearanceRaw = newValue.rawValue
+                AppPreferences.applyAppearance()
+            }
+        )
+    }
 
     private var exportFormat: Binding<ExportFormat> {
         Binding(
@@ -79,6 +90,15 @@ struct GeneralSettingsTab: View {
 
     var body: some View {
         Form {
+            Section("Appearance") {
+                Picker("Mode", selection: appAppearance) {
+                    ForEach(AppAppearance.allCases) { appearance in
+                        Text(appearance.label).tag(appearance)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
             Section("Save") {
                 HStack {
                     Text("Save to")
@@ -163,6 +183,8 @@ struct GeneralSettingsTab: View {
 
             Section {
                 Button("Reset All General Settings to Defaults") {
+                    appAppearanceRaw = AppAppearance.system.rawValue
+                    AppPreferences.applyAppearance()
                     saveDir = NSHomeDirectory() + "/Desktop"
                     copyAfterSave = true
                     playSound = true
@@ -844,49 +866,66 @@ struct HistoryTab: View {
             ContentUnavailableView("No captures yet", systemImage: "photo.on.rectangle.angled")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            List {
-                ForEach(HistoryStore.shared.records) { record in
-                    HStack(spacing: 12) {
-                        if let thumb = thumbnails[record.id.uuidString] {
-                            Image(nsImage: thumb)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: 64, height: 48)
-                                .clipShape(RoundedRectangle(cornerRadius: 4))
-                        } else {
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(.quaternary)
-                                .frame(width: 64, height: 48)
-                                .onAppear {
-                                    loadThumbnail(for: record)
-                                }
-                        }
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(record.filename)
-                                .font(.caption.weight(.medium))
-                                .lineLimit(1)
-                            Text("\(record.pixelWidth) x \(record.pixelHeight)")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            Text(record.createdAt, style: .relative)
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                        }
-
-                        Spacer()
-
-                        Button {
-                            thumbnails.removeValue(forKey: record.id.uuidString)
-                            HistoryStore.shared.deleteRecord(record)
-                        } label: {
-                            Image(systemName: "trash")
-                                .font(.caption)
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.secondary)
+            VStack(spacing: 0) {
+                HStack {
+                    Spacer()
+                    Button(role: .destructive) {
+                        thumbnails.removeAll()
+                        HistoryStore.shared.deleteAllRecords()
+                    } label: {
+                        Label("Clear All", systemImage: "trash")
+                            .font(.caption)
                     }
-                    .padding(.vertical, 2)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                }
+
+                List {
+                    ForEach(HistoryStore.shared.records) { record in
+                        HStack(spacing: 12) {
+                            if let thumb = thumbnails[record.id.uuidString] {
+                                Image(nsImage: thumb)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 64, height: 48)
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                            } else {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(.quaternary)
+                                    .frame(width: 64, height: 48)
+                                    .onAppear {
+                                        loadThumbnail(for: record)
+                                    }
+                            }
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(record.filename)
+                                    .font(.caption.weight(.medium))
+                                    .lineLimit(1)
+                                Text("\(record.pixelWidth) x \(record.pixelHeight)")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                Text(record.createdAt, style: .relative)
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
+
+                            Spacer()
+
+                            Button {
+                                thumbnails.removeValue(forKey: record.id.uuidString)
+                                HistoryStore.shared.deleteRecord(record)
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 2)
+                    }
                 }
             }
         }
@@ -910,7 +949,7 @@ struct AboutTab: View {
     private let updater = AppUpdater.shared
 
     private var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.4"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
     }
     private var build: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"

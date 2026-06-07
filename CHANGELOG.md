@@ -5,6 +5,22 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.7] - 2026-06-07
+
+### Added
+
+- **Screen recording**: Record your screen as MOV video with ScreenCaptureKit. Includes a floating status bar with timer, pause/resume, stop, and discard controls. Access via the new "Record" button in the menu bar
+- **App appearance setting**: Choose between System, Light, and Dark mode in Settings > General > Appearance. The app no longer forces light mode — respects your macOS setting by default
+- **Clear All captures**: Added "Clear All" button to both the Recent menu in the menu bar and the History tab in Settings, allowing deletion of all capture history at once (closes #63)
+
+### Fixed
+
+- **Duplicate file on Desktop**: Screenshots no longer create a visible `.base` companion file on the Desktop. The raw source image used for re-editing is now stored internally in Application Support, so only the beautified screenshot appears in the save directory
+
+### Changed
+
+- Version bumped to 0.3.7 (build 10)
+
 ## [0.3.6] - 2026-06-06
 
 ### Added

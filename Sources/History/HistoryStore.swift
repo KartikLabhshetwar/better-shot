@@ -85,6 +85,15 @@ final class HistoryStore {
         saveRecords()
     }
 
+    func deleteAllRecords() {
+        for record in records {
+            let url = urlForRecord(record)
+            try? FileManager.default.removeItem(at: url)
+        }
+        records.removeAll()
+        saveRecords()
+    }
+
     // MARK: - Persistence
 
     private func loadRecords() {

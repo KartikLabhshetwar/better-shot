@@ -159,16 +159,29 @@ final class CaptureOrchestrator {
         try? FileManager.default.copyItem(at: rawURL, to: baseURL)
     }
 
+    private static var baseStorageDir: URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = appSupport.appendingPathComponent("BetterShot/bases", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
     static func baseImageURL(for url: URL) -> URL {
-        let dir = url.deletingLastPathComponent()
         let name = url.deletingPathExtension().lastPathComponent
-        return dir.appendingPathComponent("\(name).base.png")
+        return baseStorageDir.appendingPathComponent("\(name).base.png")
     }
 
     static func resolveRawSource(for url: URL) -> URL {
         let baseURL = baseImageURL(for: url)
         if FileManager.default.fileExists(atPath: baseURL.path) {
             return baseURL
+        }
+        // Legacy: check alongside the file for old .base.png files
+        let legacyDir = url.deletingLastPathComponent()
+        let legacyName = url.deletingPathExtension().lastPathComponent
+        let legacyURL = legacyDir.appendingPathComponent("\(legacyName).base.png")
+        if FileManager.default.fileExists(atPath: legacyURL.path) {
+            return legacyURL
         }
         return url
     }

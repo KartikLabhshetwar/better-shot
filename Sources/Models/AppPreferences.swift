@@ -1,8 +1,10 @@
 import Foundation
+import AppKit
 import SwiftUI
 
 enum AppPreferences {
     // MARK: - Keys
+    private static let appearanceKey = "bs_appAppearance"
     private static let saveDirKey = "bs_saveDirectory"
     private static let copyAfterSaveKey = "bs_copyAfterSave"
     private static let playSoundKey = "bs_playSound"
@@ -11,6 +13,21 @@ enum AppPreferences {
     private static let exportFormatKey = "bs_exportFormat"
     private static let exportQualityKey = "bs_exportQuality"
     private static let selfTimerKey = "bs_selfTimerDelay"
+
+    // MARK: - Appearance
+    static var appearance: AppAppearance {
+        get {
+            guard let raw = UserDefaults.standard.string(forKey: appearanceKey),
+                  let appearance = AppAppearance(rawValue: raw) else { return .system }
+            return appearance
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: appearanceKey) }
+    }
+
+    @MainActor
+    static func applyAppearance() {
+        NSApp.appearance = appearance.nsAppearance
+    }
 
     // MARK: - General
     static var saveDirectory: String {
@@ -90,6 +107,30 @@ enum AppPreferences {
 }
 
 // MARK: - Enums
+
+enum AppAppearance: String, CaseIterable, Identifiable {
+    case system
+    case light
+    case dark
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .system: return "System"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+
+    var nsAppearance: NSAppearance? {
+        switch self {
+        case .system: return nil
+        case .light: return NSAppearance(named: .aqua)
+        case .dark: return NSAppearance(named: .darkAqua)
+        }
+    }
+}
 
 enum OverlayPosition: String, CaseIterable, Codable {
     case bottomRight = "bottomRight"
