@@ -25,7 +25,8 @@ Region, fullscreen, and window capture all use the native macOS `screencapture` 
 ### Screen Recording
 
 - **Record full screen** — Capture your entire display as MP4 video with ScreenCaptureKit
-- **Floating status bar** — Timer, pause/resume, stop, and discard controls
+- **Floating status bar** — Timer, pause/resume, stop, and discard controls (hidden from the recording itself)
+- **Auto-apply effects** — Recordings automatically get your default background, padding, corner radius, and shadow on capture — same as screenshots
 - **Video editor** — Trim, crop, add padding, corner radius, shadow, and background (solid, gradient, wallpaper, custom image). Export as MP4
 - **Configurable** — FPS (24/30/60), show cursor, capture audio in Settings > Recording
 
@@ -47,7 +48,7 @@ Rectangles, filled rectangles, ellipses, lines, curved arrows, freehand, text, n
 - **Click-to-edit** — Click the floating preview to open the editor (image or video)
 - **Drag-to-app** — Drag from the preview panel directly into Figma, Slack, or any app
 - **Pin screenshots** — Pin any capture as an always-on-top floating window, unpin all from the menu bar
-- **Auto-apply** — Automatically apply your default background on every capture and recording
+- **Auto-apply** — Automatically apply your default background, padding, corner radius, and shadow on every capture and recording
 - **Self-timer** — Countdown overlay before capture (3s, 5s, 10s)
 - **Capture history** — Separate tabs for screenshots and recordings in Settings
 - **Recent menu** — Quick access to recent screenshots and recordings from the menu bar

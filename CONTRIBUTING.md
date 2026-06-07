@@ -68,8 +68,9 @@ Resources/
 | `EditorModel.swift` | All editor state: annotation interactions, undo/redo, config |
 | `EditorCanvasView.swift` | Live canvas rendering with drag gestures |
 | `EditorInspectorView.swift` | Left panel: tools, colors, text, effects, backgrounds |
-| `AnnotationDrawing.swift` | CoreGraphics renderer for final image export |
-| `BeautifierRenderer.swift` | Composites background + shadow + radius + annotations |
+| `AnnotationDrawing.swift` | CoreGraphics renderer for final image export (Y-down flipped context) |
+| `BeautifierRenderer.swift` | Composites background + shadow + radius + annotations (flips CG context for annotations) |
+| `AnnotationItem.swift` | Annotation data model: rect, points, tools, hit-testing, `remapped(from:)` for crop |
 | `CaptureOrchestrator.swift` | Coordinates capture pipeline: capture > sound > history > preview |
 | `ShortcutService.swift` | Global keyboard shortcuts via CGEvent tap |
 | `PreviewOverlay.swift` | Floating preview card after capture (screenshots and recordings) |
@@ -79,7 +80,7 @@ Resources/
 | `RecordingStatusBar.swift` | Floating recording status bar with timer, pause, stop, discard |
 | `PreferencesView.swift` | Settings window with sidebar navigation (General, Capture, Recording, History, Videos, About) |
 | `SettingsWindowController.swift` | Creates and manages the settings NSWindow (mirrors EditorWindowController) |
-| `MenuBarPopoverController.swift` | Custom NSPanel-based menu bar popover with arrow and click-outside dismiss |
+| `MenuBarPopoverController.swift` | Custom NSPanel-based menu bar popover with arrow, click-outside dismiss, and `originScreen` for window targeting |
 | `ToastWindow.swift` | Floating toast notifications (save confirmation, OCR/color picker feedback) |
 | `AppPreferences.swift` | All UserDefaults-backed preferences |
 
@@ -89,13 +90,15 @@ Resources/
 
 ```
 User presses ⌘⇧4
-  → ShortcutService (CGEvent tap intercepts the keypress)
-  → CaptureOrchestrator.performCapture(.region)
+  → ShortcutService (CGEvent tap intercepts the keypress, captures origin screen)
+  → CaptureOrchestrator.performCapture(.region, on: screen)
   → ScreenCapture.captureRegion() (native screencapture CLI)
   → HistoryStore.importCapture() (saves to Application Support)
-  → PreviewOverlay.show() (floating card appears)
-  → User clicks preview → EditorWindowController.open()
+  → PreviewOverlay.show(on: screen) (floating card on same screen)
+  → User clicks preview → EditorWindowController.open(on: screen)
 ```
+
+All windows (editor, video editor, settings, preview, toast, pinned screenshots) open on the screen where the action originated, not the primary display.
 
 ### Recording flow
 
@@ -104,9 +107,11 @@ User presses ⌘⇧2 (or clicks Record / Record Window)
   → ShortcutService (CGEvent tap intercepts the keypress)
   → ScreenRecordingManager.startRecording() (full screen)
      or .startWindowRecording() (hover-and-click window picker)
-  → RecordingStatusBarController.show() (floating status bar)
-  → User clicks stop → HistoryStore.importCapture(kind: .recording)
-  → PreviewOverlay.show() (floating card with play icon)
+  → RecordingStatusBarController.show() (floating status bar, excluded from capture)
+  → User clicks stop → HistoryStore.importCapture(kind: .recording, deleteSource: true)
+  → VideoEditorModel.autoExportWithDefaults() (applies default beautifier config)
+  → HistoryStore.setBeautifiedPath() (links processed video to record)
+  → PreviewOverlay.show() (floating card with processed video)
   → User clicks preview → VideoEditorWindowController.open()
   → User edits effects → VideoEditorModel.exportWithEffects()
      (AVMutableVideoComposition + Core Animation layers)
@@ -124,6 +129,8 @@ EditorModel (all state)
 
 Annotations use **normalized coordinates** (0.0 to 1.0) so they're resolution-independent. The canvas renders them as SwiftUI views for interactive editing. `AnnotationDrawing` re-renders them with CoreGraphics for the final export.
 
+**Coordinate system**: The canvas preview uses SwiftUI's Y-down coordinates. The export renderer flips its CG context to Y-down before drawing annotations, so both code paths use identical coordinate math (`imageRect.minY + point.y * imageRect.height`). When crop is active, `AnnotationItem.remapped(from:)` transforms annotations from original-image to cropped-image coordinate space before export.
+
 ### Settings
 
 The settings window is managed by `SettingsWindowController`, which creates an `NSWindow` hosting `PreferencesView` in an `NSHostingView`. This mirrors the `EditorWindowController` pattern. The view uses a sidebar list (General, Capture, Recording, History, Videos, About) and a content panel. Preferences are stored via `@AppStorage` and the centralized `AppPreferences` enum. Screenshots and recordings have separate history tabs — History shows only screenshots, Videos shows only recordings.
@@ -138,11 +145,12 @@ The menu bar popover is managed by `MenuBarPopoverController`, which creates a c
 
 1. Add the case to `AnnotationTool` in `Models/AnnotationItem.swift`
 2. Set its `systemImage` and `title`
-3. Add live rendering in `Editor/AnnotationItemView.swift`
-4. Add export rendering in `Editor/AnnotationDrawing.swift`
+3. Add live rendering in `Editor/AnnotationItemView.swift` (uses `viewRect`/`viewPoint` — Y-down)
+4. Add export rendering in `Editor/AnnotationDrawing.swift` (uses `renderedRect`/`renderedPoint` with `flipped: true` — same Y-down math as the canvas)
 5. Handle creation in `EditorModel.beginDraftItem`
 6. Handle updates in `EditorModel.updateDraftItem`
 7. Add keyboard shortcut in `Editor/AnnotationKeyboard.swift`
+8. If the tool uses `rect` or `points`, ensure `AnnotationItem.remapped(from:)` handles it correctly for crop support
 
 ### Adding a new background type
 
