@@ -55,6 +55,10 @@ Rectangles, filled rectangles, ellipses, lines, curved arrows, freehand, text, n
 - **In-app updates** — Check, download, and install updates without leaving the app
 - **Configurable overlay** — Choose preview position and auto-dismiss timing
 
+### Shortcuts
+
+BetterShot's capture, OCR, and recording actions are available as App Intents in the macOS **Shortcuts** app and Siri — region/fullscreen/window screenshot, scan text, and start/stop screen recording. Screenshots and recordings are returned as files so you can chain them into other Shortcuts steps, e.g. *"Capture Region Screenshot" → "Save to Photos"* or *"Scan Text" → "Show Result"*.
+
 ## Install
 
 ### Homebrew

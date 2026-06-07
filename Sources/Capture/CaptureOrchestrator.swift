@@ -1,6 +1,14 @@
 import AppKit
 import SwiftUI
 
+/// Result of a capture request, returned to programmatic callers (e.g. App Intents)
+/// so they can chain the artifact (image file or extracted text) into other workflows.
+enum CaptureResult {
+    case image(URL)
+    case text(String)
+    case none
+}
+
 /// Coordinates the full capture pipeline: hide window -> capture -> sound -> preview/editor.
 @MainActor
 @Observable
@@ -9,55 +17,59 @@ final class CaptureOrchestrator {
 
     private(set) var lastCaptureURL: URL?
     private var captureInProgress = false
-    private var pendingCaptures: [(ShortcutService.Action, NSScreen?)] = []
+    private var pendingCaptures: [(action: ShortcutService.Action, screen: NSScreen?, continuation: CheckedContinuation<CaptureResult, Never>?)] = []
     private var captureScreen: NSScreen?
 
     private init() {}
 
-    func performCapture(_ action: ShortcutService.Action, on screen: NSScreen? = nil) async {
+    @discardableResult
+    func performCapture(_ action: ShortcutService.Action, on screen: NSScreen? = nil) async -> CaptureResult {
         if captureInProgress {
-            pendingCaptures.append((action, screen))
-            return
+            return await withCheckedContinuation { continuation in
+                pendingCaptures.append((action, screen, continuation))
+            }
         }
         captureInProgress = true
         captureScreen = screen
-        await executeCapture(action)
-        while let (next, nextScreen) = pendingCaptures.first {
+        let result = await executeCapture(action)
+        while let next = pendingCaptures.first {
             pendingCaptures.removeFirst()
-            captureScreen = nextScreen
-            await executeCapture(next)
+            captureScreen = next.screen
+            let nextResult = await executeCapture(next.action)
+            next.continuation?.resume(returning: nextResult)
         }
         captureScreen = nil
         captureInProgress = false
+        return result
     }
 
-    private func executeCapture(_ action: ShortcutService.Action) async {
+    private func executeCapture(_ action: ShortcutService.Action) async -> CaptureResult {
         switch action {
         case .region:
-            await captureAndProcess { try await ScreenCapture.shared.captureRegion() }
+            return await captureAndProcess { try await ScreenCapture.shared.captureRegion() }
         case .fullscreen:
-            await captureAndProcess { try await ScreenCapture.shared.captureFullscreen() }
+            return await captureAndProcess { try await ScreenCapture.shared.captureFullscreen() }
         case .window:
-            await captureAndProcess { try await ScreenCapture.shared.captureWindow() }
+            return await captureAndProcess { try await ScreenCapture.shared.captureWindow() }
         case .ocr:
-            await performOCR()
+            return await performOCR()
         case .colorPicker:
-            await performColorPick()
+            return await performColorPick()
         case .recording:
-            break
+            return .none
         }
     }
 
     // MARK: - Private
 
-    private func captureAndProcess(_ capture: () async throws -> URL?) async {
+    private func captureAndProcess(_ capture: () async throws -> URL?) async -> CaptureResult {
         let delay = AppPreferences.selfTimerDelay
         if delay != .off {
             await CountdownOverlay.shared.showCountdown(seconds: delay.rawValue)
         }
 
         do {
-            guard let url = try await capture() else { return }
+            guard let url = try await capture() else { return .none }
 
             ScreenCapture.shared.playShutterSound()
 
@@ -66,18 +78,20 @@ final class CaptureOrchestrator {
                 lastCaptureURL = HistoryStore.shared.urlForRecord(record)
             }
 
-            guard let capturedURL = lastCaptureURL else { return }
+            guard let capturedURL = lastCaptureURL else { return .none }
 
-            await galleryApplyAndSave(capturedURL, recordID: record?.id)
+            let displayURL = await galleryApplyAndSave(capturedURL, recordID: record?.id)
+            return .image(displayURL ?? capturedURL)
         } catch {
             print("Capture failed: \(error.localizedDescription)")
+            return .none
         }
     }
 
 
-    private func performColorPick() async {
+    private func performColorPick() async -> CaptureResult {
         let overlay = ColorPickerOverlay()
-        guard let hex = await overlay.pickColor() else { return }
+        guard let hex = await overlay.pickColor() else { return .none }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(hex, forType: .string)
@@ -88,11 +102,12 @@ final class CaptureOrchestrator {
             systemIcon: "eyedropper",
             on: captureScreen
         )
+        return .text(hex)
     }
 
-    private func performOCR() async {
+    private func performOCR() async -> CaptureResult {
         do {
-            guard let text = try await ScreenCapture.shared.captureAndOCR() else { return }
+            guard let text = try await ScreenCapture.shared.captureAndOCR() else { return .none }
             let pasteboard = NSPasteboard.general
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
@@ -103,19 +118,22 @@ final class CaptureOrchestrator {
                 systemIcon: "doc.text.viewfinder",
                 on: captureScreen
             )
+            return .text(text)
         } catch {
             print("OCR failed: \(error.localizedDescription)")
+            return .none
         }
     }
 
-    private func galleryApplyAndSave(_ url: URL, recordID: UUID? = nil) async {
+    @discardableResult
+    private func galleryApplyAndSave(_ url: URL, recordID: UUID? = nil) async -> URL? {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return }
+              let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
 
         let config = AppPreferences.defaultBeautifierConfig
         let rendered = BeautifierRenderer.render(image: cgImage, config: config)
 
-        guard let rendered else { return }
+        guard let rendered else { return nil }
 
         let savedURL = saveImage(rendered)
 
@@ -143,6 +161,7 @@ final class CaptureOrchestrator {
         }
 
         PreviewOverlay.shared.show(url: displayURL, on: captureScreen)
+        return displayURL
     }
 
     private func saveImage(_ cgImage: CGImage) -> URL? {

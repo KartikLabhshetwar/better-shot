@@ -51,6 +51,11 @@
 		F6A7B8C9D0E1F2A3B4C5D6E7 /* VideoEditorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F7A8B9C0D1E2F3A4B5C6D7E /* VideoEditorWindowController.swift */; };
 		A7B8C9D0E1F2A3B4C5D6E7F8 /* VideoTrimTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A8B9C0D1E2F3A4B5C6D7E8F /* VideoTrimTimelineView.swift */; };
 
+		3A1AC46B479780A00184F954 /* BetterShotIntentError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AFE83018D77254765879687 /* BetterShotIntentError.swift */; };
+		920178D7D282D96DADE6C014 /* BetterShotShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6130A4277E056FA7A2C20DA1 /* BetterShotShortcuts.swift */; };
+		81CC71E889B51A44C66E0A11 /* OCRIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F2DBF6CD975399F1CBFD72D /* OCRIntent.swift */; };
+		5F0749FC6B2FB5B592E90DB2 /* RecordingIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A4EEB3709E4D59CEFFC02D7 /* RecordingIntents.swift */; };
+		EF44AAEBE1A592E8967D0BAF /* ScreenshotIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF98C9B0B7DE96D16131BB3B /* ScreenshotIntents.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -99,6 +104,11 @@
 		6F7A8B9C0D1E2F3A4B5C6D7E /* VideoEditorWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoEditorWindowController.swift; sourceTree = "<group>"; };
 		7A8B9C0D1E2F3A4B5C6D7E8F /* VideoTrimTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoTrimTimelineView.swift; sourceTree = "<group>"; };
 
+		5AFE83018D77254765879687 /* BetterShotIntentError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BetterShotIntentError.swift; sourceTree = "<group>"; };
+		6130A4277E056FA7A2C20DA1 /* BetterShotShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BetterShotShortcuts.swift; sourceTree = "<group>"; };
+		6F2DBF6CD975399F1CBFD72D /* OCRIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRIntent.swift; sourceTree = "<group>"; };
+		1A4EEB3709E4D59CEFFC02D7 /* RecordingIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingIntents.swift; sourceTree = "<group>"; };
+		BF98C9B0B7DE96D16131BB3B /* ScreenshotIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotIntents.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -232,6 +242,7 @@
 				39D4566D88515C653CF4F4DB /* Models */,
 				99E8726305BC9AF4B98FA73B /* Preview */,
 				D5E6F7A8B9C0D1E2F3A4B5C6 /* Recording */,
+				5124CB9C3BB612D2FECA2047 /* Shortcuts */,
 				02E0E07267FD5201B631F82C /* Services */,
 				E4007FFA622C92BA5142F86A /* Settings */,
 				4FE4E3ABA1756F22921DCB42 /* Views */,
@@ -255,6 +266,18 @@
 				BB22CC33DD44EE55FF667788 /* SettingsWindowController.swift */,
 			);
 			path = Settings;
+			sourceTree = "<group>";
+		};
+		5124CB9C3BB612D2FECA2047 /* Shortcuts */ = {
+			isa = PBXGroup;
+			children = (
+				5AFE83018D77254765879687 /* BetterShotIntentError.swift */,
+				6130A4277E056FA7A2C20DA1 /* BetterShotShortcuts.swift */,
+				6F2DBF6CD975399F1CBFD72D /* OCRIntent.swift */,
+				1A4EEB3709E4D59CEFFC02D7 /* RecordingIntents.swift */,
+				BF98C9B0B7DE96D16131BB3B /* ScreenshotIntents.swift */,
+			);
+			path = Shortcuts;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -364,6 +387,11 @@
 				E5F6A7B8C9D0E1F2A3B4C5D6 /* VideoEditorView.swift in Sources */,
 				A7B8C9D0E1F2A3B4C5D6E7F8 /* VideoTrimTimelineView.swift in Sources */,
 				F6A7B8C9D0E1F2A3B4C5D6E7 /* VideoEditorWindowController.swift in Sources */,
+				3A1AC46B479780A00184F954 /* BetterShotIntentError.swift in Sources */,
+				920178D7D282D96DADE6C014 /* BetterShotShortcuts.swift in Sources */,
+				81CC71E889B51A44C66E0A11 /* OCRIntent.swift in Sources */,
+				5F0749FC6B2FB5B592E90DB2 /* RecordingIntents.swift in Sources */,
+				EF44AAEBE1A592E8967D0BAF /* ScreenshotIntents.swift in Sources */,
 
 			);
 			runOnlyForDeploymentPostprocessing = 0;
