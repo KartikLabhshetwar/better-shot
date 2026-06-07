@@ -305,6 +305,7 @@ final class VideoEditorModel {
     static func autoExportWithDefaults(url: URL) async -> URL? {
         let model = VideoEditorModel()
         model.sourceURL = url
+        model.config = AppPreferences.defaultBeautifierConfig
 
         let asset = AVURLAsset(url: url)
         guard let dur = try? await asset.load(.duration) else { return nil }
