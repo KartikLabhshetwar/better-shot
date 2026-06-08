@@ -42,8 +42,15 @@ final class ScreenRecordingManager: NSObject {
         state = .preparing
 
         let captureAudio = AppPreferences.recordingCaptureAudio
+        
+        let mouseLocation = NSEvent.mouseLocation
+        let targetScreen = NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) } ?? NSScreen.screens.first
+        let targetDisplayID = targetScreen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-        guard let display = content.displays.first else {
+        let display = content.displays.first { $0.displayID == targetDisplayID } ?? content.displays.first
+        
+        guard let display = display else {
             state = .idle
             return false
         }
@@ -77,7 +84,8 @@ final class ScreenRecordingManager: NSObject {
         state = .preparing
         let captureAudio = AppPreferences.recordingCaptureAudio
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-        guard let display = content.displays.first else {
+        let display = content.displays.first { $0.displayID == selection.displayID } ?? content.displays.first
+        guard let display = display else {
             state = .idle
             return false
         }
@@ -94,21 +102,38 @@ final class ScreenRecordingManager: NSObject {
         let contentRect = try await filter.contentRect
         let pointPixelScale = try await filter.pointPixelScale
 
-        let screenFrame = NSScreen.screens.first?.frame ?? NSRect(x: 0, y: 0, width: CGFloat(display.width), height: CGFloat(display.height))
+        let targetScreen = NSScreen.screens.first { screen in
+            let screenID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+            return screenID == display.displayID
+        } ?? NSScreen.screens.first
+
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        let targetScreenFrame = targetScreen?.frame ?? NSRect(x: 0, y: 0, width: CGFloat(display.width), height: CGFloat(display.height))
+        let targetScreenQuartzFrame = CGRect(
+            x: targetScreenFrame.origin.x,
+            y: primaryHeight - targetScreenFrame.origin.y - targetScreenFrame.height,
+            width: targetScreenFrame.width,
+            height: targetScreenFrame.height
+        )
 
         let selRect = selection.pointsRect
-        let clampedX = max(selRect.minX, screenFrame.minX)
-        let clampedY = max(selRect.minY, 0)
-        let clampedMaxX = min(selRect.maxX, screenFrame.maxX)
-        let clampedMaxY = min(selRect.maxY, screenFrame.height)
+        let clampedX = max(selRect.minX, targetScreenQuartzFrame.minX)
+        let clampedY = max(selRect.minY, targetScreenQuartzFrame.minY)
+        let clampedMaxX = min(selRect.maxX, targetScreenQuartzFrame.maxX)
+        let clampedMaxY = min(selRect.maxY, targetScreenQuartzFrame.maxY)
 
-        let scaleX = contentRect.width / screenFrame.width
-        let scaleY = contentRect.height / screenFrame.height
+        let localX = clampedX - targetScreenQuartzFrame.minX
+        let localY = clampedY - targetScreenQuartzFrame.minY
+        let localW = clampedMaxX - clampedX
+        let localH = clampedMaxY - clampedY
 
-        let sourceX = contentRect.minX + (clampedX - screenFrame.minX) * scaleX
-        let sourceY = contentRect.minY + clampedY * scaleY
-        let sourceW = (clampedMaxX - clampedX) * scaleX
-        let sourceH = (clampedMaxY - clampedY) * scaleY
+        let scaleX = contentRect.width / targetScreenFrame.width
+        let scaleY = contentRect.height / targetScreenFrame.height
+
+        let sourceX = contentRect.minX + localX * scaleX
+        let sourceY = contentRect.minY + localY * scaleY
+        let sourceW = localW * scaleX
+        let sourceH = localH * scaleY
 
         let mappedSourceRect = CGRect(x: sourceX, y: sourceY, width: sourceW, height: sourceH)
 

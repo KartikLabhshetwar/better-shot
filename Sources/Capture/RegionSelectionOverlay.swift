@@ -4,6 +4,7 @@ import ScreenCaptureKit
 struct RegionSelection {
     let pointsRect: CGRect  // In global display points (top-left origin, matching SCK coordinates)
     let scaleFactor: CGFloat
+    let displayID: CGDirectDisplayID
 }
 
 @MainActor
@@ -68,9 +69,12 @@ final class RegionSelectionOverlay {
             height: rect.height
         )
 
+        let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID ?? kCGNullDirectDisplay
+
         let selection = RegionSelection(
             pointsRect: pointsRect,
-            scaleFactor: screen.backingScaleFactor
+            scaleFactor: screen.backingScaleFactor,
+            displayID: displayID
         )
 
         closeOverlays()
