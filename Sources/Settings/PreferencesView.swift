@@ -671,6 +671,7 @@ struct RecordingSettingsTab: View {
     @AppStorage("bs_recordingFPS") private var recordingFPS: Int = 30
     @AppStorage("bs_recordingShowCursor") private var showCursor: Bool = true
     @AppStorage("bs_recordingCaptureAudio") private var captureAudio: Bool = false
+    @AppStorage("bs_recordingCaptureMicrophone") private var captureMicrophone: Bool = false
     @AppStorage("bs_recordingOpenEditor") private var openEditor: Bool = true
 
     var body: some View {
@@ -691,6 +692,7 @@ struct RecordingSettingsTab: View {
             Section("Capture") {
                 Toggle("Show cursor in recording", isOn: $showCursor)
                 Toggle("Capture system audio", isOn: $captureAudio)
+                Toggle("Capture microphone", isOn: $captureMicrophone)
             }
 
             Section("After Recording") {
@@ -706,6 +708,7 @@ struct RecordingSettingsTab: View {
                     recordingFPS = 30
                     showCursor = true
                     captureAudio = false
+                    captureMicrophone = false
                     openEditor = true
                 }
                 .controlSize(.small)

@@ -16,6 +16,7 @@ enum AppPreferences {
     private static let recordingFPSKey = "bs_recordingFPS"
     private static let recordingShowCursorKey = "bs_recordingShowCursor"
     private static let recordingCaptureAudioKey = "bs_recordingCaptureAudio"
+    private static let recordingCaptureMicrophoneKey = "bs_recordingCaptureMicrophone"
     private static let recordingOpenEditorKey = "bs_recordingOpenEditor"
 
     // MARK: - Appearance
@@ -111,6 +112,11 @@ enum AppPreferences {
     static var recordingCaptureAudio: Bool {
         get { UserDefaults.standard.object(forKey: recordingCaptureAudioKey) as? Bool ?? false }
         set { UserDefaults.standard.set(newValue, forKey: recordingCaptureAudioKey) }
+    }
+
+    static var recordingCaptureMicrophone: Bool {
+        get { UserDefaults.standard.object(forKey: recordingCaptureMicrophoneKey) as? Bool ?? false }
+        set { UserDefaults.standard.set(newValue, forKey: recordingCaptureMicrophoneKey) }
     }
 
     static var recordingOpenEditor: Bool {

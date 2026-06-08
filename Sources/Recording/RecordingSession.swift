@@ -6,6 +6,7 @@ final class RecordingSession: @unchecked Sendable {
     private let videoInput: AVAssetWriterInput
     private let adaptor: AVAssetWriterInputPixelBufferAdaptor
     private let audioInput: AVAssetWriterInput?
+    private let micInput: AVAssetWriterInput?
 
     private let lock = NSLock()
     private var _isCapturing = false
@@ -17,7 +18,7 @@ final class RecordingSession: @unchecked Sendable {
         set { lock.withLock { _isCapturing = newValue } }
     }
 
-    init(outputURL: URL, width: Int, height: Int, fps: Int, includeAudio: Bool) throws {
+    init(outputURL: URL, width: Int, height: Int, fps: Int, includeAudio: Bool, includeMic: Bool) throws {
         writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
 
         let videoSettings: [String: Any] = [
@@ -58,6 +59,21 @@ final class RecordingSession: @unchecked Sendable {
             audioInput = input
         } else {
             audioInput = nil
+        }
+
+        if includeMic {
+            let micSettings: [String: Any] = [
+                AVFormatIDKey: kAudioFormatMPEG4AAC,
+                AVSampleRateKey: 48000,
+                AVNumberOfChannelsKey: 1,
+                AVEncoderBitRateKey: 64_000,
+            ]
+            let input = AVAssetWriterInput(mediaType: .audio, outputSettings: micSettings)
+            input.expectsMediaDataInRealTime = true
+            writer.add(input)
+            micInput = input
+        } else {
+            micInput = nil
         }
     }
 
@@ -104,9 +120,23 @@ final class RecordingSession: @unchecked Sendable {
         audioInput.append(sampleBuffer)
     }
 
+    func appendMicSample(_ sampleBuffer: CMSampleBuffer) {
+        lock.lock()
+        guard _isCapturing, _sessionStarted else { lock.unlock(); return }
+
+        let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        guard let first = _firstTimestamp, timestamp >= first else { lock.unlock(); return }
+
+        lock.unlock()
+
+        guard let micInput, micInput.isReadyForMoreMediaData else { return }
+        micInput.append(sampleBuffer)
+    }
+
     func finishInputs() {
         videoInput.markAsFinished()
         audioInput?.markAsFinished()
+        micInput?.markAsFinished()
     }
 
     func finishWriting() async {

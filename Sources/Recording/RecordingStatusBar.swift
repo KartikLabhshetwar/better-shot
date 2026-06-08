@@ -31,6 +31,12 @@ struct RecordingStatusBarView: View {
                 .frame(width: 1, height: 18)
 
             HStack(spacing: 2) {
+                if AppPreferences.recordingCaptureMicrophone {
+                    iconButton(icon: recorder.isMicMuted ? "mic.slash.fill" : "mic.fill", tint: recorder.isMicMuted ? .red : .white.opacity(0.85)) {
+                        recorder.toggleMicMute()
+                    }
+                }
+
                 iconButton(icon: isPaused ? "play.fill" : "pause.fill") {
                     recorder.togglePause()
                 }

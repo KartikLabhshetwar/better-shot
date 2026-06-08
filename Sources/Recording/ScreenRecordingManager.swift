@@ -17,11 +17,13 @@ final class ScreenRecordingManager: NSObject {
 
     private(set) var state: State = .idle
     private(set) var elapsedSeconds: Int = 0
+    var isMicMuted: Bool = false
 
     private var stream: SCStream?
     private var session: RecordingSession?
     private var outputURL: URL?
     private var timer: Timer?
+    private var micCapture: MicrophoneCapture?
     nonisolated(unsafe) private var _streamSession: RecordingSession?
 
     private let videoQueue = DispatchQueue(label: "com.bettershot.recording.video", qos: .userInitiated)
@@ -176,6 +178,14 @@ final class ScreenRecordingManager: NSObject {
             config.channelCount = 2
         }
 
+        let captureMic = AppPreferences.recordingCaptureMicrophone
+        if captureMic {
+            let status = AVCaptureDevice.authorizationStatus(for: .audio)
+            if status == .notDetermined {
+                _ = await AVCaptureDevice.requestAccess(for: .audio)
+            }
+        }
+
         let dir = AppPreferences.saveDirectory
         let stamp = Int(Date().timeIntervalSince1970 * 1000)
         let path = "\(dir)/bettershot_\(stamp).mp4"
@@ -187,7 +197,8 @@ final class ScreenRecordingManager: NSObject {
             width: width,
             height: height,
             fps: fps,
-            includeAudio: captureAudio
+            includeAudio: captureAudio,
+            includeMic: captureMic
         )
 
         guard recordingSession.startWriting() else {
@@ -209,6 +220,19 @@ final class ScreenRecordingManager: NSObject {
         try await scStream.startCapture()
         recordingSession.isCapturing = true
 
+        if captureMic {
+            let mic = MicrophoneCapture()
+            mic.onAudioSample = { [weak self] sampleBuffer in
+                guard let self = self else { return }
+                if self.isMicMuted {
+                    self.silenceAudioBuffer(sampleBuffer)
+                }
+                self._streamSession?.appendMicSample(sampleBuffer)
+            }
+            mic.start()
+            self.micCapture = mic
+        }
+
         state = .recording
         elapsedSeconds = 0
         startTimer()
@@ -224,6 +248,10 @@ final class ScreenRecordingManager: NSObject {
         stopTimer()
 
         session?.isCapturing = false
+
+        micCapture?.stop()
+        micCapture = nil
+        isMicMuted = false
 
         if let stream {
             try? stream.removeStreamOutput(self, type: .screen)
@@ -273,6 +301,10 @@ final class ScreenRecordingManager: NSObject {
         stopTimer()
         session?.isCapturing = false
 
+        micCapture?.stop()
+        micCapture = nil
+        isMicMuted = false
+
         if let stream {
             try? stream.removeStreamOutput(self, type: .screen)
             try? stream.removeStreamOutput(self, type: .audio)
@@ -307,6 +339,16 @@ final class ScreenRecordingManager: NSObject {
         timer?.invalidate()
         timer = nil
     }
+
+    private func silenceAudioBuffer(_ sampleBuffer: CMSampleBuffer) {
+        guard let blockBuffer = CMSampleBufferGetDataBuffer(sampleBuffer) else { return }
+        let length = CMBlockBufferGetDataLength(blockBuffer)
+        _ = CMBlockBufferFillDataBytes(with: 0, blockBuffer: blockBuffer, offsetIntoDestination: 0, dataLength: length)
+    }
+
+    func toggleMicMute() {
+        isMicMuted.toggle()
+    }
 }
 
 // MARK: - SCStreamDelegate
@@ -331,8 +373,64 @@ extension ScreenRecordingManager: SCStreamOutput {
             _streamSession?.appendVideoSample(sampleBuffer)
         case .audio:
             _streamSession?.appendAudioSample(sampleBuffer)
+        case .microphone:
+            break
         @unknown default:
             break
         }
+    }
+}
+
+// MARK: - MicrophoneCapture Helper
+
+final class MicrophoneCapture: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate {
+    private var captureSession: AVCaptureSession?
+    private var audioOutput: AVCaptureAudioDataOutput?
+    private let sampleQueue = DispatchQueue(label: "com.bettershot.recording.mic", qos: .userInteractive)
+
+    var onAudioSample: ((CMSampleBuffer) -> Void)?
+
+    func start() {
+        let session = AVCaptureSession()
+
+        guard let mic = AVCaptureDevice.default(for: .audio),
+              let input = try? AVCaptureDeviceInput(device: mic) else { return }
+
+        if session.canAddInput(input) {
+            session.addInput(input)
+        }
+
+        let output = AVCaptureAudioDataOutput()
+        
+        let audioSettings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVNumberOfChannelsKey: 1,
+            AVSampleRateKey: 48000.0,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsNonInterleaved: false
+        ]
+        output.audioSettings = audioSettings
+        
+        output.setSampleBufferDelegate(self, queue: sampleQueue)
+        if session.canAddOutput(output) {
+            session.addOutput(output)
+        }
+
+        self.captureSession = session
+        self.audioOutput = output
+
+        session.startRunning()
+    }
+
+    func stop() {
+        captureSession?.stopRunning()
+        captureSession = nil
+        audioOutput = nil
+    }
+
+    nonisolated func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        onAudioSample?(sampleBuffer)
     }
 }
