@@ -187,9 +187,8 @@ final class ScreenRecordingManager: NSObject {
         }
 
         let dir = AppPreferences.saveDirectory
-        let stamp = Int(Date().timeIntervalSince1970 * 1000)
-        let path = "\(dir)/bettershot_\(stamp).mp4"
-        let url = URL(fileURLWithPath: path)
+        let filename = AppPreferences.generateFileName(extension: "mp4")
+        let url = URL(fileURLWithPath: "\(dir)/\(filename)")
         outputURL = url
 
         let recordingSession = try RecordingSession(

@@ -116,9 +116,8 @@ final class VideoEditorModel {
         let asset = AVURLAsset(url: sourceURL)
 
         let dir = AppPreferences.saveDirectory
-        let stamp = Int(Date().timeIntervalSince1970 * 1000)
-        let outputPath = "\(dir)/bettershot_\(stamp).mp4"
-        let outputURL = URL(fileURLWithPath: outputPath)
+        let filename = AppPreferences.generateFileName(extension: "mp4")
+        let outputURL = URL(fileURLWithPath: "\(dir)/\(filename)")
 
         var exportConfig = config
         if exportConfig.style != .none && exportConfig.padding <= 0 {

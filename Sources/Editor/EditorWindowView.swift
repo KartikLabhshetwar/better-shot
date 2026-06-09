@@ -100,10 +100,9 @@ struct EditorWindowView: View {
         guard let rendered = model.renderFinal() else { return }
 
         let dir = AppPreferences.saveDirectory
-        let stamp = Int(Date().timeIntervalSince1970 * 1000)
         let ext = AppPreferences.exportFormat.fileExtension
-        let path = "\(dir)/bettershot_\(stamp).\(ext)"
-        let url = URL(fileURLWithPath: path)
+        let filename = AppPreferences.generateFileName(extension: ext)
+        let url = URL(fileURLWithPath: "\(dir)/\(filename)")
 
         guard let dest = CGImageDestinationCreateWithURL(
             url as CFURL,
@@ -161,7 +160,8 @@ struct EditorWindowView: View {
     private func copyToClipboard() async {
         guard let rendered = model.renderFinal() else { return }
 
-        let nsImage = NSImage(cgImage: rendered, size: NSSize(width: rendered.width, height: rendered.height))
+        let scale = NSScreen.main?.backingScaleFactor ?? 2.0
+        let nsImage = NSImage(cgImage: rendered, size: NSSize(width: CGFloat(rendered.width) / scale, height: CGFloat(rendered.height) / scale))
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.writeObjects([nsImage])

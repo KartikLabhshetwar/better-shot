@@ -200,7 +200,8 @@ struct PreviewCardView: View {
                 generator.maximumSize = CGSize(width: 260, height: 196)
                 if let result = try? await generator.image(at: .zero) {
                     let cgImage = result.image
-                    let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+                    let scale = NSScreen.main?.backingScaleFactor ?? 2.0
+                    let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: CGFloat(cgImage.width) / scale, height: CGFloat(cgImage.height) / scale))
                     await MainActor.run { thumbnail = nsImage }
                 }
             }

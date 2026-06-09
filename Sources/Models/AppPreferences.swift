@@ -138,6 +138,17 @@ enum AppPreferences {
             }
         }
     }
+    
+    static func generateFileName(extension ext: String) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd_HHmmss"
+        let dateString = formatter.string(from: Date())
+        
+        let allowedChars = "abcdefghijklmnopqrstuvwxyz"
+        let randomSuffix = String((0..<4).compactMap { _ in allowedChars.randomElement() })
+        
+        return "bettershot_\(dateString)_\(randomSuffix).\(ext)"
+    }
 }
 
 // MARK: - Enums
