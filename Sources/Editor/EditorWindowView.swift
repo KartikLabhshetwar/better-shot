@@ -135,8 +135,9 @@ struct EditorWindowView: View {
         if AppPreferences.copyAfterSave {
             let pb = NSPasteboard.general
             pb.clearContents()
-            if let nsImage = NSImage(contentsOf: url) {
-                pb.writeObjects([nsImage])
+            if let data = try? Data(contentsOf: url) {
+                pb.declareTypes([.png], owner: nil)
+                pb.setData(data, forType: .png)
             }
         }
 
@@ -160,11 +161,13 @@ struct EditorWindowView: View {
     private func copyToClipboard() async {
         guard let rendered = model.renderFinal() else { return }
 
-        let scale = NSScreen.main?.backingScaleFactor ?? 2.0
-        let nsImage = NSImage(cgImage: rendered, size: NSSize(width: CGFloat(rendered.width) / scale, height: CGFloat(rendered.height) / scale))
         let pb = NSPasteboard.general
         pb.clearContents()
-        pb.writeObjects([nsImage])
+        let newRep = NSBitmapImageRep(cgImage: rendered)
+        if let pngData = newRep.representation(using: .png, properties: [:]) {
+            pb.declareTypes([.png], owner: nil)
+            pb.setData(pngData, forType: .png)
+        }
         withAnimation { model.toastMessage = "Copied to clipboard" }
     }
 }

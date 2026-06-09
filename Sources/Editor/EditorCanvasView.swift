@@ -294,10 +294,7 @@ private struct CanvasScreenshotView: View {
     }
 
     var body: some View {
-        let scale = NSScreen.main?.backingScaleFactor ?? 2.0
-        let nsImage = NSImage(cgImage: image, size: NSSize(width: CGFloat(image.width) / scale, height: CGFloat(image.height) / scale))
-
-        Image(nsImage: nsImage)
+        Image(decorative: image, scale: 1.0)
             .resizable()
             .interpolation(.high)
             .clipShape(clipShape)

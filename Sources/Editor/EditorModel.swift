@@ -103,8 +103,7 @@ final class EditorModel {
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return }
         sourceImage = image
         imageSize = CGSize(width: image.width, height: image.height)
-        let scale = NSScreen.main?.backingScaleFactor ?? 2.0
-        previewImage = NSImage(cgImage: image, size: NSSize(width: CGFloat(image.width) / scale, height: CGFloat(image.height) / scale))
+        previewImage = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
 
         config = AppPreferences.defaultBeautifierConfig
 
@@ -497,8 +496,7 @@ final class EditorModel {
 
         guard let composited = ctx.makeImage() else { return }
         sourceImage = composited
-        let backingScale = NSScreen.main?.backingScaleFactor ?? 2.0
-        previewImage = NSImage(cgImage: composited, size: NSSize(width: CGFloat(composited.width) / backingScale, height: CGFloat(composited.height) / backingScale))
+        previewImage = NSImage(cgImage: composited, size: NSSize(width: composited.width, height: composited.height))
     }
 
     // MARK: - Render

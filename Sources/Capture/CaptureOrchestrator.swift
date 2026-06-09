@@ -203,9 +203,12 @@ final class CaptureOrchestrator {
     private func copyToClipboard(_ url: URL) {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return }
-        let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
         let pb = NSPasteboard.general
         pb.clearContents()
-        pb.writeObjects([nsImage])
+        let newRep = NSBitmapImageRep(cgImage: cgImage)
+        if let pngData = newRep.representation(using: .png, properties: [:]) {
+            pb.declareTypes([.png], owner: nil)
+            pb.setData(pngData, forType: .png)
+        }
     }
 }
