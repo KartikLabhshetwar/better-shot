@@ -78,7 +78,7 @@ struct EditorWindowView: View {
                 } label: {
                     Label("Copy", systemImage: "doc.on.doc")
                 }
-                .keyboardShortcut("c", modifiers: [.command, .shift])
+                .keyboardShortcut("c", modifiers: .command)
 
                 Button {
                     Task { await exportImage() }
