@@ -57,7 +57,8 @@ final class AppUpdater {
                     ?? assets.first { ($0["name"] as? String)?.hasSuffix(".dmg") == true }
 
                 if let assetURLString = dmgAsset?["browser_download_url"] as? String,
-                   let assetURL = URL(string: assetURLString) {
+                   let assetURL = URL(string: assetURLString),
+                   isTrustedAssetURL(assetURL) {
                     state = .available(version: latestVersion, url: assetURL)
                     ToastWindow.shared.show(
                         title: "Update Available",
@@ -115,10 +116,11 @@ final class AppUpdater {
                     ?? assets.first { ($0["name"] as? String)?.hasSuffix(".dmg") == true }
 
                 if let assetURLString = dmgAsset?["browser_download_url"] as? String,
-                   let assetURL = URL(string: assetURLString) {
+                   let assetURL = URL(string: assetURLString),
+                   isTrustedAssetURL(assetURL) {
                     state = .available(version: latestVersion, url: assetURL)
                 } else {
-                    state = .failed("No .dmg asset found in latest release")
+                    state = .failed("No trusted .dmg asset found in latest release")
                 }
             } else {
                 state = .upToDate
@@ -190,6 +192,14 @@ final class AppUpdater {
 
             guard let currentAppURL = Bundle.main.bundleURL as URL? else {
                 state = .failed("Cannot determine current app location")
+                return
+            }
+
+            // Security: refuse to install anything that isn't validly signed by the
+            // same team as the running app. Without this, a compromised release asset
+            // is silent arbitrary code execution.
+            if let verifyError = await Self.verifyUpdateBundle(appBundle, against: currentAppURL) {
+                state = .failed("Update rejected: \(verifyError)")
                 return
             }
 
@@ -265,10 +275,89 @@ final class AppUpdater {
         }
     }
 
+    /// Only accept release assets hosted on this repo's GitHub releases page.
+    private func isTrustedAssetURL(_ url: URL) -> Bool {
+        url.scheme == "https"
+            && url.host == "github.com"
+            && url.path.hasPrefix("/\(owner)/\(repo)/releases/download/")
+    }
+
+    /// Verifies the candidate bundle has a valid code signature and the same
+    /// Team ID as the running app. Returns an error message, or nil if OK.
+    private static func verifyUpdateBundle(_ candidate: URL, against currentApp: URL) async -> String? {
+        guard let currentTeam = await teamIdentifier(of: currentApp) else {
+            return "current app is unsigned; cannot establish a trust anchor for updates"
+        }
+        let verify = await runProcess("/usr/bin/codesign", ["--verify", "--deep", "--strict", candidate.path])
+        guard verify == 0 else {
+            return "downloaded app failed code signature verification"
+        }
+        guard let candidateTeam = await teamIdentifier(of: candidate) else {
+            return "downloaded app has no Team ID"
+        }
+        guard candidateTeam == currentTeam else {
+            return "downloaded app is signed by a different team (\(candidateTeam))"
+        }
+        return nil
+    }
+
+    /// Parses `TeamIdentifier=` from `codesign -dv` output; nil if unsigned or "not set".
+    private static func teamIdentifier(of bundle: URL) async -> String? {
+        let output = await runProcessCapturingOutput("/usr/bin/codesign", ["-dv", bundle.path])
+        guard let line = output?.split(separator: "\n").first(where: { $0.hasPrefix("TeamIdentifier=") }) else {
+            return nil
+        }
+        let team = String(line.dropFirst("TeamIdentifier=".count)).trimmingCharacters(in: .whitespaces)
+        return (team.isEmpty || team == "not set") ? nil : team
+    }
+
+    private static func runProcess(_ path: String, _ arguments: [String]) async -> Int32 {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: path)
+                process.arguments = arguments
+                process.standardOutput = FileHandle.nullDevice
+                process.standardError = FileHandle.nullDevice
+                do {
+                    try process.run()
+                    process.waitUntilExit()
+                    continuation.resume(returning: process.terminationStatus)
+                } catch {
+                    continuation.resume(returning: -1)
+                }
+            }
+        }
+    }
+
+    private static func runProcessCapturingOutput(_ path: String, _ arguments: [String]) async -> String? {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: path)
+                process.arguments = arguments
+                let pipe = Pipe()
+                // codesign -dv writes details to stderr
+                process.standardOutput = pipe
+                process.standardError = pipe
+                do {
+                    try process.run()
+                } catch {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+                continuation.resume(returning: String(data: data, encoding: .utf8))
+            }
+        }
+    }
+
     private func relaunchApp(at appURL: URL) {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/sh")
-        task.arguments = ["-c", "sleep 1 && open \"\(appURL.path)\""]
+        // Path passed as $0, not interpolated — immune to shell metacharacters.
+        task.arguments = ["-c", "sleep 1 && open \"$0\"", appURL.path]
         try? task.run()
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
