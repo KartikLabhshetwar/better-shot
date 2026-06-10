@@ -99,7 +99,7 @@ struct EditorWindowView: View {
     private func exportImage() async {
         guard let rendered = model.renderFinal() else { return }
 
-        let dir = AppPreferences.saveDirectory
+        let dir = AppPreferences.saveDirectoryScreenshots
         let ext = AppPreferences.exportFormat.fileExtension
         let filename = AppPreferences.generateFileName(extension: ext)
         let url = URL(fileURLWithPath: "\(dir)/\(filename)")

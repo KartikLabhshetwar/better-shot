@@ -186,7 +186,7 @@ final class ScreenRecordingManager: NSObject {
             }
         }
 
-        let dir = AppPreferences.saveDirectory
+        let dir = AppPreferences.saveDirectoryRecordings
         let filename = AppPreferences.generateFileName(extension: "mp4")
         let url = URL(fileURLWithPath: "\(dir)/\(filename)")
         outputURL = url

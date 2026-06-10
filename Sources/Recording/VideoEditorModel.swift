@@ -115,7 +115,7 @@ final class VideoEditorModel {
         guard let sourceURL else { return nil }
         let asset = AVURLAsset(url: sourceURL)
 
-        let dir = AppPreferences.saveDirectory
+        let dir = AppPreferences.saveDirectoryRecordings
         let filename = AppPreferences.generateFileName(extension: "mp4")
         let outputURL = URL(fileURLWithPath: "\(dir)/\(filename)")
 

@@ -6,6 +6,8 @@ enum AppPreferences {
     // MARK: - Keys
     private static let appearanceKey = "bs_appAppearance"
     private static let saveDirKey = "bs_saveDirectory"
+    private static let saveDirScreenshotsKey = "bs_saveDirectoryScreenshots"
+    private static let saveDirRecordingsKey = "bs_saveDirectoryRecordings"
     private static let copyAfterSaveKey = "bs_copyAfterSave"
     private static let playSoundKey = "bs_playSound"
     private static let overlayPositionKey = "bs_overlayPosition"
@@ -38,6 +40,16 @@ enum AppPreferences {
     static var saveDirectory: String {
         get { UserDefaults.standard.string(forKey: saveDirKey) ?? NSHomeDirectory() + "/Desktop" }
         set { UserDefaults.standard.set(newValue, forKey: saveDirKey) }
+    }
+
+    static var saveDirectoryScreenshots: String {
+        get { UserDefaults.standard.string(forKey: saveDirScreenshotsKey) ?? UserDefaults.standard.string(forKey: saveDirKey) ?? NSHomeDirectory() + "/Desktop" }
+        set { UserDefaults.standard.set(newValue, forKey: saveDirScreenshotsKey) }
+    }
+
+    static var saveDirectoryRecordings: String {
+        get { UserDefaults.standard.string(forKey: saveDirRecordingsKey) ?? UserDefaults.standard.string(forKey: saveDirKey) ?? NSHomeDirectory() + "/Desktop" }
+        set { UserDefaults.standard.set(newValue, forKey: saveDirRecordingsKey) }
     }
 
     static var copyAfterSave: Bool {

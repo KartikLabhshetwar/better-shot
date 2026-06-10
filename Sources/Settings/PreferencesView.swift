@@ -69,6 +69,8 @@ struct PreferencesView: View {
 struct GeneralSettingsTab: View {
     @AppStorage("bs_appAppearance") private var appAppearanceRaw: String = AppAppearance.system.rawValue
     @AppStorage("bs_saveDirectory") private var saveDir = NSHomeDirectory() + "/Desktop"
+    @AppStorage("bs_saveDirectoryScreenshots") private var saveDirScreenshots = NSHomeDirectory() + "/Desktop"
+    @AppStorage("bs_saveDirectoryRecordings") private var saveDirRecordings = NSHomeDirectory() + "/Desktop"
     @AppStorage("bs_copyAfterSave") private var copyAfterSave = true
     @AppStorage("bs_playSound") private var playSound = true
     @AppStorage("bs_exportFormat") private var exportFormatRaw: String = ExportFormat.png.rawValue
@@ -93,9 +95,18 @@ struct GeneralSettingsTab: View {
         )
     }
 
-    private var saveDirDisplayName: String {
-        let url = URL(fileURLWithPath: saveDir)
-        return url.lastPathComponent
+    private var saveDirScreenshotsBinding: Binding<String> {
+        Binding(
+            get: { AppPreferences.saveDirectoryScreenshots },
+            set: { saveDirScreenshots = $0 }
+        )
+    }
+
+    private var saveDirRecordingsBinding: Binding<String> {
+        Binding(
+            get: { AppPreferences.saveDirectoryRecordings },
+            set: { saveDirRecordings = $0 }
+        )
     }
 
     var body: some View {
@@ -111,9 +122,9 @@ struct GeneralSettingsTab: View {
 
             Section("Save") {
                 HStack {
-                    Text("Save to")
+                    Text("Save screenshots to")
                     Spacer()
-                    Text(saveDirDisplayName)
+                    Text(URL(fileURLWithPath: saveDirScreenshotsBinding.wrappedValue).lastPathComponent)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.head)
@@ -122,9 +133,29 @@ struct GeneralSettingsTab: View {
                         panel.canChooseFiles = false
                         panel.canChooseDirectories = true
                         panel.allowsMultipleSelection = false
-                        panel.directoryURL = URL(fileURLWithPath: saveDir)
+                        panel.directoryURL = URL(fileURLWithPath: saveDirScreenshotsBinding.wrappedValue)
                         if panel.runModal() == .OK, let url = panel.url {
-                            saveDir = url.path
+                            saveDirScreenshotsBinding.wrappedValue = url.path
+                        }
+                    }
+                    .controlSize(.small)
+                }
+
+                HStack {
+                    Text("Save recordings to")
+                    Spacer()
+                    Text(URL(fileURLWithPath: saveDirRecordingsBinding.wrappedValue).lastPathComponent)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                    Button("Choose...") {
+                        let panel = NSOpenPanel()
+                        panel.canChooseFiles = false
+                        panel.canChooseDirectories = true
+                        panel.allowsMultipleSelection = false
+                        panel.directoryURL = URL(fileURLWithPath: saveDirRecordingsBinding.wrappedValue)
+                        if panel.runModal() == .OK, let url = panel.url {
+                            saveDirRecordingsBinding.wrappedValue = url.path
                         }
                     }
                     .controlSize(.small)
@@ -196,6 +227,8 @@ struct GeneralSettingsTab: View {
                     appAppearanceRaw = AppAppearance.system.rawValue
                     AppPreferences.applyAppearance()
                     saveDir = NSHomeDirectory() + "/Desktop"
+                    saveDirScreenshots = NSHomeDirectory() + "/Desktop"
+                    saveDirRecordings = NSHomeDirectory() + "/Desktop"
                     copyAfterSave = true
                     playSound = true
                     exportFormatRaw = ExportFormat.png.rawValue

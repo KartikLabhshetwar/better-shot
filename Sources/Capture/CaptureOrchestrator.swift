@@ -146,7 +146,7 @@ final class CaptureOrchestrator {
     }
 
     private func saveImage(_ cgImage: CGImage) -> URL? {
-        let dir = AppPreferences.saveDirectory
+        let dir = AppPreferences.saveDirectoryScreenshots
         let ext = AppPreferences.exportFormat.fileExtension
         let filename = AppPreferences.generateFileName(extension: ext)
         let url = URL(fileURLWithPath: "\(dir)/\(filename)")
