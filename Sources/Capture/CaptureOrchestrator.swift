@@ -142,7 +142,16 @@ final class CaptureOrchestrator {
             )
         }
 
-        PreviewOverlay.shared.show(url: displayURL, on: captureScreen)
+        if AppPreferences.openEditorAfterCapture {
+            let ext = displayURL.pathExtension.lowercased()
+            if ext == "mov" || ext == "mp4" {
+                VideoEditorWindowController.shared.open(url: displayURL, on: captureScreen)
+            } else {
+                EditorWindowController.shared.open(url: displayURL, on: captureScreen)
+            }
+        } else {
+            PreviewOverlay.shared.show(url: displayURL, on: captureScreen)
+        }
     }
 
     private func saveImage(_ cgImage: CGImage) -> URL? {
