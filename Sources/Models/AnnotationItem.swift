@@ -626,18 +626,18 @@ enum AnnotationTool: String, CaseIterable, Identifiable, Codable {
 
     var title: String {
         switch self {
-        case .select: "Select"
-        case .rectangle: "Rectangle"
-        case .filledRectangle: "Solid rectangle"
-        case .ellipse: "Circle"
-        case .line: "Straight line"
-        case .arrow: "Arrow"
-        case .freehand: "Freehand"
-        case .numberedCircle: "Numbered circle"
-        case .pixelate: "Pixelate"
-        case .blur: "Blur"
-        case .spotlight: "Spotlight"
-        case .text: "Text"
+        case .select: L10n.string("Select")
+        case .rectangle: L10n.string("Rectangle")
+        case .filledRectangle: L10n.string("Solid rectangle")
+        case .ellipse: L10n.string("Circle")
+        case .line: L10n.string("Straight line")
+        case .arrow: L10n.string("Arrow")
+        case .freehand: L10n.string("Freehand")
+        case .numberedCircle: L10n.string("Numbered circle")
+        case .pixelate: L10n.string("Pixelate")
+        case .blur: L10n.string("Blur")
+        case .spotlight: L10n.string("Spotlight")
+        case .text: L10n.string("Text")
         }
     }
 
@@ -733,16 +733,16 @@ struct AnnotationSwatch: Identifiable, Equatable, Hashable {
         (0.299 * red + 0.587 * green + 0.114 * blue) > 0.68
     }
 
-    static let black = AnnotationSwatch("black", title: "Black", red: 0.02, green: 0.02, blue: 0.024)
-    static let red = AnnotationSwatch("red", title: "Red", red: 0.97, green: 0.22, blue: 0.2)
-    static let orange = AnnotationSwatch("orange", title: "Orange", red: 1.0, green: 0.53, blue: 0.08)
-    static let yellow = AnnotationSwatch("yellow", title: "Yellow", red: 1, green: 0.82, blue: 0.18)
-    static let green = AnnotationSwatch("green", title: "Green", red: 0.18, green: 0.72, blue: 0.36)
-    static let turquoise = AnnotationSwatch("turquoise", title: "Turquoise", red: 0.20, green: 0.77, blue: 0.72)
-    static let blue = AnnotationSwatch("blue", title: "Blue", red: 0.18, green: 0.48, blue: 1)
-    static let purple = AnnotationSwatch("purple", title: "Purple", red: 0.55, green: 0.30, blue: 0.95)
-    static let pink = AnnotationSwatch("pink", title: "Pink", red: 1.0, green: 0.18, blue: 0.43)
-    static let white = AnnotationSwatch("white", title: "White", red: 0.96, green: 0.96, blue: 0.96)
+    static let black = AnnotationSwatch("black", title: L10n.string("Black"), red: 0.02, green: 0.02, blue: 0.024)
+    static let red = AnnotationSwatch("red", title: L10n.string("Red"), red: 0.97, green: 0.22, blue: 0.2)
+    static let orange = AnnotationSwatch("orange", title: L10n.string("Orange"), red: 1.0, green: 0.53, blue: 0.08)
+    static let yellow = AnnotationSwatch("yellow", title: L10n.string("Yellow"), red: 1, green: 0.82, blue: 0.18)
+    static let green = AnnotationSwatch("green", title: L10n.string("Green"), red: 0.18, green: 0.72, blue: 0.36)
+    static let turquoise = AnnotationSwatch("turquoise", title: L10n.string("Turquoise"), red: 0.20, green: 0.77, blue: 0.72)
+    static let blue = AnnotationSwatch("blue", title: L10n.string("Blue"), red: 0.18, green: 0.48, blue: 1)
+    static let purple = AnnotationSwatch("purple", title: L10n.string("Purple"), red: 0.55, green: 0.30, blue: 0.95)
+    static let pink = AnnotationSwatch("pink", title: L10n.string("Pink"), red: 1.0, green: 0.18, blue: 0.43)
+    static let white = AnnotationSwatch("white", title: L10n.string("White"), red: 0.96, green: 0.96, blue: 0.96)
 
     static let allCases: [AnnotationSwatch] = [
         .black, .red, .orange, .yellow, .green, .turquoise, .blue, .purple, .pink, .white
@@ -760,7 +760,7 @@ struct AnnotationSwatch: Identifiable, Equatable, Hashable {
         let alpha = converted.alphaComponent
         return AnnotationSwatch(
             "custom-\(Int(red * 255))-\(Int(green * 255))-\(Int(blue * 255))-\(Int(alpha * 255))",
-            title: "Custom",
+            title: L10n.string("Custom"),
             red: red,
             green: green,
             blue: blue,

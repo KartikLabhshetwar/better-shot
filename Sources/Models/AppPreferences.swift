@@ -145,9 +145,9 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .system: return "System"
-        case .light: return "Light"
-        case .dark: return "Dark"
+        case .system: return L10n.string("System")
+        case .light: return L10n.string("Light")
+        case .dark: return L10n.string("Dark")
         }
     }
 
@@ -191,7 +191,7 @@ enum SelfTimerDelay: Int, CaseIterable {
 
     var label: String {
         switch self {
-        case .off: return "Off"
+        case .off: return L10n.string("Off")
         default: return "\(rawValue)s"
         }
     }

@@ -23,6 +23,8 @@ targets:
       - path: Resources/Backgrounds
         type: folder
         buildPhase: resources
+      - path: Resources/Localization
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bettershot.app

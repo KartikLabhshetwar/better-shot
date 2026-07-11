@@ -301,7 +301,7 @@ struct VideoEditorView: View {
             }
             _ = HistoryStore.shared.importCapture(from: exportedURL, deleteSource: false, kind: .recording)
             let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage
-            ToastWindow.shared.show(message: "Recording exported!", icon: appIcon)
+            ToastWindow.shared.show(message: L10n.string("Recording exported!"), icon: appIcon)
             model.cleanup()
             NSApp.keyWindow?.close()
         }
@@ -316,7 +316,7 @@ private struct VideoInspectorSectionHeader: View {
     init(_ title: String) { self.title = title }
 
     var body: some View {
-        Text(title)
+        Text(L10n.string(title))
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(.tertiary)
             .tracking(0.5)
@@ -353,7 +353,7 @@ private struct VideoTrimSection: View {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.counterclockwise")
                                 .font(.caption)
-                            Text("Reset")
+                            Text(L10n.string("Reset"))
                                 .font(.caption2)
                         }
                         .padding(.vertical, 4)
@@ -366,7 +366,7 @@ private struct VideoTrimSection: View {
 
             VStack(spacing: 4) {
                 HStack {
-                    Text("Start")
+                    Text(L10n.string("Start"))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                     Spacer()
@@ -375,7 +375,7 @@ private struct VideoTrimSection: View {
                         .foregroundStyle(model.hasTrim ? AnyShapeStyle(.secondary) : AnyShapeStyle(.quaternary))
                 }
                 HStack {
-                    Text("End")
+                    Text(L10n.string("End"))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                     Spacer()
@@ -384,7 +384,7 @@ private struct VideoTrimSection: View {
                         .foregroundStyle(model.hasTrim ? AnyShapeStyle(.secondary) : AnyShapeStyle(.quaternary))
                 }
                 HStack {
-                    Text("Duration")
+                    Text(L10n.string("Duration"))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                     Spacer()
@@ -413,7 +413,7 @@ private struct VideoEffectsSection: View {
 
             VStack(spacing: 4) {
                 HStack {
-                    Text("Padding")
+                    Text(L10n.string("Padding"))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                     Spacer()
@@ -427,7 +427,7 @@ private struct VideoEffectsSection: View {
 
             VStack(spacing: 4) {
                 HStack {
-                    Text("Corner Radius")
+                    Text(L10n.string("Corner Radius"))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                     Spacer()
@@ -441,7 +441,7 @@ private struct VideoEffectsSection: View {
 
             VStack(spacing: 4) {
                 HStack {
-                    Text("Shadow")
+                    Text(L10n.string("Shadow"))
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                     Spacer()
@@ -469,7 +469,7 @@ private struct VideoBackgroundSection: View {
         VStack(alignment: .leading, spacing: 10) {
             VideoInspectorSectionHeader("BACKGROUND")
 
-            Text("Solid")
+            Text(L10n.string("Solid"))
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
 
@@ -481,7 +481,7 @@ private struct VideoBackgroundSection: View {
                 }
             }
 
-            Text("Gradients")
+            Text(L10n.string("Gradients"))
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
 
@@ -491,7 +491,7 @@ private struct VideoBackgroundSection: View {
                 }
             }
 
-            Text("macOS")
+            Text(L10n.string("macOS"))
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
 
@@ -551,7 +551,7 @@ private struct VideoBackgroundSection: View {
                 )
         }
         .buttonStyle(.plain)
-        .help(color.name)
+        .help(color.localizedName)
     }
 
     private func gradientButton(_ preset: GradientPreset) -> some View {
@@ -572,7 +572,7 @@ private struct VideoBackgroundSection: View {
                 )
         }
         .buttonStyle(.plain)
-        .help(preset.name)
+        .help(preset.localizedName)
     }
 
     private func bundledImageButton(_ asset: BundledBackgrounds.ImageAsset) -> some View {
@@ -628,7 +628,7 @@ private struct VideoBackgroundSection: View {
                 Spacer()
 
                 Button { pickCustomWallpaper() } label: {
-                    Text("Change").font(.caption2)
+                    Text(L10n.string("Change")).font(.caption2)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.mini)
@@ -637,7 +637,7 @@ private struct VideoBackgroundSection: View {
             Button { pickCustomWallpaper() } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "plus").font(.caption2)
-                    Text("Custom Image...").font(.caption2)
+                    Text(L10n.string("Custom Image...")).font(.caption2)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
@@ -658,7 +658,7 @@ private struct VideoBackgroundSection: View {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.canCreateDirectories = false
-        panel.title = "Choose Background Image"
+        panel.title = L10n.string("Choose Background Image")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         model.config.style = .wallpaper(WallpaperSource(path: url.path))
     }
@@ -680,7 +680,7 @@ private struct VideoCropSection: View {
                     HStack(spacing: 4) {
                         Image(systemName: "crop")
                             .font(.caption)
-                        Text(model.isCropping ? "Done" : "Crop")
+                        Text(L10n.string(model.isCropping ? "Done" : "Crop"))
                             .font(.caption2)
                     }
                     .frame(maxWidth: .infinity)
@@ -700,7 +700,7 @@ private struct VideoCropSection: View {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.counterclockwise")
                                 .font(.caption)
-                            Text("Reset")
+                            Text(L10n.string("Reset"))
                                 .font(.caption2)
                         }
                         .padding(.vertical, 6)

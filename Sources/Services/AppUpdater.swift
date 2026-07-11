@@ -60,8 +60,8 @@ final class AppUpdater {
                    let assetURL = URL(string: assetURLString) {
                     state = .available(version: latestVersion, url: assetURL)
                     ToastWindow.shared.show(
-                        title: "Update Available",
-                        message: "Version \(latestVersion) is available",
+                        title: L10n.string("Update Available"),
+                        message: L10n.format("Version %@ is available", latestVersion),
                         systemIcon: "arrow.down.circle"
                     )
                 }

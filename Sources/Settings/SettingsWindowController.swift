@@ -26,7 +26,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             defer: false
         )
         win.contentView = hostingView
-        win.title = "Settings"
+        win.title = L10n.string("Settings")
         win.isReleasedWhenClosed = false
         win.delegate = self
         win.collectionBehavior = [.transient, .moveToActiveSpace]

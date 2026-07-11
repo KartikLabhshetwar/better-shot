@@ -56,11 +56,11 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
 
     private static func promptRestart() {
         let alert = NSAlert()
-        alert.messageText = "Restart Required"
-        alert.informativeText = "BetterShot needs to restart to activate keyboard shortcut overrides. Restart now?"
+        alert.messageText = L10n.string("Restart Required")
+        alert.informativeText = L10n.string("BetterShot needs to restart to activate keyboard shortcut overrides. Restart now?")
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "Restart")
-        alert.addButton(withTitle: "Later")
+        alert.addButton(withTitle: L10n.string("Restart"))
+        alert.addButton(withTitle: L10n.string("Later"))
 
         if alert.runModal() == .alertFirstButtonReturn {
             let task = Process()

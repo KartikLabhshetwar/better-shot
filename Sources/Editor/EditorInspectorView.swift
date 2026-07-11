@@ -23,7 +23,7 @@ struct EditorInspectorView: View {
                         Button(role: .destructive) {
                             model.clearAnnotations()
                         } label: {
-                            Label("Clear All", systemImage: "trash")
+                            Label(L10n.string("Clear All"), systemImage: "trash")
                                 .font(.caption)
                                 .frame(maxWidth: .infinity)
                         }
@@ -41,7 +41,7 @@ struct EditorInspectorView: View {
                             InspectorSectionHeader("STYLE")
 
                             if model.selectionCount > 1 {
-                                Text("\(model.selectionCount) annotations selected")
+                                Text(L10n.format("%d annotations selected", model.selectionCount))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -63,7 +63,7 @@ struct EditorInspectorView: View {
                             if model.isRedactionStyleAvailable {
                                 VStack(spacing: 4) {
                                     HStack {
-                                        Text("Density")
+                                        Text(L10n.string("Density"))
                                             .font(.caption2)
                                             .foregroundStyle(.tertiary)
                                         Spacer()
@@ -134,7 +134,7 @@ private struct InspectorSectionHeader: View {
     init(_ title: String) { self.title = title }
 
     var body: some View {
-        Text(title)
+        Text(L10n.string(title))
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(.tertiary)
             .tracking(0.5)
@@ -153,7 +153,7 @@ private struct InspectorRow<Content: View>: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Text(title)
+            Text(L10n.string(title))
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .frame(width: 52, alignment: .leading)
@@ -309,7 +309,7 @@ private struct AnnotationColorPopover: View {
                         ))
                         .frame(width: 22, height: 22)
                         .overlay(Circle().stroke(.white.opacity(0.18), lineWidth: 0.5))
-                    Text("Custom")
+                    Text(L10n.string("Custom"))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.primary)
                 }
@@ -642,7 +642,7 @@ private struct LayoutSection: View {
             InspectorSectionHeader("LAYOUT")
 
             HStack(spacing: 10) {
-                Text("Ratio")
+                Text(L10n.string("Ratio"))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .frame(width: 52, alignment: .leading)
@@ -653,15 +653,15 @@ private struct LayoutSection: View {
                             model.updateConfig { $0.aspectRatio = ratio }
                         } label: {
                             if model.config.aspectRatio == ratio {
-                                Label(ratio.rawValue, systemImage: "checkmark")
+                                Label(ratio.label, systemImage: "checkmark")
                             } else {
-                                Text(ratio.rawValue)
+                                Text(ratio.label)
                             }
                         }
                     }
                 } label: {
                     HStack(spacing: 6) {
-                        Text(model.config.aspectRatio.rawValue)
+                        Text(model.config.aspectRatio.label)
                             .font(.system(size: 12))
                             .foregroundStyle(.primary.opacity(0.8))
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -687,7 +687,7 @@ private struct LayoutSection: View {
             }
 
             HStack(alignment: .top, spacing: 10) {
-                Text("Align")
+                Text(L10n.string("Align"))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .frame(width: 52, alignment: .leading)
@@ -761,7 +761,7 @@ struct BackgroundPickerSection: View {
         VStack(alignment: .leading, spacing: 10) {
             InspectorSectionHeader("BACKGROUND")
 
-            Text("Solid")
+            Text(L10n.string("Solid"))
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
 
@@ -773,7 +773,7 @@ struct BackgroundPickerSection: View {
                 }
             }
 
-            Text("Gradients")
+            Text(L10n.string("Gradients"))
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
 
@@ -783,7 +783,7 @@ struct BackgroundPickerSection: View {
                 }
             }
 
-            Text("macOS")
+            Text(L10n.string("macOS"))
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
 
@@ -823,7 +823,7 @@ struct BackgroundPickerSection: View {
             )
         }
         .buttonStyle(.plain)
-        .help("No background")
+        .help(L10n.string("No background"))
     }
 
     private func solidButton(_ color: SolidColor) -> some View {
@@ -844,7 +844,7 @@ struct BackgroundPickerSection: View {
                 )
         }
         .buttonStyle(.plain)
-        .help(color.name)
+        .help(color.localizedName)
     }
 
     private func gradientButton(_ preset: GradientPreset) -> some View {
@@ -865,7 +865,7 @@ struct BackgroundPickerSection: View {
                 )
         }
         .buttonStyle(.plain)
-        .help(preset.name)
+        .help(preset.localizedName)
     }
 
     private func bundledImageButton(_ asset: BundledBackgrounds.ImageAsset) -> some View {
@@ -923,7 +923,7 @@ struct BackgroundPickerSection: View {
                 Button {
                     pickCustomWallpaper()
                 } label: {
-                    Text("Change")
+                    Text(L10n.string("Change"))
                         .font(.caption2)
                 }
                 .buttonStyle(.bordered)
@@ -935,7 +935,7 @@ struct BackgroundPickerSection: View {
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "plus").font(.caption2)
-                    Text("Custom Image...").font(.caption2)
+                    Text(L10n.string("Custom Image...")).font(.caption2)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
@@ -956,7 +956,7 @@ struct BackgroundPickerSection: View {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.canCreateDirectories = false
-        panel.title = "Choose Background Image"
+        panel.title = L10n.string("Choose Background Image")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let path = url.path
         model.updateConfig { $0.style = .wallpaper(WallpaperSource(path: path)) }
@@ -979,7 +979,7 @@ private struct ImageCropSection: View {
                     HStack(spacing: 4) {
                         Image(systemName: "crop")
                             .font(.caption)
-                        Text(model.isCropping ? "Done" : "Crop")
+                        Text(L10n.string(model.isCropping ? "Done" : "Crop"))
                             .font(.caption2)
                     }
                     .frame(maxWidth: .infinity)
@@ -999,7 +999,7 @@ private struct ImageCropSection: View {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.counterclockwise")
                                 .font(.caption)
-                            Text("Reset")
+                            Text(L10n.string("Reset"))
                                 .font(.caption2)
                         }
                         .padding(.vertical, 6)
@@ -1083,7 +1083,7 @@ struct LabeledSlider: View {
     var body: some View {
         VStack(spacing: 4) {
             HStack {
-                Text(label)
+                Text(L10n.string(label))
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
                 Spacer()

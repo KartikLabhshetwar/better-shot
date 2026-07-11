@@ -11,6 +11,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    var label: String { L10n.string(rawValue) }
+
     var icon: String {
         switch self {
         case .general: return "gearshape"
@@ -29,7 +31,7 @@ struct PreferencesView: View {
     var body: some View {
         HStack(spacing: 0) {
             List(SettingsSection.allCases, selection: $selectedSection) { section in
-                Label(section.rawValue, systemImage: section.icon)
+                Label(section.label, systemImage: section.icon)
                     .tag(section)
             }
             .listStyle(.sidebar)
@@ -186,7 +188,7 @@ struct GeneralSettingsTab: View {
 
                 if exportFormatRaw == ExportFormat.jpeg.rawValue {
                     Slider(value: $exportQuality, in: 0.1...1.0, step: 0.05) {
-                        Text("Quality: \(Int(exportQuality * 100))%")
+                        Text(L10n.format("Quality: %d%%", Int(exportQuality * 100)))
                     }
                 }
             }
@@ -213,7 +215,7 @@ struct GeneralSettingsTab: View {
     private func defaultSlider(label: String, value: Binding<CGFloat>, range: ClosedRange<CGFloat>, format: @escaping (CGFloat) -> String) -> some View {
         VStack(spacing: 4) {
             HStack {
-                Text(label)
+                Text(L10n.string(label))
                     .font(.caption)
                 Spacer()
                 Text(format(value.wrappedValue))
@@ -228,8 +230,8 @@ struct GeneralSettingsTab: View {
     private func backgroundLabel(for style: BackgroundStyle) -> String {
         switch style {
         case .none: return "Transparent"
-        case .solid(let c): return c.name
-        case .gradient(let g): return g.name
+        case .solid(let c): return c.localizedName
+        case .gradient(let g): return g.localizedName
         case .wallpaper: return "Custom Image"
         case .bundledImage: return "macOS Wallpaper"
         }
@@ -310,7 +312,7 @@ private struct DefaultBackgroundPicker: View {
                 )
         }
         .buttonStyle(.plain)
-        .help(color.name)
+        .help(color.localizedName)
     }
 
     private func gradientButton(_ preset: GradientPreset) -> some View {
@@ -331,7 +333,7 @@ private struct DefaultBackgroundPicker: View {
                 )
         }
         .buttonStyle(.plain)
-        .help(preset.name)
+        .help(preset.localizedName)
     }
 
     private func bundledImageButton(_ asset: BundledBackgrounds.ImageAsset) -> some View {
@@ -403,7 +405,7 @@ private struct DefaultBackgroundPicker: View {
         panel.allowedContentTypes = [.image, .png, .jpeg]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.title = "Choose Background Image"
+        panel.title = L10n.string("Choose Background Image")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         selectedStyle = .wallpaper(WallpaperSource(path: url.path))
     }
@@ -725,7 +727,7 @@ struct ShortcutRow: View {
 
     var body: some View {
         HStack {
-            Text(label)
+            Text(L10n.string(label))
                 .frame(width: 100, alignment: .leading)
 
             Toggle("", isOn: Binding(
@@ -1166,7 +1168,7 @@ struct AboutTab: View {
                         Text("BetterShot")
                             .font(.system(size: 20, weight: .bold))
 
-                        Text("Version \(version)")
+                        Text(L10n.format("Version %@", version))
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
 
@@ -1220,7 +1222,7 @@ struct AboutTab: View {
 
     private func aboutSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(title)
+            Text(L10n.string(title))
                 .font(.system(size: 13, weight: .bold))
                 .padding(.bottom, 10)
 
@@ -1251,7 +1253,7 @@ struct AboutTab: View {
 
         case .available(let newVersion, let url):
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version \(newVersion) is available!")
+                Text(L10n.format("Version %@ is available!", newVersion))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.green)
 
@@ -1268,7 +1270,7 @@ struct AboutTab: View {
                     .progressViewStyle(.linear)
                     .frame(maxWidth: 220)
 
-                Text("Downloading… \(Int(progress * 100))%")
+                Text(L10n.format("Downloading… %d%%", Int(progress * 100)))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
 
@@ -1281,7 +1283,7 @@ struct AboutTab: View {
 
         case .readyToInstall(let newVersion, let dmgPath):
             VStack(alignment: .leading, spacing: 6) {
-                Text("Version \(newVersion) downloaded")
+                Text(L10n.format("Version %@ downloaded", newVersion))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.green)
 
@@ -1308,7 +1310,7 @@ struct AboutTab: View {
 
         case .failed(let message):
             VStack(alignment: .leading, spacing: 6) {
-                Text("Update failed: \(message)")
+                Text(L10n.format("Update failed: %@", message))
                     .font(.system(size: 12))
                     .foregroundStyle(.red)
 

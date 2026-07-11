@@ -76,7 +76,7 @@ struct MenuBarContentView: View {
             if PinnedScreenshotController.shared.hasPinnedWindows {
                 TrayDivider()
 
-                TrayFullWidthButton(title: "Unpin All", icon: "pin.slash") {
+                TrayFullWidthButton(title: L10n.string("Unpin All"), icon: "pin.slash") {
                     PinnedScreenshotController.shared.unpinAll()
                     dismissPopover()
                 }
@@ -105,24 +105,24 @@ struct MenuBarContentView: View {
         ]
 
         return LazyVGrid(columns: columns, spacing: 6) {
-            TrayGridButton(title: "Region", icon: "rectangle.dashed", shortcut: "\u{2318}4") {
+            TrayGridButton(title: L10n.string("Region"), icon: "rectangle.dashed", shortcut: "\u{2318}4") {
                 dismissAndRun(.region)
             }
 
-            TrayGridButton(title: "Screen", icon: "desktopcomputer", shortcut: "\u{2318}3") {
+            TrayGridButton(title: L10n.string("Screen"), icon: "desktopcomputer", shortcut: "\u{2318}3") {
                 dismissAndRun(.fullscreen)
             }
 
-            TrayGridButton(title: "Window", icon: "macwindow") {
+            TrayGridButton(title: L10n.string("Window"), icon: "macwindow") {
                 dismissAndRun(.window)
             }
 
-            TrayGridButton(title: "Pick Color", icon: "eyedropper") {
+            TrayGridButton(title: L10n.string("Pick Color"), icon: "eyedropper") {
                 dismissAndRun(.colorPicker)
             }
 
-            TrayGridMenu(title: "Record", icon: "record.circle", menuItems: [
-                TrayMenuItem(title: "Full Screen", icon: "desktopcomputer") {
+            TrayGridMenu(title: L10n.string("Record"), icon: "record.circle", menuItems: [
+                TrayMenuItem(title: L10n.string("Full Screen"), icon: "desktopcomputer") {
                     nonisolated(unsafe) let screen = originScreen
                     dismissPopover()
                     Task.detached {
@@ -130,7 +130,7 @@ struct MenuBarContentView: View {
                         await startRecording(mode: .fullScreen, on: screen)
                     }
                 },
-                TrayMenuItem(title: "Area", icon: "rectangle.dashed") {
+                TrayMenuItem(title: L10n.string("Area"), icon: "rectangle.dashed") {
                     nonisolated(unsafe) let screen = originScreen
                     dismissPopover()
                     Task.detached {
@@ -159,11 +159,11 @@ struct MenuBarContentView: View {
         ]
 
         return LazyVGrid(columns: columns, spacing: 6) {
-            TrayGridButton(title: "OCR", icon: "doc.text.viewfinder", shortcut: "\u{2318}O") {
+            TrayGridButton(title: L10n.string("OCR"), icon: "doc.text.viewfinder", shortcut: "\u{2318}O") {
                 dismissAndRun(.ocr)
             }
 
-            TrayGridMenu(title: "Recent", icon: "clock.arrow.circlepath", menuItems: recentMenuItems())
+            TrayGridMenu(title: L10n.string("Recent"), icon: "clock.arrow.circlepath", menuItems: recentMenuItems())
         }
     }
 
@@ -176,11 +176,11 @@ struct MenuBarContentView: View {
         ]
 
         return LazyVGrid(columns: columns, spacing: 6) {
-            TrayGridButton(title: "Settings", icon: "gearshape", shortcut: "\u{2318},") {
+            TrayGridButton(title: L10n.string("Settings"), icon: "gearshape", shortcut: "\u{2318},") {
                 openSettings()
             }
 
-            TrayGridButton(title: "Quit", icon: "power", shortcut: "\u{2318}Q") {
+            TrayGridButton(title: L10n.string("Quit"), icon: "power", shortcut: "\u{2318}Q") {
                 NSApplication.shared.terminate(nil)
             }
         }
@@ -191,7 +191,7 @@ struct MenuBarContentView: View {
     private var versionLabel: some View {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
         return HStack(spacing: 4) {
-            Text("Version \(version)")
+            Text(L10n.format("Version %@", version))
                 .font(.system(size: 10))
                 .foregroundStyle(.quaternary)
 
@@ -223,7 +223,7 @@ struct MenuBarContentView: View {
 
         var screenshotItems: [TrayMenuItem] = []
         if recentScreenshots.isEmpty {
-            screenshotItems.append(TrayMenuItem(title: "No screenshots yet", icon: "photo", action: {}, isDisabled: true))
+            screenshotItems.append(TrayMenuItem(title: L10n.string("No screenshots yet"), icon: "photo", action: {}, isDisabled: true))
         } else {
             for record in recentScreenshots.prefix(8) {
                 screenshotItems.append(TrayMenuItem(title: record.filename, icon: "photo") { [record] in
@@ -234,17 +234,17 @@ struct MenuBarContentView: View {
                 })
             }
             screenshotItems.append(.separator())
-            screenshotItems.append(TrayMenuItem(title: "Clear Screenshots", icon: "trash", action: {
+            screenshotItems.append(TrayMenuItem(title: L10n.string("Clear Screenshots"), icon: "trash", action: {
                 HistoryStore.shared.records
                     .filter { $0.kind == .screenshot }
                     .forEach { HistoryStore.shared.deleteRecord($0) }
             }, isDestructive: true))
         }
-        items.append(TrayMenuItem(title: "Screenshots", icon: "photo.on.rectangle", action: {}, submenu: screenshotItems))
+        items.append(TrayMenuItem(title: L10n.string("Screenshots"), icon: "photo.on.rectangle", action: {}, submenu: screenshotItems))
 
         var recordingItems: [TrayMenuItem] = []
         if recentRecordings.isEmpty {
-            recordingItems.append(TrayMenuItem(title: "No recordings yet", icon: "video", action: {}, isDisabled: true))
+            recordingItems.append(TrayMenuItem(title: L10n.string("No recordings yet"), icon: "video", action: {}, isDisabled: true))
         } else {
             for record in recentRecordings.prefix(8) {
                 recordingItems.append(TrayMenuItem(title: record.filename, icon: "video") { [record] in
@@ -255,13 +255,13 @@ struct MenuBarContentView: View {
                 })
             }
             recordingItems.append(.separator())
-            recordingItems.append(TrayMenuItem(title: "Clear Recordings", icon: "trash", action: {
+            recordingItems.append(TrayMenuItem(title: L10n.string("Clear Recordings"), icon: "trash", action: {
                 HistoryStore.shared.records
                     .filter { $0.kind == .recording }
                     .forEach { HistoryStore.shared.deleteRecord($0) }
             }, isDestructive: true))
         }
-        items.append(TrayMenuItem(title: "Recordings", icon: "video.circle", action: {}, submenu: recordingItems))
+        items.append(TrayMenuItem(title: L10n.string("Recordings"), icon: "video.circle", action: {}, submenu: recordingItems))
 
         return items
     }

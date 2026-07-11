@@ -30,6 +30,8 @@ struct SolidColor: Codable, Equatable, Hashable, Identifiable {
     var cgColor: CGColor {
         CGColor(srgbRed: red, green: green, blue: blue, alpha: 1)
     }
+
+    var localizedName: String { L10n.string(name) }
 }
 
 extension SolidColor {
@@ -75,6 +77,8 @@ struct GradientPreset: Codable, Equatable, Hashable, Identifiable {
 }
 
 extension GradientPreset {
+    var localizedName: String { L10n.string(name) }
+
     var swiftUIGradient: LinearGradient {
         LinearGradient(
             colors: stops.map { Color(red: $0.red, green: $0.green, blue: $0.blue) },
@@ -214,6 +218,8 @@ enum CanvasAspectRatio: String, Codable, CaseIterable {
     case threeTwo = "3:2"
     case sixteenNine = "16:9"
     case nineSixteen = "9:16"
+
+    var label: String { self == .auto ? L10n.string(rawValue) : rawValue }
 
     var numericValue: CGFloat? {
         switch self {

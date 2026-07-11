@@ -262,13 +262,13 @@ struct PreviewCardView: View {
 
             // Center pill actions
             HStack(spacing: 6) {
-                pillButton("Copy") {
+                pillButton(L10n.string("Copy")) {
                     let pb = NSPasteboard.general
                     pb.clearContents()
                     pb.writeObjects([image])
                     overlay.dismiss()
                 }
-                pillButton("Save") {
+                pillButton(L10n.string("Save")) {
                     overlay.dismiss()
                 }
             }

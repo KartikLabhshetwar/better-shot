@@ -83,8 +83,8 @@ final class CaptureOrchestrator {
         pasteboard.setString(hex, forType: .string)
         ScreenCapture.shared.playShutterSound()
         ToastWindow.shared.show(
-            title: "Copied",
-            message: "\(hex) copied to clipboard",
+            title: L10n.string("Copied"),
+            message: L10n.format("%@ copied to clipboard", hex),
             systemIcon: "eyedropper",
             on: captureScreen
         )
@@ -98,8 +98,8 @@ final class CaptureOrchestrator {
             pasteboard.setString(text, forType: .string)
             ScreenCapture.shared.playShutterSound()
             ToastWindow.shared.show(
-                title: "Copied",
-                message: "Text copied to clipboard",
+                title: L10n.string("Copied"),
+                message: L10n.string("Text copied to clipboard"),
                 systemIcon: "doc.text.viewfinder",
                 on: captureScreen
             )
@@ -136,7 +136,7 @@ final class CaptureOrchestrator {
         if savedURL != nil {
             let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage
             ToastWindow.shared.show(
-                message: AppPreferences.copyAfterSave ? "Screenshot saved & copied!" : "Screenshot saved!",
+                message: L10n.string(AppPreferences.copyAfterSave ? "Screenshot saved & copied!" : "Screenshot saved!"),
                 icon: appIcon,
                 on: captureScreen
             )

@@ -141,7 +141,7 @@ struct EditorWindowView: View {
             }
         }
 
-        withAnimation { model.toastMessage = "Exported" }
+        withAnimation { model.toastMessage = L10n.string("Exported") }
         try? await Task.sleep(for: .seconds(1.0))
         NSApp.keyWindow?.close()
     }
@@ -165,6 +165,6 @@ struct EditorWindowView: View {
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.writeObjects([nsImage])
-        withAnimation { model.toastMessage = "Copied to clipboard" }
+        withAnimation { model.toastMessage = L10n.string("Copied to clipboard") }
     }
 }
