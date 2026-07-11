@@ -229,11 +229,11 @@ struct GeneralSettingsTab: View {
 
     private func backgroundLabel(for style: BackgroundStyle) -> String {
         switch style {
-        case .none: return "Transparent"
+        case .none: return L10n.string("Transparent")
         case .solid(let c): return c.localizedName
         case .gradient(let g): return g.localizedName
-        case .wallpaper: return "Custom Image"
-        case .bundledImage: return "macOS Wallpaper"
+        case .wallpaper: return L10n.string("Custom Image")
+        case .bundledImage: return L10n.string("macOS Wallpaper")
         }
     }
 }
