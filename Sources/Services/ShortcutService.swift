@@ -142,6 +142,11 @@ final class ShortcutService {
             return Unmanaged.passUnretained(event)
         }
 
+        // Let synthetic ⌘V events posted by TerminalPasteService pass through.
+        if event.getIntegerValueField(.eventSourceUserData) == TerminalPasteService.syntheticEventUserData {
+            return Unmanaged.passUnretained(event)
+        }
+
         let keyCode = UInt32(event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags
 
@@ -170,6 +175,16 @@ final class ShortcutService {
                 }
                 return nil
             }
+        }
+
+        // Plain ⌘V in a terminal with an image on the clipboard → paste the
+        // image's file path (Claude Code integration). The tap runs on the
+        // main run loop, so hopping onto the main actor is safe.
+        if keyCode == UInt32(kVK_ANSI_V), carbonMods == UInt32(cmdKey) {
+            let handled = MainActor.assumeIsolated {
+                TerminalPasteService.shared.interceptCommandV()
+            }
+            if handled { return nil }
         }
 
         return Unmanaged.passUnretained(event)

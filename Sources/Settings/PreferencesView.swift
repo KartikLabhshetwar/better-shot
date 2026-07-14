@@ -73,6 +73,7 @@ struct GeneralSettingsTab: View {
     @AppStorage("bs_playSound") private var playSound = true
     @AppStorage("bs_exportFormat") private var exportFormatRaw: String = ExportFormat.png.rawValue
     @AppStorage("bs_exportQuality") private var exportQuality: Double = 0.9
+    @AppStorage("bs_terminalPasteEnabled") private var terminalPasteEnabled = true
 
     @State private var defaultConfig = AppPreferences.defaultBeautifierConfig
 
@@ -137,6 +138,14 @@ struct GeneralSettingsTab: View {
                 Toggle("Play shutter sound", isOn: $playSound)
             }
 
+            Section("Claude Code") {
+                Toggle("Paste images into terminals with ⌘V", isOn: $terminalPasteEnabled)
+
+                Text("When a terminal (iTerm2, Terminal, Warp, Ghostty…) is active and the clipboard holds an image, ⌘V pastes the image's file path — Claude Code attaches it as [Image #1], just like drag & drop. Copied text is never affected.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Default Effects") {
                 DefaultConfigPreview(config: defaultConfig)
                     .frame(height: 120)
@@ -198,6 +207,7 @@ struct GeneralSettingsTab: View {
                     saveDir = NSHomeDirectory() + "/Desktop"
                     copyAfterSave = true
                     playSound = true
+                    terminalPasteEnabled = true
                     exportFormatRaw = ExportFormat.png.rawValue
                     exportQuality = 0.9
                     defaultConfig = .default

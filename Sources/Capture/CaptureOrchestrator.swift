@@ -208,5 +208,7 @@ final class CaptureOrchestrator {
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.writeObjects([nsImage])
+        // Lets ⌘V in a terminal paste the saved file's path (Claude Code integration).
+        TerminalPasteService.shared.noteCopiedToClipboard(url)
     }
 }

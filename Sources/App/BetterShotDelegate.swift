@@ -10,6 +10,8 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
 
         MenuBarPopoverController.shared.setup()
 
+        TerminalPasteService.shared.cleanupOldImages()
+
         Task {
             await AppUpdater.shared.checkForUpdatesQuietly()
         }

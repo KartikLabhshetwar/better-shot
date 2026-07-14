@@ -5,6 +5,12 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Claude Code integration (⌘V paste into terminals)**: When a terminal app (iTerm2, Terminal, Warp, kitty, Alacritty, WezTerm, Ghostty) is frontmost and the clipboard holds an image, plain `⌘V` now pastes the image's file path instead — Claude Code picks it up as `[Image #1]`, exactly like drag & drop. Screenshots captured by BetterShot reuse the already-saved file; images copied from other apps are saved to `~/Pictures/BetterShot` (cleaned up after 7 days). Copied text is never affected, and the original clipboard is restored right after the paste. Can be disabled in Settings → General → Claude Code (enabled by default)
+
 ## [0.3.7] - 2026-06-07
 
 ### Added

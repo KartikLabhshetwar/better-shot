@@ -17,6 +17,7 @@ enum AppPreferences {
     private static let recordingShowCursorKey = "bs_recordingShowCursor"
     private static let recordingCaptureAudioKey = "bs_recordingCaptureAudio"
     private static let recordingOpenEditorKey = "bs_recordingOpenEditor"
+    private static let terminalPasteKey = "bs_terminalPasteEnabled"
 
     // MARK: - Appearance
     static var appearance: AppAppearance {
@@ -47,6 +48,14 @@ enum AppPreferences {
     static var playSound: Bool {
         get { UserDefaults.standard.object(forKey: playSoundKey) as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: playSoundKey) }
+    }
+
+    /// When enabled, plain ⌘V in a terminal app with an image on the clipboard
+    /// pastes the image's file path instead — so Claude Code picks it up as
+    /// an attached image (same as drag & drop).
+    static var terminalPasteEnabled: Bool {
+        get { UserDefaults.standard.object(forKey: terminalPasteKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: terminalPasteKey) }
     }
 
     // MARK: - Overlay
