@@ -121,6 +121,15 @@ struct MenuBarContentView: View {
                 dismissAndRun(.colorPicker)
             }
 
+            TrayGridButton(title: "Scrolling", icon: "arrow.up.and.down.square") {
+                let screen = originScreen
+                dismissPopover()
+                Task {
+                    try? await Task.sleep(nanoseconds: 200_000_000)
+                    await ScrollingCaptureController.shared.start(on: screen)
+                }
+            }
+
             TrayGridMenu(title: "Record", icon: "record.circle", menuItems: [
                 TrayMenuItem(title: "Full Screen", icon: "desktopcomputer") {
                     nonisolated(unsafe) let screen = originScreen

@@ -48,6 +48,26 @@ final class CaptureOrchestrator {
         }
     }
 
+    /// Finishes a capture produced outside the normal flow (e.g. scrolling capture):
+    /// runs the same history + beautifier + preview pipeline as a regular screenshot.
+    func finishExternalCapture(cgImage: CGImage, on screen: NSScreen?) async {
+        captureScreen = screen
+        let tempPath = NSTemporaryDirectory() + "bettershot_scroll_\(Int(Date().timeIntervalSince1970 * 1000)).png"
+        let tempURL = URL(fileURLWithPath: tempPath)
+        guard let dest = CGImageDestinationCreateWithURL(tempURL as CFURL, "public.png" as CFString, 1, nil) else { return }
+        CGImageDestinationAddImage(dest, cgImage, nil)
+        guard CGImageDestinationFinalize(dest) else { return }
+        ScreenCapture.shared.playShutterSound()
+        let record = HistoryStore.shared.importCapture(from: tempURL)
+        if let record {
+            lastCaptureURL = HistoryStore.shared.urlForRecord(record)
+        }
+        if let capturedURL = lastCaptureURL {
+            await galleryApplyAndSave(capturedURL, recordID: record?.id)
+        }
+        captureScreen = nil
+    }
+
     // MARK: - Private
 
     private func captureAndProcess(_ capture: () async throws -> URL?) async {
