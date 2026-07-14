@@ -10,6 +10,7 @@ enum AppPreferences {
     private static let playSoundKey = "bs_playSound"
     private static let overlayPositionKey = "bs_overlayPosition"
     private static let overlayDismissDelayKey = "bs_overlayDismissDelay"
+    private static let overlayNeverDismissKey = "bs_overlayNeverDismiss"
     private static let exportFormatKey = "bs_exportFormat"
     private static let exportQualityKey = "bs_exportQuality"
     private static let selfTimerKey = "bs_selfTimerDelay"
@@ -65,6 +66,13 @@ enum AppPreferences {
             return val > 0 ? val : 5.0
         }
         set { UserDefaults.standard.set(newValue, forKey: overlayDismissDelayKey) }
+    }
+
+    /// When true, preview overlay cards stay visible until manually closed
+    /// (no auto-dismiss timer).
+    static var overlayNeverDismiss: Bool {
+        get { UserDefaults.standard.object(forKey: overlayNeverDismissKey) as? Bool ?? false }
+        set { UserDefaults.standard.set(newValue, forKey: overlayNeverDismissKey) }
     }
 
     // MARK: - Export

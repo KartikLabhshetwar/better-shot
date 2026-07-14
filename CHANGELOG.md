@@ -5,6 +5,13 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Stacked preview cards**: Screenshots taken in quick succession now stack up in the corner (newest at the bottom, up to 5) instead of replacing each other — like CleanShot X. Each card has its own auto-dismiss timer and close button, and cards are ~30% larger than before
+- **"Keep visible until closed" option**: New toggle in Capture settings keeps preview cards on screen until dismissed manually via their close button (disables the auto-dismiss timer)
+
 ## [0.3.7] - 2026-06-07
 
 ### Added

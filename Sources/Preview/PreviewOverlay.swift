@@ -2,27 +2,50 @@ import AppKit
 import AVFoundation
 import SwiftUI
 
-/// Shows a floating preview card after capture. Uses a borderless NSPanel.
+/// Shows a stack of floating preview cards after capture. Uses a borderless NSPanel.
+/// Multiple screenshots taken in quick succession stack up (newest closest to the
+/// screen corner) instead of replacing each other, up to `maxItems`.
 @MainActor
 @Observable
 final class PreviewOverlay {
     static let shared = PreviewOverlay()
 
-    private(set) var currentURL: URL?
-    private(set) var isVisible = false
+    static let maxItems = 5
+
+    /// Card size, scaled 30% larger than the original 130x98 design.
+    static let cardSize = CGSize(width: 169, height: 127)
+    static let itemSpacing: CGFloat = 14
+    static let panelWidth: CGFloat = 260
+    static let panelTrailingPadding: CGFloat = 26
+    static let panelLeadingPadding: CGFloat = 26
+    static let panelBottomPadding: CGFloat = 31
+    static let panelTopPadding: CGFloat = 63
+
+    struct Item: Identifiable {
+        let id = UUID()
+        let url: URL
+        let screen: NSScreen?
+    }
+
+    private(set) var items: [Item] = []
+    private var dismissTasks: [UUID: Task<Void, Never>] = [:]
     private var panel: NSPanel?
-    private var dismissTask: Task<Void, Never>?
     private var targetScreen: NSScreen?
+
+    var isVisible: Bool { !items.isEmpty }
 
     private init() {}
 
     func show(url: URL, on screen: NSScreen? = nil) {
-        dismissTask?.cancel()
-        dismissTask = nil
-
-        currentURL = url
         targetScreen = screen
-        isVisible = true
+
+        if items.count >= Self.maxItems, let oldest = items.first {
+            cancelDismiss(for: oldest.id)
+            items.removeFirst()
+        }
+
+        let item = Item(url: url, screen: screen)
+        items.append(item)
 
         if panel == nil {
             createPanel()
@@ -31,36 +54,45 @@ final class PreviewOverlay {
         positionPanel()
         panel?.orderFront(nil)
 
-        scheduleDismiss()
+        scheduleDismiss(for: item.id)
     }
 
-    func dismiss() {
-        dismissTask?.cancel()
-        dismissTask = nil
+    func dismiss(_ id: UUID) {
+        cancelDismiss(for: id)
+        items.removeAll { $0.id == id }
 
+        if items.isEmpty {
+            panel?.orderOut(nil)
+            panel = nil
+        } else {
+            positionPanel()
+        }
+    }
+
+    func dismissAll() {
+        for id in dismissTasks.keys { dismissTasks[id]?.cancel() }
+        dismissTasks.removeAll()
+        items.removeAll()
         panel?.orderOut(nil)
         panel = nil
-        isVisible = false
-        currentURL = nil
     }
 
     // MARK: - Panel Setup
 
-    func openAnnotateEditor() {
-        guard let url = currentURL else { return }
-        let screen = targetScreen
-        dismiss()
-        let ext = url.pathExtension.lowercased()
+    func openAnnotateEditor(for item: Item) {
+        let screen = item.screen
+        dismiss(item.id)
+        let ext = item.url.pathExtension.lowercased()
         if ext == "mov" || ext == "mp4" {
-            VideoEditorWindowController.shared.open(url: url, on: screen)
+            VideoEditorWindowController.shared.open(url: item.url, on: screen)
         } else {
-            EditorWindowController.shared.open(url: url, on: screen)
+            EditorWindowController.shared.open(url: item.url, on: screen)
         }
     }
 
     private func createPanel() {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 160, height: 130),
+            contentRect: NSRect(x: 0, y: 0, width: Self.panelWidth, height: Self.panelTopPadding + Self.panelBottomPadding + Self.cardSize.height),
             styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: false
@@ -73,7 +105,8 @@ final class PreviewOverlay {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isMovableByWindowBackground = false
 
-        let hostingView = NSHostingView(rootView: PreviewCardView(overlay: self))
+        let hostingView = NSHostingView(rootView: PreviewStackView(overlay: self))
+        hostingView.autoresizingMask = [.width, .height]
         panel.contentView = hostingView
 
         self.panel = panel
@@ -87,49 +120,88 @@ final class PreviewOverlay {
         guard let panel, let screen else { return }
 
         let screenFrame = screen.visibleFrame
-        let panelSize = CGSize(width: 200, height: 170)
+        let count = max(items.count, 1)
+        let height = Self.panelTopPadding + Self.panelBottomPadding
+            + CGFloat(count) * Self.cardSize.height
+            + CGFloat(count - 1) * Self.itemSpacing
+        let width = Self.panelWidth
 
         let x: CGFloat
-        let y: CGFloat
-
         switch AppPreferences.overlayPosition {
         case .bottomRight:
-            x = screenFrame.maxX - panelSize.width
-            y = screenFrame.minY
+            x = screenFrame.maxX - width
         case .bottomLeft:
             x = screenFrame.minX
-            y = screenFrame.minY
         }
+        let y = screenFrame.minY
 
-        panel.setFrame(NSRect(origin: NSPoint(x: x, y: y), size: panelSize), display: true)
+        panel.setFrame(NSRect(origin: NSPoint(x: x, y: y), size: CGSize(width: width, height: height)), display: true)
     }
 
-    private func scheduleDismiss() {
-        dismissTask?.cancel()
-        dismissTask = Task {
+    private func scheduleDismiss(for id: UUID) {
+        cancelDismiss(for: id)
+        guard !AppPreferences.overlayNeverDismiss else { return }
+        dismissTasks[id] = Task {
             try? await Task.sleep(for: .seconds(AppPreferences.overlayDismissDelay))
             guard !Task.isCancelled else { return }
-            dismiss()
+            self.dismiss(id)
         }
+    }
+
+    private func cancelDismiss(for id: UUID) {
+        dismissTasks[id]?.cancel()
+        dismissTasks[id] = nil
+    }
+}
+
+// MARK: - Preview Stack SwiftUI View
+
+struct PreviewStackView: View {
+    let overlay: PreviewOverlay
+
+    private var alignment: HorizontalAlignment {
+        AppPreferences.overlayPosition == .bottomLeft ? .leading : .trailing
+    }
+
+    var body: some View {
+        VStack(alignment: alignment, spacing: PreviewOverlay.itemSpacing) {
+            ForEach(overlay.items) { item in
+                PreviewCardView(item: item, overlay: overlay)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: AppPreferences.overlayPosition == .bottomLeft ? .bottomLeading : .bottomTrailing)
+        .padding(.leading, AppPreferences.overlayPosition == .bottomLeft ? PreviewOverlay.panelLeadingPadding : 0)
+        .padding(.trailing, AppPreferences.overlayPosition == .bottomLeft ? 0 : PreviewOverlay.panelTrailingPadding)
+        .padding(.bottom, PreviewOverlay.panelBottomPadding)
     }
 }
 
 // MARK: - Preview Card SwiftUI View
 
 struct PreviewCardView: View {
+    let item: PreviewOverlay.Item
     let overlay: PreviewOverlay
     @State private var isHovered = false
     @State private var thumbnail: NSImage?
 
-    private let cardSize = CGSize(width: 130, height: 98)
+    init(item: PreviewOverlay.Item, overlay: PreviewOverlay) {
+        self.item = item
+        self.overlay = overlay
+        let ext = item.url.pathExtension.lowercased()
+        let isVideo = ext == "mov" || ext == "mp4"
+        // Images load synchronously here; video thumbnails generate async in onAppear.
+        _thumbnail = State(initialValue: isVideo ? nil : NSImage(contentsOf: item.url))
+    }
+
+    private var cardSize: CGSize { PreviewOverlay.cardSize }
 
     private var isVideo: Bool {
-        guard let ext = overlay.currentURL?.pathExtension.lowercased() else { return false }
+        let ext = item.url.pathExtension.lowercased()
         return ext == "mov" || ext == "mp4"
     }
 
     var body: some View {
-        Group {
+        ZStack {
             if let image = thumbnail {
                 ZStack {
                     Image(nsImage: image)
@@ -140,7 +212,7 @@ struct PreviewCardView: View {
 
                     if isVideo {
                         Image(systemName: "play.circle.fill")
-                            .font(.system(size: 28))
+                            .font(.system(size: 36))
                             .foregroundStyle(.white.opacity(0.9))
                             .shadow(radius: 4)
                     }
@@ -163,49 +235,32 @@ struct PreviewCardView: View {
                     }
                 }
                 .onTapGesture {
-                    overlay.openAnnotateEditor()
+                    overlay.openAnnotateEditor(for: item)
                 }
                 .onDrag {
-                    if let url = overlay.currentURL {
-                        return NSItemProvider(object: url as NSURL)
-                    }
-                    return NSItemProvider(object: image)
+                    NSItemProvider(object: item.url as NSURL)
                 }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-        .padding(.trailing, 20)
-        .padding(.bottom, 24)
-        .frame(width: 200, height: 170)
-        .onChange(of: overlay.currentURL) { _, newURL in
-            loadThumbnail(from: newURL)
-        }
+        .frame(width: cardSize.width, height: cardSize.height)
         .onAppear {
-            loadThumbnail(from: overlay.currentURL)
+            if isVideo, thumbnail == nil {
+                loadVideoThumbnail(from: item.url)
+            }
         }
     }
 
-    private func loadThumbnail(from url: URL?) {
-        guard let url else {
-            thumbnail = nil
-            return
-        }
-
-        let ext = url.pathExtension.lowercased()
-        if ext == "mov" || ext == "mp4" {
-            Task.detached {
-                let asset = AVURLAsset(url: url)
-                let generator = AVAssetImageGenerator(asset: asset)
-                generator.appliesPreferredTrackTransform = true
-                generator.maximumSize = CGSize(width: 260, height: 196)
-                if let result = try? await generator.image(at: .zero) {
-                    let cgImage = result.image
-                    let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-                    await MainActor.run { thumbnail = nsImage }
-                }
+    private func loadVideoThumbnail(from url: URL) {
+        Task.detached {
+            let asset = AVURLAsset(url: url)
+            let generator = AVAssetImageGenerator(asset: asset)
+            generator.appliesPreferredTrackTransform = true
+            generator.maximumSize = CGSize(width: 338, height: 254)
+            if let result = try? await generator.image(at: .zero) {
+                let cgImage = result.image
+                let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+                await MainActor.run { thumbnail = nsImage }
             }
-        } else {
-            thumbnail = NSImage(contentsOf: url)
         }
     }
 
@@ -215,7 +270,7 @@ struct PreviewCardView: View {
             Color.black.opacity(0.45)
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    overlay.openAnnotateEditor()
+                    overlay.openAnnotateEditor(for: item)
                 }
 
             // Corner actions
@@ -223,21 +278,19 @@ struct PreviewCardView: View {
                 HStack {
                     // Delete
                     cornerButton("trash.circle.fill") {
-                        if let url = overlay.currentURL {
-                            if let record = HistoryStore.shared.records.first(where: {
-                                HistoryStore.shared.urlForRecord($0) == url
-                            }) {
-                                HistoryStore.shared.deleteRecord(record)
-                            } else {
-                                try? FileManager.default.removeItem(at: url)
-                            }
+                        if let record = HistoryStore.shared.records.first(where: {
+                            HistoryStore.shared.urlForRecord($0) == item.url
+                        }) {
+                            HistoryStore.shared.deleteRecord(record)
+                        } else {
+                            try? FileManager.default.removeItem(at: item.url)
                         }
-                        overlay.dismiss()
+                        overlay.dismiss(item.id)
                     }
                     Spacer()
                     // Dismiss
                     cornerButton("xmark.circle.fill") {
-                        overlay.dismiss()
+                        overlay.dismiss(item.id)
                     }
                 }
 
@@ -246,30 +299,28 @@ struct PreviewCardView: View {
                 HStack {
                     // Annotate (pen icon)
                     cornerButton("pencil.circle.fill") {
-                        overlay.openAnnotateEditor()
+                        overlay.openAnnotateEditor(for: item)
                     }
                     Spacer()
                     // Pin screenshot
                     cornerButton("pin.circle.fill") {
-                        if let url = overlay.currentURL {
-                            PinnedScreenshotController.shared.pin(url: url)
-                        }
-                        overlay.dismiss()
+                        PinnedScreenshotController.shared.pin(url: item.url)
+                        overlay.dismiss(item.id)
                     }
                 }
             }
-            .padding(6)
+            .padding(8)
 
             // Center pill actions
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 pillButton("Copy") {
                     let pb = NSPasteboard.general
                     pb.clearContents()
                     pb.writeObjects([image])
-                    overlay.dismiss()
+                    overlay.dismiss(item.id)
                 }
                 pillButton("Save") {
-                    overlay.dismiss()
+                    overlay.dismiss(item.id)
                 }
             }
         }
@@ -280,7 +331,7 @@ struct PreviewCardView: View {
             Image(systemName: systemName)
                 .symbolRenderingMode(.palette)
                 .foregroundStyle(.white, .white.opacity(0.25))
-                .font(.system(size: 16))
+                .font(.system(size: 20))
         }
         .buttonStyle(.plain)
     }
@@ -288,10 +339,10 @@ struct PreviewCardView: View {
     private func pillButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.primary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
                 .background(.white.opacity(0.85), in: Capsule())
         }
         .buttonStyle(.plain)

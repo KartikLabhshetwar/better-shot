@@ -562,6 +562,7 @@ struct CaptureSettingsTab: View {
     @AppStorage("bs_selfTimerDelay") private var selfTimerRaw: Int = 0
     @AppStorage("bs_overlayPosition") private var overlayPositionRaw: String = OverlayPosition.bottomRight.rawValue
     @AppStorage("bs_overlayDismissDelay") private var overlayDismissDelay: Double = 5.0
+    @AppStorage("bs_overlayNeverDismiss") private var overlayNeverDismiss: Bool = false
     @State private var shortcutResetID = UUID()
 
     private var selfTimerDelay: Binding<SelfTimerDelay> {
@@ -595,6 +596,8 @@ struct CaptureSettingsTab: View {
                     Text("Bottom Left").tag(OverlayPosition.bottomLeft)
                 }
 
+                Toggle("Keep visible until closed", isOn: $overlayNeverDismiss)
+
                 HStack {
                     Text("Dismiss after")
                     Spacer()
@@ -602,8 +605,10 @@ struct CaptureSettingsTab: View {
                         .font(.system(.caption, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
+                .foregroundStyle(overlayNeverDismiss ? .tertiary : .primary)
                 Slider(value: $overlayDismissDelay, in: 2...15, step: 1)
                     .controlSize(.small)
+                    .disabled(overlayNeverDismiss)
             }
 
             Section("Keyboard Shortcuts") {
@@ -641,6 +646,7 @@ struct CaptureSettingsTab: View {
                     selfTimerRaw = 0
                     overlayPositionRaw = OverlayPosition.bottomRight.rawValue
                     overlayDismissDelay = 5.0
+                    overlayNeverDismiss = false
                     for action in ShortcutService.Action.allCases {
                         let def: ShortcutService.Shortcut? = switch action {
                         case .region: .defaultRegion
