@@ -11,7 +11,7 @@ enum RedactionImageProcessor {
         cache.totalCostLimit = 32 * 1024 * 1024
         return cache
     }()
-    private static let ciContext = CIContext(options: [.cacheIntermediates: false])
+    nonisolated(unsafe) private static let ciContext = CIContext(options: [.cacheIntermediates: false])
 
     static func previewImage(
         source: NSImage,

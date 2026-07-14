@@ -299,10 +299,10 @@ final class AppUpdater {
 }
 
 private final class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
-    let onProgress: (Double) -> Void
-    var completion: ((Result<URL, Error>) -> Void)?
+    let onProgress: @Sendable (Double) -> Void
+    nonisolated(unsafe) var completion: (@Sendable (Result<URL, Error>) -> Void)?
 
-    init(onProgress: @escaping (Double) -> Void) {
+    init(onProgress: @escaping @Sendable (Double) -> Void) {
         self.onProgress = onProgress
     }
 

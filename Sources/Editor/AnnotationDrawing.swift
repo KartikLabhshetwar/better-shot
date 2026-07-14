@@ -5,7 +5,7 @@ import AppKit
 
 enum AnnotationDrawing {
 
-    private static let ciContext = CIContext(options: [.cacheIntermediates: false])
+    nonisolated(unsafe) private static let ciContext = CIContext(options: [.cacheIntermediates: false])
 
     static func draw(_ items: [AnnotationItem], in ctx: CGContext, imageRect: CGRect, fullCanvasRect: CGRect, sourceImage: CGImage?, flipped: Bool = false) {
         ctx.setLineCap(.round)

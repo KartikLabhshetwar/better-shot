@@ -79,11 +79,11 @@ final class HistoryStore {
 
     // MARK: - Access
 
-    func urlForRecord(_ record: CaptureRecord) -> URL {
+    nonisolated func urlForRecord(_ record: CaptureRecord) -> URL {
         storageDir.appendingPathComponent(record.filename)
     }
 
-    func displayURLForRecord(_ record: CaptureRecord) -> URL {
+    nonisolated func displayURLForRecord(_ record: CaptureRecord) -> URL {
         if let path = record.beautifiedPath {
             let url = URL(fileURLWithPath: path)
             if FileManager.default.fileExists(atPath: url.path) {
@@ -93,7 +93,7 @@ final class HistoryStore {
         return urlForRecord(record)
     }
 
-    func thumbnail(for record: CaptureRecord, maxSize: CGFloat = 120) -> NSImage? {
+    nonisolated func thumbnail(for record: CaptureRecord, maxSize: CGFloat = 120) -> NSImage? {
         let url = displayURLForRecord(record)
 
         if record.kind == .recording {

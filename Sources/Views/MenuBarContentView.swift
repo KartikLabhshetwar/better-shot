@@ -123,17 +123,17 @@ struct MenuBarContentView: View {
 
             TrayGridMenu(title: "Record", icon: "record.circle", menuItems: [
                 TrayMenuItem(title: "Full Screen", icon: "desktopcomputer") {
-                    nonisolated(unsafe) let screen = originScreen
+                    let screen = originScreen
                     dismissPopover()
-                    Task.detached {
+                    Task {
                         try? await Task.sleep(nanoseconds: 200_000_000)
                         await startRecording(mode: .fullScreen, on: screen)
                     }
                 },
                 TrayMenuItem(title: "Area", icon: "rectangle.dashed") {
-                    nonisolated(unsafe) let screen = originScreen
+                    let screen = originScreen
                     dismissPopover()
-                    Task.detached {
+                    Task {
                         try? await Task.sleep(nanoseconds: 200_000_000)
                         await startRecording(mode: .area, on: screen)
                     }
@@ -210,9 +210,9 @@ struct MenuBarContentView: View {
     }
 
     private func dismissAndRun(_ action: ShortcutService.Action) {
-        nonisolated(unsafe) let screen = originScreen
+        let screen = originScreen
         dismissPopover()
-        Task.detached {
+        Task {
             try? await Task.sleep(nanoseconds: 200_000_000)
             await CaptureOrchestrator.shared.performCapture(action, on: screen)
         }

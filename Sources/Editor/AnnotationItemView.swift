@@ -488,6 +488,7 @@ private struct AnnotationTextBoxView: NSViewRepresentable {
         textView.needsDisplay = true
     }
 
+    @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
         var text: Binding<String>
         var onCommit: () -> Void

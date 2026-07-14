@@ -1,4 +1,4 @@
-import AVFoundation
+@preconcurrency import AVFoundation
 import AppKit
 import SwiftUI
 import CoreImage
@@ -347,8 +347,12 @@ final class VideoEditorModel {
                     images.append(NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height)))
                 }
             }
-            await MainActor.run { self?.thumbnails = images }
+            await self?.setThumbnails(images)
         }
+    }
+
+    private func setThumbnails(_ images: [NSImage]) {
+        thumbnails = images
     }
 
     private func formatTime(_ seconds: Double) -> String {
