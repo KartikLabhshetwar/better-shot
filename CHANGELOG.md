@@ -5,6 +5,12 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Permissions onboarding**: New welcome window guides you through granting Accessibility and Screen Recording — fires the native system prompts, deep-links to the exact System Settings pane, detects the grant within seconds, and activates keyboard shortcuts automatically. Stale permission entries left behind by a previous build are reset via `tccutil`, and the app restarts itself when Screen Recording requires it
+
 ## [0.3.7] - 2026-06-07
 
 ### Added
