@@ -31,6 +31,12 @@ extension LocalAPIRequest {
             if buffer.count > maxHeadSize { throw ParseError.headTooLarge }
             return nil
         }
+        // The check above only fires while the terminator is missing. A client that sends an
+        // oversized head and its terminator together would otherwise land here on the first
+        // parse and skip the cap entirely, so measure the head we actually found.
+        guard buffer.distance(from: buffer.startIndex, to: headEnd.lowerBound) <= maxHeadSize else {
+            throw ParseError.headTooLarge
+        }
 
         let head = String(decoding: buffer[buffer.startIndex..<headEnd.lowerBound], as: UTF8.self)
         var lines = head.split(separator: "\r\n", omittingEmptySubsequences: false)
