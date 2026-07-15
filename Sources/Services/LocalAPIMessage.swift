@@ -51,8 +51,15 @@ extension LocalAPIRequest {
             headers[name] = value
         }
 
-        let contentLength = headers["content-length"].flatMap { Int($0) } ?? 0
-        guard contentLength >= 0 else { throw ParseError.malformedHead }
+        // A Content-Length that is negative, non-numeric, or too large for Int is a malformed
+        // head. Falling back to zero would accept the request and silently ignore its body.
+        let contentLength: Int
+        if let rawLength = headers["content-length"] {
+            guard let parsed = Int(rawLength), parsed >= 0 else { throw ParseError.malformedHead }
+            contentLength = parsed
+        } else {
+            contentLength = 0
+        }
         guard contentLength <= maxBodySize else { throw ParseError.bodyTooLarge }
 
         let bodyStart = headEnd.upperBound

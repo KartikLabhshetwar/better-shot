@@ -130,13 +130,18 @@ private enum LocalAPIConnection {
     /// Rejects requests whose Host isn't loopback. Stops a web page from reaching the API by
     /// pointing a hostname it controls at 127.0.0.1 (DNS rebinding).
     private static func reject(_ request: LocalAPIRequest) -> LocalAPIResponse? {
-        let host = request.header("host") ?? ""
-        let name = host.contains("]")
-            ? String(host.prefix(while: { $0 != "]" }).dropFirst())   // [::1]:port
-            : String(host.prefix(while: { $0 != ":" }))
+        let rawHost = request.header("host") ?? ""
+        // Host names are case-insensitive, so "LOCALHOST" has to pass the same check as "localhost".
+        let host = rawHost.lowercased()
+        let name: String
+        if host.hasPrefix("["), let close = host.firstIndex(of: "]") {
+            name = String(host[host.index(after: host.startIndex)..<close])   // [::1]:port
+        } else {
+            name = String(host.prefix(while: { $0 != ":" }))
+        }
 
         guard ["127.0.0.1", "localhost", "::1"].contains(name) else {
-            return .error(403, "Host '\(host)' is not allowed. The local API only answers 127.0.0.1")
+            return .error(403, "Host '\(rawHost)' is not allowed. The local API only answers 127.0.0.1")
         }
         return nil
     }
