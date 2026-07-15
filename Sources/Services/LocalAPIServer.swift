@@ -10,6 +10,9 @@ final class LocalAPIServer {
 
     nonisolated static let defaultPort: UInt16 = 17595
 
+    /// The ports the preference accepts. Below 1024 needs root, so it would only ever fail to bind.
+    nonisolated static let validPortRange: ClosedRange<Int> = 1024...65535
+
     private(set) var isRunning = false
     /// The port actually bound, which is the truth the UI should show — the stored preference may
     /// be out of range and fall back to `defaultPort`.
@@ -141,7 +144,7 @@ private enum LocalAPIConnection {
         }
 
         guard ["127.0.0.1", "localhost", "::1"].contains(name) else {
-            return .error(403, "Host '\(rawHost)' is not allowed. The local API only answers 127.0.0.1")
+            return .error(403, "Host '\(rawHost)' is not allowed. The local API only answers loopback (127.0.0.1, localhost, ::1)")
         }
         return nil
     }

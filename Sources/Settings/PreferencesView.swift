@@ -783,7 +783,15 @@ struct APISettingsTab: View {
             }
         }
         .formStyle(.grouped)
-        .onChange(of: apiEnabled) { _, _ in server.applyPreferences() }
+        .onChange(of: apiEnabled) { _, enabled in
+            // Snap a stored out-of-range port to the default, so the field cannot claim a port the
+            // server would never bind. The field is disabled while enabled, so this is the last
+            // chance to reconcile the two.
+            if enabled, !LocalAPIServer.validPortRange.contains(apiPort) {
+                apiPort = Int(LocalAPIServer.defaultPort)
+            }
+            server.applyPreferences()
+        }
     }
 }
 

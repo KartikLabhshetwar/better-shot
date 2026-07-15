@@ -139,7 +139,7 @@ It is **off by default**. Turn it on in Settings > **API**, where you can also c
 
 | Endpoint | What it does |
 |---|---|
-| `GET /health` | Liveness check — `{"status":"ok","version":"0.3.7"}` |
+| `GET /health` | Liveness check — `{"status":"ok","version":"x.y.z"}` |
 | `GET /presets` | Every solid and gradient preset, with ids, names, and hex colors |
 | `POST /beautify` | Renders an image and returns the PNG bytes |
 

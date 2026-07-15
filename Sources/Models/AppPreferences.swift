@@ -129,7 +129,7 @@ enum AppPreferences {
     static var localAPIPort: UInt16 {
         get {
             let val = UserDefaults.standard.integer(forKey: localAPIPortKey)
-            return (1024...65535).contains(val) ? UInt16(val) : LocalAPIServer.defaultPort
+            return LocalAPIServer.validPortRange.contains(val) ? UInt16(val) : LocalAPIServer.defaultPort
         }
         set { UserDefaults.standard.set(Int(newValue), forKey: localAPIPortKey) }
     }
