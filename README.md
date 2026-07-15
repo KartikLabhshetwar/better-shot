@@ -126,9 +126,56 @@ Open from the menu bar > **Settings** (or `⌘,`).
 - **General** — Save location, clipboard behavior, appearance, default effects with live preview (padding, radius, shadow, background including macOS wallpapers and custom images), export format
 - **Capture** — Self-timer delay, keyboard shortcuts (click any shortcut to re-record it, including record screen), overlay position and dismiss timing
 - **Recording** — FPS (24/30/60), show cursor, capture audio, open editor after recording
+- **API** — Enable the local HTTP API, choose its port, check its status
 - **History** — Browse and delete past screenshots
 - **Videos** — Browse and delete past recordings, open in video editor
 - **About** — Version info, in-app update checker, project links (GitHub, X)
+
+## Local API
+
+BetterShot can expose a small HTTP API so scripts, CI jobs, and other tools can render screenshots through the same beautifier the editor uses.
+
+It is **off by default**. Turn it on in Settings > **API**, where you can also change the port (default `17595`). The server binds to `127.0.0.1` only — it is never reachable from the network, and requests with a non-loopback `Host` are rejected.
+
+| Endpoint | What it does |
+|---|---|
+| `GET /health` | Liveness check — `{"status":"ok","version":"0.3.7"}` |
+| `GET /presets` | Every solid and gradient preset, with ids, names, and hex colors |
+| `POST /beautify` | Renders an image and returns the PNG bytes |
+
+### Beautify
+
+Upload the image as `multipart/form-data`:
+
+```bash
+curl -X POST http://127.0.0.1:17595/beautify \
+  -F "image=@screenshot.png" \
+  -F "background=dawn-fire" \
+  -F "padding=0.15" \
+  -F "aspectRatio=16:9" \
+  -o beautified.png
+```
+
+Or send JSON with the image base64-encoded:
+
+```bash
+curl -X POST http://127.0.0.1:17595/beautify \
+  -H "Content-Type: application/json" \
+  -d "{\"image\":\"$(base64 -i screenshot.png)\",\"background\":\"#1E90FF\"}" \
+  -o beautified.png
+```
+
+| Field | Default | Values |
+|---|---|---|
+| `image` | required | The image to render — a file part (multipart) or a base64 string (JSON) |
+| `background` | `none` | `none`, a `#RRGGBB` hex, or any preset id from `GET /presets` |
+| `padding` | `0.08` | `0`–`0.45`, as a fraction of the image's short edge |
+| `cornerRadius` | `0.018` | `0`–`0.12`, as a fraction of the image's short edge |
+| `shadowStrength` | `0.36` | `0`–`1` |
+| `aspectRatio` | `Auto` | `Auto`, `1:1`, `4:3`, `3:2`, `16:9`, `9:16` |
+| `alignment` | `center` | `center`, `top`, `bottom`, `leading`, `trailing`, `topLeading`, `topTrailing`, `bottomLeading`, `bottomTrailing` |
+
+Numbers outside their range are clamped. A successful call returns `image/png`; anything else returns JSON like `{"error":"Unknown background 'x'..."}` with a 4xx or 5xx status.
 
 ## Make commands
 

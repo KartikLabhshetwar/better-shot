@@ -5,6 +5,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case general = "General"
     case capture = "Capture"
     case recording = "Recording"
+    case api = "API"
     case history = "History"
     case videos = "Videos"
     case about = "About"
@@ -16,6 +17,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .general: return "gearshape"
         case .capture: return "camera.viewfinder"
         case .recording: return "record.circle"
+        case .api: return "network"
         case .history: return "photo.on.rectangle.angled"
         case .videos: return "video.circle"
         case .about: return "info.circle"
@@ -47,6 +49,9 @@ struct PreferencesView: View {
                 RecordingSettingsTab()
                     .opacity(selectedSection == .recording ? 1 : 0)
                     .allowsHitTesting(selectedSection == .recording)
+                APISettingsTab()
+                    .opacity(selectedSection == .api ? 1 : 0)
+                    .allowsHitTesting(selectedSection == .api)
                 HistoryTab()
                     .opacity(selectedSection == .history ? 1 : 0)
                     .allowsHitTesting(selectedSection == .history)
@@ -713,6 +718,72 @@ struct RecordingSettingsTab: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+// MARK: - API
+
+struct APISettingsTab: View {
+    @AppStorage("bs_localAPIEnabled") private var apiEnabled: Bool = false
+    @AppStorage("bs_localAPIPort") private var apiPort: Int = Int(LocalAPIServer.defaultPort)
+
+    // @Observable singletons need @State for SwiftUI to track them.
+    @State private var server = LocalAPIServer.shared
+
+    var body: some View {
+        Form {
+            Section("Local API") {
+                Toggle("Enable local API", isOn: $apiEnabled)
+
+                Text("Lets scripts and other tools render beautified screenshots over HTTP. Off by default. The server listens on 127.0.0.1 only — it is never reachable from the network.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                TextField("Port", value: $apiPort, format: .number.grouping(.never))
+                    .disabled(apiEnabled)
+                    .help(apiEnabled ? "Turn the API off to change the port." : "")
+            }
+
+            Section("Status") {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(server.isRunning ? Color.green : Color.secondary)
+                        .frame(width: 8, height: 8)
+
+                    if let port = server.activePort {
+                        Text("Running at http://127.0.0.1:\(String(port))")
+                            .font(.system(.body, design: .monospaced))
+                            .textSelection(.enabled)
+                    } else {
+                        Text("Stopped")
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+                }
+
+                if let error = server.lastError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+
+                Text("Endpoints: GET /health, GET /presets, POST /beautify. See the README for the request format.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Button("Reset All API Settings to Defaults") {
+                    apiEnabled = false
+                    apiPort = Int(LocalAPIServer.defaultPort)
+                }
+                .controlSize(.small)
+                .foregroundStyle(.red)
+            }
+        }
+        .formStyle(.grouped)
+        .onChange(of: apiEnabled) { _, _ in server.applyPreferences() }
     }
 }
 

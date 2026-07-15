@@ -9,6 +9,7 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
 
         MenuBarPopoverController.shared.setup()
+        LocalAPIServer.shared.applyPreferences()
 
         Task {
             await AppUpdater.shared.checkForUpdatesQuietly()
@@ -29,6 +30,7 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         permissionPollTimer?.invalidate()
         ShortcutService.shared.unregisterAll()
+        LocalAPIServer.shared.stop()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

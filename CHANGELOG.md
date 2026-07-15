@@ -5,6 +5,12 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Local REST API**: Optional HTTP API for rendering screenshots through the same beautifier the editor uses, so scripts, CI jobs, and other tools can produce styled screenshots programmatically. Three endpoints: `GET /health`, `GET /presets` (every solid and gradient preset with ids, names, and hex colors), and `POST /beautify` (multipart file upload or JSON with a base64 image, returns PNG bytes). Background, padding, corner radius, shadow, aspect ratio, and alignment are all settable per request. Off by default — enable it and choose a port in the new Settings > API tab. Built on Network.framework with no new dependencies, bound to `127.0.0.1` only, and rejects requests with a non-loopback `Host` header to block DNS rebinding
+
 ## [0.3.7] - 2026-06-07
 
 ### Added

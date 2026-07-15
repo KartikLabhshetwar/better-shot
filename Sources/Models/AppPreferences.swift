@@ -17,6 +17,8 @@ enum AppPreferences {
     private static let recordingShowCursorKey = "bs_recordingShowCursor"
     private static let recordingCaptureAudioKey = "bs_recordingCaptureAudio"
     private static let recordingOpenEditorKey = "bs_recordingOpenEditor"
+    private static let localAPIEnabledKey = "bs_localAPIEnabled"
+    private static let localAPIPortKey = "bs_localAPIPort"
 
     // MARK: - Appearance
     static var appearance: AppAppearance {
@@ -116,6 +118,20 @@ enum AppPreferences {
     static var recordingOpenEditor: Bool {
         get { UserDefaults.standard.object(forKey: recordingOpenEditorKey) as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: recordingOpenEditorKey) }
+    }
+
+    // MARK: - Local API
+    static var localAPIEnabled: Bool {
+        get { UserDefaults.standard.object(forKey: localAPIEnabledKey) as? Bool ?? false }
+        set { UserDefaults.standard.set(newValue, forKey: localAPIEnabledKey) }
+    }
+
+    static var localAPIPort: UInt16 {
+        get {
+            let val = UserDefaults.standard.integer(forKey: localAPIPortKey)
+            return (1024...65535).contains(val) ? UInt16(val) : LocalAPIServer.defaultPort
+        }
+        set { UserDefaults.standard.set(Int(newValue), forKey: localAPIPortKey) }
     }
 
     // MARK: - Default Beautifier Config
