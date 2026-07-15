@@ -161,7 +161,7 @@ Or send JSON with the image base64-encoded:
 ```bash
 curl -X POST http://127.0.0.1:17595/beautify \
   -H "Content-Type: application/json" \
-  -d "{\"image\":\"$(base64 -i screenshot.png)\",\"background\":\"#1E90FF\"}" \
+  -d "{\"image\":\"$(base64 -i screenshot.png | tr -d '\n')\",\"background\":\"#1E90FF\"}" \
   -o beautified.png
 ```
 
