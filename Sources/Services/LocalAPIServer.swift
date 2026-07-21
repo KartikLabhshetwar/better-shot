@@ -148,8 +148,10 @@ private enum LocalAPIConnection {
             name = String(host.prefix(while: { $0 != ":" }))
         }
 
-        guard ["127.0.0.1", "localhost", "::1"].contains(name) else {
-            return .error(403, "Host '\(rawHost)' is not allowed. The local API only answers loopback (127.0.0.1, localhost, ::1)")
+        // The allow-list mirrors the listener's IPv4-only loopback binding; add ::1
+        // back here if the binding ever goes dual-stack.
+        guard ["127.0.0.1", "localhost"].contains(name) else {
+            return .error(403, "Host '\(rawHost)' is not allowed. The local API only answers loopback (127.0.0.1, localhost)")
         }
         return nil
     }

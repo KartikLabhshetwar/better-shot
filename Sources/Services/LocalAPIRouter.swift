@@ -137,7 +137,10 @@ enum LocalAPIRouter {
 
             func number(_ name: String) throws -> Double? {
                 guard let raw = field(name) else { return nil }
-                guard let value = Double(raw) else {
+                // curl -F fields can carry stray whitespace or a trailing newline
+                // (e.g. values read from files); don't 400 on those.
+                let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard let value = Double(trimmed) else {
                     throw BeautifyError("'\(name)' must be a number, got '\(raw)'")
                 }
                 return value
