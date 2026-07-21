@@ -86,7 +86,12 @@ final class LocalAPIServer {
             stop()
             lastError = Self.describe(error, port: port)
         case .cancelled:
+            // A cancel arriving here is system-initiated: stop() detaches this handler
+            // before cancelling, so without the reset the UI would keep showing a
+            // bound port (and a stale error) for a listener that no longer exists.
             isRunning = false
+            activePort = nil
+            lastError = nil
         default:
             break
         }

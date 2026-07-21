@@ -160,7 +160,7 @@ enum LocalAPIRouter {
             do {
                 body = try JSONDecoder().decode(BeautifyBody.self, from: request.body)
             } catch {
-                throw BeautifyError("Could not parse JSON body")
+                throw BeautifyError("Could not parse JSON body: \(error.localizedDescription)")
             }
             guard let base64 = body.image else {
                 throw BeautifyError("Missing 'image' (base64-encoded image data)")
@@ -190,15 +190,19 @@ enum LocalAPIRouter {
         if let shadowStrength = body.shadowStrength {
             config.shadowStrength = try clamp(shadowStrength, to: 0...1, name: "shadowStrength")
         }
+        // Enum fields tolerate case and stray whitespace so scripts don't have to
+        // reproduce the exact rawValue casing.
         if let raw = body.aspectRatio {
-            guard let aspectRatio = CanvasAspectRatio(rawValue: raw) else {
+            let normalized = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let aspectRatio = CanvasAspectRatio.allCases.first(where: { $0.rawValue.lowercased() == normalized.lowercased() }) else {
                 let valid = CanvasAspectRatio.allCases.map(\.rawValue).joined(separator: ", ")
                 throw BeautifyError("Unknown aspectRatio '\(raw)'. Valid values: \(valid)")
             }
             config.aspectRatio = aspectRatio
         }
         if let raw = body.alignment {
-            guard let alignment = ImageAlignment(rawValue: raw) else {
+            let normalized = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let alignment = ImageAlignment.allCases.first(where: { $0.rawValue.lowercased() == normalized.lowercased() }) else {
                 let valid = ImageAlignment.allCases.map(\.rawValue).joined(separator: ", ")
                 throw BeautifyError("Unknown alignment '\(raw)'. Valid values: \(valid)")
             }
