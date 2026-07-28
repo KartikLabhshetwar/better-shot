@@ -762,18 +762,7 @@ struct ShortcutRow: View {
             }
         }
         .onAppear {
-            shortcut = ShortcutService.shared.loadShortcut(for: action) ?? defaultShortcut
-        }
-    }
-
-    private var defaultShortcut: ShortcutService.Shortcut {
-        switch action {
-        case .region: return .defaultRegion
-        case .fullscreen: return .defaultFullscreen
-        case .window: return .defaultWindow
-        case .ocr: return .defaultOCR
-        case .colorPicker: return .defaultColorPicker
-        case .recording: return .defaultRecording
+            shortcut = ShortcutService.shared.loadShortcut(for: action) ?? ShortcutService.defaultShortcut(for: action)
         }
     }
 

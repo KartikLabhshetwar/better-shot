@@ -59,10 +59,10 @@ final class ShortcutService {
     }
 
     private static func cacheShortcuts() {
-        cachedShortcuts = globalShortcutBindingsForTests()
+        cachedShortcuts = globalShortcutBindings()
     }
 
-    static func globalShortcutBindingsForTests(loader: ShortcutLoadClosure? = nil) -> [(Action, Shortcut)] {
+    static func globalShortcutBindings(loader: ShortcutLoadClosure? = nil) -> [(Action, Shortcut)] {
         let resolveLoader: ShortcutLoadClosure = loader ?? { action in
             ShortcutService.shared.loadShortcut(for: action)
         }

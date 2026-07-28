@@ -1,9 +1,7 @@
 import UniformTypeIdentifiers
 
 extension UTType {
-    static var webp: UTType {
-        UTType(importedAs: "org.webmproject.webp")
-    }
+    static let webp = UTType(importedAs: "org.webmproject.webp")
 }
 
 enum ExportFormat: String, CaseIterable {

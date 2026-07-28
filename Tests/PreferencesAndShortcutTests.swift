@@ -127,6 +127,24 @@ final class PreferencesAndShortcutTests: XCTestCase {
         }
     }
 
+    func testImageExportErrorDescriptionsAreNonEmptyForAllCases() {
+        let errors: [ImageExportError] = [
+            .invalidDimensions,
+            .pixelBufferOverflow,
+            .bitmapContextCreationFailed,
+            .webPEncodeFailed,
+            .imageDestinationCreationFailed,
+            .imageFinalizeFailed,
+            .dataWriteFailed,
+        ]
+
+        for error in errors {
+            let description = error.errorDescription?.trimmingCharacters(in: .whitespacesAndNewlines)
+            XCTAssertNotNil(description)
+            XCTAssertFalse(description?.isEmpty ?? true)
+        }
+    }
+
     private func makeTinyTestImage() -> CGImage? {
         makeImage(
             width: 2,

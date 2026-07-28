@@ -3,7 +3,7 @@ import Foundation
 import ImageIO
 import libwebp
 
-enum ImageExportError: Error, Equatable {
+enum ImageExportError: Error, Equatable, LocalizedError {
     case invalidDimensions
     case pixelBufferOverflow
     case bitmapContextCreationFailed
@@ -11,6 +11,25 @@ enum ImageExportError: Error, Equatable {
     case imageDestinationCreationFailed
     case imageFinalizeFailed
     case dataWriteFailed
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidDimensions:
+            return "Image dimensions invalid or exceed supported limits."
+        case .pixelBufferOverflow:
+            return "Image pixel buffer size overflowed during export."
+        case .bitmapContextCreationFailed:
+            return "Failed to create bitmap context for image export."
+        case .webPEncodeFailed:
+            return "Failed to encode image as WebP."
+        case .imageDestinationCreationFailed:
+            return "Failed to create image destination for export."
+        case .imageFinalizeFailed:
+            return "Failed to finalize exported image data."
+        case .dataWriteFailed:
+            return "Failed to write exported image data to disk."
+        }
+    }
 }
 
 enum ImageExporter {
