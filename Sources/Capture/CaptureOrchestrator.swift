@@ -148,25 +148,23 @@ final class CaptureOrchestrator {
     private func saveImage(_ cgImage: CGImage) -> URL? {
         let dir = AppPreferences.saveDirectory
         let stamp = Int(Date().timeIntervalSince1970 * 1000)
-        let ext = AppPreferences.exportFormat.fileExtension
-        let path = "\(dir)/bettershot_\(stamp).\(ext)"
+        let format = AppPreferences.exportFormat
+        let path = "\(dir)/bettershot_\(stamp).\(format.fileExtension)"
         let url = URL(fileURLWithPath: path)
 
-        guard let destination = CGImageDestinationCreateWithURL(
-            url as CFURL,
-            AppPreferences.exportFormat.utType as CFString,
-            1, nil
-        ) else { return nil }
-
-        var options: [CFString: Any] = [:]
-        if AppPreferences.exportFormat == .jpeg {
-            options[kCGImageDestinationLossyCompressionQuality] = AppPreferences.exportQuality
+        do {
+            try ImageExporter.export(cgImage, format: format, quality: AppPreferences.exportQuality, to: url)
+            return url
+        } catch {
+            print("Export failed: \(error.localizedDescription)")
+            ToastWindow.shared.show(
+                title: "Export Failed",
+                message: "Could not save screenshot",
+                systemIcon: "exclamationmark.triangle",
+                on: captureScreen
+            )
+            return nil
         }
-
-        CGImageDestinationAddImage(destination, cgImage, options as CFDictionary)
-
-        guard CGImageDestinationFinalize(destination) else { return nil }
-        return url
     }
 
     private func saveBaseImage(rawURL: URL, alongside beautifiedURL: URL) {

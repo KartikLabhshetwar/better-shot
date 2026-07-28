@@ -12,6 +12,11 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     ENABLE_USER_SCRIPT_SANDBOXING: false
 
+packages:
+  libwebp-Xcode:
+    url: https://github.com/SDWebImage/libwebp-Xcode
+    exactVersion: 1.5.0
+
 targets:
   BetterShot:
     type: application
@@ -37,3 +42,34 @@ targets:
         LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
     entitlements:
       path: Resources/BetterShot.entitlements
+    dependencies:
+      - package: libwebp-Xcode
+        product: libwebp
+
+  BetterShotFocusedTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests
+      - Sources/Models/ExportFormat.swift
+      - Sources/Models/ExportQualityResolver.swift
+      - Sources/Services/ShortcutBindings.swift
+      - Sources/Services/ImageExporter.swift
+    dependencies:
+      - package: libwebp-Xcode
+        product: libwebp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.bettershot.focused-tests
+        PRODUCT_NAME: BetterShotFocusedTests
+        GENERATE_INFOPLIST_FILE: true
+        CODE_SIGNING_ALLOWED: false
+
+schemes:
+  BetterShotFocusedTests:
+    build:
+      targets:
+        BetterShotFocusedTests: all
+    test:
+      targets:
+        - BetterShotFocusedTests

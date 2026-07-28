@@ -36,7 +36,7 @@ Region, fullscreen, and window capture all use the native macOS `screencapture` 
 - **Crop** — Crop screenshots and recordings with draggable handles, dark mask, and rule-of-thirds grid
 - **Layout** — Aspect ratio (Auto, 1:1, 4:3, 3:2, 16:9, 9:16), 9-point alignment grid with smart corner radius
 - **Defaults** — Configure your preferred effects and background in Settings with a live preview
-- **Export** — PNG or JPEG for screenshots, MP4 for recordings
+- **Export** — PNG, JPEG, or WebP for screenshots, MP4 for recordings
 
 ### Annotate
 
@@ -124,7 +124,7 @@ Screen Recording lets the app capture your screen. Accessibility lets it overrid
 Open from the menu bar > **Settings** (or `⌘,`).
 
 - **General** — Save location, clipboard behavior, appearance, default effects with live preview (padding, radius, shadow, background including macOS wallpapers and custom images), export format
-- **Capture** — Self-timer delay, keyboard shortcuts (click any shortcut to re-record it, including record screen), overlay position and dismiss timing
+- **Capture** — Self-timer delay, keyboard shortcuts (click any shortcut to re-record it, including window and record screen), overlay position and dismiss timing
 - **Recording** — FPS (24/30/60), show cursor, capture audio, open editor after recording
 - **History** — Browse and delete past screenshots
 - **Videos** — Browse and delete past recordings, open in video editor

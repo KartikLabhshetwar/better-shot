@@ -101,23 +101,17 @@ struct EditorWindowView: View {
 
         let dir = AppPreferences.saveDirectory
         let stamp = Int(Date().timeIntervalSince1970 * 1000)
-        let ext = AppPreferences.exportFormat.fileExtension
-        let path = "\(dir)/bettershot_\(stamp).\(ext)"
+        let format = AppPreferences.exportFormat
+        let path = "\(dir)/bettershot_\(stamp).\(format.fileExtension)"
         let url = URL(fileURLWithPath: path)
 
-        guard let dest = CGImageDestinationCreateWithURL(
-            url as CFURL,
-            AppPreferences.exportFormat.utType as CFString,
-            1, nil
-        ) else { return }
-
-        var options: [CFString: Any] = [:]
-        if AppPreferences.exportFormat == .jpeg {
-            options[kCGImageDestinationLossyCompressionQuality] = AppPreferences.exportQuality
+        do {
+            try ImageExporter.export(rendered, format: format, quality: AppPreferences.exportQuality, to: url)
+        } catch {
+            print("Editor export failed: \(error.localizedDescription)")
+            withAnimation { model.toastMessage = "Export failed" }
+            return
         }
-
-        CGImageDestinationAddImage(dest, rendered, options as CFDictionary)
-        guard CGImageDestinationFinalize(dest) else { return }
 
         if let sourceURL = model.sourceURL {
             let baseURL = CaptureOrchestrator.baseImageURL(for: url)

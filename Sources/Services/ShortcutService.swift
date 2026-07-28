@@ -21,26 +21,8 @@ final class ShortcutService {
 
     // MARK: - Shortcut Definition
 
-    struct Shortcut: Codable, Equatable {
-        var keyCode: UInt32
-        var modifiers: UInt32
-        var enabled: Bool
-
-        static let defaultRegion = Shortcut(keyCode: UInt32(kVK_ANSI_4), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
-        static let defaultFullscreen = Shortcut(keyCode: UInt32(kVK_ANSI_3), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
-        static let defaultOCR = Shortcut(keyCode: UInt32(kVK_ANSI_O), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
-        static let defaultColorPicker = Shortcut(keyCode: UInt32(kVK_ANSI_C), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
-        static let defaultRecording = Shortcut(keyCode: UInt32(kVK_ANSI_2), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
-    }
-
-    enum Action: UInt32, CaseIterable {
-        case region = 1
-        case fullscreen = 2
-        case window = 3
-        case ocr = 4
-        case colorPicker = 5
-        case recording = 6
-    }
+    typealias Action = ShortcutAction
+    typealias Shortcut = ShortcutDefinition
 
     // MARK: - Registration (CGEvent tap — intercepts system shortcuts)
 
@@ -77,14 +59,18 @@ final class ShortcutService {
     }
 
     private static func cacheShortcuts() {
-        let service = ShortcutService.shared
-        cachedShortcuts = [
-            (.region, service.loadShortcut(for: .region) ?? .defaultRegion),
-            (.fullscreen, service.loadShortcut(for: .fullscreen) ?? .defaultFullscreen),
-            (.ocr, service.loadShortcut(for: .ocr) ?? .defaultOCR),
-            (.colorPicker, service.loadShortcut(for: .colorPicker) ?? .defaultColorPicker),
-            (.recording, service.loadShortcut(for: .recording) ?? .defaultRecording),
-        ]
+        cachedShortcuts = globalShortcutBindingsForTests()
+    }
+
+    static func globalShortcutBindingsForTests(loader: ShortcutLoadClosure? = nil) -> [(Action, Shortcut)] {
+        let resolveLoader: ShortcutLoadClosure = loader ?? { action in
+            ShortcutService.shared.loadShortcut(for: action)
+        }
+        return ShortcutBindings.resolveBindings(loadShortcut: resolveLoader)
+    }
+
+    static func defaultShortcut(for action: Action) -> Shortcut {
+        ShortcutBindings.defaultShortcut(for: action)
     }
 
     func unregisterAll() {
@@ -101,7 +87,7 @@ final class ShortcutService {
     // MARK: - Persistence
 
     func saveShortcut(_ shortcut: Shortcut, for action: Action) {
-        let key = "bs_hotkey_\(action.rawValue)"
+        let key = ShortcutBindings.key(for: action)
         if let data = try? JSONEncoder().encode(shortcut) {
             UserDefaults.standard.set(data, forKey: key)
         }
@@ -109,7 +95,7 @@ final class ShortcutService {
     }
 
     func loadShortcut(for action: Action) -> Shortcut? {
-        let key = "bs_hotkey_\(action.rawValue)"
+        let key = ShortcutBindings.key(for: action)
         guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
         return try? JSONDecoder().decode(Shortcut.self, from: data)
     }

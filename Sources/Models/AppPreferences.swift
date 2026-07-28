@@ -79,8 +79,8 @@ enum AppPreferences {
 
     static var exportQuality: Double {
         get {
-            let val = UserDefaults.standard.double(forKey: exportQualityKey)
-            return val > 0 ? val : 0.9
+            let storedValue = UserDefaults.standard.object(forKey: exportQualityKey) as? Double
+            return ExportQualityResolver.resolve(storedValue)
         }
         set { UserDefaults.standard.set(newValue, forKey: exportQualityKey) }
     }
@@ -163,24 +163,6 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 enum OverlayPosition: String, CaseIterable, Codable {
     case bottomRight = "bottomRight"
     case bottomLeft = "bottomLeft"
-}
-
-enum ExportFormat: String, CaseIterable {
-    case png, jpeg
-
-    var utType: String {
-        switch self {
-        case .png: return "public.png"
-        case .jpeg: return "public.jpeg"
-        }
-    }
-
-    var fileExtension: String {
-        switch self {
-        case .png: return "png"
-        case .jpeg: return "jpg"
-        }
-    }
 }
 
 enum SelfTimerDelay: Int, CaseIterable {

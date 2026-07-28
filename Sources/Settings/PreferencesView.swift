@@ -184,8 +184,8 @@ struct GeneralSettingsTab: View {
                 }
                 .pickerStyle(.segmented)
 
-                if exportFormatRaw == ExportFormat.jpeg.rawValue {
-                    Slider(value: $exportQuality, in: 0.1...1.0, step: 0.05) {
+                if exportFormat.wrappedValue.supportsLossyCompressionQuality {
+                    Slider(value: $exportQuality, in: ExportQualityResolver.sliderRange, step: 0.05) {
                         Text("Quality: \(Int(exportQuality * 100))%")
                     }
                 }
@@ -610,6 +610,7 @@ struct CaptureSettingsTab: View {
                 VStack(alignment: .leading, spacing: 8) {
                     ShortcutRow(label: "Region", action: .region)
                     ShortcutRow(label: "Fullscreen", action: .fullscreen)
+                    ShortcutRow(label: "Window", action: .window)
                     ShortcutRow(label: "OCR Region", action: .ocr)
                     ShortcutRow(label: "Color Picker", action: .colorPicker)
                     ShortcutRow(label: "Record Screen", action: .recording)
@@ -618,17 +619,7 @@ struct CaptureSettingsTab: View {
 
                 Button("Reset Shortcuts to Defaults") {
                     for action in ShortcutService.Action.allCases {
-                        let def: ShortcutService.Shortcut? = switch action {
-                        case .region: .defaultRegion
-                        case .fullscreen: .defaultFullscreen
-                        case .ocr: .defaultOCR
-                        case .colorPicker: .defaultColorPicker
-                        case .recording: .defaultRecording
-                        case .window: nil
-                        }
-                        if let def {
-                            ShortcutService.shared.saveShortcut(def, for: action)
-                        }
+                        ShortcutService.shared.saveShortcut(ShortcutService.defaultShortcut(for: action), for: action)
                     }
                     ShortcutService.shared.registerAll()
                     shortcutResetID = UUID()
@@ -642,17 +633,7 @@ struct CaptureSettingsTab: View {
                     overlayPositionRaw = OverlayPosition.bottomRight.rawValue
                     overlayDismissDelay = 5.0
                     for action in ShortcutService.Action.allCases {
-                        let def: ShortcutService.Shortcut? = switch action {
-                        case .region: .defaultRegion
-                        case .fullscreen: .defaultFullscreen
-                        case .ocr: .defaultOCR
-                        case .colorPicker: .defaultColorPicker
-                        case .recording: .defaultRecording
-                        case .window: nil
-                        }
-                        if let def {
-                            ShortcutService.shared.saveShortcut(def, for: action)
-                        }
+                        ShortcutService.shared.saveShortcut(ShortcutService.defaultShortcut(for: action), for: action)
                     }
                     ShortcutService.shared.registerAll()
                     shortcutResetID = UUID()
@@ -789,7 +770,7 @@ struct ShortcutRow: View {
         switch action {
         case .region: return .defaultRegion
         case .fullscreen: return .defaultFullscreen
-        case .window: return ShortcutService.Shortcut(keyCode: 0, modifiers: 0, enabled: false)
+        case .window: return .defaultWindow
         case .ocr: return .defaultOCR
         case .colorPicker: return .defaultColorPicker
         case .recording: return .defaultRecording
