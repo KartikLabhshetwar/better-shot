@@ -1,10 +1,15 @@
 import Carbon
 import AppKit
 import CoreGraphics
+import OSLog
 
 @MainActor
 final class ShortcutService {
     static let shared = ShortcutService()
+    private nonisolated static let logger = Logger(
+        subsystem: "com.bettershot.app",
+        category: "Shortcuts"
+    )
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -29,8 +34,13 @@ final class ShortcutService {
     func registerAll() {
         unregisterAll()
 
-        guard Self.hasAccessibilityPermission else {
-            print("BetterShot: No accessibility permission, skipping event tap registration")
+        let accessibilityTrusted = Self.hasAccessibilityPermission
+        Self.logger.notice(
+            "Shortcut registration requested; accessibilityTrusted=\(accessibilityTrusted, privacy: .public)"
+        )
+
+        guard accessibilityTrusted else {
+            Self.logger.error("Event tap registration skipped because Accessibility trust is missing")
             return
         }
 
@@ -44,7 +54,7 @@ final class ShortcutService {
             callback: ShortcutService.eventTapCallback,
             userInfo: nil
         ) else {
-            print("BetterShot: Failed to create event tap — app may need a restart after granting Accessibility permission")
+            Self.logger.error("CGEvent.tapCreate failed even though Accessibility trust is present")
             return
         }
 
@@ -55,7 +65,10 @@ final class ShortcutService {
         self.eventTap = tap
         self.runLoopSource = source
         Self.cacheShortcuts()
-        print("BetterShot: Event tap registered successfully — keyboard shortcuts active")
+        let enabledCount = Self.cachedShortcuts.lazy.filter(\.1.enabled).count
+        Self.logger.notice(
+            "Event tap registered successfully; enabledBindings=\(enabledCount, privacy: .public)"
+        )
     }
 
     private static func cacheShortcuts() {
@@ -104,7 +117,10 @@ final class ShortcutService {
 
     static func requestAccessibilityPermission() {
         let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
-        _ = AXIsProcessTrustedWithOptions(options)
+        let trusted = AXIsProcessTrustedWithOptions(options)
+        logger.notice(
+            "Accessibility trust checked with prompt; trusted=\(trusted, privacy: .public)"
+        )
     }
 
     nonisolated static var hasAccessibilityPermission: Bool {
@@ -115,10 +131,16 @@ final class ShortcutService {
 
     private static let eventTapCallback: CGEventTapCallBack = { _, type, event, _ in
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            logger.error(
+                "Event tap disabled by macOS; type=\(type.rawValue, privacy: .public). Attempting to re-enable"
+            )
             // Re-enable the tap if macOS disables it
             Task { @MainActor in
                 if let tap = ShortcutService.shared.eventTap {
                     CGEvent.tapEnable(tap: tap, enable: true)
+                    logger.notice("Event tap re-enabled")
+                } else {
+                    logger.error("Event tap could not be re-enabled because its port is missing")
                 }
             }
             return Unmanaged.passUnretained(event)

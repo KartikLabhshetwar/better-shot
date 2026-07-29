@@ -17,6 +17,11 @@ final class PreferencesAndShortcutTests: XCTestCase {
         XCTAssertEqual(ExportQualityResolver.resolve(0.65), 0.65)
     }
 
+    func testResolveExportQualityClampsStoredValuesToSliderRange() {
+        XCTAssertEqual(ExportQualityResolver.resolve(-0.1), 0.0)
+        XCTAssertEqual(ExportQualityResolver.resolve(1.1), 1.0)
+    }
+
     func testExportQualitySliderRangeCoversZeroToOne() {
         XCTAssertEqual(ExportQualityResolver.sliderRange.lowerBound, 0.0)
         XCTAssertEqual(ExportQualityResolver.sliderRange.upperBound, 1.0)

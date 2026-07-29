@@ -79,7 +79,7 @@ enum AppPreferences {
 
     static var exportQuality: Double {
         get {
-            let storedValue = UserDefaults.standard.object(forKey: exportQualityKey) as? Double
+            let storedValue = (UserDefaults.standard.object(forKey: exportQualityKey) as? NSNumber)?.doubleValue
             return ExportQualityResolver.resolve(storedValue)
         }
         set { UserDefaults.standard.set(newValue, forKey: exportQualityKey) }
