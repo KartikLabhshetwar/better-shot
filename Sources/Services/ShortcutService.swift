@@ -7,7 +7,7 @@ import OSLog
 final class ShortcutService {
     static let shared = ShortcutService()
     private nonisolated static let logger = Logger(
-        subsystem: "com.bettershot.app",
+        subsystem: Bundle.main.bundleIdentifier ?? "com.bettershot.app",
         category: "Shortcuts"
     )
 

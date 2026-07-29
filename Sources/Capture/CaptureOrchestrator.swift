@@ -159,7 +159,7 @@ final class CaptureOrchestrator {
             print("Export failed: \(error.localizedDescription)")
             ToastWindow.shared.show(
                 title: "Export Failed",
-                message: "Could not save screenshot",
+                message: "Could not save screenshot: \(error.localizedDescription)",
                 systemIcon: "exclamationmark.triangle",
                 on: captureScreen
             )
