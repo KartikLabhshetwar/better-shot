@@ -199,8 +199,9 @@ final class PreferencesAndShortcutTests: XCTestCase {
     }
 
     private func decodeCGImage(from data: Data, ext: String) throws -> CGImage {
-        _ = ext
-        let source = try XCTUnwrap(CGImageSourceCreateWithData(data as CFData, nil))
+        let hint = UTType(filenameExtension: ext)?.identifier
+        let options: CFDictionary? = hint.map { [kCGImageSourceTypeIdentifierHint: $0] as CFDictionary }
+        let source = try XCTUnwrap(CGImageSourceCreateWithData(data as CFData, options))
         return try XCTUnwrap(CGImageSourceCreateImageAtIndex(source, 0, nil))
     }
 
