@@ -1012,8 +1012,9 @@ struct HistoryTab: View {
     }
 
     private func loadThumbnail(for record: CaptureRecord) {
+        let source = HistoryStore.shared.thumbnailSource(for: record)
         Task.detached {
-            let thumb = await HistoryStore.shared.thumbnail(for: record, maxSize: 80)
+            let thumb = HistoryStore.decodeThumbnail(source, maxSize: 80)
             await MainActor.run {
                 if let thumb {
                     thumbnails[record.id.uuidString] = thumb
@@ -1119,8 +1120,9 @@ struct VideosTab: View {
     }
 
     private func loadThumbnail(for record: CaptureRecord) {
+        let source = HistoryStore.shared.thumbnailSource(for: record)
         Task.detached {
-            let thumb = await HistoryStore.shared.thumbnail(for: record, maxSize: 80)
+            let thumb = HistoryStore.decodeThumbnail(source, maxSize: 80)
             await MainActor.run {
                 if let thumb {
                     thumbnails[record.id.uuidString] = thumb
