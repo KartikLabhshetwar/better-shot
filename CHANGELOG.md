@@ -5,6 +5,17 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Microphone recording**: New "Capture microphone" toggle in Settings > Recording. Your voice is summed onto the same audio track as system audio, so voice-overs survive in every player — not just the ones that mix multiple audio tracks. Requires macOS 15 or later; on macOS 14 the toggle is disabled with the reason shown rather than silently doing nothing.
+
+### Fixed
+
+- **Recordings had no way to capture your voice**: "Capture system audio" only ever recorded what the Mac played through its output. Recording yourself talking produced a silent audio track and nothing in the UI said why, because the app had no microphone code path and no `NSMicrophoneUsageDescription`, so macOS would have terminated it had one been requested.
+- **Microphone denial is now visible**: If the privacy grant is missing, the recording continues without voice and a toast names the setting to change, instead of the stream failing to start.
+
 ## [0.3.7] - 2026-06-07
 
 ### Added

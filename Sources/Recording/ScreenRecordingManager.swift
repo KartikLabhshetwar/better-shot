@@ -26,6 +26,7 @@ final class ScreenRecordingManager: NSObject {
 
     private let videoQueue = DispatchQueue(label: "com.bettershot.recording.video", qos: .userInitiated)
     private let audioQueue = DispatchQueue(label: "com.bettershot.recording.audio", qos: .userInteractive)
+    private let microphoneQueue = DispatchQueue(label: "com.bettershot.recording.microphone", qos: .userInteractive)
 
     private override init() { super.init() }
 
@@ -39,9 +40,11 @@ final class ScreenRecordingManager: NSObject {
 
     func startFullScreenRecording() async throws -> Bool {
         guard state == .idle else { return false }
-        state = .preparing
 
         let captureAudio = AppPreferences.recordingCaptureAudio
+        let captureMicrophone = await resolveMicrophoneCapture()
+        state = .preparing
+
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         guard let display = content.displays.first else {
             state = .idle
@@ -64,7 +67,8 @@ final class ScreenRecordingManager: NSObject {
             filter: filter,
             width: captureWidth,
             height: captureHeight,
-            captureAudio: captureAudio
+            captureAudio: captureAudio,
+            captureMicrophone: captureMicrophone
         )
     }
 
@@ -74,8 +78,10 @@ final class ScreenRecordingManager: NSObject {
         let overlay = RegionSelectionOverlay()
         guard let selection = await overlay.selectRegion() else { return false }
 
-        state = .preparing
         let captureAudio = AppPreferences.recordingCaptureAudio
+        let captureMicrophone = await resolveMicrophoneCapture()
+        state = .preparing
+
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         guard let display = content.displays.first else {
             state = .idle
@@ -121,7 +127,37 @@ final class ScreenRecordingManager: NSObject {
             width: captureWidth,
             height: captureHeight,
             captureAudio: captureAudio,
+            captureMicrophone: captureMicrophone,
             sourceRect: mappedSourceRect
+        )
+    }
+
+    /// Resolves the microphone toggle against OS support and the privacy grant, so a
+    /// blocked mic degrades to a silent-voice recording with a visible reason rather
+    /// than a stream that fails to start.
+    private func resolveMicrophoneCapture() async -> Bool {
+        guard AppPreferences.recordingCaptureMicrophone,
+              AppPreferences.microphoneCaptureSupported else { return false }
+
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            return true
+        case .notDetermined:
+            if await AVCaptureDevice.requestAccess(for: .audio) { return true }
+            showMicrophoneBlockedToast()
+            return false
+        default:
+            showMicrophoneBlockedToast()
+            return false
+        }
+    }
+
+    private func showMicrophoneBlockedToast() {
+        ToastWindow.shared.show(
+            title: "Microphone blocked",
+            message: "Recording without voice. Allow BetterShot under Privacy & Security > Microphone.",
+            systemIcon: "mic.slash",
+            duration: 4
         )
     }
 
@@ -130,6 +166,7 @@ final class ScreenRecordingManager: NSObject {
         width: Int,
         height: Int,
         captureAudio: Bool,
+        captureMicrophone: Bool,
         sourceRect: CGRect? = nil
     ) async throws -> Bool {
         let config = SCStreamConfiguration()
@@ -151,6 +188,10 @@ final class ScreenRecordingManager: NSObject {
             config.channelCount = 2
         }
 
+        if captureMicrophone, #available(macOS 15.0, *) {
+            config.captureMicrophone = true
+        }
+
         let dir = AppPreferences.saveDirectory
         let stamp = Int(Date().timeIntervalSince1970 * 1000)
         let path = "\(dir)/bettershot_\(stamp).mp4"
@@ -162,7 +203,8 @@ final class ScreenRecordingManager: NSObject {
             width: width,
             height: height,
             fps: fps,
-            includeAudio: captureAudio
+            includeAudio: captureAudio,
+            includeMicrophone: captureMicrophone
         )
 
         guard recordingSession.startWriting() else {
@@ -177,6 +219,9 @@ final class ScreenRecordingManager: NSObject {
         try scStream.addStreamOutput(self, type: .screen, sampleHandlerQueue: videoQueue)
         if captureAudio {
             try scStream.addStreamOutput(self, type: .audio, sampleHandlerQueue: audioQueue)
+        }
+        if captureMicrophone, #available(macOS 15.0, *) {
+            try scStream.addStreamOutput(self, type: .microphone, sampleHandlerQueue: microphoneQueue)
         }
 
         self.stream = scStream
@@ -203,6 +248,9 @@ final class ScreenRecordingManager: NSObject {
         if let stream {
             try? stream.removeStreamOutput(self, type: .screen)
             try? stream.removeStreamOutput(self, type: .audio)
+            if #available(macOS 15.0, *) {
+                try? stream.removeStreamOutput(self, type: .microphone)
+            }
             try? await stream.stopCapture()
         }
         stream = nil
@@ -251,6 +299,9 @@ final class ScreenRecordingManager: NSObject {
         if let stream {
             try? stream.removeStreamOutput(self, type: .screen)
             try? stream.removeStreamOutput(self, type: .audio)
+            if #available(macOS 15.0, *) {
+                try? stream.removeStreamOutput(self, type: .microphone)
+            }
             try? await stream.stopCapture()
         }
         stream = nil
@@ -306,8 +357,10 @@ extension ScreenRecordingManager: SCStreamOutput {
             _streamSession?.appendVideoSample(sampleBuffer)
         case .audio:
             _streamSession?.appendAudioSample(sampleBuffer)
-        @unknown default:
-            break
+        default:
+            if #available(macOS 15.0, *), type == .microphone {
+                _streamSession?.appendMicrophoneSample(sampleBuffer)
+            }
         }
     }
 }
