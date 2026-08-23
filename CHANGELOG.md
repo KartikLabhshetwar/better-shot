@@ -20,11 +20,13 @@ that survives a crash mid-recording.
 - **Share links via Cloudflare R2**: A Share button next to Export uploads the recording to your own R2 bucket and copies the public link to your clipboard. Configure it in Settings > Sharing with your account ID, bucket, public base URL, and an R2 API token scoped to Object Read & Write. Uploads go straight from the app to R2 over a hand-signed AWS SigV4 request (CryptoKit only, no SDK and no proxy worker), so nothing routes through a third-party service
 - **Keychain-backed credentials**: The R2 access key ID and secret access key are stored in the macOS Keychain. Only non-secret config (account ID, bucket, public base URL, enable flag) lives in UserDefaults
 - **Test Connection button**: Verifies R2 credentials before you rely on them, using an object-scoped probe so an Object Read & Write token passes without needing bucket list permission
+- **Source picker bar**: Record no longer starts capturing the instant you click it. It opens a floating bar that lists every connected display and every open window alongside area selection, with microphone and system audio toggles and a 0/1/3/5 second start delay. Choosing a source morphs the same bar in place into the recording controls, so the bar you set up in is the bar you stop in
+- **Record a single window**: Window capture uses a window-scoped content filter, so the recording follows that window and excludes whatever is stacked on top of it
 - **Recording area highlight**: When recording a region, the area outside it dims and the edge gets a pulsing accent border, so you always know what is in frame. The overlay is click-through and excluded from the capture itself
 - **Redesigned recording bar**: The floating bar now uses an `NSVisualEffectView` HUD material with refined corner radius and shadow, an AppKit-tracked hover puck that keeps responding while Better Shot is in the background, spring-based show and hide animations, and drag position that persists between recordings
 - **Multi-display capture**: Recording now targets the display under your pointer (or the frontmost window) instead of always grabbing the main display. Region capture carries its own `CGDirectDisplayID`, so selections on secondary and negative-origin displays land in the right place
 - **Crash-resilient recording**: Video is written as fragmented MP4 with a 2-second fragment interval, so a crash or force quit mid-recording leaves a playable file instead of a corrupt one
-- **Separate system and microphone audio**: System audio and microphone are written as independent tracks rather than being mixed at capture time
+- **Microphone recording**: Turning on the mic in the recording bar records your narration into the video as its own audio track, kept separate from system audio rather than mixed at capture time. Requires macOS 15, which is where ScreenCaptureKit added microphone capture, so the control is hidden on macOS 14
 - **Open editor after screenshot**: New setting to jump straight into the editor after taking a screenshot ([#72](https://github.com/KartikLabhshetwar/better-shot/pull/72), thanks [@y-u-s-u-f](https://github.com/y-u-s-u-f))
 - **New owl mascot**: New app icon and logo across the app and website
 
@@ -32,6 +34,7 @@ that survives a crash mid-recording.
 
 - **Reduce Motion is respected**: The recording bar's show and hide animations fall back to an instant transition when `accessibilityDisplayShouldReduceMotion` is set
 - **Pause and resume rebuilt**: Pausing now compacts presentation timestamps properly instead of leaving a gap, so paused time no longer stretches the exported timeline
+- **Restart keeps your source**: Restarting a recording replays whatever you were capturing, including the region you selected, instead of always restarting full screen
 - **Capture callbacks off the main actor**: The `SCStream` wrapper is `NSLock`-guarded so ScreenCaptureKit callbacks stay off the main actor under Swift 6 strict concurrency
 
 ### Fixed
