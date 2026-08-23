@@ -93,14 +93,22 @@ final class HistoryStore {
         return urlForRecord(record)
     }
 
-    func thumbnail(for record: CaptureRecord, maxSize: CGFloat = 120) -> NSImage? {
-        let url = displayURLForRecord(record)
+    /// What `decodeThumbnail` needs, resolved on the main actor before the decode is handed off.
+    struct ThumbnailSource: Sendable {
+        let url: URL
+        let kind: CaptureKind
+    }
 
-        if record.kind == .recording {
-            return videoThumbnail(url: url, maxSize: maxSize)
+    func thumbnailSource(for record: CaptureRecord) -> ThumbnailSource {
+        ThumbnailSource(url: displayURLForRecord(record), kind: record.kind)
+    }
+
+    nonisolated static func decodeThumbnail(_ source: ThumbnailSource, maxSize: CGFloat = 120) -> NSImage? {
+        if source.kind == .recording {
+            return videoThumbnail(url: source.url, maxSize: maxSize)
         }
 
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        guard let imageSource = CGImageSourceCreateWithURL(source.url as CFURL, nil) else { return nil }
 
         let options: [CFString: Any] = [
             kCGImageSourceThumbnailMaxPixelSize: maxSize,
@@ -108,11 +116,11 @@ final class HistoryStore {
             kCGImageSourceCreateThumbnailWithTransform: true,
         ]
 
-        guard let thumb = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        guard let thumb = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options as CFDictionary) else { return nil }
         return NSImage(cgImage: thumb, size: NSSize(width: thumb.width, height: thumb.height))
     }
 
-    nonisolated func videoThumbnail(url: URL, maxSize: CGFloat = 120) -> NSImage? {
+    nonisolated static func videoThumbnail(url: URL, maxSize: CGFloat = 120) -> NSImage? {
         let asset = AVURLAsset(url: url)
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
