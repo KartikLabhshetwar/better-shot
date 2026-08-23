@@ -7,6 +7,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case recording = "Recording"
     case history = "History"
     case videos = "Videos"
+    case sharing = "Sharing"
     case about = "About"
 
     var id: String { rawValue }
@@ -18,6 +19,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .recording: return "record.circle"
         case .history: return "photo.on.rectangle.angled"
         case .videos: return "video.circle"
+        case .sharing: return "link.circle"
         case .about: return "info.circle"
         }
     }
@@ -53,6 +55,9 @@ struct PreferencesView: View {
                 VideosTab()
                     .opacity(selectedSection == .videos ? 1 : 0)
                     .allowsHitTesting(selectedSection == .videos)
+                SharingSettingsTab()
+                    .opacity(selectedSection == .sharing ? 1 : 0)
+                    .allowsHitTesting(selectedSection == .sharing)
                 AboutTab()
                     .opacity(selectedSection == .about ? 1 : 0)
                     .allowsHitTesting(selectedSection == .about)

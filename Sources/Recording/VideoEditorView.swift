@@ -22,6 +22,10 @@ struct VideoEditorView: View {
     @State var model = VideoEditorModel()
     let url: URL
 
+    @State private var shareCredentials = R2CredentialStore.shared
+    @State private var shareUploader = R2Uploader.shared
+    @State private var shareItemID: UUID?
+
     var body: some View {
         HSplitView {
             videoInspector
@@ -59,6 +63,25 @@ struct VideoEditorView: View {
                 } label: {
                     Label("Delete", systemImage: "trash")
                         .foregroundStyle(.red)
+                }
+
+                if shareCredentials.isConfigured && shareCredentials.enabled {
+                    Button {
+                        Task { await shareRecording() }
+                    } label: {
+                        if let shareItemID, shareUploader.uploadingItems.contains(shareItemID) {
+                            HStack(spacing: 6) {
+                                ProgressView(value: shareUploader.uploadProgress[shareItemID] ?? 0)
+                                    .progressViewStyle(.circular)
+                                    .controlSize(.small)
+                                Text("\(Int((shareUploader.uploadProgress[shareItemID] ?? 0) * 100))%")
+                                    .font(.caption)
+                            }
+                        } else {
+                            Label("Share", systemImage: "link")
+                        }
+                    }
+                    .disabled(shareItemID != nil)
                 }
 
                 Button {
@@ -285,6 +308,14 @@ struct VideoEditorView: View {
         try? FileManager.default.removeItem(at: sourceURL)
         model.cleanup()
         NSApp.keyWindow?.close()
+    }
+
+    private func shareRecording() async {
+        guard let sourceURL = model.sourceURL else { return }
+        let itemID = UUID()
+        shareItemID = itemID
+        _ = await ShareService.shared.share(itemID: itemID, fileURL: sourceURL)
+        shareItemID = nil
     }
 
     private func exportRecording() async {
