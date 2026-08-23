@@ -2,9 +2,88 @@ import ScreenCaptureKit
 import AVFoundation
 import AppKit
 
+nonisolated final class ScreenCaptureStream: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _stream: SCStream?
+    private var _hasAudio = false
+
+    private let videoQueue = DispatchQueue(label: "com.bettershot.recording.video", qos: .userInteractive)
+    private let audioQueue = DispatchQueue(label: "com.bettershot.recording.audio", qos: .userInteractive)
+
+    var onVideoFrame: ((CMSampleBuffer) -> Void)?
+    var onAudioSample: ((CMSampleBuffer) -> Void)?
+    var onError: ((Error) -> Void)?
+
+    static func availableContent() async throws -> SCShareableContent {
+        try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+    }
+
+    func makeStream(filter: SCContentFilter, configuration: SCStreamConfiguration) throws -> SCStream {
+        let stream = SCStream(filter: filter, configuration: configuration, delegate: self)
+        try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: videoQueue)
+        let hasAudio = configuration.capturesAudio
+        if hasAudio {
+            try stream.addStreamOutput(self, type: .audio, sampleHandlerQueue: audioQueue)
+        }
+        lock.withLock {
+            _stream = stream
+            _hasAudio = hasAudio
+        }
+        return stream
+    }
+
+    func stop() async {
+        let (stream, hasAudio): (SCStream?, Bool) = lock.withLock {
+            let s = _stream
+            _stream = nil
+            return (s, _hasAudio)
+        }
+        guard let stream else { return }
+        try? await stream.stopCapture()
+        try? stream.removeStreamOutput(self, type: .screen)
+        if hasAudio {
+            try? stream.removeStreamOutput(self, type: .audio)
+        }
+    }
+
+    func detachHandlers() {
+        onVideoFrame = nil
+        onAudioSample = nil
+        onError = nil
+    }
+
+    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
+        guard CMSampleBufferDataIsReady(sampleBuffer) else { return }
+        switch type {
+        case .screen:
+            if let status = Self.frameStatus(for: sampleBuffer),
+               status == .blank || status == .suspended || status == .stopped {
+                return
+            }
+            onVideoFrame?(sampleBuffer)
+        case .audio:
+            onAudioSample?(sampleBuffer)
+        @unknown default:
+            break
+        }
+    }
+
+    func stream(_ stream: SCStream, didStopWithError error: any Error) {
+        onError?(error)
+    }
+
+    private static func frameStatus(for sampleBuffer: CMSampleBuffer) -> SCFrameStatus? {
+        guard let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
+              let rawValue = attachments.first?[SCStreamFrameInfo.status] as? Int else {
+            return nil
+        }
+        return SCFrameStatus(rawValue: rawValue)
+    }
+}
+
 @MainActor
 @Observable
-final class ScreenRecordingManager: NSObject {
+final class ScreenRecordingManager {
     static let shared = ScreenRecordingManager()
 
     enum State: Equatable {
@@ -18,54 +97,46 @@ final class ScreenRecordingManager: NSObject {
     private(set) var state: State = .idle
     private(set) var elapsedSeconds: Int = 0
 
-    private var stream: SCStream?
+    private let capture = ScreenCaptureStream()
     private var session: RecordingSession?
     private var outputURL: URL?
     private var timer: Timer?
-    nonisolated(unsafe) private var _streamSession: RecordingSession?
 
-    private let videoQueue = DispatchQueue(label: "com.bettershot.recording.video", qos: .userInitiated)
-    private let audioQueue = DispatchQueue(label: "com.bettershot.recording.audio", qos: .userInteractive)
-
-    private override init() { super.init() }
+    private init() {}
 
     var isRecording: Bool { state == .recording || state == .paused }
 
     // MARK: - Start
 
     func startRecording() async throws -> Bool {
-        return try await startFullScreenRecording()
+        try await startFullScreenRecording()
     }
 
     func startFullScreenRecording() async throws -> Bool {
         guard state == .idle else { return false }
         state = .preparing
 
-        let captureAudio = AppPreferences.recordingCaptureAudio
-        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-        guard let display = content.displays.first else {
+        let targetDisplayID = ActiveDisplayResolver.activeDisplayID() ?? CGMainDisplayID()
+
+        do {
+            let content = try await ScreenCaptureStream.availableContent()
+            guard let display = Self.display(matching: targetDisplayID, in: content) else {
+                state = .idle
+                return false
+            }
+
+            let filter = Self.displayFilter(display: display, content: content)
+            let scale = max(1, CGFloat(filter.pointPixelScale))
+            let (width, height) = Self.pixelSize(
+                points: CGSize(width: CGFloat(display.width), height: CGFloat(display.height)),
+                scale: scale
+            )
+
+            return try await beginCapture(filter: filter, width: width, height: height)
+        } catch {
             state = .idle
-            return false
+            throw error
         }
-
-        let ownBundleID = Bundle.main.bundleIdentifier ?? ""
-        let excludedApps = content.applications.filter { $0.bundleIdentifier == ownBundleID }
-
-        let filter = SCContentFilter(
-            display: display,
-            excludingApplications: excludedApps,
-            exceptingWindows: []
-        )
-
-        let captureWidth = display.width * 2
-        let captureHeight = display.height * 2
-
-        return try await beginCapture(
-            filter: filter,
-            width: captureWidth,
-            height: captureHeight,
-            captureAudio: captureAudio
-        )
     }
 
     func startAreaRecording() async throws -> Bool {
@@ -75,86 +146,136 @@ final class ScreenRecordingManager: NSObject {
         guard let selection = await overlay.selectRegion() else { return false }
 
         state = .preparing
-        let captureAudio = AppPreferences.recordingCaptureAudio
-        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-        guard let display = content.displays.first else {
-            state = .idle
-            return false
-        }
 
+        do {
+            let content = try await ScreenCaptureStream.availableContent()
+            let targetDisplayID = selection.displayID
+            guard let display = Self.display(matching: targetDisplayID, in: content) else {
+                state = .idle
+                return false
+            }
+
+            let filter = Self.displayFilter(display: display, content: content)
+            let sourceRect = Self.sourceRect(
+                forGlobalQuartzRect: selection.pointsRect,
+                displayID: display.displayID,
+                contentRect: filter.contentRect
+            )
+            guard sourceRect.width >= 1, sourceRect.height >= 1 else {
+                state = .idle
+                return false
+            }
+
+            let scale = max(1, CGFloat(filter.pointPixelScale))
+            let (width, height) = Self.pixelSize(points: sourceRect.size, scale: scale)
+
+            return try await beginCapture(
+                filter: filter,
+                width: width,
+                height: height,
+                sourceRect: sourceRect
+            )
+        } catch {
+            state = .idle
+            throw error
+        }
+    }
+
+    // MARK: - Capture targeting
+
+    private static func display(matching displayID: CGDirectDisplayID, in content: SCShareableContent) -> SCDisplay? {
+        content.displays.first { $0.displayID == displayID } ?? content.displays.first
+    }
+
+    private static func displayFilter(display: SCDisplay, content: SCShareableContent) -> SCContentFilter {
         let ownBundleID = Bundle.main.bundleIdentifier ?? ""
         let excludedApps = content.applications.filter { $0.bundleIdentifier == ownBundleID }
+        return SCContentFilter(display: display, excludingApplications: excludedApps, exceptingWindows: [])
+    }
 
-        let filter = SCContentFilter(
-            display: display,
-            excludingApplications: excludedApps,
-            exceptingWindows: []
-        )
+    private static func pixelSize(points: CGSize, scale: CGFloat) -> (Int, Int) {
+        let width = max(2, Int((points.width * scale).rounded(.toNearestOrAwayFromZero)) & ~1)
+        let height = max(2, Int((points.height * scale).rounded(.toNearestOrAwayFromZero)) & ~1)
+        return (width, height)
+    }
 
-        let contentRect = try await filter.contentRect
-        let pointPixelScale = try await filter.pointPixelScale
-
-        let screenFrame = NSScreen.screens.first?.frame ?? NSRect(x: 0, y: 0, width: CGFloat(display.width), height: CGFloat(display.height))
-
-        let selRect = selection.pointsRect
-        let clampedX = max(selRect.minX, screenFrame.minX)
-        let clampedY = max(selRect.minY, 0)
-        let clampedMaxX = min(selRect.maxX, screenFrame.maxX)
-        let clampedMaxY = min(selRect.maxY, screenFrame.height)
-
-        let scaleX = contentRect.width / screenFrame.width
-        let scaleY = contentRect.height / screenFrame.height
-
-        let sourceX = contentRect.minX + (clampedX - screenFrame.minX) * scaleX
-        let sourceY = contentRect.minY + clampedY * scaleY
-        let sourceW = (clampedMaxX - clampedX) * scaleX
-        let sourceH = (clampedMaxY - clampedY) * scaleY
-
-        let mappedSourceRect = CGRect(x: sourceX, y: sourceY, width: sourceW, height: sourceH)
-
-        let scale = CGFloat(pointPixelScale)
-        let captureWidth = Int(sourceW * scale)
-        let captureHeight = Int(sourceH * scale)
-
-        return try await beginCapture(
-            filter: filter,
-            width: captureWidth,
-            height: captureHeight,
-            captureAudio: captureAudio,
-            sourceRect: mappedSourceRect
+    static func sourceRect(
+        forGlobalQuartzRect selectionRect: CGRect,
+        displayID: CGDirectDisplayID,
+        contentRect: CGRect
+    ) -> CGRect {
+        sourceRect(
+            forGlobalQuartzRect: selectionRect,
+            displayBounds: CGDisplayBounds(displayID),
+            contentRect: contentRect
         )
     }
+
+    static func sourceRect(
+        forGlobalQuartzRect selectionRect: CGRect,
+        displayBounds: CGRect,
+        contentRect: CGRect
+    ) -> CGRect {
+        guard displayBounds.width > 0, displayBounds.height > 0,
+              contentRect.width > 0, contentRect.height > 0 else {
+            return clamped(selectionRect, to: contentRect)
+        }
+
+        let scaleX = contentRect.width / displayBounds.width
+        let scaleY = contentRect.height / displayBounds.height
+
+        let minLocalX = min(max(selectionRect.minX - displayBounds.minX, 0), displayBounds.width)
+        let maxLocalX = min(max(selectionRect.maxX - displayBounds.minX, 0), displayBounds.width)
+        let minLocalY = min(max(selectionRect.minY - displayBounds.minY, 0), displayBounds.height)
+        let maxLocalY = min(max(selectionRect.maxY - displayBounds.minY, 0), displayBounds.height)
+
+        let rect = CGRect(
+            x: contentRect.minX + minLocalX * scaleX,
+            y: contentRect.minY + minLocalY * scaleY,
+            width: max(1, (maxLocalX - minLocalX) * scaleX),
+            height: max(1, (maxLocalY - minLocalY) * scaleY)
+        )
+        return clamped(rect, to: contentRect)
+    }
+
+    private static func clamped(_ rect: CGRect, to bounds: CGRect) -> CGRect {
+        guard bounds.width > 0, bounds.height > 0 else { return .zero }
+        let width = min(max(rect.width, 1), bounds.width)
+        let height = min(max(rect.height, 1), bounds.height)
+        let minX = min(max(rect.minX, bounds.minX), bounds.maxX - width)
+        let minY = min(max(rect.minY, bounds.minY), bounds.maxY - height)
+        return CGRect(x: minX, y: minY, width: width, height: height)
+    }
+
+    // MARK: - Stream lifecycle
 
     private func beginCapture(
         filter: SCContentFilter,
         width: Int,
         height: Int,
-        captureAudio: Bool,
         sourceRect: CGRect? = nil
     ) async throws -> Bool {
+        let captureAudio = AppPreferences.recordingCaptureAudio
+        let fps = AppPreferences.recordingFPS
+
         let config = SCStreamConfiguration()
         config.width = width
         config.height = height
-
-        if let sourceRect {
-            config.sourceRect = sourceRect
-        }
-        let fps = AppPreferences.recordingFPS
+        if let sourceRect { config.sourceRect = sourceRect }
         config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(fps))
         config.pixelFormat = kCVPixelFormatType_32BGRA
-        config.queueDepth = 5
+        config.queueDepth = 3
         config.showsCursor = AppPreferences.recordingShowCursor
-
         if captureAudio {
             config.capturesAudio = true
-            config.sampleRate = 48000
+            config.excludesCurrentProcessAudio = true
+            config.sampleRate = 48_000
             config.channelCount = 2
         }
 
         let dir = AppPreferences.saveDirectory
         let stamp = Int(Date().timeIntervalSince1970 * 1000)
-        let path = "\(dir)/bettershot_\(stamp).mp4"
-        let url = URL(fileURLWithPath: path)
+        let url = URL(fileURLWithPath: "\(dir)/bettershot_\(stamp).mp4")
         outputURL = url
 
         let recordingSession = try RecordingSession(
@@ -167,27 +288,42 @@ final class ScreenRecordingManager: NSObject {
 
         guard recordingSession.startWriting() else {
             state = .idle
+            outputURL = nil
             return false
         }
 
-        self.session = recordingSession
-        self._streamSession = recordingSession
+        session = recordingSession
 
-        let scStream = SCStream(filter: filter, configuration: config, delegate: self)
-        try scStream.addStreamOutput(self, type: .screen, sampleHandlerQueue: videoQueue)
-        if captureAudio {
-            try scStream.addStreamOutput(self, type: .audio, sampleHandlerQueue: audioQueue)
+        capture.onVideoFrame = { [recordingSession] buffer in
+            recordingSession.appendVideoSample(buffer)
+        }
+        capture.onAudioSample = { [recordingSession] buffer in
+            recordingSession.appendAudioSample(buffer)
+        }
+        capture.onError = { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.isRecording else { return }
+                _ = await self.stopRecording()
+            }
         }
 
-        self.stream = scStream
+        do {
+            let stream = try capture.makeStream(filter: filter, configuration: config)
+            try await stream.startCapture()
+        } catch {
+            capture.detachHandlers()
+            recordingSession.cancelWriting()
+            session = nil
+            try? FileManager.default.removeItem(at: url)
+            outputURL = nil
+            state = .idle
+            throw error
+        }
 
-        try await scStream.startCapture()
         recordingSession.isCapturing = true
-
         state = .recording
         elapsedSeconds = 0
         startTimer()
-
         return true
     }
 
@@ -199,24 +335,23 @@ final class ScreenRecordingManager: NSObject {
         stopTimer()
 
         session?.isCapturing = false
-
-        if let stream {
-            try? stream.removeStreamOutput(self, type: .screen)
-            try? stream.removeStreamOutput(self, type: .audio)
-            try? await stream.stopCapture()
-        }
-        stream = nil
+        await capture.stop()
+        capture.detachHandlers()
 
         session?.finishInputs()
-        await session?.finishWriting()
+        let wroteFootage = await session?.finishWriting() ?? false
         session = nil
-        _streamSession = nil
 
         state = .idle
         elapsedSeconds = 0
 
         let url = outputURL
         outputURL = nil
+
+        guard wroteFootage, let url else {
+            if let url { try? FileManager.default.removeItem(at: url) }
+            return nil
+        }
         return url
     }
 
@@ -224,14 +359,14 @@ final class ScreenRecordingManager: NSObject {
 
     func pauseRecording() {
         guard state == .recording else { return }
-        session?.isCapturing = false
+        session?.pause()
         state = .paused
         stopTimer()
     }
 
     func resumeRecording() {
         guard state == .paused else { return }
-        session?.isCapturing = true
+        session?.resume()
         state = .recording
         startTimer()
     }
@@ -244,20 +379,15 @@ final class ScreenRecordingManager: NSObject {
     // MARK: - Cancel
 
     func cancelRecording() async {
-        guard (isRecording || state == .preparing) && state != .stopping else { return }
+        guard isRecording || state == .preparing, state != .stopping else { return }
         stopTimer()
-        session?.isCapturing = false
 
-        if let stream {
-            try? stream.removeStreamOutput(self, type: .screen)
-            try? stream.removeStreamOutput(self, type: .audio)
-            try? await stream.stopCapture()
-        }
-        stream = nil
+        session?.isCapturing = false
+        await capture.stop()
+        capture.detachHandlers()
 
         session?.cancelWriting()
         session = nil
-        _streamSession = nil
 
         if let url = outputURL {
             try? FileManager.default.removeItem(at: url)
@@ -281,33 +411,5 @@ final class ScreenRecordingManager: NSObject {
     private func stopTimer() {
         timer?.invalidate()
         timer = nil
-    }
-}
-
-// MARK: - SCStreamDelegate
-
-extension ScreenRecordingManager: SCStreamDelegate {
-    nonisolated func stream(_ stream: SCStream, didStopWithError error: any Error) {
-        Task { @MainActor in
-            if self.isRecording {
-                _ = await self.stopRecording()
-            }
-        }
-    }
-}
-
-// MARK: - SCStreamOutput
-
-extension ScreenRecordingManager: SCStreamOutput {
-    nonisolated func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
-        switch type {
-        case .screen:
-            guard sampleBuffer.isValid else { return }
-            _streamSession?.appendVideoSample(sampleBuffer)
-        case .audio:
-            _streamSession?.appendAudioSample(sampleBuffer)
-        @unknown default:
-            break
-        }
     }
 }
