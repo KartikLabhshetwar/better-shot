@@ -625,25 +625,15 @@ private struct VideoZoomSection: View {
                 }
 
                 if let selectedCue {
-                    VStack(spacing: 4) {
-                        HStack {
-                            Text("Zoom Amount")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                            Spacer()
-                            Text(String(format: "%.1fx", selectedCue.zoom))
-                                .font(.system(.caption2, design: .monospaced))
-                                .foregroundStyle(.tertiary)
-                        }
-                        Slider(
-                            value: Binding(
-                                get: { selectedCue.zoom },
-                                set: { model.setZoomAmount($0, forCueID: selectedCue.id) }
-                            ),
-                            in: 1.0...4.0
-                        )
-                        .controlSize(.small)
-                    }
+                    InspectorSlider(
+                        "Zoom Amount",
+                        value: Binding(
+                            get: { CGFloat(selectedCue.zoom) },
+                            set: { model.setZoomAmount(Double($0), forCueID: selectedCue.id) }
+                        ),
+                        range: 1.0...4.0,
+                        format: .magnification(fractionDigits: 1)
+                    )
                 }
 
                 Text("\(model.zoomCues.count) zoom cue\(model.zoomCues.count == 1 ? "" : "s"). Drag pills on the timeline to adjust.")
@@ -664,47 +654,26 @@ private struct VideoEffectsSection: View {
         VStack(alignment: .leading, spacing: 12) {
             VideoInspectorSectionHeader("EFFECTS")
 
-            VStack(spacing: 4) {
-                HStack {
-                    Text("Padding")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                    Spacer()
-                    Text("\(Int(model.config.padding * 100))%")
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(.tertiary)
-                }
-                Slider(value: $model.config.padding, in: 0.0...0.45)
-                    .controlSize(.small)
-            }
+            InspectorSlider(
+                "Padding",
+                value: $model.config.padding,
+                range: 0.0...0.45,
+                format: .percent()
+            )
 
-            VStack(spacing: 4) {
-                HStack {
-                    Text("Corner Radius")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                    Spacer()
-                    Text("\(Int(model.config.cornerRadius * 1000))")
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(.tertiary)
-                }
-                Slider(value: $model.config.cornerRadius, in: 0.0...0.12)
-                    .controlSize(.small)
-            }
+            InspectorSlider(
+                "Corner Radius",
+                value: $model.config.cornerRadius,
+                range: 0.0...0.12,
+                format: .scaled(by: 1000)
+            )
 
-            VStack(spacing: 4) {
-                HStack {
-                    Text("Shadow")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                    Spacer()
-                    Text("\(Int(model.config.shadowStrength * 100))%")
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(.tertiary)
-                }
-                Slider(value: $model.config.shadowStrength, in: 0.0...1.0)
-                    .controlSize(.small)
-            }
+            InspectorSlider(
+                "Shadow",
+                value: $model.config.shadowStrength,
+                range: 0.0...1.0,
+                format: .percent()
+            )
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 14)

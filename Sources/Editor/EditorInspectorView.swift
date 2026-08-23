@@ -61,25 +61,15 @@ struct EditorInspectorView: View {
                             }
 
                             if model.isRedactionStyleAvailable {
-                                VStack(spacing: 4) {
-                                    HStack {
-                                        Text("Density")
-                                            .font(.caption2)
-                                            .foregroundStyle(.tertiary)
-                                        Spacer()
-                                        Text("\(Int(model.redactionDensity * 100))%")
-                                            .font(.system(.caption2, design: .monospaced))
-                                            .foregroundStyle(.tertiary)
-                                    }
-                                    Slider(
-                                        value: Binding(
-                                            get: { model.redactionDensity },
-                                            set: { model.setRedactionDensity($0) }
-                                        ),
-                                        in: 0.15...1
-                                    )
-                                    .controlSize(.small)
-                                }
+                                InspectorSlider(
+                                    "Density",
+                                    value: Binding(
+                                        get: { model.redactionDensity },
+                                        set: { model.setRedactionDensity($0) }
+                                    ),
+                                    range: 0.15...1,
+                                    format: .percent()
+                                )
                             }
                         }
                         .padding(.horizontal, 14)
@@ -1033,27 +1023,27 @@ struct BeautifierControlsSection: View {
         VStack(alignment: .leading, spacing: 12) {
             InspectorSectionHeader("EFFECTS")
 
-            LabeledSlider(
-                label: "Padding",
+            InspectorSlider(
+                "Padding",
                 value: Binding(get: { model.config.padding }, set: { model.config.padding = $0 }),
                 range: 0.0...0.45,
-                format: { "\(Int($0 * 100))%" },
+                format: .percent(),
                 onEditingChanged: { handleSliderEditing($0) }
             )
 
-            LabeledSlider(
-                label: "Corner Radius",
+            InspectorSlider(
+                "Corner Radius",
                 value: Binding(get: { model.config.cornerRadius }, set: { model.config.cornerRadius = $0 }),
                 range: 0.0...0.12,
-                format: { "\(Int($0 * 1000))" },
+                format: .scaled(by: 1000),
                 onEditingChanged: { handleSliderEditing($0) }
             )
 
-            LabeledSlider(
-                label: "Shadow",
+            InspectorSlider(
+                "Shadow",
                 value: Binding(get: { model.config.shadowStrength }, set: { model.config.shadowStrength = $0 }),
                 range: 0.0...1.0,
-                format: { "\(Int($0 * 100))%" },
+                format: .percent(),
                 onEditingChanged: { handleSliderEditing($0) }
             )
         }
@@ -1073,28 +1063,3 @@ struct BeautifierControlsSection: View {
     }
 }
 
-struct LabeledSlider: View {
-    let label: String
-    @Binding var value: CGFloat
-    let range: ClosedRange<CGFloat>
-    let format: (CGFloat) -> String
-    var onEditingChanged: ((Bool) -> Void)?
-
-    var body: some View {
-        VStack(spacing: 4) {
-            HStack {
-                Text(label)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                Spacer()
-                Text(format(value))
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-            }
-            Slider(value: $value, in: range) { editing in
-                onEditingChanged?(editing)
-            }
-            .controlSize(.small)
-        }
-    }
-}

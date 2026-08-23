@@ -42,9 +42,11 @@ that survives a crash mid-recording.
 - **Pause and resume rebuilt**: Pausing now compacts presentation timestamps properly instead of leaving a gap, so paused time no longer stretches the exported timeline
 - **Restart keeps your source**: Restarting a recording replays whatever you were capturing, including the region you selected, instead of always restarting full screen
 - **Capture callbacks off the main actor**: The `SCStream` wrapper is `NSLock`-guarded so ScreenCaptureKit callbacks stay off the main actor under Swift 6 strict concurrency
+- **New inspector sliders in both editors**: Padding, Corner Radius, Shadow, Redaction Density, and Zoom Amount are now label-in-track scrubbers instead of stock macOS sliders. The whole row is draggable, so there is no thumb to chase; hovering reveals calibrated tick marks and the current position; and the value beside it is an editable field, so you can type an exact number, or nudge with the arrow keys. Ported from [screendrop](https://github.com/fayazara/screendrop)'s inspector, and shared by the image editor and the video editor so both read as one control system
 
 ### Fixed
 
+- **Every recording crashed the instant it started**: A closure written inside a `@MainActor` function inherits main-actor isolation unless its parameter type is `@Sendable`. The pointer sampler's timer handler, the three ScreenCaptureKit sample callbacks, and the updater's download delegate were all assigned that way and then invoked on background queues, so Swift 6's isolation check raised `EXC_BREAKPOINT` on the first pointer sample of every recording, in every mode. All of them are now explicitly `@Sendable`, and the capture callbacks moved behind the stream's existing lock, which also removes an unsynchronized read and write of those properties
 - **Every capture was stored up to three times**: A screenshot kept its original in Application Support, its beautified export in the save folder, and a byte-identical second copy of the original under `BetterShot/bases/`. The editor now maps an export back to the original through history instead of that duplicate, recordings are referenced where they are written rather than copied into Application Support (which cost a full second copy of every video), and re-exporting from either editor updates the existing history entry instead of importing another copy ([#99](https://github.com/KartikLabhshetwar/better-shot/issues/99))
 - **History grew without limit**: History now keeps the 100 most recent captures by default, configurable in Settings > General > History (50 to 500, or unlimited). Trimming removes only the originals BetterShot keeps in Application Support, never files in your save folder. Leftover copies in `BetterShot/bases/` from earlier versions are pruned at launch ([#99](https://github.com/KartikLabhshetwar/better-shot/issues/99))
 - **Share uploaded the raw recording**: The Share button uploaded the original capture, so trim, crop, zoom, and background effects were silently dropped from every shared link. It now renders your edits into a temporary file, uploads that, and cleans up afterwards. Unedited recordings still upload the original file with no re-encode
@@ -59,7 +61,7 @@ that survives a crash mid-recording.
 
 ### Credits
 
-- **screendrop**: The recording capture core, floating bar chrome, area highlight, and the zoom cue and viewport timeline engine are ported and adapted from [fayazara/screendrop](https://github.com/fayazara/screendrop), released under CC0-1.0 (public domain). Better Shot remains BSD 3-Clause licensed
+- **screendrop**: The recording capture core, floating bar chrome, area highlight, and the zoom cue and viewport timeline engine, and the inspector slider are ported and adapted from [fayazara/screendrop](https://github.com/fayazara/screendrop), released under CC0-1.0 (public domain). Better Shot remains BSD 3-Clause licensed
 
 ### Known limitations
 
