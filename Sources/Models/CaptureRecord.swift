@@ -10,6 +10,8 @@ struct CaptureRecord: Identifiable, Codable, Equatable {
     var kind: CaptureKind
     var hasAnnotations: Bool
     var beautifiedPath: String?
+    /// Absolute path when the file lives outside Application Support and is only referenced.
+    var sourcePath: String?
 
     init(
         filename: String,
@@ -17,7 +19,8 @@ struct CaptureRecord: Identifiable, Codable, Equatable {
         pixelHeight: Int,
         kind: CaptureKind = .screenshot,
         hasAnnotations: Bool = false,
-        beautifiedPath: String? = nil
+        beautifiedPath: String? = nil,
+        sourcePath: String? = nil
     ) {
         self.id = UUID()
         self.createdAt = Date()
@@ -27,7 +30,10 @@ struct CaptureRecord: Identifiable, Codable, Equatable {
         self.kind = kind
         self.hasAnnotations = hasAnnotations
         self.beautifiedPath = beautifiedPath
+        self.sourcePath = sourcePath
     }
+
+    var isManaged: Bool { sourcePath == nil }
 }
 
 enum CaptureKind: String, Codable {

@@ -198,6 +198,65 @@ final class ScreenRecordingManager {
         }
     }
 
+    func startWindowRecording(windowID: CGWindowID) async throws -> Bool {
+        guard state == .idle else { return false }
+        state = .preparing
+
+        do {
+            let content = try await ScreenCaptureStream.availableContent()
+            guard let window = content.windows.first(where: { $0.windowID == windowID }) else {
+                state = .idle
+                return false
+            }
+
+            let filter = SCContentFilter(desktopIndependentWindow: window)
+            let scale = max(1, CGFloat(filter.pointPixelScale))
+            let (width, height) = Self.pixelSize(points: filter.contentRect.size, scale: scale)
+
+            activeRegionRect = nil
+            return try await beginCapture(
+                filter: filter,
+                width: width,
+                height: height,
+                pointerCaptureRect: window.frame
+            )
+        } catch {
+            state = .idle
+            throw error
+        }
+    }
+
+    func startDisplayRecording(displayID: CGDirectDisplayID) async throws -> Bool {
+        guard state == .idle else { return false }
+        state = .preparing
+
+        do {
+            let content = try await ScreenCaptureStream.availableContent()
+            guard let display = Self.display(matching: displayID, in: content) else {
+                state = .idle
+                return false
+            }
+
+            let filter = Self.displayFilter(display: display, content: content)
+            let scale = max(1, CGFloat(filter.pointPixelScale))
+            let (width, height) = Self.pixelSize(
+                points: CGSize(width: CGFloat(display.width), height: CGFloat(display.height)),
+                scale: scale
+            )
+
+            activeRegionRect = nil
+            return try await beginCapture(
+                filter: filter,
+                width: width,
+                height: height,
+                pointerCaptureRect: CGDisplayBounds(display.displayID)
+            )
+        } catch {
+            state = .idle
+            throw error
+        }
+    }
+
     // MARK: - Capture targeting
 
     private static func display(matching displayID: CGDirectDisplayID, in content: SCShareableContent) -> SCDisplay? {

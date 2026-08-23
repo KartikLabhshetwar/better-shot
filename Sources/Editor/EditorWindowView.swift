@@ -119,18 +119,13 @@ struct EditorWindowView: View {
         CGImageDestinationAddImage(dest, rendered, options as CFDictionary)
         guard CGImageDestinationFinalize(dest) else { return }
 
-        if let sourceURL = model.sourceURL {
-            let baseURL = CaptureOrchestrator.baseImageURL(for: url)
-            try? FileManager.default.copyItem(at: sourceURL, to: baseURL)
-
-            if let record = HistoryStore.shared.records.first(where: {
-                HistoryStore.shared.urlForRecord($0) == sourceURL
-                    || HistoryStore.shared.displayURLForRecord($0) == sourceURL
-            }) {
-                HistoryStore.shared.deleteRecord(record)
-            }
-
-            _ = HistoryStore.shared.importCapture(from: url, deleteSource: false, kind: .screenshot)
+        if let record = HistoryStore.shared.records.first(where: {
+            HistoryStore.shared.urlForRecord($0) == model.sourceURL
+                || HistoryStore.shared.displayURLForRecord($0) == model.sourceURL
+        }) {
+            HistoryStore.shared.setBeautifiedPath(url.path, for: record.id)
+        } else {
+            _ = HistoryStore.shared.referenceCapture(at: url, kind: .screenshot)
         }
 
         if AppPreferences.copyAfterSave {
