@@ -26,8 +26,7 @@ enum RecordingMotion {
     }
 }
 
-/// Drives the bar's spring show/hide, kept separate from `ScreenRecordingManager` so the
-/// panel controller can animate the transition before actually ordering the window out.
+/// Drives the bar's spring show/hide, separate from `ScreenRecordingManager` so the panel can animate before ordering out.
 @Observable
 @MainActor
 final class RecordingBarPresentation {
@@ -52,8 +51,7 @@ struct RecordingBarMaterial: NSViewRepresentable {
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 
-/// A bar icon button with a hover puck and a press state, tracked via AppKit so hover keeps
-/// working while BetterShot is in the background - true for the entire life of a recording.
+/// Bar icon button with an AppKit-tracked hover puck, so hover still works while BetterShot is in the background.
 struct RecordingBarIconButton: View {
     let systemImage: String
     var tint: Color = Color(nsColor: .labelColor)

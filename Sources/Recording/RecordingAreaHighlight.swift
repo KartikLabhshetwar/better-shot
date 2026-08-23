@@ -1,9 +1,6 @@
 import AppKit
 
-/// Click-through overlay that outlines the region being recorded, dimming everything outside
-/// it so the recording boundary stays visible under whatever windows the user brings forward.
-/// Purely decorative: ignores mouse events and, like the recording bar, never appears in the
-/// recording itself because BetterShot excludes its own app from every `SCContentFilter`.
+/// Click-through overlay dimming everything outside the recorded region, excluded from capture like the recording bar.
 @MainActor
 final class RecordingAreaHighlightPresenter {
     static let shared = RecordingAreaHighlightPresenter()
@@ -12,7 +9,7 @@ final class RecordingAreaHighlightPresenter {
 
     private init() {}
 
-    /// - Parameter rect: the recorded area in AppKit/global screen coordinates (bottom-left origin).
+    /// Shows the highlight for a rect in AppKit global screen coordinates (bottom-left origin).
     func show(rect: CGRect, on screen: NSScreen? = nil) {
         hide()
 

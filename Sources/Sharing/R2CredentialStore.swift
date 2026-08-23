@@ -15,8 +15,7 @@ struct R2Credentials: Sendable {
     }
 }
 
-/// Keychain-backed storage for Cloudflare R2 sharing configuration.
-/// Secrets (access key ID, secret access key) live in the Keychain, never UserDefaults.
+/// Keychain-backed R2 config: secrets go to the Keychain, non-secret settings to UserDefaults.
 @MainActor
 @Observable
 final class R2CredentialStore {
