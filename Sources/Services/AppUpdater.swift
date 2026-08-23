@@ -137,7 +137,14 @@ final class AppUpdater {
             }
         }
 
+        // A delegate-based URLSession keeps a strong reference to its delegate until it is
+        // invalidated, so the session and the delegate outlive every download otherwise.
         let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+        defer {
+            session.finishTasksAndInvalidate()
+            self.downloadTask = nil
+        }
+
         let downloadTask = session.downloadTask(with: url)
         self.downloadTask = downloadTask
 
