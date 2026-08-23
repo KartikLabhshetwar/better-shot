@@ -19,6 +19,8 @@ enum AppPreferences {
     private static let recordingOpenEditorKey = "bs_recordingOpenEditor"
     private static let openEditorAfterCaptureKey = "bs_openEditorAfterCapture"
     private static let historyRetentionKey = "bs_historyRetentionLimit"
+    private static let recordingCaptureMicrophoneKey = "bs_recordingCaptureMicrophone"
+    private static let recordingStartDelaySecondsKey = "bs_recordingStartDelaySeconds"
 
     // MARK: - Appearance
     static var appearance: AppAppearance {
@@ -118,6 +120,16 @@ enum AppPreferences {
     static var recordingOpenEditor: Bool {
         get { UserDefaults.standard.object(forKey: recordingOpenEditorKey) as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: recordingOpenEditorKey) }
+    }
+
+    static var recordingCaptureMicrophone: Bool {
+        get { UserDefaults.standard.object(forKey: recordingCaptureMicrophoneKey) as? Bool ?? false }
+        set { UserDefaults.standard.set(newValue, forKey: recordingCaptureMicrophoneKey) }
+    }
+
+    static var recordingStartDelaySeconds: Int {
+        get { UserDefaults.standard.integer(forKey: recordingStartDelaySecondsKey) }
+        set { UserDefaults.standard.set(newValue, forKey: recordingStartDelaySecondsKey) }
     }
 
     // MARK: - Screenshot

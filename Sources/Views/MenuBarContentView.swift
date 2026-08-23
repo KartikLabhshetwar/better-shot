@@ -121,24 +121,11 @@ struct MenuBarContentView: View {
                 dismissAndRun(.colorPicker)
             }
 
-            TrayGridMenu(title: "Record", icon: "record.circle", menuItems: [
-                TrayMenuItem(title: "Full Screen", icon: "desktopcomputer") {
-                    nonisolated(unsafe) let screen = originScreen
-                    dismissPopover()
-                    Task.detached {
-                        try? await Task.sleep(nanoseconds: 200_000_000)
-                        await startRecording(mode: .fullScreen, on: screen)
-                    }
-                },
-                TrayMenuItem(title: "Area", icon: "rectangle.dashed") {
-                    nonisolated(unsafe) let screen = originScreen
-                    dismissPopover()
-                    Task.detached {
-                        try? await Task.sleep(nanoseconds: 200_000_000)
-                        await startRecording(mode: .area, on: screen)
-                    }
-                },
-            ])
+            TrayGridButton(title: "Record", icon: "record.circle", shortcut: "\u{2318}2") {
+                let screen = originScreen
+                dismissPopover()
+                RecordingBarPresenter.shared.showPicker(on: screen)
+            }
         }
     }
 
@@ -270,28 +257,6 @@ struct MenuBarContentView: View {
         let screen = originScreen
         dismissPopover()
         SettingsWindowController.shared.open(on: screen)
-    }
-
-    private enum RecordingMode {
-        case fullScreen, area
-    }
-
-    @MainActor
-    private func startRecording(mode: RecordingMode = .fullScreen, on screen: NSScreen? = nil) async {
-        do {
-            let started: Bool
-            switch mode {
-            case .fullScreen:
-                started = try await ScreenRecordingManager.shared.startFullScreenRecording()
-            case .area:
-                started = try await ScreenRecordingManager.shared.startAreaRecording()
-            }
-            if started {
-                RecordingStatusBarController.shared.show(on: screen)
-            }
-        } catch {
-            print("Recording failed: \(error.localizedDescription)")
-        }
     }
 
 }
