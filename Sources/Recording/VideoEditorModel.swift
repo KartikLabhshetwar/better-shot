@@ -37,6 +37,10 @@ final class VideoEditorModel {
     var formattedDuration: String { formatTime(trimmedDuration) }
 
     func loadVideo(from url: URL) {
+        // Detach from the outgoing player before it is replaced — a periodic time observer
+        // can only be removed by the AVPlayer that vended it.
+        removeTimeObserver()
+
         let resolvedURL: URL
         if let record = HistoryStore.shared.records.first(where: {
             $0.beautifiedPath != nil && URL(fileURLWithPath: $0.beautifiedPath!) == url
@@ -304,17 +308,21 @@ final class VideoEditorModel {
 
     func cleanup() {
         player?.pause()
-        if let observer = timeObserver {
-            player?.removeTimeObserver(observer)
-        }
-        timeObserver = nil
+        removeTimeObserver()
         player = nil
     }
 
     // MARK: - Private
 
+    private func removeTimeObserver() {
+        guard let observer = timeObserver else { return }
+        player?.removeTimeObserver(observer)
+        timeObserver = nil
+    }
+
     private func setupTimeObserver() {
         guard let player else { return }
+        removeTimeObserver()
         let interval = CMTime(value: 1, timescale: 30)
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             Task { @MainActor in
