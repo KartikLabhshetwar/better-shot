@@ -108,12 +108,29 @@ User presses ⌘⇧2 (or clicks Record / Record Window)
   → ScreenRecordingManager.startRecording() (full screen)
      or .startWindowRecording() (hover-and-click window picker)
   → RecordingStatusBarController.show() (floating status bar, excluded from capture)
-  → User clicks stop → HistoryStore.importCapture(kind: .recording, deleteSource: false)
+  → User clicks stop → HistoryStore.referenceCapture(kind: .recording)
   → PreviewOverlay.show() (floating card with raw video)
   → User clicks preview → VideoEditorWindowController.open()
   → User edits effects → VideoEditorModel.exportWithEffects()
      (AVMutableVideoComposition + Core Animation layers)
 ```
+
+### Storage
+
+Every capture is on disk once. Screenshots keep their untouched original in
+`~/Library/Application Support/BetterShot/` (`CaptureRecord.filename`) and the
+beautified export in the user's save folder (`CaptureRecord.beautifiedPath`);
+`CaptureOrchestrator.resolveRawSource` maps an export back to that original so
+the editor reloads unflattened pixels. Recordings are written straight into the
+save folder and only referenced by history (`CaptureRecord.sourcePath`), never
+copied. Re-exporting updates `beautifiedPath` in place instead of creating a
+second record.
+
+History keeps the most recent 100 captures by default, configurable in Settings
+> General > History (up to 500, or unlimited). Trimming deletes only the
+originals BetterShot owns in Application Support, never files in the save
+folder. `BetterShot/bases/` is a legacy directory from when every screenshot
+kept a duplicate raw copy; it is read for old captures and pruned at launch.
 
 ### Editor flow
 

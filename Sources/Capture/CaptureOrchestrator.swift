@@ -119,12 +119,8 @@ final class CaptureOrchestrator {
 
         let savedURL = saveImage(rendered)
 
-        if let savedURL {
-            saveBaseImage(rawURL: url, alongside: savedURL)
-
-            if let recordID {
-                HistoryStore.shared.setBeautifiedPath(savedURL.path, for: recordID)
-            }
+        if let savedURL, let recordID {
+            HistoryStore.shared.setBeautifiedPath(savedURL.path, for: recordID)
         }
 
         if AppPreferences.copyAfterSave, let savedURL {
@@ -178,16 +174,10 @@ final class CaptureOrchestrator {
         return url
     }
 
-    private func saveBaseImage(rawURL: URL, alongside beautifiedURL: URL) {
-        let baseURL = Self.baseImageURL(for: beautifiedURL)
-        try? FileManager.default.copyItem(at: rawURL, to: baseURL)
-    }
-
-    private static var baseStorageDir: URL {
+    /// Legacy home of duplicated raw copies. Nothing writes here any more; kept so old captures still resolve.
+    static var baseStorageDir: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = appSupport.appendingPathComponent("BetterShot/bases", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
+        return appSupport.appendingPathComponent("BetterShot/bases", isDirectory: true)
     }
 
     static func baseImageURL(for url: URL) -> URL {
@@ -195,6 +185,7 @@ final class CaptureOrchestrator {
         return baseStorageDir.appendingPathComponent("\(name).base.png")
     }
 
+    /// Maps a saved/beautified image back to the untouched capture the editor should load.
     static func resolveRawSource(for url: URL) -> URL {
         let baseURL = baseImageURL(for: url)
         if FileManager.default.fileExists(atPath: baseURL.path) {
@@ -206,6 +197,12 @@ final class CaptureOrchestrator {
         let legacyURL = legacyDir.appendingPathComponent("\(legacyName).base.png")
         if FileManager.default.fileExists(atPath: legacyURL.path) {
             return legacyURL
+        }
+        if let record = HistoryStore.shared.records.first(where: { $0.beautifiedPath == url.path }) {
+            let rawURL = HistoryStore.shared.urlForRecord(record)
+            if FileManager.default.fileExists(atPath: rawURL.path) {
+                return rawURL
+            }
         }
         return url
     }

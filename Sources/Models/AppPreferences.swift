@@ -18,6 +18,7 @@ enum AppPreferences {
     private static let recordingCaptureAudioKey = "bs_recordingCaptureAudio"
     private static let recordingOpenEditorKey = "bs_recordingOpenEditor"
     private static let openEditorAfterCaptureKey = "bs_openEditorAfterCapture"
+    private static let historyRetentionKey = "bs_historyRetentionLimit"
 
     // MARK: - Appearance
     static var appearance: AppAppearance {
@@ -125,6 +126,13 @@ enum AppPreferences {
         set { UserDefaults.standard.set(newValue, forKey: openEditorAfterCaptureKey) }
     }
 
+    // MARK: - History
+    /// How many captures history keeps. 0 means unlimited.
+    static var historyRetentionLimit: Int {
+        get { UserDefaults.standard.object(forKey: historyRetentionKey) as? Int ?? 100 }
+        set { UserDefaults.standard.set(newValue, forKey: historyRetentionKey) }
+    }
+
     // MARK: - Default Beautifier Config
     static var defaultBeautifierConfig: BeautifierConfig {
         get {
@@ -187,6 +195,20 @@ enum ExportFormat: String, CaseIterable {
         case .png: return "png"
         case .jpeg: return "jpg"
         }
+    }
+}
+
+enum HistoryRetention: Int, CaseIterable, Identifiable {
+    case fifty = 50
+    case hundred = 100
+    case twoFifty = 250
+    case fiveHundred = 500
+    case unlimited = 0
+
+    var id: Int { rawValue }
+
+    var label: String {
+        self == .unlimited ? "Unlimited" : "\(rawValue) captures"
     }
 }
 

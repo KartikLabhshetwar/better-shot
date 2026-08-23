@@ -354,15 +354,14 @@ struct VideoEditorView: View {
         model.isExporting = true
         let sourceURL = model.sourceURL
         if let exportedURL = await model.exportTrimmed() {
-            if let sourceURL {
-                if let oldRecord = HistoryStore.shared.records.first(where: {
-                    HistoryStore.shared.urlForRecord($0) == sourceURL
-                        || HistoryStore.shared.displayURLForRecord($0) == sourceURL
-                }) {
-                    HistoryStore.shared.deleteRecord(oldRecord)
-                }
+            if let record = HistoryStore.shared.records.first(where: {
+                HistoryStore.shared.urlForRecord($0) == sourceURL
+                    || HistoryStore.shared.displayURLForRecord($0) == sourceURL
+            }) {
+                HistoryStore.shared.setBeautifiedPath(exportedURL.path, for: record.id)
+            } else {
+                _ = HistoryStore.shared.referenceCapture(at: exportedURL, kind: .recording)
             }
-            _ = HistoryStore.shared.importCapture(from: exportedURL, deleteSource: false, kind: .recording)
             let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage
             ToastWindow.shared.show(message: "Recording exported!", icon: appIcon)
             model.cleanup()

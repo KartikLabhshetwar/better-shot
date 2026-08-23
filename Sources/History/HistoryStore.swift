@@ -19,6 +19,7 @@ final class HistoryStore {
 
         try? FileManager.default.createDirectory(at: storageDir, withIntermediateDirectories: true)
         loadRecords()
+        pruneOrphanedBases()
     }
 
     // MARK: - Import
@@ -39,28 +40,14 @@ final class HistoryStore {
             return nil
         }
 
-        var width = 0, height = 0
-        if kind == .recording {
-            let asset = AVURLAsset(url: destURL)
-            if let track = asset.tracks(withMediaType: .video).first {
-                let size = track.naturalSize.applying(track.preferredTransform)
-                width = Int(abs(size.width))
-                height = Int(abs(size.height))
-            }
-        } else if let source = CGImageSourceCreateWithURL(destURL as CFURL, nil),
-                  let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] {
-            width = props[kCGImagePropertyPixelWidth] as? Int ?? 0
-            height = props[kCGImagePropertyPixelHeight] as? Int ?? 0
-        }
-
+        let size = Self.pixelSize(of: destURL, kind: kind)
         let record = CaptureRecord(
             filename: filename,
-            pixelWidth: width,
-            pixelHeight: height,
+            pixelWidth: size.width,
+            pixelHeight: size.height,
             kind: kind
         )
-        records.insert(record, at: 0)
-        saveRecords()
+        insert(record)
 
         if deleteSource {
             try? FileManager.default.removeItem(at: tempURL)
@@ -69,10 +56,50 @@ final class HistoryStore {
         return record
     }
 
+    /// Adds a capture that already lives in its final location, without copying it into Application Support.
+    func referenceCapture(at url: URL, kind: CaptureKind = .screenshot) -> CaptureRecord? {
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+
+        let size = Self.pixelSize(of: url, kind: kind)
+        let record = CaptureRecord(
+            filename: url.lastPathComponent,
+            pixelWidth: size.width,
+            pixelHeight: size.height,
+            kind: kind,
+            sourcePath: url.path
+        )
+        insert(record)
+        return record
+    }
+
+    private func insert(_ record: CaptureRecord) {
+        records.insert(record, at: 0)
+        trimToRetentionLimit()
+        saveRecords()
+    }
+
+    private static func pixelSize(of url: URL, kind: CaptureKind) -> (width: Int, height: Int) {
+        if kind == .recording {
+            let asset = AVURLAsset(url: url)
+            guard let track = asset.tracks(withMediaType: .video).first else { return (0, 0) }
+            let size = track.naturalSize.applying(track.preferredTransform)
+            return (Int(abs(size.width)), Int(abs(size.height)))
+        }
+
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else {
+            return (0, 0)
+        }
+        return (props[kCGImagePropertyPixelWidth] as? Int ?? 0, props[kCGImagePropertyPixelHeight] as? Int ?? 0)
+    }
+
     // MARK: - Update
 
     func setBeautifiedPath(_ path: String, for recordID: UUID) {
         guard let index = records.firstIndex(where: { $0.id == recordID }) else { return }
+        if let superseded = records[index].beautifiedPath, superseded != path {
+            try? FileManager.default.removeItem(atPath: superseded)
+        }
         records[index].beautifiedPath = path
         saveRecords()
     }
@@ -80,7 +107,10 @@ final class HistoryStore {
     // MARK: - Access
 
     func urlForRecord(_ record: CaptureRecord) -> URL {
-        storageDir.appendingPathComponent(record.filename)
+        if let sourcePath = record.sourcePath {
+            return URL(fileURLWithPath: sourcePath)
+        }
+        return storageDir.appendingPathComponent(record.filename)
     }
 
     func displayURLForRecord(_ record: CaptureRecord) -> URL {
@@ -159,6 +189,21 @@ final class HistoryStore {
         saveRecords()
     }
 
+    /// Removes leftovers from when every capture kept a duplicated raw copy under `BetterShot/bases`.
+    private func pruneOrphanedBases() {
+        let dir = CaptureOrchestrator.baseStorageDir
+        guard let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { return }
+
+        var referenced = Set(records.map { CaptureOrchestrator.baseImageURL(for: urlForRecord($0)).path })
+        referenced.formUnion(records.compactMap { $0.beautifiedPath }.map {
+            CaptureOrchestrator.baseImageURL(for: URL(fileURLWithPath: $0)).path
+        })
+
+        for file in files where !referenced.contains(file.path) {
+            try? FileManager.default.removeItem(at: file)
+        }
+    }
+
     // MARK: - Persistence
 
     private func loadRecords() {
@@ -166,6 +211,20 @@ final class HistoryStore {
         let decoded = (try? JSONDecoder().decode([CaptureRecord].self, from: data)) ?? []
         // Filter out records whose files no longer exist
         records = decoded.filter { FileManager.default.fileExists(atPath: urlForRecord($0).path) }
+        trimToRetentionLimit()
+        if records.count != decoded.count { saveRecords() }
+    }
+
+    /// Drops the oldest records past the retention limit, deleting only files BetterShot owns.
+    func trimToRetentionLimit() {
+        let limit = AppPreferences.historyRetentionLimit
+        guard limit > 0, records.count > limit else { return }
+
+        for record in records[limit...] where record.isManaged {
+            try? FileManager.default.removeItem(at: urlForRecord(record))
+        }
+        records.removeSubrange(limit...)
+        saveRecords()
     }
 
     private func saveRecords() {

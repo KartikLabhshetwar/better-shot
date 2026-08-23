@@ -78,6 +78,7 @@ struct GeneralSettingsTab: View {
     @AppStorage("bs_playSound") private var playSound = true
     @AppStorage("bs_exportFormat") private var exportFormatRaw: String = ExportFormat.png.rawValue
     @AppStorage("bs_exportQuality") private var exportQuality: Double = 0.9
+    @AppStorage("bs_historyRetentionLimit") private var historyRetentionLimit = 100
 
     @State private var defaultConfig = AppPreferences.defaultBeautifierConfig
 
@@ -140,6 +141,23 @@ struct GeneralSettingsTab: View {
 
             Section("Capture") {
                 Toggle("Play shutter sound", isOn: $playSound)
+            }
+
+            Section {
+                Picker("Keep last", selection: $historyRetentionLimit) {
+                    ForEach(HistoryRetention.allCases) { retention in
+                        Text(retention.label).tag(retention.rawValue)
+                    }
+                }
+                .onChange(of: historyRetentionLimit) { _, _ in
+                    HistoryStore.shared.trimToRetentionLimit()
+                }
+            } header: {
+                Text("History")
+            } footer: {
+                Text("Older entries are removed from history along with the originals BetterShot keeps in Application Support. Files in your save folder are left alone.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Default Effects") {
@@ -205,6 +223,7 @@ struct GeneralSettingsTab: View {
                     playSound = true
                     exportFormatRaw = ExportFormat.png.rawValue
                     exportQuality = 0.9
+                    historyRetentionLimit = 100
                     defaultConfig = .default
                     AppPreferences.defaultBeautifierConfig = .default
                 }
