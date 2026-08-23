@@ -101,6 +101,8 @@ final class ScreenRecordingManager {
     private var session: RecordingSession?
     private var outputURL: URL?
     private var timer: Timer?
+    private let pointerCapture = PointerCaptureRecorder()
+    private(set) var activeRegionRect: CGRect?
 
     private init() {}
 
@@ -132,7 +134,13 @@ final class ScreenRecordingManager {
                 scale: scale
             )
 
-            return try await beginCapture(filter: filter, width: width, height: height)
+            activeRegionRect = nil
+            return try await beginCapture(
+                filter: filter,
+                width: width,
+                height: height,
+                pointerCaptureRect: CGDisplayBounds(display.displayID)
+            )
         } catch {
             state = .idle
             throw error
@@ -169,11 +177,20 @@ final class ScreenRecordingManager {
             let scale = max(1, CGFloat(filter.pointPixelScale))
             let (width, height) = Self.pixelSize(points: sourceRect.size, scale: scale)
 
+            let primaryHeight = CGDisplayBounds(CGMainDisplayID()).height
+            activeRegionRect = CGRect(
+                x: selection.pointsRect.minX,
+                y: primaryHeight - selection.pointsRect.maxY,
+                width: selection.pointsRect.width,
+                height: selection.pointsRect.height
+            )
+
             return try await beginCapture(
                 filter: filter,
                 width: width,
                 height: height,
-                sourceRect: sourceRect
+                sourceRect: sourceRect,
+                pointerCaptureRect: selection.pointsRect
             )
         } catch {
             state = .idle
@@ -253,7 +270,8 @@ final class ScreenRecordingManager {
         filter: SCContentFilter,
         width: Int,
         height: Int,
-        sourceRect: CGRect? = nil
+        sourceRect: CGRect? = nil,
+        pointerCaptureRect: CGRect
     ) async throws -> Bool {
         let captureAudio = AppPreferences.recordingCaptureAudio
         let fps = AppPreferences.recordingFPS
@@ -310,12 +328,14 @@ final class ScreenRecordingManager {
         do {
             let stream = try capture.makeStream(filter: filter, configuration: config)
             try await stream.startCapture()
+            pointerCapture.start(captureRect: pointerCaptureRect)
         } catch {
             capture.detachHandlers()
             recordingSession.cancelWriting()
             session = nil
             try? FileManager.default.removeItem(at: url)
             outputURL = nil
+            activeRegionRect = nil
             state = .idle
             throw error
         }
@@ -341,6 +361,8 @@ final class ScreenRecordingManager {
         session?.finishInputs()
         let wroteFootage = await session?.finishWriting() ?? false
         session = nil
+        let capturedPointerData = pointerCapture.stop()
+        activeRegionRect = nil
 
         state = .idle
         elapsedSeconds = 0
@@ -352,7 +374,14 @@ final class ScreenRecordingManager {
             if let url { try? FileManager.default.removeItem(at: url) }
             return nil
         }
+        writePointerSidecar(capturedPointerData, alongside: url)
         return url
+    }
+
+    private func writePointerSidecar(_ capture: PointerCaptureFile, alongside url: URL) {
+        guard !capture.travel.isEmpty || !capture.presses.isEmpty else { return }
+        guard let data = try? JSONEncoder().encode(capture) else { return }
+        try? data.write(to: url.deletingPathExtension().appendingPathExtension("pointer.json"))
     }
 
     // MARK: - Pause / Resume
@@ -360,6 +389,7 @@ final class ScreenRecordingManager {
     func pauseRecording() {
         guard state == .recording else { return }
         session?.pause()
+        pointerCapture.pause()
         state = .paused
         stopTimer()
     }
@@ -367,6 +397,7 @@ final class ScreenRecordingManager {
     func resumeRecording() {
         guard state == .paused else { return }
         session?.resume()
+        pointerCapture.resume()
         state = .recording
         startTimer()
     }
@@ -388,6 +419,8 @@ final class ScreenRecordingManager {
 
         session?.cancelWriting()
         session = nil
+        _ = pointerCapture.stop()
+        activeRegionRect = nil
 
         if let url = outputURL {
             try? FileManager.default.removeItem(at: url)

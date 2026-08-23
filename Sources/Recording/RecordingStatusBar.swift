@@ -148,6 +148,10 @@ final class RecordingStatusBarController {
         let panel = panel ?? makePanel()
         panel.setFrameOrigin(resolvedOrigin(for: panel.frame.size, preferredScreen: preferredScreen))
         panel.orderFrontRegardless()
+
+        if let rect = ScreenRecordingManager.shared.activeRegionRect {
+            RecordingAreaHighlightPresenter.shared.show(rect: rect, on: preferredScreen)
+        }
         RecordingBarPresentation.shared.isPresented = true
     }
 
