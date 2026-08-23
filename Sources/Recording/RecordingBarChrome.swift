@@ -12,6 +12,8 @@ enum RecordingBarMetrics {
     static let shadowOpacity: Double = 0.35
     static let shadowRadius: CGFloat = 16
     static let shadowY: CGFloat = 5
+    static let activeTint = Color(nsColor: .labelColor)
+    static let inactiveTint = Color(nsColor: .labelColor).opacity(0.4)
 }
 
 /// Reduced-motion aware animation curves, checked live rather than cached.
@@ -23,6 +25,10 @@ enum RecordingMotion {
 
     static var showHideSpring: Animation {
         reduceMotion ? .linear(duration: 0.01) : .spring(response: 0.32, dampingFraction: 0.82)
+    }
+
+    static var modeChange: Animation {
+        reduceMotion ? .linear(duration: 0.01) : .easeInOut(duration: 0.28)
     }
 }
 
@@ -51,37 +57,59 @@ struct RecordingBarMaterial: NSViewRepresentable {
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 
-/// Bar icon button with an AppKit-tracked hover puck, so hover still works while BetterShot is in the background.
-struct RecordingBarIconButton: View {
+/// Bar icon with an AppKit-tracked hover puck, so hover still works while BetterShot is in the background. Usable bare as a `Menu` label, or wrapped by `RecordingBarIconButton`.
+struct RecordingBarIconLabel: View {
     let systemImage: String
-    var tint: Color = Color(nsColor: .labelColor)
+    var tint: Color = RecordingBarMetrics.activeTint
     let accessibilityLabel: String
-    let action: () -> Void
 
     @Environment(\.isEnabled) private var isEnabled
     @State private var isHovering = false
 
     var body: some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(tint.opacity(isEnabled ? 1 : 0.35))
+            .frame(width: RecordingBarMetrics.controlSize, height: RecordingBarMetrics.controlSize)
+            .background {
+                Circle()
+                    .fill(Color(nsColor: .labelColor).opacity(0.12))
+                    .frame(width: RecordingBarMetrics.hoverDiameter, height: RecordingBarMetrics.hoverDiameter)
+                    .opacity(isHovering ? 1 : 0)
+            }
+            .contentShape(Circle())
+            .background {
+                RecordingBarHoverTracker(isEnabled: isEnabled) { isHovering = $0 }
+            }
+            .accessibilityLabel(accessibilityLabel)
+            .animation(.easeOut(duration: 0.12), value: isHovering)
+    }
+}
+
+/// Bar icon button with an AppKit-tracked hover puck, so hover still works while BetterShot is in the background.
+struct RecordingBarIconButton: View {
+    let systemImage: String
+    var tint: Color = RecordingBarMetrics.activeTint
+    let accessibilityLabel: String
+    let action: () -> Void
+
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
         Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(tint.opacity(isEnabled ? 1 : 0.35))
-                .frame(width: RecordingBarMetrics.controlSize, height: RecordingBarMetrics.controlSize)
-                .background {
-                    Circle()
-                        .fill(Color(nsColor: .labelColor).opacity(0.12))
-                        .frame(width: RecordingBarMetrics.hoverDiameter, height: RecordingBarMetrics.hoverDiameter)
-                        .opacity(isHovering ? 1 : 0)
-                }
-                .contentShape(Circle())
-                .background {
-                    RecordingBarHoverTracker(isEnabled: isEnabled) { isHovering = $0 }
-                }
+            RecordingBarIconLabel(systemImage: systemImage, tint: tint, accessibilityLabel: accessibilityLabel)
         }
         .buttonStyle(RecordingBarButtonStyle())
         .disabled(!isEnabled)
-        .accessibilityLabel(accessibilityLabel)
-        .animation(.easeOut(duration: 0.12), value: isHovering)
+    }
+}
+
+/// Thin vertical separator between bar sections.
+struct RecordingBarDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(RecordingBarMetrics.edge)
+            .frame(width: 1, height: 18)
     }
 }
 

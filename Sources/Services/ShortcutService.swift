@@ -157,13 +157,8 @@ final class ShortcutService {
                 let mouseScreen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) }
                 Task { @MainActor in
                     if action == .recording {
-                        if ScreenRecordingManager.shared.isRecording {
-                            return
-                        }
-                        let started = try? await ScreenRecordingManager.shared.startRecording()
-                        if started == true {
-                            RecordingStatusBarController.shared.show(on: mouseScreen)
-                        }
+                        guard !ScreenRecordingManager.shared.isRecording else { return }
+                        RecordingBarPresenter.shared.togglePicker(on: mouseScreen)
                     } else {
                         await CaptureOrchestrator.shared.performCapture(action, on: mouseScreen)
                     }

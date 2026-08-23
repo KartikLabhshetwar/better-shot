@@ -1,11 +1,12 @@
 import SwiftUI
 
-struct RecordingStatusBarView: View {
+/// The in-session half of the recording bar: elapsed time plus pause/stop/restart/discard. Hosted by `RecordingBarPresenter` once a recording starts.
+struct RecordingSessionControls: View {
     @State private var recorder = ScreenRecordingManager.shared
-    @State private var presentation = RecordingBarPresentation.shared
     @State private var isPulsing = false
 
     private var isPaused: Bool { recorder.state == .paused }
+    private var isSettling: Bool { recorder.state == .preparing || recorder.state == .stopping }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -13,12 +14,6 @@ struct RecordingStatusBarView: View {
             RecordingBarDivider()
             controls
         }
-        .fixedSize()
-        .frame(height: RecordingBarMetrics.height)
-        .background(barBackground)
-        .scaleEffect(presentation.isPresented ? 1 : 0.92, anchor: .bottom)
-        .opacity(presentation.isPresented ? 1 : 0)
-        .animation(RecordingMotion.showHideSpring, value: presentation.isPresented)
     }
 
     private var elapsed: some View {
@@ -62,6 +57,7 @@ struct RecordingStatusBarView: View {
             ) {
                 recorder.togglePause()
             }
+            .disabled(isSettling)
 
             RecordingBarIconButton(
                 systemImage: "stop.fill",
@@ -69,7 +65,7 @@ struct RecordingStatusBarView: View {
                 accessibilityLabel: "Stop and save recording"
             ) {
                 Task {
-                    RecordingStatusBarController.shared.dismiss()
+                    RecordingBarPresenter.shared.hide()
                     if let url = await recorder.stopRecording() {
                         let record = HistoryStore.shared.referenceCapture(at: url, kind: .recording)
                         if let record {
@@ -79,6 +75,7 @@ struct RecordingStatusBarView: View {
                     }
                 }
             }
+            .disabled(isSettling)
 
             RecordingBarIconButton(
                 systemImage: "arrow.counterclockwise",
@@ -88,155 +85,30 @@ struct RecordingStatusBarView: View {
                     await recorder.cancelRecording()
                     let started = try? await recorder.startRecording()
                     if started != true {
-                        RecordingStatusBarController.shared.dismiss()
+                        RecordingBarPresenter.shared.hide()
                     }
                 }
             }
+            .disabled(isSettling)
 
             RecordingBarIconButton(
                 systemImage: "xmark",
                 accessibilityLabel: "Discard recording"
             ) {
                 Task {
-                    RecordingStatusBarController.shared.dismiss()
+                    RecordingBarPresenter.shared.hide()
                     await recorder.cancelRecording()
                 }
             }
+            .disabled(recorder.state == .preparing)
         }
         .padding(.leading, 6)
         .padding(.trailing, 8)
-    }
-
-    private var barBackground: some View {
-        RecordingBarMaterial()
-            .clipShape(RoundedRectangle(cornerRadius: RecordingBarMetrics.cornerRadius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: RecordingBarMetrics.cornerRadius, style: .continuous)
-                    .strokeBorder(RecordingBarMetrics.edge, lineWidth: 0.5)
-            )
-            .shadow(color: .black.opacity(RecordingBarMetrics.shadowOpacity), radius: RecordingBarMetrics.shadowRadius, y: RecordingBarMetrics.shadowY)
     }
 
     private func formatTime(_ seconds: Int) -> String {
         let m = seconds / 60
         let s = seconds % 60
         return String(format: "%02d:%02d", m, s)
-    }
-}
-
-private struct RecordingBarDivider: View {
-    var body: some View {
-        Rectangle()
-            .fill(RecordingBarMetrics.edge)
-            .frame(width: 1, height: 18)
-    }
-}
-
-@MainActor
-final class RecordingStatusBarController {
-    static let shared = RecordingStatusBarController()
-
-    private var panel: NSPanel?
-    private var hideTask: Task<Void, Never>?
-
-    private init() {}
-
-    func show(on preferredScreen: NSScreen? = nil) {
-        hideTask?.cancel()
-        hideTask = nil
-
-        let panel = panel ?? makePanel()
-        panel.setFrameOrigin(resolvedOrigin(for: panel.frame.size, preferredScreen: preferredScreen))
-        panel.orderFrontRegardless()
-
-        if let rect = ScreenRecordingManager.shared.activeRegionRect {
-            RecordingAreaHighlightPresenter.shared.show(rect: rect, on: preferredScreen)
-        }
-        RecordingBarPresentation.shared.isPresented = true
-    }
-
-    func dismiss() {
-        RecordingAreaHighlightPresenter.shared.hide()
-        RecordingBarPresentation.shared.isPresented = false
-
-        let panel = panel
-        hideTask = Task { @MainActor [weak self] in
-            let nanoseconds: UInt64 = RecordingMotion.reduceMotion ? 0 : 220_000_000
-            try? await Task.sleep(nanoseconds: nanoseconds)
-            guard !Task.isCancelled else { return }
-            panel?.orderOut(nil)
-            self?.hideTask = nil
-        }
-    }
-
-    private func makePanel() -> NSPanel {
-        let rootView = RecordingStatusBarView()
-            .environment(\.colorScheme, .dark)
-
-        let hostingView = NSHostingView(rootView: rootView)
-        hostingView.setFrameSize(hostingView.fittingSize)
-
-        let panel = NSPanel(
-            contentRect: NSRect(origin: .zero, size: hostingView.fittingSize),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = false
-        panel.level = .floating
-        panel.hidesOnDeactivate = false
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.isMovableByWindowBackground = true
-        panel.sharingType = .none
-        panel.contentView = hostingView
-
-        NotificationCenter.default.addObserver(
-            forName: NSWindow.didMoveNotification,
-            object: panel,
-            queue: .main
-        ) { notification in
-            guard let window = notification.object as? NSWindow else { return }
-            RecordingBarPositionStore.save(window.frame.origin)
-        }
-
-        self.panel = panel
-        return panel
-    }
-
-    private func resolvedOrigin(for panelSize: NSSize, preferredScreen: NSScreen?) -> NSPoint {
-        if let saved = RecordingBarPositionStore.load() {
-            let savedFrame = NSRect(origin: saved, size: panelSize)
-            if NSScreen.screens.contains(where: { $0.visibleFrame.intersects(savedFrame) }) {
-                return saved
-            }
-        }
-        let screen = preferredScreen ?? NSScreen.main
-        let screenFrame = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 800, height: 600)
-        return NSPoint(
-            x: screenFrame.midX - panelSize.width / 2,
-            y: screenFrame.minY + 16
-        )
-    }
-}
-
-/// Remembers the bar's dragged position across launches.
-private enum RecordingBarPositionStore {
-    private static let xKey = "bs_recbar_x"
-    private static let yKey = "bs_recbar_y"
-
-    static func save(_ origin: NSPoint) {
-        UserDefaults.standard.set(Double(origin.x), forKey: xKey)
-        UserDefaults.standard.set(Double(origin.y), forKey: yKey)
-    }
-
-    static func load() -> NSPoint? {
-        guard UserDefaults.standard.object(forKey: xKey) != nil,
-              UserDefaults.standard.object(forKey: yKey) != nil else { return nil }
-        return NSPoint(
-            x: UserDefaults.standard.double(forKey: xKey),
-            y: UserDefaults.standard.double(forKey: yKey)
-        )
     }
 }
