@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import ScreenCaptureKit
 import SwiftUI
 
@@ -11,6 +12,27 @@ struct RecordingPickerControls: View {
     @State private var captureSystemAudio = AppPreferences.recordingCaptureAudio
     @State private var startDelaySeconds = AppPreferences.recordingStartDelaySeconds
 
+    private func toggleMicrophone() {
+        guard !captureMicrophone else {
+            captureMicrophone = false
+            AppPreferences.recordingCaptureMicrophone = false
+            return
+        }
+        AVCaptureDevice.requestAccess(for: .audio) { granted in
+            Task { @MainActor in
+                captureMicrophone = granted
+                AppPreferences.recordingCaptureMicrophone = granted
+                if !granted {
+                    ToastWindow.shared.show(
+                        title: "Microphone Blocked",
+                        message: "Allow BetterShot in System Settings > Privacy & Security > Microphone.",
+                        systemIcon: "mic.slash"
+                    )
+                }
+            }
+        }
+    }
+
     var body: some View {
         HStack(spacing: RecordingBarMetrics.itemSpacing) {
             displaySource
@@ -22,13 +44,14 @@ struct RecordingPickerControls: View {
 
             RecordingBarDivider()
 
-            RecordingBarIconButton(
-                systemImage: captureMicrophone ? "mic.fill" : "mic.slash",
-                tint: captureMicrophone ? RecordingBarMetrics.activeTint : RecordingBarMetrics.inactiveTint,
-                accessibilityLabel: captureMicrophone ? "Microphone on" : "Microphone off"
-            ) {
-                captureMicrophone.toggle()
-                AppPreferences.recordingCaptureMicrophone = captureMicrophone
+            if ScreenCaptureStream.supportsMicrophoneCapture {
+                RecordingBarIconButton(
+                    systemImage: captureMicrophone ? "mic.fill" : "mic.slash",
+                    tint: captureMicrophone ? RecordingBarMetrics.activeTint : RecordingBarMetrics.inactiveTint,
+                    accessibilityLabel: captureMicrophone ? "Microphone on" : "Microphone off"
+                ) {
+                    toggleMicrophone()
+                }
             }
 
             RecordingBarIconButton(
@@ -130,8 +153,7 @@ struct RecordingPickerControls: View {
     private func startAreaRecording() {
         RecordingBarPresenter.shared.hide()
         Task {
-            await runStartDelay()
-            let started = (try? await ScreenRecordingManager.shared.startAreaRecording()) ?? false
+            let started = (try? await ScreenRecordingManager.shared.startAreaRecording(afterSelection: runStartDelay)) ?? false
             if started {
                 RecordingBarPresenter.shared.showRecording()
             }

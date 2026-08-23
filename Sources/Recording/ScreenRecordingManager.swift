@@ -6,13 +6,21 @@ nonisolated final class ScreenCaptureStream: NSObject, SCStreamOutput, SCStreamD
     private let lock = NSLock()
     private var _stream: SCStream?
     private var _hasAudio = false
+    private var _hasMicrophone = false
 
     private let videoQueue = DispatchQueue(label: "com.bettershot.recording.video", qos: .userInteractive)
     private let audioQueue = DispatchQueue(label: "com.bettershot.recording.audio", qos: .userInteractive)
+    private let micQueue = DispatchQueue(label: "com.bettershot.recording.microphone", qos: .userInteractive)
 
     var onVideoFrame: ((CMSampleBuffer) -> Void)?
     var onAudioSample: ((CMSampleBuffer) -> Void)?
+    var onMicrophoneSample: ((CMSampleBuffer) -> Void)?
     var onError: ((Error) -> Void)?
+
+    static var supportsMicrophoneCapture: Bool {
+        if #available(macOS 15.0, *) { return true }
+        return false
+    }
 
     static func availableContent() async throws -> SCShareableContent {
         try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
@@ -25,18 +33,24 @@ nonisolated final class ScreenCaptureStream: NSObject, SCStreamOutput, SCStreamD
         if hasAudio {
             try stream.addStreamOutput(self, type: .audio, sampleHandlerQueue: audioQueue)
         }
+        var hasMicrophone = false
+        if #available(macOS 15.0, *), configuration.captureMicrophone {
+            try stream.addStreamOutput(self, type: .microphone, sampleHandlerQueue: micQueue)
+            hasMicrophone = true
+        }
         lock.withLock {
             _stream = stream
             _hasAudio = hasAudio
+            _hasMicrophone = hasMicrophone
         }
         return stream
     }
 
     func stop() async {
-        let (stream, hasAudio): (SCStream?, Bool) = lock.withLock {
+        let (stream, hasAudio, hasMicrophone): (SCStream?, Bool, Bool) = lock.withLock {
             let s = _stream
             _stream = nil
-            return (s, _hasAudio)
+            return (s, _hasAudio, _hasMicrophone)
         }
         guard let stream else { return }
         try? await stream.stopCapture()
@@ -44,11 +58,15 @@ nonisolated final class ScreenCaptureStream: NSObject, SCStreamOutput, SCStreamD
         if hasAudio {
             try? stream.removeStreamOutput(self, type: .audio)
         }
+        if hasMicrophone, #available(macOS 15.0, *) {
+            try? stream.removeStreamOutput(self, type: .microphone)
+        }
     }
 
     func detachHandlers() {
         onVideoFrame = nil
         onAudioSample = nil
+        onMicrophoneSample = nil
         onError = nil
     }
 
@@ -63,8 +81,10 @@ nonisolated final class ScreenCaptureStream: NSObject, SCStreamOutput, SCStreamD
             onVideoFrame?(sampleBuffer)
         case .audio:
             onAudioSample?(sampleBuffer)
-        @unknown default:
-            break
+        default:
+            if #available(macOS 15.0, *), type == .microphone {
+                onMicrophoneSample?(sampleBuffer)
+            }
         }
     }
 
@@ -147,12 +167,13 @@ final class ScreenRecordingManager {
         }
     }
 
-    func startAreaRecording() async throws -> Bool {
+    func startAreaRecording(afterSelection: (() async -> Void)? = nil) async throws -> Bool {
         guard state == .idle else { return false }
 
         let overlay = RegionSelectionOverlay()
         guard let selection = await overlay.selectRegion() else { return false }
 
+        await afterSelection?()
         state = .preparing
 
         do {
@@ -333,6 +354,9 @@ final class ScreenRecordingManager {
         pointerCaptureRect: CGRect
     ) async throws -> Bool {
         let captureAudio = AppPreferences.recordingCaptureAudio
+        let captureMicrophone = AppPreferences.recordingCaptureMicrophone
+            && ScreenCaptureStream.supportsMicrophoneCapture
+            && AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         let fps = AppPreferences.recordingFPS
 
         let config = SCStreamConfiguration()
@@ -349,6 +373,9 @@ final class ScreenRecordingManager {
             config.sampleRate = 48_000
             config.channelCount = 2
         }
+        if captureMicrophone, #available(macOS 15.0, *) {
+            config.captureMicrophone = true
+        }
 
         let dir = AppPreferences.saveDirectory
         let stamp = Int(Date().timeIntervalSince1970 * 1000)
@@ -360,7 +387,8 @@ final class ScreenRecordingManager {
             width: width,
             height: height,
             fps: fps,
-            includeAudio: captureAudio
+            includeAudio: captureAudio,
+            includeMicrophone: captureMicrophone
         )
 
         guard recordingSession.startWriting() else {
@@ -376,6 +404,9 @@ final class ScreenRecordingManager {
         }
         capture.onAudioSample = { [recordingSession] buffer in
             recordingSession.appendAudioSample(buffer)
+        }
+        capture.onMicrophoneSample = { [recordingSession] buffer in
+            recordingSession.appendAudioSample(buffer, isMicrophone: true)
         }
         capture.onError = { [weak self] _ in
             Task { @MainActor in
