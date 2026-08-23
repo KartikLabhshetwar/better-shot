@@ -12,10 +12,20 @@ nonisolated final class ScreenCaptureStream: NSObject, SCStreamOutput, SCStreamD
     private let audioQueue = DispatchQueue(label: "com.bettershot.recording.audio", qos: .userInteractive)
     private let micQueue = DispatchQueue(label: "com.bettershot.recording.microphone", qos: .userInteractive)
 
-    var onVideoFrame: ((CMSampleBuffer) -> Void)?
-    var onAudioSample: ((CMSampleBuffer) -> Void)?
-    var onMicrophoneSample: ((CMSampleBuffer) -> Void)?
-    var onError: ((Error) -> Void)?
+    struct Handlers {
+        var video: (@Sendable (CMSampleBuffer) -> Void)?
+        var audio: (@Sendable (CMSampleBuffer) -> Void)?
+        var microphone: (@Sendable (CMSampleBuffer) -> Void)?
+        var error: (@Sendable (Error) -> Void)?
+    }
+
+    private var _handlers = Handlers()
+
+    private var handlers: Handlers { lock.withLock { _handlers } }
+
+    func setHandlers(_ handlers: Handlers) {
+        lock.withLock { _handlers = handlers }
+    }
 
     static var supportsMicrophoneCapture: Bool {
         if #available(macOS 15.0, *) { return true }
@@ -64,10 +74,7 @@ nonisolated final class ScreenCaptureStream: NSObject, SCStreamOutput, SCStreamD
     }
 
     func detachHandlers() {
-        onVideoFrame = nil
-        onAudioSample = nil
-        onMicrophoneSample = nil
-        onError = nil
+        lock.withLock { _handlers = Handlers() }
     }
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
@@ -78,18 +85,18 @@ nonisolated final class ScreenCaptureStream: NSObject, SCStreamOutput, SCStreamD
                status == .blank || status == .suspended || status == .stopped {
                 return
             }
-            onVideoFrame?(sampleBuffer)
+            handlers.video?(sampleBuffer)
         case .audio:
-            onAudioSample?(sampleBuffer)
+            handlers.audio?(sampleBuffer)
         default:
             if #available(macOS 15.0, *), type == .microphone {
-                onMicrophoneSample?(sampleBuffer)
+                handlers.microphone?(sampleBuffer)
             }
         }
     }
 
     func stream(_ stream: SCStream, didStopWithError error: any Error) {
-        onError?(error)
+        handlers.error?(error)
     }
 
     private static func frameStatus(for sampleBuffer: CMSampleBuffer) -> SCFrameStatus? {
@@ -432,21 +439,23 @@ final class ScreenRecordingManager {
 
         session = recordingSession
 
-        capture.onVideoFrame = { [recordingSession] buffer in
-            recordingSession.appendVideoSample(buffer)
-        }
-        capture.onAudioSample = { [recordingSession] buffer in
-            recordingSession.appendAudioSample(buffer)
-        }
-        capture.onMicrophoneSample = { [recordingSession] buffer in
-            recordingSession.appendAudioSample(buffer, isMicrophone: true)
-        }
-        capture.onError = { [weak self] _ in
-            Task { @MainActor in
-                guard let self, self.isRecording else { return }
-                _ = await self.stopRecording()
+        capture.setHandlers(ScreenCaptureStream.Handlers(
+            video: { [recordingSession] buffer in
+                recordingSession.appendVideoSample(buffer)
+            },
+            audio: { [recordingSession] buffer in
+                recordingSession.appendAudioSample(buffer)
+            },
+            microphone: { [recordingSession] buffer in
+                recordingSession.appendAudioSample(buffer, isMicrophone: true)
+            },
+            error: { [weak self] _ in
+                Task { @MainActor in
+                    guard let self, self.isRecording else { return }
+                    _ = await self.stopRecording()
+                }
             }
-        }
+        ))
 
         do {
             let stream = try capture.makeStream(filter: filter, configuration: config)

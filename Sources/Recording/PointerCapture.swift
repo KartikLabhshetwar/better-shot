@@ -51,15 +51,17 @@ final class PointerCaptureRecorder: @unchecked Sendable {
         let queue = DispatchQueue(label: "com.bettershot.recording.pointer", qos: .utility)
         let source = DispatchSource.makeTimerSource(queue: queue)
         source.schedule(deadline: .now(), repeating: Self.sampleInterval)
-        source.setEventHandler { [weak self] in
+        let sampleHandler: @Sendable () -> Void = { [weak self] in
             self?.sampleTravel()
         }
+        source.setEventHandler(handler: sampleHandler)
         source.resume()
         timer = source
 
-        pressMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+        let pressHandler: @Sendable (NSEvent) -> Void = { [weak self] _ in
             self?.recordPress()
         }
+        pressMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown], handler: pressHandler)
     }
 
     @MainActor
