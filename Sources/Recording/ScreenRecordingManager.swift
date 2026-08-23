@@ -164,6 +164,7 @@ final class ScreenRecordingManager {
 
     func startFullScreenRecording() async throws -> Bool {
         guard state == .idle else { return false }
+        guard Self.ensureScreenRecordingPermission() else { return false }
         state = .preparing
 
         let targetDisplayID = ActiveDisplayResolver.activeDisplayID() ?? CGMainDisplayID()
@@ -208,6 +209,7 @@ final class ScreenRecordingManager {
 
     private func beginAreaCapture(selection: RegionSelection) async throws -> Bool {
         guard state == .idle else { return false }
+        guard Self.ensureScreenRecordingPermission() else { return false }
         state = .preparing
 
         do {
@@ -256,6 +258,7 @@ final class ScreenRecordingManager {
 
     func startWindowRecording(windowID: CGWindowID) async throws -> Bool {
         guard state == .idle else { return false }
+        guard Self.ensureScreenRecordingPermission() else { return false }
         state = .preparing
 
         do {
@@ -285,6 +288,7 @@ final class ScreenRecordingManager {
 
     func startDisplayRecording(displayID: CGDirectDisplayID) async throws -> Bool {
         guard state == .idle else { return false }
+        guard Self.ensureScreenRecordingPermission() else { return false }
         state = .preparing
 
         do {
@@ -384,6 +388,18 @@ final class ScreenRecordingManager {
         return CGRect(x: minX, y: minY, width: width, height: height)
     }
 
+    /// Preflights Screen Recording TCC before touching ScreenCaptureKit, since a missing grant otherwise fails the stream silently.
+    private static func ensureScreenRecordingPermission() -> Bool {
+        if CGPreflightScreenCaptureAccess() { return true }
+        if CGRequestScreenCaptureAccess() { return true }
+        ToastWindow.shared.show(
+            title: "Screen Recording Permission Needed",
+            message: "Allow BetterShot in System Settings > Privacy & Security > Screen & System Audio Recording, then reopen the app.",
+            systemIcon: "exclamationmark.triangle"
+        )
+        return false
+    }
+
     // MARK: - Stream lifecycle
 
     private func beginCapture(
@@ -394,9 +410,27 @@ final class ScreenRecordingManager {
         pointerCaptureRect: CGRect
     ) async throws -> Bool {
         let captureAudio = AppPreferences.recordingCaptureAudio
-        let captureMicrophone = AppPreferences.recordingCaptureMicrophone
-            && ScreenCaptureStream.supportsMicrophoneCapture
-            && AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        let microphoneRequested = AppPreferences.recordingCaptureMicrophone
+        let microphoneAuthorized = microphoneRequested ? await AVCaptureDevice.requestAccess(for: .audio) : false
+        let microphoneDevice = microphoneRequested && ScreenCaptureStream.supportsMicrophoneCapture && microphoneAuthorized
+            ? MicrophoneCatalog.preferred(savedID: AppPreferences.recordingMicrophoneDeviceID)
+            : nil
+        let captureMicrophone = microphoneDevice != nil
+        if microphoneRequested, !captureMicrophone {
+            let reason: String
+            if !ScreenCaptureStream.supportsMicrophoneCapture {
+                reason = "Microphone capture needs macOS 15 or later."
+            } else if !microphoneAuthorized {
+                reason = "Allow BetterShot in System Settings > Privacy & Security > Microphone."
+            } else {
+                reason = "No microphone is available on this Mac."
+            }
+            ToastWindow.shared.show(
+                title: "Recording Without Microphone",
+                message: reason,
+                systemIcon: "mic.slash"
+            )
+        }
         let fps = AppPreferences.recordingFPS
 
         let config = SCStreamConfiguration()
@@ -413,13 +447,13 @@ final class ScreenRecordingManager {
             config.sampleRate = 48_000
             config.channelCount = 2
         }
-        if captureMicrophone, #available(macOS 15.0, *) {
+        if let microphoneDevice, #available(macOS 15.0, *) {
             config.captureMicrophone = true
+            config.microphoneCaptureDeviceID = microphoneDevice.uniqueID
         }
 
-        let dir = AppPreferences.saveDirectory
         let stamp = Int(Date().timeIntervalSince1970 * 1000)
-        let url = URL(fileURLWithPath: "\(dir)/bettershot_\(stamp).mp4")
+        let url = RecordingStagingDirectory.url.appendingPathComponent("bettershot_\(stamp).mp4")
         outputURL = url
 
         let recordingSession = try RecordingSession(

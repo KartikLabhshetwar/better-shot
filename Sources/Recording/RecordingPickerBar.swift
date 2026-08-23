@@ -9,6 +9,7 @@ struct RecordingPickerControls: View {
 
     @State private var sources = RecordingSourceCatalog.shared
     @State private var captureMicrophone = AppPreferences.recordingCaptureMicrophone
+    @State private var selectedMicrophoneID = MicrophoneCatalog.preferred(savedID: AppPreferences.recordingMicrophoneDeviceID)?.uniqueID
     @State private var captureSystemAudio = AppPreferences.recordingCaptureAudio
     @State private var startDelaySeconds = AppPreferences.recordingStartDelaySeconds
     @State private var camera = CameraBubbleController.shared
@@ -23,6 +24,9 @@ struct RecordingPickerControls: View {
             Task { @MainActor in
                 captureMicrophone = granted
                 AppPreferences.recordingCaptureMicrophone = granted
+                if granted, selectedMicrophoneID == nil {
+                    selectedMicrophoneID = MicrophoneCatalog.preferred(savedID: AppPreferences.recordingMicrophoneDeviceID)?.uniqueID
+                }
                 if !granted {
                     ToastWindow.shared.show(
                         title: "Microphone Blocked",
@@ -34,12 +38,33 @@ struct RecordingPickerControls: View {
         }
     }
 
+    @ViewBuilder
+    private var microphonePicker: some View {
+        let devices = MicrophoneCatalog.available()
+        if devices.isEmpty {
+            Text("No microphones available")
+        } else {
+            ForEach(devices, id: \.uniqueID) { device in
+                Button {
+                    AppPreferences.recordingMicrophoneDeviceID = device.uniqueID
+                    selectedMicrophoneID = device.uniqueID
+                } label: {
+                    if device.uniqueID == selectedMicrophoneID {
+                        Label(device.localizedName, systemImage: "checkmark")
+                    } else {
+                        Text(device.localizedName)
+                    }
+                }
+            }
+        }
+    }
+
     var body: some View {
         HStack(spacing: RecordingBarMetrics.itemSpacing) {
             displaySource
             windowSource
 
-            RecordingBarIconButton(systemImage: "rectangle.dashed", accessibilityLabel: "Area, drag to select the region to record") {
+            RecordingBarIconButton(id: "area", title: "Drag to select a region", systemImage: "rectangle.dashed", accessibilityLabel: "Area, drag to select the region to record") {
                 startAreaRecording()
             }
 
@@ -47,16 +72,23 @@ struct RecordingPickerControls: View {
 
             if ScreenCaptureStream.supportsMicrophoneCapture {
                 RecordingBarIconButton(
+                    id: "microphone",
+                    title: captureMicrophone ? "Microphone on" : "Microphone off",
                     systemImage: captureMicrophone ? "mic.fill" : "mic.slash",
                     tint: captureMicrophone ? RecordingBarMetrics.activeTint : RecordingBarMetrics.inactiveTint,
                     accessibilityLabel: captureMicrophone ? "Microphone on" : "Microphone off"
                 ) {
                     toggleMicrophone()
                 }
+                .contextMenu {
+                    microphonePicker
+                }
             }
 
             if camera.hasCamera {
                 RecordingBarIconButton(
+                    id: "camera",
+                    title: camera.isEnabled ? "Camera on" : "Camera off",
                     systemImage: camera.isEnabled ? "video.fill" : "video.slash",
                     tint: camera.isEnabled ? RecordingBarMetrics.activeTint : RecordingBarMetrics.inactiveTint,
                     accessibilityLabel: camera.isEnabled ? "Face cam on" : "Face cam off"
@@ -72,6 +104,8 @@ struct RecordingPickerControls: View {
             }
 
             RecordingBarIconButton(
+                id: "systemAudio",
+                title: captureSystemAudio ? "System audio on" : "System audio off",
                 systemImage: captureSystemAudio ? "speaker.wave.2.fill" : "speaker.slash",
                 tint: captureSystemAudio ? RecordingBarMetrics.activeTint : RecordingBarMetrics.inactiveTint,
                 accessibilityLabel: captureSystemAudio ? "System audio on" : "System audio off"
@@ -82,7 +116,7 @@ struct RecordingPickerControls: View {
 
             delayMenu
 
-            RecordingBarIconButton(systemImage: "xmark", accessibilityLabel: "Close the recorder") {
+            RecordingBarIconButton(id: "close", title: "Close", systemImage: "xmark", accessibilityLabel: "Close the recorder") {
                 camera.suspend()
                 RecordingBarPresenter.shared.hide()
             }
@@ -102,12 +136,12 @@ struct RecordingPickerControls: View {
                     }
                 }
             } label: {
-                RecordingBarIconLabel(systemImage: "menubar.rectangle", accessibilityLabel: "Display, choose which screen to record")
+                RecordingBarIconLabel(id: "display", title: "Pick a screen to record", systemImage: "menubar.rectangle", accessibilityLabel: "Display, choose which screen to record")
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
         } else {
-            RecordingBarIconButton(systemImage: "menubar.rectangle", accessibilityLabel: "Display, record the whole screen") {
+            RecordingBarIconButton(id: "display", title: "Record the whole screen", systemImage: "menubar.rectangle", accessibilityLabel: "Display, record the whole screen") {
                 guard let display = sources.displays.first else { return }
                 beginRecording(on: ActiveDisplayResolver.screen(for: display.displayID)) {
                     try await ScreenRecordingManager.shared.startDisplayRecording(displayID: display.displayID)
@@ -133,7 +167,7 @@ struct RecordingPickerControls: View {
                 Task { await sources.refresh() }
             }
         } label: {
-            RecordingBarIconLabel(systemImage: "macwindow", accessibilityLabel: "Window, choose an app window to record")
+            RecordingBarIconLabel(id: "window", title: "Pick an app window", systemImage: "macwindow", accessibilityLabel: "Window, choose an app window to record")
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
@@ -155,6 +189,8 @@ struct RecordingPickerControls: View {
             }
         } label: {
             RecordingBarIconLabel(
+                id: "timer",
+                title: startDelaySeconds == 0 ? "Timer off" : "Timer \(startDelaySeconds)s",
                 systemImage: "timer",
                 tint: startDelaySeconds == 0 ? RecordingBarMetrics.inactiveTint : RecordingBarMetrics.activeTint,
                 accessibilityLabel: startDelaySeconds == 0 ? "Start delay off" : "Start delay \(startDelaySeconds) seconds"

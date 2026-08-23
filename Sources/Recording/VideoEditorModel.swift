@@ -3,6 +3,7 @@ import AppKit
 import SwiftUI
 import CoreImage
 
+
 private struct ClipEditSnapshot {
     var clips: [Clip]
     var trimStart: Double
@@ -324,8 +325,8 @@ final class VideoEditorModel {
         if currentTime > trimEnd { seekTo(trimEnd) }
     }
 
-    func exportTrimmed(into directory: String? = nil) async -> URL? {
-        guard let sourceURL else { return nil }
+    func exportTrimmed(into directory: String? = nil) async throws -> URL {
+        guard let sourceURL else { throw VideoExportError.noSourceRecording }
         let asset = AVURLAsset(url: sourceURL)
 
         let dir = directory ?? AppPreferences.saveDirectory
@@ -342,11 +343,11 @@ final class VideoEditorModel {
         let hasZoom = zoomEnabled && !zoomCues.isEmpty
 
         if isClipMode || hasEffects || hasCrop || hasZoom {
-            return await exportWithEffects(asset: asset, outputURL: outputURL, config: exportConfig)
+            return try await exportWithEffects(asset: asset, outputURL: outputURL, config: exportConfig)
         }
 
         guard let session = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetHighestQuality) else {
-            return nil
+            throw VideoExportError.exportSessionUnavailable
         }
 
         session.outputURL = outputURL
@@ -358,14 +359,20 @@ final class VideoEditorModel {
 
         await session.export()
 
-        if session.status == .completed {
+        switch session.status {
+        case .completed:
             return outputURL
+        case .cancelled:
+            throw VideoExportError.exportCancelled
+        default:
+            throw VideoExportError.exportFailed(session.error)
         }
-        return nil
     }
 
-    private func exportWithEffects(asset: AVURLAsset, outputURL: URL, config: BeautifierConfig) async -> URL? {
-        guard let videoTrack = try? await asset.loadTracks(withMediaType: .video).first else { return nil }
+    private func exportWithEffects(asset: AVURLAsset, outputURL: URL, config: BeautifierConfig) async throws -> URL {
+        guard let videoTrack = try? await asset.loadTracks(withMediaType: .video).first else {
+            throw VideoExportError.noVideoTrack
+        }
 
         let naturalSize = (try? await videoTrack.load(.naturalSize)) ?? CGSize(width: 1920, height: 1080)
         let transform = (try? await videoTrack.load(.preferredTransform)) ?? .identity
@@ -374,13 +381,17 @@ final class VideoEditorModel {
         let fullH = abs(transformed.height)
 
         let useZoom = zoomEnabled
-        let vidW = useZoom ? fullW : fullW * cropRect.width
-        let vidH = useZoom ? fullH : fullH * cropRect.height
-
+        let canvas = ExportCanvasGeometry.canvas(
+            videoWidth: useZoom ? fullW : fullW * cropRect.width,
+            videoHeight: useZoom ? fullH : fullH * cropRect.height,
+            paddingFraction: config.padding
+        )
+        let vidW = canvas.videoWidth
+        let vidH = canvas.videoHeight
+        let pad = canvas.padding
+        let canvasW = canvas.width
+        let canvasH = canvas.height
         let shortEdge = min(vidW, vidH)
-        let pad = shortEdge * config.padding
-        let canvasW = vidW + pad * 2
-        let canvasH = vidH + pad * 2
         let cornerRadius = config.cornerRadius * shortEdge
 
         let composition: AVMutableComposition
@@ -388,16 +399,23 @@ final class VideoEditorModel {
 
         if isClipMode {
             let normalizedClips = ClipTimeline(clips: clips).normalized(to: duration)
-            guard !normalizedClips.isEmpty else { return nil }
+            guard !normalizedClips.isEmpty else { throw VideoExportError.emptyClipTimeline }
             let audioTracks = (try? await asset.loadTracks(withMediaType: .audio)) ?? []
-            guard let built = try? ClipCompositionBuilder.makeComposition(videoTrack: videoTrack, audioTracks: audioTracks, clips: normalizedClips) else { return nil }
+            let built: AVMutableComposition
+            do {
+                built = try ClipCompositionBuilder.makeComposition(videoTrack: videoTrack, audioTracks: audioTracks, clips: normalizedClips)
+            } catch {
+                throw VideoExportError.clipCompositionFailed(error)
+            }
             composition = built
             let timeline = ClipTimeline(clips: normalizedClips)
             mapToSourceTime = { timeline.sourceTime(at: $0) }
         } else {
             let legacyComposition = AVMutableComposition()
 
-            guard let compVideoTrack = legacyComposition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else { return nil }
+            guard let compVideoTrack = legacyComposition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+                throw VideoExportError.compositionTrackUnavailable
+            }
 
             let timeRange = CMTimeRange(
                 start: CMTime(seconds: trimStart, preferredTimescale: 600),
@@ -407,7 +425,7 @@ final class VideoEditorModel {
             do {
                 try compVideoTrack.insertTimeRange(timeRange, of: videoTrack, at: .zero)
             } catch {
-                return nil
+                throw VideoExportError.trimInsertFailed(error)
             }
 
             for audioTrack in (try? await asset.loadTracks(withMediaType: .audio)) ?? [] {
@@ -420,7 +438,9 @@ final class VideoEditorModel {
             mapToSourceTime = { $0 + baseTrimStart }
         }
 
-        guard let compVideoTrack = composition.tracks(withMediaType: .video).first else { return nil }
+        guard let compVideoTrack = composition.tracks(withMediaType: .video).first else {
+            throw VideoExportError.compositionTrackUnavailable
+        }
 
         let videoComposition = AVMutableVideoComposition()
         videoComposition.renderSize = CGSize(width: canvasW, height: canvasH)
@@ -488,89 +508,19 @@ final class VideoEditorModel {
         instruction.layerInstructions = [layerInstruction]
         videoComposition.instructions = [instruction]
 
-        let bgLayer = CALayer()
-        bgLayer.frame = CGRect(x: 0, y: 0, width: canvasW, height: canvasH)
-        applyBackgroundToLayer(bgLayer, style: config.style, size: CGSize(width: canvasW, height: canvasH))
-
-        if config.shadowStrength > 0 {
-            let shadowContainer = CALayer()
-            shadowContainer.frame = CGRect(x: pad, y: pad, width: vidW, height: vidH)
-            shadowContainer.shadowColor = CGColor(gray: 0, alpha: 1)
-            shadowContainer.shadowOpacity = Float(config.shadowStrength * 0.4)
-            shadowContainer.shadowRadius = max(4, 20 * config.shadowStrength)
-            shadowContainer.shadowOffset = CGSize(width: 0, height: -max(2, 8 * config.shadowStrength))
-            shadowContainer.cornerRadius = cornerRadius
-
-            let mask = CALayer()
-            mask.frame = shadowContainer.bounds
-            mask.cornerRadius = cornerRadius
-            mask.backgroundColor = CGColor(gray: 0, alpha: 1)
-            shadowContainer.mask = mask
-
-            bgLayer.addSublayer(shadowContainer)
-        }
-
-        let videoLayer = CALayer()
-        videoLayer.frame = CGRect(x: 0, y: 0, width: canvasW, height: canvasH)
-
-        if cornerRadius > 0 {
-            let maskLayer = CAShapeLayer()
-            maskLayer.path = CGPath(roundedRect: CGRect(x: pad, y: pad, width: vidW, height: vidH), cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
-            videoLayer.mask = maskLayer
-        }
-
-        let outputLayer = CALayer()
-        outputLayer.frame = CGRect(x: 0, y: 0, width: canvasW, height: canvasH)
-        outputLayer.addSublayer(bgLayer)
-        outputLayer.addSublayer(videoLayer)
-
-        videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(
-            postProcessingAsVideoLayer: videoLayer,
-            in: outputLayer
+        let cardRect = CGRect(x: pad, y: pad, width: vidW, height: vidH)
+        let exportConfig = VideoFrameExporter.Configuration(
+            composition: composition,
+            videoComposition: videoComposition,
+            canvasSize: CGSize(width: canvasW, height: canvasH),
+            cardRect: cardRect,
+            cornerRadius: cornerRadius,
+            backgroundStyle: config.style,
+            shadowStrength: config.shadowStrength,
+            outputURL: outputURL
         )
 
-        guard let session = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality) else {
-            return nil
-        }
-
-        session.outputURL = outputURL
-        session.outputFileType = .mp4
-        session.videoComposition = videoComposition
-
-        await session.export()
-
-        return session.status == .completed ? outputURL : nil
-    }
-
-    private func applyBackgroundToLayer(_ layer: CALayer, style: BackgroundStyle, size: CGSize) {
-        switch style {
-        case .none:
-            layer.backgroundColor = CGColor(gray: 0.1, alpha: 1)
-        case .solid(let color):
-            layer.backgroundColor = color.cgColor
-        case .gradient(let preset):
-            let gradientLayer = CAGradientLayer()
-            gradientLayer.frame = CGRect(origin: .zero, size: size)
-            gradientLayer.colors = preset.stops.map {
-                CGColor(red: $0.red, green: $0.green, blue: $0.blue, alpha: 1)
-            }
-            gradientLayer.startPoint = CGPoint(x: preset.startPoint.x, y: preset.startPoint.y)
-            gradientLayer.endPoint = CGPoint(x: preset.endPoint.x, y: preset.endPoint.y)
-            layer.addSublayer(gradientLayer)
-        case .wallpaper(let source):
-            if let image = NSImage(contentsOfFile: source.path),
-               let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-                layer.contents = cgImage
-                layer.contentsGravity = .resizeAspectFill
-            }
-        case .bundledImage(let assetID):
-            if let asset = BundledBackgrounds.asset(byID: assetID),
-               let nsImage = asset.image,
-               let cgImage = nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-                layer.contents = cgImage
-                layer.contentsGravity = .resizeAspectFill
-            }
-        }
+        return try await VideoFrameExporter().export(exportConfig) { _ in }
     }
 
     func cleanup() {

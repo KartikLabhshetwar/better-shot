@@ -52,6 +52,8 @@ struct RecordingSessionControls: View {
     private var controls: some View {
         HStack(spacing: RecordingBarMetrics.itemSpacing) {
             RecordingBarIconButton(
+                id: "pauseResume",
+                title: isPaused ? "Resume recording" : "Pause recording",
                 systemImage: isPaused ? "play.fill" : "pause.fill",
                 accessibilityLabel: isPaused ? "Resume recording" : "Pause recording"
             ) {
@@ -60,6 +62,8 @@ struct RecordingSessionControls: View {
             .disabled(isSettling)
 
             RecordingBarIconButton(
+                id: "stop",
+                title: "Stop and save",
                 systemImage: "stop.fill",
                 tint: Color(nsColor: .systemRed),
                 accessibilityLabel: "Stop and save recording"
@@ -79,6 +83,8 @@ struct RecordingSessionControls: View {
             .disabled(isSettling)
 
             RecordingBarIconButton(
+                id: "restart",
+                title: "Start over",
                 systemImage: "arrow.counterclockwise",
                 accessibilityLabel: "Restart recording"
             ) {
@@ -93,6 +99,8 @@ struct RecordingSessionControls: View {
             .disabled(isSettling)
 
             RecordingBarIconButton(
+                id: "discard",
+                title: "Discard recording",
                 systemImage: "xmark",
                 accessibilityLabel: "Discard recording"
             ) {

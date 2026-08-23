@@ -422,10 +422,13 @@ struct VideoEditorView: View {
         try? FileManager.default.createDirectory(at: stagingDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: stagingDir) }
 
-        guard let renderedURL = await model.exportTrimmed(into: stagingDir.path) else {
+        let renderedURL: URL
+        do {
+            renderedURL = try await model.exportTrimmed(into: stagingDir.path)
+        } catch {
             ToastWindow.shared.show(
                 title: "Share Failed",
-                message: "Could not render your edits.",
+                message: error.localizedDescription,
                 systemIcon: "exclamationmark.triangle"
             )
             return
@@ -435,22 +438,33 @@ struct VideoEditorView: View {
 
     private func exportRecording() async {
         model.isExporting = true
+        defer { model.isExporting = false }
         let sourceURL = model.sourceURL
-        if let exportedURL = await model.exportTrimmed() {
-            if let sourceURL, let record = HistoryStore.shared.records.first(where: {
-                HistoryStore.shared.urlForRecord($0) == sourceURL
-                    || HistoryStore.shared.displayURLForRecord($0) == sourceURL
-            }) {
-                HistoryStore.shared.setBeautifiedPath(exportedURL.path, for: record.id)
-            } else {
-                _ = HistoryStore.shared.referenceCapture(at: exportedURL, kind: .recording)
-            }
-            let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage
-            ToastWindow.shared.show(message: "Recording exported!", icon: appIcon)
-            model.cleanup()
-            NSApp.keyWindow?.close()
+
+        let exportedURL: URL
+        do {
+            exportedURL = try await model.exportTrimmed()
+        } catch {
+            ToastWindow.shared.show(
+                title: "Export Failed",
+                message: error.localizedDescription,
+                systemIcon: "exclamationmark.triangle"
+            )
+            return
         }
-        model.isExporting = false
+
+        if let sourceURL, let record = HistoryStore.shared.records.first(where: {
+            HistoryStore.shared.urlForRecord($0) == sourceURL
+                || HistoryStore.shared.displayURLForRecord($0) == sourceURL
+        }) {
+            HistoryStore.shared.setBeautifiedPath(exportedURL.path, for: record.id)
+        } else {
+            _ = HistoryStore.shared.referenceCapture(at: exportedURL, kind: .recording)
+        }
+        let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage
+        ToastWindow.shared.show(message: "Recording exported!", icon: appIcon)
+        model.cleanup()
+        NSApp.keyWindow?.close()
     }
 }
 

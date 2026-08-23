@@ -24,6 +24,7 @@ enum AppPreferences {
     private static let recordingShowCameraKey = "bs_recordingShowCamera"
     private static let recordingCameraSizeKey = "bs_recordingCameraSize"
     private static let recordingCameraDeviceIDKey = "bs_recordingCameraDeviceID"
+    private static let recordingMicrophoneDeviceIDKey = "bs_recordingMicrophoneDeviceID"
 
     // MARK: - Appearance
     static var appearance: AppAppearance {
@@ -148,6 +149,11 @@ enum AppPreferences {
     static var recordingCameraDeviceID: String? {
         get { UserDefaults.standard.string(forKey: recordingCameraDeviceIDKey) }
         set { UserDefaults.standard.set(newValue, forKey: recordingCameraDeviceIDKey) }
+    }
+
+    static var recordingMicrophoneDeviceID: String? {
+        get { UserDefaults.standard.string(forKey: recordingMicrophoneDeviceIDKey) }
+        set { UserDefaults.standard.set(newValue, forKey: recordingMicrophoneDeviceIDKey) }
     }
 
     // MARK: - Screenshot

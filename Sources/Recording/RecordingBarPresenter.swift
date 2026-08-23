@@ -71,6 +71,7 @@ final class RecordingBarPresenter {
     func hide() {
         showTask?.cancel()
         showTask = nil
+        RecordingBarHoverView.endActiveHover()
         RecordingAreaHighlightPresenter.shared.hide()
         RecordingBarPresentation.shared.isPresented = false
 
@@ -156,6 +157,9 @@ final class RecordingBarPresenter {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isMovableByWindowBackground = true
         panel.sharingType = .none
+        // The controls track hover themselves so they still highlight, and claim the pointing-hand cursor, while BetterShot is in the background - which is the whole time a recording is running.
+        panel.acceptsMouseMovedEvents = true
+        panel.disableCursorRects()
         panel.contentView = hostingView
 
         NotificationCenter.default.addObserver(
@@ -189,8 +193,21 @@ private final class RecordingBarPanel: NSPanel {
 private struct RecordingBarRootView: View {
     @State private var presenter = RecordingBarPresenter.shared
     @State private var presentation = RecordingBarPresentation.shared
+    @State private var tooltip = RecordingBarTooltipModel()
 
     var body: some View {
+        ZStack(alignment: .bottom) {
+            Color.clear
+                .frame(width: 1, height: RecordingBarMetrics.height + RecordingBarMetrics.tooltipReservedHeight)
+                .allowsHitTesting(false)
+            bar
+            tooltipLayer
+        }
+        .coordinateSpace(.named(RecordingBarCoordinateSpace.bar))
+        .environment(tooltip)
+    }
+
+    private var bar: some View {
         Group {
             switch presenter.mode {
             case .picker:
@@ -207,6 +224,22 @@ private struct RecordingBarRootView: View {
         .scaleEffect(presentation.isPresented ? 1 : 0.92, anchor: .bottom)
         .opacity(presentation.isPresented ? 1 : 0)
         .animation(RecordingMotion.showHideSpring, value: presentation.isPresented)
+    }
+
+    /// Positioned off the hovered control's measured frame rather than a hardcoded index, so it keeps tracking when the bar's contents change - a mode swap, or a menu label swapping in.
+    private var tooltipLayer: some View {
+        GeometryReader { _ in
+            if let target = tooltip.visible {
+                RecordingBarTooltipPill(text: target.text)
+                    .position(
+                        x: target.frame.midX,
+                        y: target.frame.minY - RecordingBarMetrics.tooltipGap - RecordingBarMetrics.tooltipPillHeight / 2
+                    )
+            }
+        }
+        .allowsHitTesting(false)
+        .animation(.easeOut(duration: 0.12), value: tooltip.visible?.id)
+        .animation(.easeOut(duration: 0.12), value: tooltip.visible?.text)
     }
 
     private var barBackground: some View {
