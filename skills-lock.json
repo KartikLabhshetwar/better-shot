@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "ip-as-logo": {
+      "source": "s1dashu/ip-as-logo-skill",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "a5c61fb7c674373537cdfcb132640439b5f26008cd26b10b550c2cc9cd3acd59"
+    }
+  }
+}
