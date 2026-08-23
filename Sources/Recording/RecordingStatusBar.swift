@@ -83,7 +83,7 @@ struct RecordingSessionControls: View {
             ) {
                 Task {
                     await recorder.cancelRecording()
-                    let started = try? await recorder.startRecording()
+                    let started = try? await recorder.restartRecording()
                     if started != true {
                         RecordingBarPresenter.shared.hide()
                     }

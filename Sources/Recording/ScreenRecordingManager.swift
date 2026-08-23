@@ -101,6 +101,13 @@ nonisolated final class ScreenCaptureStream: NSObject, SCStreamOutput, SCStreamD
     }
 }
 
+enum RecordingSource {
+    case fullScreen
+    case display(CGDirectDisplayID)
+    case window(CGWindowID)
+    case area(RegionSelection)
+}
+
 @MainActor
 @Observable
 final class ScreenRecordingManager {
@@ -123,6 +130,7 @@ final class ScreenRecordingManager {
     private var timer: Timer?
     private let pointerCapture = PointerCaptureRecorder()
     private(set) var activeRegionRect: CGRect?
+    private var lastSource: RecordingSource?
 
     private init() {}
 
@@ -132,6 +140,19 @@ final class ScreenRecordingManager {
 
     func startRecording() async throws -> Bool {
         try await startFullScreenRecording()
+    }
+
+    func restartRecording() async throws -> Bool {
+        switch lastSource {
+        case .fullScreen, .none:
+            return try await startFullScreenRecording()
+        case .display(let displayID):
+            return try await startDisplayRecording(displayID: displayID)
+        case .window(let windowID):
+            return try await startWindowRecording(windowID: windowID)
+        case .area(let selection):
+            return try await beginAreaCapture(selection: selection)
+        }
     }
 
     func startFullScreenRecording() async throws -> Bool {
@@ -155,6 +176,7 @@ final class ScreenRecordingManager {
             )
 
             activeRegionRect = nil
+            lastSource = .fullScreen
             return try await beginCapture(
                 filter: filter,
                 width: width,
@@ -174,6 +196,11 @@ final class ScreenRecordingManager {
         guard let selection = await overlay.selectRegion() else { return false }
 
         await afterSelection?()
+        return try await beginAreaCapture(selection: selection)
+    }
+
+    private func beginAreaCapture(selection: RegionSelection) async throws -> Bool {
+        guard state == .idle else { return false }
         state = .preparing
 
         do {
@@ -206,6 +233,7 @@ final class ScreenRecordingManager {
                 height: selection.pointsRect.height
             )
 
+            lastSource = .area(selection)
             return try await beginCapture(
                 filter: filter,
                 width: width,
@@ -235,6 +263,7 @@ final class ScreenRecordingManager {
             let (width, height) = Self.pixelSize(points: filter.contentRect.size, scale: scale)
 
             activeRegionRect = nil
+            lastSource = .window(windowID)
             return try await beginCapture(
                 filter: filter,
                 width: width,
@@ -266,6 +295,7 @@ final class ScreenRecordingManager {
             )
 
             activeRegionRect = nil
+            lastSource = .display(displayID)
             return try await beginCapture(
                 filter: filter,
                 width: width,
