@@ -8,7 +8,7 @@ export interface ReleaseInfo {
 }
 
 const fallback: ReleaseInfo = {
-  version: "0.3.7",
+  version: "4.0.0",
   appleSilicon: `https://github.com/${REPO}/releases/latest`,
   intel: `https://github.com/${REPO}/releases/latest`,
 }

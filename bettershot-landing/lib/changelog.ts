@@ -22,7 +22,7 @@ export function getChangelog(): ChangelogVersion[] {
   let currentSection: ChangelogSection | null = null
 
   for (const line of lines) {
-    // Match version header: ## [0.3.7] - 2026-06-07
+    // Match version header: ## [4.0.0] - 2026-08-23
     const versionMatch = line.match(/^## \[(.+?)\]\s*-\s*(.+)$/)
     if (versionMatch) {
       if (currentSection && currentVersion) {

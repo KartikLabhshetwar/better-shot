@@ -5,6 +5,54 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-08-23
+
+The recording release. Better Shot's capture pipeline, floating bar, and video
+editor were rebuilt on top of the engine from
+[screendrop](https://github.com/fayazara/screendrop) (CC0-1.0, public domain),
+adding cursor-tracked auto-zoom, self-hosted share links, and a capture core
+that survives a crash mid-recording.
+
+### Added
+
+- **Auto-zoom (virtual camera)**: Recordings now track your cursor and zoom in around it, the way a screencast editor would. Pointer position is sampled at 30 Hz during capture and written to a `.pointer.json` sidecar next to the video; the editor turns clicks into zoom cues, smooths them through a spring-damped viewport timeline, and bakes the motion into the export as per-frame transform ramps. Toggle it in the video editor's Zoom inspector, where each cue can be retimed, rescaled, or deleted, and preview it live before exporting
+- **Zoom cue lane**: A second timeline lane under the trim strip shows every zoom cue in place, so you can see where the camera moves relative to the footage
+- **Share links via Cloudflare R2**: A Share button next to Export uploads the recording to your own R2 bucket and copies the public link to your clipboard. Configure it in Settings > Sharing with your account ID, bucket, public base URL, and an R2 API token scoped to Object Read & Write. Uploads go straight from the app to R2 over a hand-signed AWS SigV4 request (CryptoKit only, no SDK and no proxy worker), so nothing routes through a third-party service
+- **Keychain-backed credentials**: The R2 access key ID and secret access key are stored in the macOS Keychain. Only non-secret config (account ID, bucket, public base URL, enable flag) lives in UserDefaults
+- **Test Connection button**: Verifies R2 credentials before you rely on them, using an object-scoped probe so an Object Read & Write token passes without needing bucket list permission
+- **Recording area highlight**: When recording a region, the area outside it dims and the edge gets a pulsing accent border, so you always know what is in frame. The overlay is click-through and excluded from the capture itself
+- **Redesigned recording bar**: The floating bar now uses an `NSVisualEffectView` HUD material with refined corner radius and shadow, an AppKit-tracked hover puck that keeps responding while Better Shot is in the background, spring-based show and hide animations, and drag position that persists between recordings
+- **Multi-display capture**: Recording now targets the display under your pointer (or the frontmost window) instead of always grabbing the main display. Region capture carries its own `CGDirectDisplayID`, so selections on secondary and negative-origin displays land in the right place
+- **Crash-resilient recording**: Video is written as fragmented MP4 with a 2-second fragment interval, so a crash or force quit mid-recording leaves a playable file instead of a corrupt one
+- **Separate system and microphone audio**: System audio and microphone are written as independent tracks rather than being mixed at capture time
+- **Open editor after screenshot**: New setting to jump straight into the editor after taking a screenshot ([#72](https://github.com/KartikLabhshetwar/better-shot/pull/72), thanks [@y-u-s-u-f](https://github.com/y-u-s-u-f))
+- **New owl mascot**: New app icon and logo across the app and website
+
+### Changed
+
+- **Reduce Motion is respected**: The recording bar's show and hide animations fall back to an instant transition when `accessibilityDisplayShouldReduceMotion` is set
+- **Pause and resume rebuilt**: Pausing now compacts presentation timestamps properly instead of leaving a gap, so paused time no longer stretches the exported timeline
+- **Capture callbacks off the main actor**: The `SCStream` wrapper is `NSLock`-guarded so ScreenCaptureKit callbacks stay off the main actor under Swift 6 strict concurrency
+
+### Fixed
+
+- **Share uploaded the raw recording**: The Share button uploaded the original capture, so trim, crop, zoom, and background effects were silently dropped from every shared link. It now renders your edits into a temporary file, uploads that, and cleans up afterwards. Unedited recordings still upload the original file with no re-encode
+- **Valid R2 credentials reported as invalid**: Test Connection signed a request against the bucket root, which needs list permission that an Object Read & Write token does not have. It now probes an object key inside the bucket instead
+- **Zoom followed the cursor to the wrong place on region recordings**: Pointer samples are captured in Quartz global coordinates, but the region rect was being converted to AppKit coordinates before being handed to the sampler, so zoom tracked an inverted Y position on any area recording
+- **History and Videos tabs stuttered while scrolling**: `HistoryStore` is `@MainActor`, so thumbnail decoding hopped back onto the main actor and ran `CGImageSource` and `AVAssetImageGenerator` work there. Decoding is now genuinely off the main actor
+- **Full-size decode after every screenshot**: The floating preview card decoded the entire screenshot on the main actor for a 130x98 point card, roughly 60 MB per shot on a 5K display. It now decodes a 260 px thumbnail off the main actor
+- **Updater leaked a URLSession**: A delegate-based `URLSession` was never invalidated, so it and its delegate outlived every update download ([#90](https://github.com/KartikLabhshetwar/better-shot/pull/90), thanks [@zergzorg](https://github.com/zergzorg))
+- **Video editor leaked AVPlayer time observers**: The previous observer was not released when loading a new video ([#91](https://github.com/KartikLabhshetwar/better-shot/pull/91), thanks [@zergzorg](https://github.com/zergzorg))
+
+### Credits
+
+- **screendrop**: The recording capture core, floating bar chrome, area highlight, and the zoom cue and viewport timeline engine are ported and adapted from [fayazara/screendrop](https://github.com/fayazara/screendrop), released under CC0-1.0 (public domain). Better Shot remains BSD 3-Clause licensed
+
+### Known limitations
+
+- Auto-zoom overrides manual crop at export: when zoom is enabled, the crop rectangle is ignored
+- Zoom cues are derived from clicks, so a recording with no clicks produces no cues
+
 ## [0.3.7] - 2026-06-07
 
 ### Added
