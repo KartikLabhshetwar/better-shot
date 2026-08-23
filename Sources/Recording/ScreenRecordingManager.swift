@@ -168,7 +168,7 @@ final class ScreenRecordingManager {
                 return false
             }
 
-            let filter = Self.displayFilter(display: display, content: content)
+            let filter = Self.displayFilter(display: display, content: content, cameraWindowID: CameraBubbleController.shared.windowID)
             let scale = max(1, CGFloat(filter.pointPixelScale))
             let (width, height) = Self.pixelSize(
                 points: CGSize(width: CGFloat(display.width), height: CGFloat(display.height)),
@@ -211,7 +211,7 @@ final class ScreenRecordingManager {
                 return false
             }
 
-            let filter = Self.displayFilter(display: display, content: content)
+            let filter = Self.displayFilter(display: display, content: content, cameraWindowID: CameraBubbleController.shared.windowID)
             let sourceRect = Self.sourceRect(
                 forGlobalQuartzRect: selection.pointsRect,
                 displayID: display.displayID,
@@ -287,7 +287,7 @@ final class ScreenRecordingManager {
                 return false
             }
 
-            let filter = Self.displayFilter(display: display, content: content)
+            let filter = Self.displayFilter(display: display, content: content, cameraWindowID: CameraBubbleController.shared.windowID)
             let scale = max(1, CGFloat(filter.pointPixelScale))
             let (width, height) = Self.pixelSize(
                 points: CGSize(width: CGFloat(display.width), height: CGFloat(display.height)),
@@ -314,10 +314,13 @@ final class ScreenRecordingManager {
         content.displays.first { $0.displayID == displayID } ?? content.displays.first
     }
 
-    private static func displayFilter(display: SCDisplay, content: SCShareableContent) -> SCContentFilter {
+    private static func displayFilter(display: SCDisplay, content: SCShareableContent, cameraWindowID: CGWindowID?) -> SCContentFilter {
         let ownBundleID = Bundle.main.bundleIdentifier ?? ""
         let excludedApps = content.applications.filter { $0.bundleIdentifier == ownBundleID }
-        return SCContentFilter(display: display, excludingApplications: excludedApps, exceptingWindows: [])
+        let cameraWindows = cameraWindowID.flatMap { id in
+            content.windows.first { $0.windowID == id }
+        }.map { [$0] } ?? []
+        return SCContentFilter(display: display, excludingApplications: excludedApps, exceptingWindows: cameraWindows)
     }
 
     private static func pixelSize(points: CGSize, scale: CGFloat) -> (Int, Int) {

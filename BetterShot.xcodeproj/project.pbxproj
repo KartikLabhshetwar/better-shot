@@ -34,6 +34,7 @@
 		7492DCC25BAEBAFD914AAC6C /* EditorCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D72A7FD249FD623240D8735 /* EditorCanvasView.swift */; };
 		7A3EBC41CA7A6F9DE045888B /* AnnotationRedactionImageProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 147306FB804DB8E1D8FC83DA /* AnnotationRedactionImageProcessor.swift */; };
 		7C4AD16D6095D80279D2C66E /* RecordingBarChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8908BA741C21BE7AAFF8F028 /* RecordingBarChrome.swift */; };
+		83732BC3FFEBD8CF3A10C556 /* CameraBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EC6AE3A415F2A5CE882C1ED /* CameraBubble.swift */; };
 		8782829F9AD2E1BE2B796AC7 /* ShortcutService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAE1EE5C32D7D0D099A88951 /* ShortcutService.swift */; };
 		87B41081A50FF4716E4423EC /* EditorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9057B39C894A83FE5C27A761 /* EditorWindowController.swift */; };
 		918CF31A69D7A8EB445F4164 /* CaptureRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5558B01BB764A6621835508 /* CaptureRecord.swift */; };
@@ -73,6 +74,7 @@
 		147306FB804DB8E1D8FC83DA /* AnnotationRedactionImageProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationRedactionImageProcessor.swift; sourceTree = "<group>"; };
 		17544CDA089E3F65F7BCE622 /* AnnotationDrawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationDrawing.swift; sourceTree = "<group>"; };
 		1A8FF0E5AD713FC1D7E99DE7 /* BetterShotDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BetterShotDelegate.swift; sourceTree = "<group>"; };
+		1EC6AE3A415F2A5CE882C1ED /* CameraBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraBubble.swift; sourceTree = "<group>"; };
 		24D46DA7E74F2EB4C230512D /* PointerCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointerCapture.swift; sourceTree = "<group>"; };
 		29B6B3D52CB7D59DAE025C2D /* ViewportTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewportTimeline.swift; sourceTree = "<group>"; };
 		2B95C7007292236807887D07 /* ToastWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastWindow.swift; sourceTree = "<group>"; };
@@ -264,6 +266,7 @@
 			isa = PBXGroup;
 			children = (
 				4056BF81776068841C838844 /* ActiveDisplayResolver.swift */,
+				1EC6AE3A415F2A5CE882C1ED /* CameraBubble.swift */,
 				E26AF580197196A4D9BBE7B3 /* ClipTimeline.swift */,
 				CFF564CCEAAF75E63C049071 /* ClipTimelineView.swift */,
 				24D46DA7E74F2EB4C230512D /* PointerCapture.swift */,
@@ -384,6 +387,7 @@
 				BA2E35F115F67D7CA6DEE5A9 /* BetterShotApp.swift in Sources */,
 				12F0105D52F612AA1BD73023 /* BetterShotDelegate.swift in Sources */,
 				F3BAB5D4C1617D203E95885B /* BundledBackgrounds.swift in Sources */,
+				83732BC3FFEBD8CF3A10C556 /* CameraBubble.swift in Sources */,
 				FE59D61ABB427B6DFC1D377A /* CaptureOrchestrator.swift in Sources */,
 				918CF31A69D7A8EB445F4164 /* CaptureRecord.swift in Sources */,
 				546351AF6683978F99C7929C /* ClipTimeline.swift in Sources */,

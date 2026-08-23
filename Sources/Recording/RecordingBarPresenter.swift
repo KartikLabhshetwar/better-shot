@@ -17,6 +17,7 @@ final class RecordingBarPresenter {
     @ObservationIgnored private var panel: NSPanel?
     @ObservationIgnored private var hideTask: Task<Void, Never>?
     @ObservationIgnored private var showTask: Task<Void, Never>?
+    @ObservationIgnored private var isApplyingFrame = false
 
     private init() {}
 
@@ -37,6 +38,9 @@ final class RecordingBarPresenter {
         showTask = Task { @MainActor [weak self] in
             await RecordingSourceCatalog.shared.refresh()
             guard let self, !Task.isCancelled, self.mode == .picker else { return }
+            if AppPreferences.recordingShowCamera {
+                CameraBubbleController.shared.enable()
+            }
             let panel = self.panel ?? self.makePanel()
             self.applyFrame(to: panel, on: screen, keepingCurrentPosition: false, animated: false)
             panel.orderFrontRegardless()
@@ -92,9 +96,9 @@ final class RecordingBarPresenter {
     }
 
     private func applyFrame(to panel: NSPanel, on screen: NSScreen?, keepingCurrentPosition: Bool, animated: Bool) {
-        guard let hostingView = panel.contentView as? NSHostingView<RecordingBarRootView> else { return }
-        hostingView.layoutSubtreeIfNeeded()
-        let size = hostingView.fittingSize
+        guard let contentView = panel.contentView else { return }
+        contentView.layoutSubtreeIfNeeded()
+        let size = contentView.fittingSize
         let origin: NSPoint
         if keepingCurrentPosition {
             let current = panel.frame
@@ -103,6 +107,8 @@ final class RecordingBarPresenter {
             origin = resolvedOrigin(for: size, preferredScreen: screen)
         }
         let frame = NSRect(origin: origin, size: size)
+        isApplyingFrame = true
+        defer { isApplyingFrame = false }
         if animated, !RecordingMotion.reduceMotion {
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.28
@@ -156,9 +162,12 @@ final class RecordingBarPresenter {
             forName: NSWindow.didMoveNotification,
             object: panel,
             queue: .main
-        ) { notification in
+        ) { [weak self] notification in
             guard let window = notification.object as? NSWindow else { return }
-            RecordingBarPositionStore.save(window.frame.origin)
+            MainActor.assumeIsolated {
+                guard let self, !self.isApplyingFrame else { return }
+                RecordingBarPositionStore.save(window.frame.origin)
+            }
         }
 
         self.panel = panel
@@ -213,8 +222,8 @@ private struct RecordingBarRootView: View {
 
 /// Remembers the bar's dragged position across launches.
 private enum RecordingBarPositionStore {
-    private static let xKey = "bs_recbar_x"
-    private static let yKey = "bs_recbar_y"
+    private static let xKey = "bs_recbar_origin_x_v2"
+    private static let yKey = "bs_recbar_origin_y_v2"
 
     static func save(_ origin: NSPoint) {
         UserDefaults.standard.set(Double(origin.x), forKey: xKey)

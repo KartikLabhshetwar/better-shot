@@ -17,6 +17,7 @@ that survives a crash mid-recording.
 
 - **Auto-zoom (virtual camera)**: Recordings now track your cursor and zoom in around it, the way a screencast editor would. Pointer position is sampled at 30 Hz during capture and written to a `.pointer.json` sidecar next to the video; the editor turns clicks into zoom cues, smooths them through a spring-damped viewport timeline, and bakes the motion into the export as per-frame transform ramps. Toggle it in the video editor's Zoom inspector, where each cue can be retimed, rescaled, or deleted, and preview it live before exporting
 - **Zoom cue lane**: A second timeline lane under the trim strip shows every zoom cue in place, so you can see where the camera moves relative to the footage
+- **Face cam**: A circular camera bubble you can turn on from the recording bar and drag anywhere on screen. It is captured as part of the recording rather than composited afterwards, so what you position is exactly what lands in the video. Right-click the bubble's toolbar button for Small, Medium, and Large. Works with any connected camera, including Continuity Camera with your iPhone
 - **Clip timeline**: The trim strip is now a multi-clip editor. Split at the playhead, drag either edge of a clip to trim it, click a clip to select and scrub it, and delete the parts you do not want. The player, zoom preview, and export all follow the edited timeline, so what you scrub is what you get
 - **Per-clip speed**: Each clip carries its own speed between 0.25x and 4x, applied to video and audio together, so you can hold on a slow section and skim past a long one in the same recording
 - **Undo and redo in the video editor**: `Cmd Z` and `Cmd Shift Z` step through clip edits
@@ -35,6 +36,7 @@ that survives a crash mid-recording.
 
 ### Changed
 
+- **The recording bar remembers only positions you chose**: Dragging the bar saves where you put it, but programmatic repositioning no longer counts as a drag, so an automatic placement can no longer be saved and then restored forever. A saved position is also only reused when it fits entirely on a screen
 - **Roomier recording bar**: Taller controls, wider spacing between them, more generous padding around the edges, and a softer corner radius. The bar now sits centered above the bottom of the screen with clearance instead of hugging the bottom edge
 - **Reduce Motion is respected**: The recording bar's show and hide animations fall back to an instant transition when `accessibilityDisplayShouldReduceMotion` is set
 - **Pause and resume rebuilt**: Pausing now compacts presentation timestamps properly instead of leaving a gap, so paused time no longer stretches the exported timeline
@@ -46,7 +48,8 @@ that survives a crash mid-recording.
 - **Every capture was stored up to three times**: A screenshot kept its original in Application Support, its beautified export in the save folder, and a byte-identical second copy of the original under `BetterShot/bases/`. The editor now maps an export back to the original through history instead of that duplicate, recordings are referenced where they are written rather than copied into Application Support (which cost a full second copy of every video), and re-exporting from either editor updates the existing history entry instead of importing another copy ([#99](https://github.com/KartikLabhshetwar/better-shot/issues/99))
 - **History grew without limit**: History now keeps the 100 most recent captures by default, configurable in Settings > General > History (50 to 500, or unlimited). Trimming removes only the originals BetterShot keeps in Application Support, never files in your save folder. Leftover copies in `BetterShot/bases/` from earlier versions are pruned at launch ([#99](https://github.com/KartikLabhshetwar/better-shot/issues/99))
 - **Share uploaded the raw recording**: The Share button uploaded the original capture, so trim, crop, zoom, and background effects were silently dropped from every shared link. It now renders your edits into a temporary file, uploads that, and cleans up afterwards. Unedited recordings still upload the original file with no re-encode
-- **Recording bar opened off to the left**: The bar was measured and positioned before the display and window lists had loaded, so it was centered at its empty width and then grew rightward, leaving it left of center. It now loads its sources first and centers at its real width
+- **Recording bar sat in the bottom-left corner**: The bar measured itself by casting its content view to `NSHostingView<RecordingBarRootView>`, but the view is built with an `.environment` modifier applied, so the real type is `NSHostingView<ModifiedContent<...>>` and the cast always failed. The measurement guard returned early and the bar's frame was never set at all, leaving it at its construction origin in the bottom-left corner. It now measures through `NSView.fittingSize`, which needs no cast, and centers above the bottom edge
+- **Microphone and camera entitlements were wiped on every project regeneration**: `project.yml` owns `BetterShot.entitlements`, so XcodeGen rewrote the hand-added microphone entitlement back to an empty dictionary each time the project was regenerated. Both device entitlements are now declared in `project.yml` and survive regeneration
 - **Valid R2 credentials reported as invalid**: Test Connection signed a request against the bucket root, which needs list permission that an Object Read & Write token does not have. It now probes an object key inside the bucket instead
 - **Zoom followed the cursor to the wrong place on region recordings**: Pointer samples are captured in Quartz global coordinates, but the region rect was being converted to AppKit coordinates before being handed to the sampler, so zoom tracked an inverted Y position on any area recording
 - **History and Videos tabs stuttered while scrolling**: `HistoryStore` is `@MainActor`, so thumbnail decoding hopped back onto the main actor and ran `CGImageSource` and `AVAssetImageGenerator` work there. Decoding is now genuinely off the main actor
@@ -61,6 +64,7 @@ that survives a crash mid-recording.
 ### Known limitations
 
 - Auto-zoom overrides manual crop at export: when zoom is enabled, the crop rectangle is ignored
+- The face cam bubble is captured from the screen, so it appears in full screen and area recordings but not in single-window recordings, which capture only that window's own content
 - Zoom cues are derived from clicks, so a recording with no clicks produces no cues
 
 ## [0.3.7] - 2026-06-07

@@ -21,6 +21,9 @@ enum AppPreferences {
     private static let historyRetentionKey = "bs_historyRetentionLimit"
     private static let recordingCaptureMicrophoneKey = "bs_recordingCaptureMicrophone"
     private static let recordingStartDelaySecondsKey = "bs_recordingStartDelaySeconds"
+    private static let recordingShowCameraKey = "bs_recordingShowCamera"
+    private static let recordingCameraSizeKey = "bs_recordingCameraSize"
+    private static let recordingCameraDeviceIDKey = "bs_recordingCameraDeviceID"
 
     // MARK: - Appearance
     static var appearance: AppAppearance {
@@ -130,6 +133,21 @@ enum AppPreferences {
     static var recordingStartDelaySeconds: Int {
         get { UserDefaults.standard.integer(forKey: recordingStartDelaySecondsKey) }
         set { UserDefaults.standard.set(newValue, forKey: recordingStartDelaySecondsKey) }
+    }
+
+    static var recordingShowCamera: Bool {
+        get { UserDefaults.standard.object(forKey: recordingShowCameraKey) as? Bool ?? false }
+        set { UserDefaults.standard.set(newValue, forKey: recordingShowCameraKey) }
+    }
+
+    static var recordingCameraSize: Int {
+        get { UserDefaults.standard.object(forKey: recordingCameraSizeKey) as? Int ?? 200 }
+        set { UserDefaults.standard.set(newValue, forKey: recordingCameraSizeKey) }
+    }
+
+    static var recordingCameraDeviceID: String? {
+        get { UserDefaults.standard.string(forKey: recordingCameraDeviceIDKey) }
+        set { UserDefaults.standard.set(newValue, forKey: recordingCameraDeviceIDKey) }
     }
 
     // MARK: - Screenshot

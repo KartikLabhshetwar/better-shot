@@ -37,3 +37,6 @@ targets:
         LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
     entitlements:
       path: Resources/BetterShot.entitlements
+      properties:
+        com.apple.security.device.audio-input: true
+        com.apple.security.device.camera: true

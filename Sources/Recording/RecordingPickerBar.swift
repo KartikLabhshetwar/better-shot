@@ -11,6 +11,7 @@ struct RecordingPickerControls: View {
     @State private var captureMicrophone = AppPreferences.recordingCaptureMicrophone
     @State private var captureSystemAudio = AppPreferences.recordingCaptureAudio
     @State private var startDelaySeconds = AppPreferences.recordingStartDelaySeconds
+    @State private var camera = CameraBubbleController.shared
 
     private func toggleMicrophone() {
         guard !captureMicrophone else {
@@ -54,6 +55,22 @@ struct RecordingPickerControls: View {
                 }
             }
 
+            if camera.hasCamera {
+                RecordingBarIconButton(
+                    systemImage: camera.isEnabled ? "video.fill" : "video.slash",
+                    tint: camera.isEnabled ? RecordingBarMetrics.activeTint : RecordingBarMetrics.inactiveTint,
+                    accessibilityLabel: camera.isEnabled ? "Face cam on" : "Face cam off"
+                ) {
+                    camera.toggle()
+                }
+                .disabled(camera.isStarting)
+                .contextMenu {
+                    ForEach(CameraBubbleController.Size.allCases) { size in
+                        Button(size.label) { camera.resize(to: size) }
+                    }
+                }
+            }
+
             RecordingBarIconButton(
                 systemImage: captureSystemAudio ? "speaker.wave.2.fill" : "speaker.slash",
                 tint: captureSystemAudio ? RecordingBarMetrics.activeTint : RecordingBarMetrics.inactiveTint,
@@ -66,6 +83,7 @@ struct RecordingPickerControls: View {
             delayMenu
 
             RecordingBarIconButton(systemImage: "xmark", accessibilityLabel: "Close the recorder") {
+                camera.suspend()
                 RecordingBarPresenter.shared.hide()
             }
         }
