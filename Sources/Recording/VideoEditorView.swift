@@ -108,6 +108,10 @@ struct VideoEditorView: View {
 
                 VideoInspectorDivider()
 
+                VideoZoomSection(model: model)
+
+                VideoInspectorDivider()
+
                 VideoEffectsSection(model: model)
 
                 VideoInspectorDivider()
@@ -143,6 +147,7 @@ struct VideoEditorView: View {
             let canvasW = videoW + pad * 2
             let canvasH = videoH + pad * 2
             let cornerRadius = config.cornerRadius * min(videoW, videoH)
+            let zoomFrame = model.viewportFrame(at: model.currentTime)
 
             ZStack {
                 Color(nsColor: .windowBackgroundColor)
@@ -160,6 +165,7 @@ struct VideoEditorView: View {
                             }
                         }
                         .frame(width: videoW, height: videoH)
+                        .scaleEffect(zoomFrame.magnification, anchor: UnitPoint(x: zoomFrame.anchor.x, y: zoomFrame.anchor.y))
                         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                         .shadow(
                             color: config.shadowStrength > 0 ? .black.opacity(Double(config.shadowStrength) * 0.4) : .clear,
@@ -268,8 +274,15 @@ struct VideoEditorView: View {
     // MARK: - Timeline
 
     private var timelineSection: some View {
-        VideoTrimTimelineView(model: model)
-            .frame(height: 54)
+        VStack(spacing: 6) {
+            VideoTrimTimelineView(model: model)
+                .frame(height: 54)
+
+            if model.zoomEnabled {
+                ZoomCueLaneView(model: model)
+                    .frame(height: 18)
+            }
+        }
     }
 
     // MARK: - Actions
@@ -398,6 +411,116 @@ private struct VideoTrimSection: View {
                 .font(.caption2)
                 .foregroundStyle(.quaternary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 14)
+    }
+}
+
+private struct VideoZoomSection: View {
+    @Bindable var model: VideoEditorModel
+
+    private var selectedCue: ZoomCue? {
+        guard let id = model.selectedZoomCueID else { return nil }
+        return model.zoomCues.first { $0.id == id }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VideoInspectorSectionHeader("ZOOM")
+                Spacer()
+                Toggle("", isOn: $model.zoomEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+            }
+
+            if model.zoomEnabled {
+                if model.hasPointerCapture {
+                    Button {
+                        model.regenerateZoomCues()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "wand.and.stars")
+                                .font(.caption)
+                            Text("Auto Zoom")
+                                .font(.caption2)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Text("No cursor data recorded for this clip.")
+                        .font(.caption2)
+                        .foregroundStyle(.quaternary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                HStack(spacing: 8) {
+                    Button {
+                        model.addZoomCue(at: model.currentTime)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus")
+                                .font(.caption)
+                            Text("Add")
+                                .font(.caption2)
+                        }
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 10)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                    }
+                    .buttonStyle(.plain)
+
+                    if let selectedCue {
+                        Button {
+                            model.deleteZoomCue(selectedCue.id)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "trash")
+                                    .font(.caption)
+                                Text("Delete")
+                                    .font(.caption2)
+                            }
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 10)
+                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.red)
+                    }
+                }
+
+                if let selectedCue {
+                    VStack(spacing: 4) {
+                        HStack {
+                            Text("Zoom Amount")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                            Spacer()
+                            Text(String(format: "%.1fx", selectedCue.zoom))
+                                .font(.system(.caption2, design: .monospaced))
+                                .foregroundStyle(.tertiary)
+                        }
+                        Slider(
+                            value: Binding(
+                                get: { selectedCue.zoom },
+                                set: { model.setZoomAmount($0, forCueID: selectedCue.id) }
+                            ),
+                            in: 1.0...4.0
+                        )
+                        .controlSize(.small)
+                    }
+                }
+
+                Text("\(model.zoomCues.count) zoom cue\(model.zoomCues.count == 1 ? "" : "s"). Drag pills on the timeline to adjust.")
+                    .font(.caption2)
+                    .foregroundStyle(.quaternary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 14)

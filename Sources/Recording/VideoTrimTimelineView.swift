@@ -340,3 +340,113 @@ final class VideoTrimTimelineControl: NSView {
         }
     }
 }
+
+struct ZoomCueLaneView: View {
+    let model: VideoEditorModel
+
+    private let sideInset: CGFloat = 12
+
+    var body: some View {
+        GeometryReader { geo in
+            let trackWidth = max(1, geo.size.width - sideInset * 2)
+
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(Color.primary.opacity(0.06))
+                    .frame(width: trackWidth, height: geo.size.height)
+                    .offset(x: sideInset)
+
+                ForEach(model.zoomCues) { cue in
+                    ZoomCuePillView(
+                        model: model,
+                        cue: cue,
+                        trackWidth: trackWidth,
+                        sideInset: sideInset,
+                        laneHeight: geo.size.height
+                    )
+                }
+            }
+        }
+    }
+}
+
+private struct ZoomCuePillView: View {
+    let model: VideoEditorModel
+    let cue: ZoomCue
+    let trackWidth: CGFloat
+    let sideInset: CGFloat
+    let laneHeight: CGFloat
+
+    @State private var dragOriginalStart: TimeInterval?
+    @State private var dragOriginalEnd: TimeInterval?
+
+    private enum DragKind { case move, resizeStart, resizeEnd }
+
+    private var isSelected: Bool { model.selectedZoomCueID == cue.id }
+
+    private func x(for time: TimeInterval) -> CGFloat {
+        guard model.duration > 0 else { return sideInset }
+        return sideInset + trackWidth * CGFloat(time / model.duration)
+    }
+
+    var body: some View {
+        let startX = x(for: cue.start)
+        let endX = x(for: cue.end)
+        let width = max(6, endX - startX)
+        let edgeWidth = min(6, width / 3)
+
+        ZStack {
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .fill(isSelected ? Color.accentColor : Color.accentColor.opacity(0.55))
+                .frame(width: width, height: laneHeight)
+                .contentShape(Rectangle())
+                .gesture(dragGesture(kind: .move))
+                .onTapGesture { model.selectedZoomCueID = cue.id }
+
+            HStack {
+                Rectangle()
+                    .fill(Color.white.opacity(0.001))
+                    .frame(width: edgeWidth, height: laneHeight)
+                    .gesture(dragGesture(kind: .resizeStart))
+                Spacer(minLength: 0)
+                Rectangle()
+                    .fill(Color.white.opacity(0.001))
+                    .frame(width: edgeWidth, height: laneHeight)
+                    .gesture(dragGesture(kind: .resizeEnd))
+            }
+            .frame(width: width, height: laneHeight)
+        }
+        .frame(width: width, height: laneHeight)
+        .position(x: startX + width / 2, y: laneHeight / 2)
+    }
+
+    private func dragGesture(kind: DragKind) -> some Gesture {
+        DragGesture(minimumDistance: 2)
+            .onChanged { value in
+                if dragOriginalStart == nil {
+                    dragOriginalStart = cue.start
+                    dragOriginalEnd = cue.end
+                }
+                guard let origStart = dragOriginalStart, let origEnd = dragOriginalEnd,
+                      model.duration > 0, trackWidth > 0 else { return }
+                let dt = Double(value.translation.width / trackWidth) * model.duration
+                switch kind {
+                case .move:
+                    let cueDuration = origEnd - origStart
+                    let newStart = max(0, min(origStart + dt, model.duration - cueDuration))
+                    model.updateZoomCue(id: cue.id, start: newStart, end: newStart + cueDuration)
+                case .resizeStart:
+                    let newStart = max(0, min(origStart + dt, origEnd - ZoomCue.minimumDuration))
+                    model.updateZoomCue(id: cue.id, start: newStart, end: origEnd)
+                case .resizeEnd:
+                    let newEnd = min(model.duration, max(origEnd + dt, origStart + ZoomCue.minimumDuration))
+                    model.updateZoomCue(id: cue.id, start: origStart, end: newEnd)
+                }
+                model.selectedZoomCueID = cue.id
+            }
+            .onEnded { _ in
+                dragOriginalStart = nil
+                dragOriginalEnd = nil
+            }
+    }
+}

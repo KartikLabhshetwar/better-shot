@@ -26,8 +26,18 @@ final class VideoEditorModel {
     var isCropping = false
     var cropRect = CGRect(x: 0, y: 0, width: 1, height: 1)
 
+    var zoomEnabled = false
+    var zoomCues: [ZoomCue] = []
+    var selectedZoomCueID: UUID?
+    private var pointerCapture: PointerCaptureFile?
+    private var viewportTimeline: ViewportTimeline = .identity
+
     var hasTrim: Bool { trimStart > 0.01 || (duration > 0 && trimEnd < duration - 0.01) }
     var hasCrop: Bool { cropRect != CGRect(x: 0, y: 0, width: 1, height: 1) }
+    var hasPointerCapture: Bool {
+        guard let pointerCapture else { return false }
+        return !pointerCapture.travel.isEmpty || !pointerCapture.presses.isEmpty
+    }
 
     private var timeObserver: Any?
 
@@ -70,9 +80,88 @@ final class VideoEditorModel {
                     videoHeight = Int(abs(transformed.height))
                 }
             }
+            loadPointerCapture()
+            regenerateZoomCues()
             generateThumbnails()
             setupTimeObserver()
         }
+    }
+
+    func viewportFrame(at time: Double) -> ViewportFrame {
+        zoomEnabled ? viewportTimeline.frame(at: time) : .identity
+    }
+
+    func regenerateZoomCues() {
+        zoomCues = ZoomCueSynthesizer.cues(from: pointerCapture ?? PointerCaptureFile(), duration: duration)
+        selectedZoomCueID = nil
+        rebuildViewportTimeline()
+    }
+
+    func addZoomCue(at time: Double) {
+        guard duration > 0 else { return }
+        let half: TimeInterval = 1.25
+        let start = max(0, time - half)
+        let end = min(duration, time + half)
+        guard end - start >= ZoomCue.minimumDuration else { return }
+        let anchor = pointerCapture.flatMap { nearestPointerPoint(in: $0, at: time) } ?? CGPoint(x: 0.5, y: 0.5)
+        let cue = ZoomCue(start: start, end: end, anchorMode: .pointerAnchor, pinnedPoint: anchor)
+        zoomCues.append(cue)
+        zoomCues.sort { $0.start < $1.start }
+        selectedZoomCueID = cue.id
+        rebuildViewportTimeline()
+    }
+
+    func deleteZoomCue(_ id: UUID) {
+        zoomCues.removeAll { $0.id == id }
+        if selectedZoomCueID == id { selectedZoomCueID = nil }
+        rebuildViewportTimeline()
+    }
+
+    func updateZoomCue(id: UUID, start: TimeInterval, end: TimeInterval) {
+        guard let index = zoomCues.firstIndex(where: { $0.id == id }) else { return }
+        zoomCues[index].start = max(0, start)
+        zoomCues[index].end = min(duration, end)
+        rebuildViewportTimeline()
+    }
+
+    func setZoomAmount(_ value: Double, forCueID id: UUID) {
+        guard let index = zoomCues.firstIndex(where: { $0.id == id }) else { return }
+        zoomCues[index].zoom = max(1, value)
+        rebuildViewportTimeline()
+    }
+
+    private func nearestPointerPoint(in capture: PointerCaptureFile, at time: Double) -> CGPoint? {
+        let travelPoints = capture.travel.map { ($0.time, CGPoint(x: $0.x, y: $0.y)) }
+        let pressPoints = capture.presses.map { ($0.time, CGPoint(x: $0.x, y: $0.y)) }
+        let candidates = travelPoints + pressPoints
+        guard !candidates.isEmpty else { return nil }
+        return candidates.min(by: { abs($0.0 - time) < abs($1.0 - time) })?.1
+    }
+
+    private func rebuildViewportTimeline() {
+        viewportTimeline = ViewportTimeline.build(
+            cues: zoomCues,
+            capture: pointerCapture ?? PointerCaptureFile(),
+            duration: duration
+        )
+    }
+
+    private func pointerSidecarURL(for videoURL: URL) -> URL {
+        URL(fileURLWithPath: videoURL.deletingPathExtension().path + ".pointer.json")
+    }
+
+    private func loadPointerCapture() {
+        guard let sourceURL else {
+            pointerCapture = nil
+            return
+        }
+        let sidecarURL = pointerSidecarURL(for: sourceURL)
+        guard let data = try? Data(contentsOf: sidecarURL),
+              let decoded = try? JSONDecoder().decode(PointerCaptureFile.self, from: data) else {
+            pointerCapture = nil
+            return
+        }
+        pointerCapture = decoded
     }
 
     func togglePlayback() {
@@ -130,8 +219,9 @@ final class VideoEditorModel {
         }
 
         let hasEffects = exportConfig.padding > 0 || exportConfig.cornerRadius > 0 || exportConfig.shadowStrength > 0 || exportConfig.style != .none
+        let hasZoom = zoomEnabled && !zoomCues.isEmpty
 
-        if hasEffects || hasCrop {
+        if hasEffects || hasCrop || hasZoom {
             return await exportWithEffects(asset: asset, outputURL: outputURL, config: exportConfig)
         }
 
@@ -163,8 +253,9 @@ final class VideoEditorModel {
         let fullW = abs(transformed.width)
         let fullH = abs(transformed.height)
 
-        let vidW = fullW * cropRect.width
-        let vidH = fullH * cropRect.height
+        let useZoom = zoomEnabled
+        let vidW = useZoom ? fullW : fullW * cropRect.width
+        let vidH = useZoom ? fullH : fullH * cropRect.height
 
         let shortEdge = min(vidW, vidH)
         let pad = shortEdge * config.padding
@@ -202,21 +293,57 @@ final class VideoEditorModel {
 
         let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: compVideoTrack)
 
-        let cropOffsetX = fullW * cropRect.origin.x
-        let cropOffsetY = fullH * cropRect.origin.y
-        var finalTransform = transform
-        let postCropTranslation: CGAffineTransform
-        if transform == .identity {
-            postCropTranslation = CGAffineTransform(translationX: -cropOffsetX + pad, y: -cropOffsetY + pad)
+        if useZoom {
+            let timeline = viewportTimeline
+            let compositionDuration = trimEnd - trimStart
+            let step: TimeInterval = 0.1
+
+            func frameTransform(atSourceTime sourceTime: TimeInterval) -> CGAffineTransform {
+                let viewport = timeline.frame(at: sourceTime)
+                let anchorDisplay = CGPoint(x: viewport.anchor.x * fullW, y: viewport.anchor.y * fullH)
+                let magnification = max(1, viewport.magnification)
+                let zoomTransform = CGAffineTransform(translationX: -anchorDisplay.x, y: -anchorDisplay.y)
+                    .concatenating(CGAffineTransform(scaleX: magnification, y: magnification))
+                    .concatenating(CGAffineTransform(translationX: anchorDisplay.x, y: anchorDisplay.y))
+                return transform
+                    .concatenating(zoomTransform)
+                    .concatenating(CGAffineTransform(translationX: pad, y: pad))
+            }
+
+            if compositionDuration > 0 {
+                var t: TimeInterval = 0
+                var previousTransform = frameTransform(atSourceTime: trimStart)
+                while t < compositionDuration {
+                    let nextT = min(t + step, compositionDuration)
+                    let toTransform = frameTransform(atSourceTime: nextT + trimStart)
+                    let range = CMTimeRange(
+                        start: CMTime(seconds: t, preferredTimescale: 600),
+                        end: CMTime(seconds: nextT, preferredTimescale: 600)
+                    )
+                    layerInstruction.setTransformRamp(fromStart: previousTransform, toEnd: toTransform, timeRange: range)
+                    previousTransform = toTransform
+                    t = nextT
+                }
+            } else {
+                layerInstruction.setTransform(frameTransform(atSourceTime: trimStart), at: .zero)
+            }
         } else {
-            let originAfterTransform = CGPoint(x: cropOffsetX, y: cropOffsetY).applying(transform)
-            let fullOriginAfterTransform = CGPoint.zero.applying(transform)
-            let dx = fullOriginAfterTransform.x - originAfterTransform.x + pad
-            let dy = fullOriginAfterTransform.y - originAfterTransform.y + pad
-            postCropTranslation = CGAffineTransform(translationX: dx, y: dy)
+            let cropOffsetX = fullW * cropRect.origin.x
+            let cropOffsetY = fullH * cropRect.origin.y
+            var finalTransform = transform
+            let postCropTranslation: CGAffineTransform
+            if transform == .identity {
+                postCropTranslation = CGAffineTransform(translationX: -cropOffsetX + pad, y: -cropOffsetY + pad)
+            } else {
+                let originAfterTransform = CGPoint(x: cropOffsetX, y: cropOffsetY).applying(transform)
+                let fullOriginAfterTransform = CGPoint.zero.applying(transform)
+                let dx = fullOriginAfterTransform.x - originAfterTransform.x + pad
+                let dy = fullOriginAfterTransform.y - originAfterTransform.y + pad
+                postCropTranslation = CGAffineTransform(translationX: dx, y: dy)
+            }
+            finalTransform = finalTransform.concatenating(postCropTranslation)
+            layerInstruction.setTransform(finalTransform, at: .zero)
         }
-        finalTransform = finalTransform.concatenating(postCropTranslation)
-        layerInstruction.setTransform(finalTransform, at: .zero)
 
         instruction.layerInstructions = [layerInstruction]
         videoComposition.instructions = [instruction]

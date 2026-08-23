@@ -23,6 +23,7 @@ final class ScreenRecordingManager: NSObject {
     private var outputURL: URL?
     private var timer: Timer?
     nonisolated(unsafe) private var _streamSession: RecordingSession?
+    private let pointerCapture = PointerCaptureRecorder()
 
     private let videoQueue = DispatchQueue(label: "com.bettershot.recording.video", qos: .userInitiated)
     private let audioQueue = DispatchQueue(label: "com.bettershot.recording.audio", qos: .userInteractive)
@@ -59,12 +60,14 @@ final class ScreenRecordingManager: NSObject {
 
         let captureWidth = display.width * 2
         let captureHeight = display.height * 2
+        let pointerCaptureRect = CGDisplayBounds(display.displayID)
 
         return try await beginCapture(
             filter: filter,
             width: captureWidth,
             height: captureHeight,
-            captureAudio: captureAudio
+            captureAudio: captureAudio,
+            pointerCaptureRect: pointerCaptureRect
         )
     }
 
@@ -116,12 +119,21 @@ final class ScreenRecordingManager: NSObject {
         let captureWidth = Int(sourceW * scale)
         let captureHeight = Int(sourceH * scale)
 
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? screenFrame.height
+        let pointerCaptureRect = CGRect(
+            x: clampedX,
+            y: primaryHeight - clampedMaxY,
+            width: clampedMaxX - clampedX,
+            height: clampedMaxY - clampedY
+        )
+
         return try await beginCapture(
             filter: filter,
             width: captureWidth,
             height: captureHeight,
             captureAudio: captureAudio,
-            sourceRect: mappedSourceRect
+            sourceRect: mappedSourceRect,
+            pointerCaptureRect: pointerCaptureRect
         )
     }
 
@@ -130,7 +142,8 @@ final class ScreenRecordingManager: NSObject {
         width: Int,
         height: Int,
         captureAudio: Bool,
-        sourceRect: CGRect? = nil
+        sourceRect: CGRect? = nil,
+        pointerCaptureRect: CGRect
     ) async throws -> Bool {
         let config = SCStreamConfiguration()
         config.width = width
@@ -183,6 +196,7 @@ final class ScreenRecordingManager: NSObject {
 
         try await scStream.startCapture()
         recordingSession.isCapturing = true
+        pointerCapture.start(captureRect: pointerCaptureRect)
 
         state = .recording
         elapsedSeconds = 0
@@ -212,12 +226,26 @@ final class ScreenRecordingManager: NSObject {
         session = nil
         _streamSession = nil
 
+        let capturedPointerData = pointerCapture.stop()
+
         state = .idle
         elapsedSeconds = 0
 
         let url = outputURL
         outputURL = nil
+
+        if let url {
+            writePointerSidecar(capturedPointerData, alongside: url)
+        }
+
         return url
+    }
+
+    private func writePointerSidecar(_ capture: PointerCaptureFile, alongside url: URL) {
+        guard !capture.travel.isEmpty || !capture.presses.isEmpty else { return }
+        let sidecarPath = url.deletingPathExtension().path + ".pointer.json"
+        guard let data = try? JSONEncoder().encode(capture) else { return }
+        try? data.write(to: URL(fileURLWithPath: sidecarPath))
     }
 
     // MARK: - Pause / Resume
@@ -225,6 +253,7 @@ final class ScreenRecordingManager: NSObject {
     func pauseRecording() {
         guard state == .recording else { return }
         session?.isCapturing = false
+        pointerCapture.pause()
         state = .paused
         stopTimer()
     }
@@ -232,6 +261,7 @@ final class ScreenRecordingManager: NSObject {
     func resumeRecording() {
         guard state == .paused else { return }
         session?.isCapturing = true
+        pointerCapture.resume()
         state = .recording
         startTimer()
     }
@@ -258,6 +288,7 @@ final class ScreenRecordingManager: NSObject {
         session?.cancelWriting()
         session = nil
         _streamSession = nil
+        _ = pointerCapture.stop()
 
         if let url = outputURL {
             try? FileManager.default.removeItem(at: url)
