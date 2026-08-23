@@ -298,13 +298,96 @@ struct VideoEditorView: View {
 
     private var timelineSection: some View {
         VStack(spacing: 6) {
-            VideoTrimTimelineView(model: model)
-                .frame(height: 54)
+            clipToolbar
+
+            if model.isClipMode {
+                ClipTimelineView(model: model)
+                    .frame(height: 54)
+            } else {
+                VideoTrimTimelineView(model: model)
+                    .frame(height: 54)
+            }
 
             if model.zoomEnabled {
                 ZoomCueLaneView(model: model)
                     .frame(height: 18)
             }
+        }
+    }
+
+    private var clipToolbar: some View {
+        HStack(spacing: 8) {
+            Button {
+                model.splitAtPlayhead()
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "scissors")
+                        .font(.caption)
+                    Text("Split")
+                        .font(.caption2)
+                }
+                .padding(.vertical, 4)
+                .padding(.horizontal, 8)
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: 5))
+            }
+            .buttonStyle(.plain)
+
+            if let selectedClip = model.clips.first(where: { $0.id == model.selectedClipID }) {
+                Button {
+                    model.deleteSelectedClip()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "trash")
+                            .font(.caption)
+                        Text("Delete")
+                            .font(.caption2)
+                    }
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 8)
+                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 5))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.red)
+                .disabled(!model.canDeleteSelectedClip)
+
+                Picker("", selection: Binding(
+                    get: { selectedClip.speed },
+                    set: { model.setSpeed($0, forClipID: selectedClip.id) }
+                )) {
+                    Text("0.5x").tag(0.5)
+                    Text("1x").tag(1.0)
+                    Text("1.5x").tag(1.5)
+                    Text("2x").tag(2.0)
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: 70)
+                .controlSize(.small)
+            }
+
+            Spacer()
+
+            Button {
+                model.undo()
+            } label: {
+                Image(systemName: "arrow.uturn.backward")
+                    .font(.system(size: 12))
+            }
+            .buttonStyle(.plain)
+            .disabled(!model.canUndo)
+            .keyboardShortcut("z", modifiers: .command)
+            .help("Undo")
+
+            Button {
+                model.redo()
+            } label: {
+                Image(systemName: "arrow.uturn.forward")
+                    .font(.system(size: 12))
+            }
+            .buttonStyle(.plain)
+            .disabled(!model.canRedo)
+            .keyboardShortcut("z", modifiers: [.command, .shift])
+            .help("Redo")
         }
     }
 
@@ -354,15 +437,14 @@ struct VideoEditorView: View {
         model.isExporting = true
         let sourceURL = model.sourceURL
         if let exportedURL = await model.exportTrimmed() {
-            if let sourceURL {
-                if let oldRecord = HistoryStore.shared.records.first(where: {
-                    HistoryStore.shared.urlForRecord($0) == sourceURL
-                        || HistoryStore.shared.displayURLForRecord($0) == sourceURL
-                }) {
-                    HistoryStore.shared.deleteRecord(oldRecord)
-                }
+            if let sourceURL, let record = HistoryStore.shared.records.first(where: {
+                HistoryStore.shared.urlForRecord($0) == sourceURL
+                    || HistoryStore.shared.displayURLForRecord($0) == sourceURL
+            }) {
+                HistoryStore.shared.setBeautifiedPath(exportedURL.path, for: record.id)
+            } else {
+                _ = HistoryStore.shared.importCapture(from: exportedURL, deleteSource: false, kind: .recording)
             }
-            _ = HistoryStore.shared.importCapture(from: exportedURL, deleteSource: false, kind: .recording)
             let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage
             ToastWindow.shared.show(message: "Recording exported!", icon: appIcon)
             model.cleanup()
@@ -409,9 +491,7 @@ private struct VideoTrimSection: View {
                 Spacer()
                 if model.hasTrim {
                     Button {
-                        model.trimStart = 0
-                        model.trimEnd = model.duration
-                        model.seekTo(0)
+                        model.resetTrim()
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.counterclockwise")

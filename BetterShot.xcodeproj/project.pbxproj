@@ -24,6 +24,7 @@
 		3AA2E443AA076D9AA4BCFFA9 /* PinnedScreenshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B3D8697A2AEA9FD3527BA3D /* PinnedScreenshot.swift */; };
 		3F10E4A10ECE3E37549B99BA /* EditorWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5FC4CD374D6C387202BB773 /* EditorWindowView.swift */; };
 		52B62D47D9FDBE73F0FEDB1A /* ToastWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B95C7007292236807887D07 /* ToastWindow.swift */; };
+		546351AF6683978F99C7929C /* ClipTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26AF580197196A4D9BBE7B3 /* ClipTimeline.swift */; };
 		5DC7C7A2CF426EEB84D10515 /* MenuBarPopoverController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE6013043C27F30509A03C16 /* MenuBarPopoverController.swift */; };
 		60129245C0B6E2A29C14B762 /* VideoEditorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C35ADEA40B41A4AD5BD3588 /* VideoEditorModel.swift */; };
 		6158A6FD21D793D955B2E0E9 /* AppPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = C757566A38307689528E5A9E /* AppPreferences.swift */; };
@@ -35,6 +36,7 @@
 		8782829F9AD2E1BE2B796AC7 /* ShortcutService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAE1EE5C32D7D0D099A88951 /* ShortcutService.swift */; };
 		87B41081A50FF4716E4423EC /* EditorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9057B39C894A83FE5C27A761 /* EditorWindowController.swift */; };
 		918CF31A69D7A8EB445F4164 /* CaptureRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5558B01BB764A6621835508 /* CaptureRecord.swift */; };
+		95EC2C6E72E5DAA684DE0CE3 /* ClipTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFF564CCEAAF75E63C049071 /* ClipTimelineView.swift */; };
 		99DDE6D704C920238ACF8B8C /* VideoEditorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA371E3B22FCF68762E77651 /* VideoEditorWindowController.swift */; };
 		9A417A3F04D2578AE8199ACC /* EditorInspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5229BD9DF667A270F2BF5A01 /* EditorInspectorView.swift */; };
 		A3D2948CBD1AB43FE793A68A /* VideoEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D2EB2E1080285BC4EC284AB /* VideoEditorView.swift */; };
@@ -105,9 +107,11 @@
 		C5558B01BB764A6621835508 /* CaptureRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureRecord.swift; sourceTree = "<group>"; };
 		C72B137FE8A09ED62E3E58DF /* RecordingStatusBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStatusBar.swift; sourceTree = "<group>"; };
 		C757566A38307689528E5A9E /* AppPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferences.swift; sourceTree = "<group>"; };
+		CFF564CCEAAF75E63C049071 /* ClipTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipTimelineView.swift; sourceTree = "<group>"; };
 		D58300A37E3A994CE15987C5 /* BeautifierRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeautifierRenderer.swift; sourceTree = "<group>"; };
 		D6198417D4285E0B0F93CD9C /* RecordingAreaHighlight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingAreaHighlight.swift; sourceTree = "<group>"; };
 		DAB8EF01048DA815D1AEDD9A /* VideoTrimTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoTrimTimelineView.swift; sourceTree = "<group>"; };
+		E26AF580197196A4D9BBE7B3 /* ClipTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipTimeline.swift; sourceTree = "<group>"; };
 		E3F4A34905E009410BCE4384 /* RecordingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSession.swift; sourceTree = "<group>"; };
 		EE6013043C27F30509A03C16 /* MenuBarPopoverController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarPopoverController.swift; sourceTree = "<group>"; };
 		F46A331394FBCD6FCFD29F62 /* BetterShot.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BetterShot.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -254,6 +258,8 @@
 			isa = PBXGroup;
 			children = (
 				4056BF81776068841C838844 /* ActiveDisplayResolver.swift */,
+				E26AF580197196A4D9BBE7B3 /* ClipTimeline.swift */,
+				CFF564CCEAAF75E63C049071 /* ClipTimelineView.swift */,
 				24D46DA7E74F2EB4C230512D /* PointerCapture.swift */,
 				D6198417D4285E0B0F93CD9C /* RecordingAreaHighlight.swift */,
 				8908BA741C21BE7AAFF8F028 /* RecordingBarChrome.swift */,
@@ -371,6 +377,8 @@
 				F3BAB5D4C1617D203E95885B /* BundledBackgrounds.swift in Sources */,
 				FE59D61ABB427B6DFC1D377A /* CaptureOrchestrator.swift in Sources */,
 				918CF31A69D7A8EB445F4164 /* CaptureRecord.swift in Sources */,
+				546351AF6683978F99C7929C /* ClipTimeline.swift in Sources */,
+				95EC2C6E72E5DAA684DE0CE3 /* ClipTimelineView.swift in Sources */,
 				F5F0FA6599AB12F8B47278B0 /* ColorPickerOverlay.swift in Sources */,
 				A6D62B552A8AE5AD951AB3EC /* CountdownOverlay.swift in Sources */,
 				7492DCC25BAEBAFD914AAC6C /* EditorCanvasView.swift in Sources */,

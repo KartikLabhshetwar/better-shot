@@ -3,6 +3,13 @@ import AppKit
 import SwiftUI
 import CoreImage
 
+private struct ClipEditSnapshot {
+    var clips: [Clip]
+    var trimStart: Double
+    var trimEnd: Double
+    var selectedClipID: UUID?
+}
+
 @MainActor
 @Observable
 final class VideoEditorModel {
@@ -32,10 +39,19 @@ final class VideoEditorModel {
     private var pointerCapture: PointerCaptureFile?
     private var viewportTimeline: ViewportTimeline = .identity
 
+    var clips: [Clip] = []
+    var selectedClipID: UUID?
+    private var undoStack: [ClipEditSnapshot] = []
+    private var redoStack: [ClipEditSnapshot] = []
+
     var hasTrim: Bool { trimStart > 0.01 || (duration > 0 && trimEnd < duration - 0.01) }
     var hasCrop: Bool { cropRect != CGRect(x: 0, y: 0, width: 1, height: 1) }
+    var isClipMode: Bool { !clips.isEmpty }
+    var canUndo: Bool { !undoStack.isEmpty }
+    var canRedo: Bool { !redoStack.isEmpty }
+    var canDeleteSelectedClip: Bool { clips.count > 1 && selectedClipID != nil }
     var hasEdits: Bool {
-        hasTrim || hasCrop
+        hasTrim || hasCrop || isClipMode
             || (zoomEnabled && !zoomCues.isEmpty)
             || config.padding > 0 || config.cornerRadius > 0 || config.shadowStrength > 0 || config.style != .none
     }
@@ -209,6 +225,105 @@ final class VideoEditorModel {
         if currentTime > trimEnd { seekTo(trimEnd) }
     }
 
+    func selectClip(_ id: UUID?) {
+        selectedClipID = id
+    }
+
+    func splitAtPlayhead() {
+        let base = clips.isEmpty ? [Clip(sourceStart: trimStart, sourceEnd: trimEnd)] : clips
+        guard let result = ClipTimeline(clips: base).split(at: currentTime) else { return }
+        commitClips(result.clips, selecting: result.selectedID)
+    }
+
+    func deleteSelectedClip() {
+        guard let id = selectedClipID, let next = ClipTimeline(clips: clips).deleting(id: id) else { return }
+        let removedIndex = clips.firstIndex(where: { $0.id == id }) ?? 0
+        let selection = next.indices.contains(removedIndex) ? next[removedIndex].id : next.last?.id
+        commitClips(next, selecting: selection)
+    }
+
+    func setSpeed(_ speed: Double, forClipID id: UUID) {
+        guard let clip = clips.first(where: { $0.id == id }) else { return }
+        var updated = clip
+        updated.speed = min(max(speed, Clip.minimumSpeed), Clip.maximumSpeed)
+        commitClips(ClipTimeline(clips: clips).replacing(updated), selecting: id)
+    }
+
+    func beginClipTrim() {
+        pushUndoSnapshot()
+    }
+
+    func updateClipTrim(_ id: UUID, start: Double, end: Double) {
+        guard let index = clips.firstIndex(where: { $0.id == id }) else { return }
+        var updated = clips[index]
+        let minStart = index > 0 ? clips[index - 1].sourceEnd : 0
+        let maxEnd = index < clips.count - 1 ? clips[index + 1].sourceStart : duration
+        updated.sourceStart = min(max(start, minStart), updated.sourceEnd - Clip.minimumDuration)
+        updated.sourceEnd = max(min(end, maxEnd), updated.sourceStart + Clip.minimumDuration)
+        clips[index] = updated
+        syncTrimBoundsToClips()
+    }
+
+    func endClipTrim() {}
+
+    func resetTrim() {
+        pushUndoSnapshot()
+        clips = []
+        selectedClipID = nil
+        trimStart = 0
+        trimEnd = duration
+        seekTo(0)
+    }
+
+    func undo() {
+        guard let snapshot = undoStack.popLast() else { return }
+        redoStack.append(currentSnapshot())
+        restoreSnapshot(snapshot)
+    }
+
+    func redo() {
+        guard let snapshot = redoStack.popLast() else { return }
+        undoStack.append(currentSnapshot())
+        restoreSnapshot(snapshot)
+    }
+
+    private func currentSnapshot() -> ClipEditSnapshot {
+        ClipEditSnapshot(clips: clips, trimStart: trimStart, trimEnd: trimEnd, selectedClipID: selectedClipID)
+    }
+
+    private func pushUndoSnapshot() {
+        undoStack.append(currentSnapshot())
+        redoStack.removeAll()
+    }
+
+    private func commitClips(_ newClips: [Clip], selecting id: UUID?) {
+        pushUndoSnapshot()
+        applyClips(newClips, selecting: id)
+    }
+
+    private func applyClips(_ newClips: [Clip], selecting id: UUID?) {
+        clips = newClips
+        selectedClipID = id
+        syncTrimBoundsToClips()
+    }
+
+    private func restoreSnapshot(_ snapshot: ClipEditSnapshot) {
+        clips = snapshot.clips
+        trimStart = snapshot.trimStart
+        trimEnd = snapshot.trimEnd
+        selectedClipID = snapshot.selectedClipID
+        if currentTime < trimStart { seekTo(trimStart) }
+        if currentTime > trimEnd { seekTo(trimEnd) }
+    }
+
+    private func syncTrimBoundsToClips() {
+        guard let first = clips.first, let last = clips.last else { return }
+        trimStart = first.sourceStart
+        trimEnd = last.sourceEnd
+        if currentTime < trimStart { seekTo(trimStart) }
+        if currentTime > trimEnd { seekTo(trimEnd) }
+    }
+
     func exportTrimmed(into directory: String? = nil) async -> URL? {
         guard let sourceURL else { return nil }
         let asset = AVURLAsset(url: sourceURL)
@@ -226,7 +341,7 @@ final class VideoEditorModel {
         let hasEffects = exportConfig.padding > 0 || exportConfig.cornerRadius > 0 || exportConfig.shadowStrength > 0 || exportConfig.style != .none
         let hasZoom = zoomEnabled && !zoomCues.isEmpty
 
-        if hasEffects || hasCrop || hasZoom {
+        if isClipMode || hasEffects || hasCrop || hasZoom {
             return await exportWithEffects(asset: asset, outputURL: outputURL, config: exportConfig)
         }
 
@@ -268,25 +383,44 @@ final class VideoEditorModel {
         let canvasH = vidH + pad * 2
         let cornerRadius = config.cornerRadius * shortEdge
 
-        let composition = AVMutableComposition()
+        let composition: AVMutableComposition
+        let mapToSourceTime: (TimeInterval) -> TimeInterval
 
-        guard let compVideoTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else { return nil }
+        if isClipMode {
+            let normalizedClips = ClipTimeline(clips: clips).normalized(to: duration)
+            guard !normalizedClips.isEmpty else { return nil }
+            let audioTrack = try? await asset.loadTracks(withMediaType: .audio).first
+            guard let built = try? ClipCompositionBuilder.makeComposition(videoTrack: videoTrack, audioTrack: audioTrack, clips: normalizedClips) else { return nil }
+            composition = built
+            let timeline = ClipTimeline(clips: normalizedClips)
+            mapToSourceTime = { timeline.sourceTime(at: $0) }
+        } else {
+            let legacyComposition = AVMutableComposition()
 
-        let timeRange = CMTimeRange(
-            start: CMTime(seconds: trimStart, preferredTimescale: 600),
-            end: CMTime(seconds: trimEnd, preferredTimescale: 600)
-        )
+            guard let compVideoTrack = legacyComposition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else { return nil }
 
-        do {
-            try compVideoTrack.insertTimeRange(timeRange, of: videoTrack, at: .zero)
-        } catch {
-            return nil
+            let timeRange = CMTimeRange(
+                start: CMTime(seconds: trimStart, preferredTimescale: 600),
+                end: CMTime(seconds: trimEnd, preferredTimescale: 600)
+            )
+
+            do {
+                try compVideoTrack.insertTimeRange(timeRange, of: videoTrack, at: .zero)
+            } catch {
+                return nil
+            }
+
+            if let audioTrack = try? await asset.loadTracks(withMediaType: .audio).first,
+               let compAudioTrack = legacyComposition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
+                try? compAudioTrack.insertTimeRange(timeRange, of: audioTrack, at: .zero)
+            }
+
+            composition = legacyComposition
+            let baseTrimStart = trimStart
+            mapToSourceTime = { $0 + baseTrimStart }
         }
 
-        if let audioTrack = try? await asset.loadTracks(withMediaType: .audio).first,
-           let compAudioTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
-            try? compAudioTrack.insertTimeRange(timeRange, of: audioTrack, at: .zero)
-        }
+        guard let compVideoTrack = composition.tracks(withMediaType: .video).first else { return nil }
 
         let videoComposition = AVMutableVideoComposition()
         videoComposition.renderSize = CGSize(width: canvasW, height: canvasH)
@@ -300,10 +434,11 @@ final class VideoEditorModel {
 
         if useZoom {
             let timeline = viewportTimeline
-            let compositionDuration = trimEnd - trimStart
+            let compositionDuration = composition.duration.seconds
             let step: TimeInterval = 0.1
 
-            func frameTransform(atSourceTime sourceTime: TimeInterval) -> CGAffineTransform {
+            func frameTransform(atEditorTime editorTime: TimeInterval) -> CGAffineTransform {
+                let sourceTime = mapToSourceTime(editorTime)
                 let viewport = timeline.frame(at: sourceTime)
                 let anchorDisplay = CGPoint(x: viewport.anchor.x * fullW, y: viewport.anchor.y * fullH)
                 let magnification = max(1, viewport.magnification)
@@ -317,10 +452,10 @@ final class VideoEditorModel {
 
             if compositionDuration > 0 {
                 var t: TimeInterval = 0
-                var previousTransform = frameTransform(atSourceTime: trimStart)
+                var previousTransform = frameTransform(atEditorTime: 0)
                 while t < compositionDuration {
                     let nextT = min(t + step, compositionDuration)
-                    let toTransform = frameTransform(atSourceTime: nextT + trimStart)
+                    let toTransform = frameTransform(atEditorTime: nextT)
                     let range = CMTimeRange(
                         start: CMTime(seconds: t, preferredTimescale: 600),
                         end: CMTime(seconds: nextT, preferredTimescale: 600)
@@ -330,7 +465,7 @@ final class VideoEditorModel {
                     t = nextT
                 }
             } else {
-                layerInstruction.setTransform(frameTransform(atSourceTime: trimStart), at: .zero)
+                layerInstruction.setTransform(frameTransform(atEditorTime: 0), at: .zero)
             }
         } else {
             let cropOffsetX = fullW * cropRect.origin.x
