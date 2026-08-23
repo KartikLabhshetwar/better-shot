@@ -562,6 +562,7 @@ struct CaptureSettingsTab: View {
     @AppStorage("bs_selfTimerDelay") private var selfTimerRaw: Int = 0
     @AppStorage("bs_overlayPosition") private var overlayPositionRaw: String = OverlayPosition.bottomRight.rawValue
     @AppStorage("bs_overlayDismissDelay") private var overlayDismissDelay: Double = 5.0
+    @AppStorage("bs_openEditorAfterCapture") private var openEditorAfterCapture = false
     @State private var shortcutResetID = UUID()
 
     private var selfTimerDelay: Binding<SelfTimerDelay> {
@@ -606,6 +607,14 @@ struct CaptureSettingsTab: View {
                     .controlSize(.small)
             }
 
+            Section("After Capture") {
+                Toggle("Open editor automatically", isOn: $openEditorAfterCapture)
+
+                Text("When enabled, the annotation editor opens immediately after taking a screenshot.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Keyboard Shortcuts") {
                 VStack(alignment: .leading, spacing: 8) {
                     ShortcutRow(label: "Region", action: .region)
@@ -641,6 +650,7 @@ struct CaptureSettingsTab: View {
                     selfTimerRaw = 0
                     overlayPositionRaw = OverlayPosition.bottomRight.rawValue
                     overlayDismissDelay = 5.0
+                    openEditorAfterCapture = false
                     for action in ShortcutService.Action.allCases {
                         let def: ShortcutService.Shortcut? = switch action {
                         case .region: .defaultRegion

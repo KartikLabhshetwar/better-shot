@@ -17,6 +17,7 @@ enum AppPreferences {
     private static let recordingShowCursorKey = "bs_recordingShowCursor"
     private static let recordingCaptureAudioKey = "bs_recordingCaptureAudio"
     private static let recordingOpenEditorKey = "bs_recordingOpenEditor"
+    private static let openEditorAfterCaptureKey = "bs_openEditorAfterCapture"
 
     // MARK: - Appearance
     static var appearance: AppAppearance {
@@ -116,6 +117,12 @@ enum AppPreferences {
     static var recordingOpenEditor: Bool {
         get { UserDefaults.standard.object(forKey: recordingOpenEditorKey) as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: recordingOpenEditorKey) }
+    }
+
+    // MARK: - Screenshot
+    static var openEditorAfterCapture: Bool {
+        get { UserDefaults.standard.object(forKey: openEditorAfterCaptureKey) as? Bool ?? false }
+        set { UserDefaults.standard.set(newValue, forKey: openEditorAfterCaptureKey) }
     }
 
     // MARK: - Default Beautifier Config
