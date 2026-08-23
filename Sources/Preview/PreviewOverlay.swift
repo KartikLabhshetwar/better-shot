@@ -205,8 +205,26 @@ struct PreviewCardView: View {
                 }
             }
         } else {
-            thumbnail = NSImage(contentsOf: url)
+            Task.detached {
+                let image = Self.downsampledImage(at: url, maxPixelSize: 260)
+                await MainActor.run { thumbnail = image }
+            }
         }
+    }
+
+    /// Decodes a thumbnail-sized image instead of the full capture: a 5K screenshot costs
+    /// ~60 MB decoded, and the card only ever shows it at 130x98 points.
+    nonisolated private static func downsampledImage(at url: URL, maxPixelSize: CGFloat) -> NSImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+
+        let options: [CFString: Any] = [
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+        ]
+
+        guard let thumb = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return NSImage(cgImage: thumb, size: NSSize(width: thumb.width, height: thumb.height))
     }
 
     @ViewBuilder
@@ -265,7 +283,12 @@ struct PreviewCardView: View {
                 pillButton("Copy") {
                     let pb = NSPasteboard.general
                     pb.clearContents()
-                    pb.writeObjects([image])
+                    // The card holds a downsampled thumbnail — copy the capture itself.
+                    if let url = overlay.currentURL, let fullSize = NSImage(contentsOf: url) {
+                        pb.writeObjects([fullSize])
+                    } else {
+                        pb.writeObjects([image])
+                    }
                     overlay.dismiss()
                 }
                 pillButton("Save") {
