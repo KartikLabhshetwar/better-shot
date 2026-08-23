@@ -69,7 +69,7 @@ struct RecordingPickerControls: View {
                 RecordingBarPresenter.shared.hide()
             }
         }
-        .padding(.horizontal, 6)
+        .padding(.horizontal, RecordingBarMetrics.horizontalPadding)
     }
 
     @ViewBuilder

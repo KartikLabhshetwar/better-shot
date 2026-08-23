@@ -14,6 +14,7 @@ struct RecordingSessionControls: View {
             RecordingBarDivider()
             controls
         }
+        .padding(.horizontal, RecordingBarMetrics.horizontalPadding)
     }
 
     private var elapsed: some View {
@@ -39,8 +40,7 @@ struct RecordingSessionControls: View {
                 .animation(.default, value: recorder.elapsedSeconds)
                 .frame(minWidth: 40, alignment: .leading)
         }
-        .padding(.leading, 14)
-        .padding(.trailing, 10)
+        .padding(.trailing, 2)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             isPaused

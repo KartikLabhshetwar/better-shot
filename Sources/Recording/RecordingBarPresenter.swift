@@ -16,6 +16,7 @@ final class RecordingBarPresenter {
 
     @ObservationIgnored private var panel: NSPanel?
     @ObservationIgnored private var hideTask: Task<Void, Never>?
+    @ObservationIgnored private var showTask: Task<Void, Never>?
 
     private init() {}
 
@@ -32,17 +33,24 @@ final class RecordingBarPresenter {
         hideTask = nil
 
         mode = .picker
-        let panel = panel ?? makePanel()
-        Task { await RecordingSourceCatalog.shared.refresh() }
-        reposition(panel, on: screen, keepingCurrentPosition: false, animated: false)
-        panel.orderFrontRegardless()
-        panel.makeKey()
-        RecordingBarPresentation.shared.isPresented = true
+        showTask?.cancel()
+        showTask = Task { @MainActor [weak self] in
+            await RecordingSourceCatalog.shared.refresh()
+            guard let self, !Task.isCancelled, self.mode == .picker else { return }
+            let panel = self.panel ?? self.makePanel()
+            self.applyFrame(to: panel, on: screen, keepingCurrentPosition: false, animated: false)
+            panel.orderFrontRegardless()
+            panel.makeKey()
+            RecordingBarPresentation.shared.isPresented = true
+            self.showTask = nil
+        }
     }
 
     func showRecording(on screen: NSScreen? = nil) {
         hideTask?.cancel()
         hideTask = nil
+        showTask?.cancel()
+        showTask = nil
 
         let panel = panel ?? makePanel()
         let isMorphing = panel.isVisible && mode == .picker
@@ -57,6 +65,8 @@ final class RecordingBarPresenter {
     }
 
     func hide() {
+        showTask?.cancel()
+        showTask = nil
         RecordingAreaHighlightPresenter.shared.hide()
         RecordingBarPresentation.shared.isPresented = false
 
@@ -83,6 +93,7 @@ final class RecordingBarPresenter {
 
     private func applyFrame(to panel: NSPanel, on screen: NSScreen?, keepingCurrentPosition: Bool, animated: Bool) {
         guard let hostingView = panel.contentView as? NSHostingView<RecordingBarRootView> else { return }
+        hostingView.layoutSubtreeIfNeeded()
         let size = hostingView.fittingSize
         let origin: NSPoint
         if keepingCurrentPosition {
@@ -106,7 +117,7 @@ final class RecordingBarPresenter {
     private func resolvedOrigin(for panelSize: NSSize, preferredScreen: NSScreen?) -> NSPoint {
         if let saved = RecordingBarPositionStore.load() {
             let savedFrame = NSRect(origin: saved, size: panelSize)
-            if NSScreen.screens.contains(where: { $0.visibleFrame.intersects(savedFrame) }) {
+            if NSScreen.screens.contains(where: { $0.visibleFrame.contains(savedFrame) }) {
                 return saved
             }
         }
@@ -114,7 +125,7 @@ final class RecordingBarPresenter {
         let screenFrame = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 800, height: 600)
         return NSPoint(
             x: screenFrame.midX - panelSize.width / 2,
-            y: screenFrame.minY + 16
+            y: screenFrame.minY + RecordingBarMetrics.bottomInset
         )
     }
 

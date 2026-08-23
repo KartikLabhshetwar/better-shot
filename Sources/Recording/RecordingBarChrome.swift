@@ -3,11 +3,14 @@ import SwiftUI
 
 /// Sizing and color constants shared by the recording bar and its controls.
 enum RecordingBarMetrics {
-    static let controlSize: CGFloat = 30
-    static let height: CGFloat = 44
-    static let cornerRadius: CGFloat = 14
-    static let itemSpacing: CGFloat = 2
-    static let hoverDiameter: CGFloat = 28
+    static let controlSize: CGFloat = 34
+    static let height: CGFloat = 54
+    static let cornerRadius: CGFloat = 18
+    static let itemSpacing: CGFloat = 6
+    static let sectionSpacing: CGFloat = 10
+    static let horizontalPadding: CGFloat = 14
+    static let bottomInset: CGFloat = 64
+    static let hoverDiameter: CGFloat = 32
     static let edge = Color(nsColor: .separatorColor).opacity(0.5)
     static let shadowOpacity: Double = 0.35
     static let shadowRadius: CGFloat = 16
@@ -109,7 +112,8 @@ struct RecordingBarDivider: View {
     var body: some View {
         Rectangle()
             .fill(RecordingBarMetrics.edge)
-            .frame(width: 1, height: 18)
+            .frame(width: 1, height: 22)
+            .padding(.horizontal, RecordingBarMetrics.sectionSpacing - RecordingBarMetrics.itemSpacing)
     }
 }
 
