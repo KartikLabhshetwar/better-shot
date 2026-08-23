@@ -178,8 +178,9 @@ final class R2Uploader {
             throw R2UploadError(message: "Fill in all fields before testing.")
         }
 
+        let probeKey = "bettershot-connection-probe"
         let host = "\(credentials.accountID).r2.cloudflarestorage.com"
-        let canonicalURI = "/" + uriEncodePath(credentials.bucket)
+        let canonicalURI = "/" + uriEncodePath(credentials.bucket) + "/" + uriEncodePath(probeKey)
         guard let url = URL(string: "https://\(host)\(canonicalURI)") else {
             throw R2UploadError(message: "Invalid R2 endpoint URL.")
         }
@@ -206,9 +207,9 @@ final class R2Uploader {
         guard let http = response as? HTTPURLResponse else {
             throw R2UploadError(message: "No response from R2.")
         }
-        guard (200..<300).contains(http.statusCode) else {
-            throw R2UploadError(message: parseErrorMessage(data: data, statusCode: http.statusCode))
-        }
+        if (200..<300).contains(http.statusCode) { return }
+        if http.statusCode == 404, errorCode(data: data) != "NoSuchBucket" { return }
+        throw R2UploadError(message: parseErrorMessage(data: data, statusCode: http.statusCode))
     }
 
     nonisolated private static func performUpload(
@@ -291,6 +292,11 @@ final class R2Uploader {
             return "\(code): \(detail)"
         }
         return code
+    }
+
+    nonisolated private static func errorCode(data: Data) -> String? {
+        guard let text = String(data: data, encoding: .utf8) else { return nil }
+        return extractXMLValue(tag: "Code", from: text)
     }
 
     nonisolated private static func extractXMLValue(tag: String, from xml: String) -> String? {
