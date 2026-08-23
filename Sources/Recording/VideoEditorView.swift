@@ -327,8 +327,27 @@ struct VideoEditorView: View {
         guard let sourceURL = model.sourceURL else { return }
         let itemID = UUID()
         shareItemID = itemID
-        _ = await ShareService.shared.share(itemID: itemID, fileURL: sourceURL)
-        shareItemID = nil
+        defer { shareItemID = nil }
+
+        guard model.hasEdits else {
+            _ = await ShareService.shared.share(itemID: itemID, fileURL: sourceURL)
+            return
+        }
+
+        let stagingDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BetterShotShare-\(itemID.uuidString)")
+        try? FileManager.default.createDirectory(at: stagingDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: stagingDir) }
+
+        guard let renderedURL = await model.exportTrimmed(into: stagingDir.path) else {
+            ToastWindow.shared.show(
+                title: "Share Failed",
+                message: "Could not render your edits.",
+                systemIcon: "exclamationmark.triangle"
+            )
+            return
+        }
+        _ = await ShareService.shared.share(itemID: itemID, fileURL: renderedURL)
     }
 
     private func exportRecording() async {

@@ -34,6 +34,11 @@ final class VideoEditorModel {
 
     var hasTrim: Bool { trimStart > 0.01 || (duration > 0 && trimEnd < duration - 0.01) }
     var hasCrop: Bool { cropRect != CGRect(x: 0, y: 0, width: 1, height: 1) }
+    var hasEdits: Bool {
+        hasTrim || hasCrop
+            || (zoomEnabled && !zoomCues.isEmpty)
+            || config.padding > 0 || config.cornerRadius > 0 || config.shadowStrength > 0 || config.style != .none
+    }
     var hasPointerCapture: Bool {
         guard let pointerCapture else { return false }
         return !pointerCapture.travel.isEmpty || !pointerCapture.presses.isEmpty
@@ -204,11 +209,11 @@ final class VideoEditorModel {
         if currentTime > trimEnd { seekTo(trimEnd) }
     }
 
-    func exportTrimmed() async -> URL? {
+    func exportTrimmed(into directory: String? = nil) async -> URL? {
         guard let sourceURL else { return nil }
         let asset = AVURLAsset(url: sourceURL)
 
-        let dir = AppPreferences.saveDirectory
+        let dir = directory ?? AppPreferences.saveDirectory
         let stamp = Int(Date().timeIntervalSince1970 * 1000)
         let outputPath = "\(dir)/bettershot_\(stamp).mp4"
         let outputURL = URL(fileURLWithPath: outputPath)
