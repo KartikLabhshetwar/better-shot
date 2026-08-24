@@ -7,6 +7,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     private var window: NSWindow?
 
+    var hasOpenWindow: Bool { window != nil }
+
     private override init() { super.init() }
 
     func open(on screen: NSScreen? = nil) {
@@ -43,12 +45,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         window = nil
-        DispatchQueue.main.async {
-            if !EditorWindowController.shared.hasOpenWindows
-                && !VideoEditorWindowController.shared.hasOpenWindow {
-                NSApp.setActivationPolicy(.accessory)
-            }
-        }
+        ActivationPolicy.dropIfNoWindowsLeft()
     }
 
     private func centerOnCurrentScreen(_ window: NSWindow, preferring preferred: NSScreen? = nil) {

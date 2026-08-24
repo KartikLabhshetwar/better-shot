@@ -135,6 +135,8 @@ final class ScreenRecordingManager {
     private var session: RecordingSession?
     private var outputURL: URL?
     private var timer: Timer?
+    private var elapsedAnchor: ContinuousClock.Instant?
+    private var elapsedBeforePause: Duration = .zero
     private let pointerCapture = PointerCaptureRecorder()
     private(set) var activeRegionRect: CGRect?
     private var lastSource: RecordingSource?
@@ -508,7 +510,7 @@ final class ScreenRecordingManager {
 
         recordingSession.isCapturing = true
         state = .recording
-        elapsedSeconds = 0
+        resetElapsed()
         startTimer()
         return true
     }
@@ -531,7 +533,7 @@ final class ScreenRecordingManager {
         activeRegionRect = nil
 
         state = .idle
-        elapsedSeconds = 0
+        resetElapsed()
 
         let url = outputURL
         outputURL = nil
@@ -594,21 +596,49 @@ final class ScreenRecordingManager {
         outputURL = nil
 
         state = .idle
-        elapsedSeconds = 0
+        resetElapsed()
     }
 
     // MARK: - Timer
 
+    /// Ticks faster than 1Hz but only publishes on a whole-second change, so the label never lags a resume by up to a second.
     private func startTimer() {
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.elapsedSeconds += 1
-            }
+        stopTimer()
+        elapsedAnchor = ContinuousClock.now
+        syncElapsed()
+        let timer = Timer(timeInterval: 0.2, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.syncElapsed() }
         }
+        timer.tolerance = 0.05
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
     }
 
     private func stopTimer() {
+        if let elapsedAnchor {
+            elapsedBeforePause += ContinuousClock.now - elapsedAnchor
+        }
+        elapsedAnchor = nil
         timer?.invalidate()
         timer = nil
+        syncElapsed()
+    }
+
+    private func resetElapsed() {
+        elapsedAnchor = nil
+        elapsedBeforePause = .zero
+        elapsedSeconds = 0
+    }
+
+    /// Derived from a monotonic anchor rather than accumulated ticks, so a dropped tick under encoder load never loses a second.
+    private func syncElapsed() {
+        var total = elapsedBeforePause
+        if let elapsedAnchor {
+            total += ContinuousClock.now - elapsedAnchor
+        }
+        let seconds = Int(total.components.seconds)
+        if seconds != elapsedSeconds {
+            elapsedSeconds = seconds
+        }
     }
 }

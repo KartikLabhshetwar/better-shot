@@ -574,7 +574,7 @@ private struct ImageCropSection: View {
     @Bindable var model: EditorModel
 
     var body: some View {
-        InspectorSection("Crop") {
+        InspectorSection("Crop", collapsedByDefault: true) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
                     InspectorPill(

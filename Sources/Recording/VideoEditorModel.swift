@@ -69,7 +69,12 @@ final class VideoEditorModel {
         return !pointerCapture.travel.isEmpty || !pointerCapture.presses.isEmpty
     }
 
-    private var timeObserver: Any?
+    @ObservationIgnored private var timeObserver: Any?
+    @ObservationIgnored private var loadTask: Task<Void, Never>?
+    @ObservationIgnored private var gradeTask: Task<Void, Never>?
+    @ObservationIgnored private var thumbnailTask: Task<Void, Never>?
+    @ObservationIgnored private var pendingSeek: (time: Double, precise: Bool)?
+    @ObservationIgnored private var isSeekInFlight = false
 
     var trimmedDuration: Double { trimEnd - trimStart }
 
@@ -77,9 +82,16 @@ final class VideoEditorModel {
     var formattedDuration: String { formatTime(trimmedDuration) }
 
     func loadVideo(from url: URL) {
-        // Detach from the outgoing player before it is replaced — a periodic time observer
-        // can only be removed by the AVPlayer that vended it.
         removeTimeObserver()
+        loadTask?.cancel()
+        thumbnailTask?.cancel()
+        pendingSeek = nil
+        isSeekInFlight = false
+        thumbnails = []
+        currentTime = 0
+        trimStart = 0
+        trimEnd = 0
+        duration = 0
 
         let resolvedURL: URL
         if let record = HistoryStore.shared.records.first(where: {
@@ -98,41 +110,48 @@ final class VideoEditorModel {
         previewGrade.correction = config.colorCorrection
         attachPreviewGrade(to: item, url: url)
 
-        Task {
-            if let dur = try? await asset.load(.duration) {
-                duration = dur.seconds
-                trimEnd = duration
+        loadTask = Task { @MainActor [weak self] in
+            let loaded = try? await asset.load(.duration)
+            guard let self, !Task.isCancelled else { return }
+            if let seconds = loaded?.seconds, seconds.isFinite, seconds > 0 {
+                self.duration = seconds
+                self.trimEnd = seconds
             }
             if let track = try? await asset.loadTracks(withMediaType: .video).first {
                 let size = try? await track.load(.naturalSize)
                 let transform = try? await track.load(.preferredTransform)
+                guard !Task.isCancelled else { return }
                 if let size, let transform {
                     let transformed = size.applying(transform)
-                    videoWidth = Int(abs(transformed.width))
-                    videoHeight = Int(abs(transformed.height))
+                    self.videoWidth = Int(abs(transformed.width))
+                    self.videoHeight = Int(abs(transformed.height))
                 }
             }
-            loadPointerCapture()
-            regenerateZoomCues()
-            generateThumbnails()
-            setupTimeObserver()
+            guard !Task.isCancelled else { return }
+            self.loadPointerCapture()
+            self.regenerateZoomCues()
+            self.generateThumbnails()
+            self.setupTimeObserver()
+            self.loadTask = nil
         }
     }
 
     private func attachPreviewGrade(to item: AVPlayerItem, url: URL) {
+        gradeTask?.cancel()
         let grade = previewGrade
-        Task {
+        gradeTask = Task { @MainActor [weak self] in
             let composition = try? await AVMutableVideoComposition.videoComposition(with: AVURLAsset(url: url)) { request in
                 request.finish(with: ColorGrade.apply(grade.correction, to: request.sourceImage), context: nil)
             }
-            guard let composition, player?.currentItem === item else { return }
+            guard let self, !Task.isCancelled, let composition, self.player?.currentItem === item else { return }
             item.videoComposition = composition
+            self.gradeTask = nil
         }
     }
 
     private func refreshPreviewFrame() {
         guard let player, player.timeControlStatus != .playing else { return }
-        player.seek(to: player.currentTime(), toleranceBefore: .zero, toleranceAfter: .zero)
+        enqueueSeek(player.currentTime().seconds, precise: true)
     }
 
     func viewportFrame(at time: Double) -> ViewportFrame {
@@ -226,10 +245,42 @@ final class VideoEditorModel {
         }
     }
 
-    func seekTo(_ time: Double) {
-        let cmTime = CMTime(seconds: time, preferredTimescale: 600)
-        player?.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero)
-        currentTime = time
+    /// `precise` off is for scrubbing: a tolerant seek lands on the nearest decoded frame instead of forcing a full decode per pointer move.
+    func seekTo(_ time: Double, precise: Bool = true) {
+        let clamped = duration > 0 ? min(max(time, 0), duration) : max(time, 0)
+        currentTime = clamped
+        enqueueSeek(clamped, precise: precise)
+    }
+
+    func pauseForScrub() {
+        guard isPlaying else { return }
+        player?.pause()
+        isPlaying = false
+    }
+
+    /// One seek in flight at a time, with only the newest request queued behind it, so a drag never builds a backlog the player has to work through after the pointer stops.
+    private func enqueueSeek(_ time: Double, precise: Bool) {
+        pendingSeek = (time, precise)
+        guard !isSeekInFlight else { return }
+        dispatchPendingSeek()
+    }
+
+    private func dispatchPendingSeek() {
+        guard let player, let next = pendingSeek else { return }
+        pendingSeek = nil
+        isSeekInFlight = true
+        let tolerance = next.precise ? CMTime.zero : CMTime(value: 1, timescale: 10)
+        player.seek(
+            to: CMTime(seconds: next.time, preferredTimescale: 600),
+            toleranceBefore: tolerance,
+            toleranceAfter: tolerance
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.isSeekInFlight = false
+                self.dispatchPendingSeek()
+            }
+        }
     }
 
     func stepForward() {
@@ -241,15 +292,29 @@ final class VideoEditorModel {
     }
 
     func setTrimStart(_ value: Double) {
-        trimStart = max(0, min(value, trimEnd - 1.0))
-        if currentTime < trimStart { seekTo(trimStart) }
+        applyTrim(trimSelection.settingStart(value, duration: duration))
+    }
+
+    func setTrimEnd(_ value: Double) {
+        applyTrim(trimSelection.settingEnd(value, duration: duration))
     }
 
     func resetCrop() { cropRect = CGRect(x: 0, y: 0, width: 1, height: 1) }
 
-    func setTrimEnd(_ value: Double) {
-        trimEnd = min(duration, max(value, trimStart + 1.0))
+    var trimSelection: TrimSelection { TrimSelection(start: trimStart, end: trimEnd) }
+
+    private func applyTrim(_ selection: TrimSelection) {
+        trimStart = selection.start
+        trimEnd = selection.end
+        if currentTime < trimStart { seekTo(trimStart) }
         if currentTime > trimEnd { seekTo(trimEnd) }
+    }
+
+    /// The timeline has already clamped both bounds and the playhead together, so this writes them as one edit instead of round-tripping through the setters and seeking twice.
+    func applyTrimDrag(_ selection: TrimSelection, playhead: Double, precise: Bool) {
+        trimStart = selection.start
+        trimEnd = selection.end
+        seekTo(playhead, precise: precise)
     }
 
     func selectClip(_ id: UUID?) {
@@ -290,8 +355,6 @@ final class VideoEditorModel {
         clips[index] = updated
         syncTrimBoundsToClips()
     }
-
-    func endClipTrim() {}
 
     func resetTrim() {
         pushUndoSnapshot()
@@ -554,6 +617,10 @@ final class VideoEditorModel {
     }
 
     func cleanup() {
+        loadTask?.cancel()
+        gradeTask?.cancel()
+        thumbnailTask?.cancel()
+        pendingSeek = nil
         player?.pause()
         removeTimeObserver()
         player = nil
@@ -572,8 +639,8 @@ final class VideoEditorModel {
         removeTimeObserver()
         let interval = CMTime(value: 1, timescale: 30)
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
-            Task { @MainActor in
-                guard let self else { return }
+            MainActor.assumeIsolated {
+                guard let self, !self.isSeekInFlight, self.pendingSeek == nil else { return }
                 self.currentTime = time.seconds
                 if self.currentTime >= self.trimEnd && self.isPlaying {
                     self.player?.pause()
@@ -585,24 +652,31 @@ final class VideoEditorModel {
     }
 
     private func generateThumbnails() {
-        guard let sourceURL, duration > 0 else { return }
-        let asset = AVURLAsset(url: sourceURL)
-        let generator = AVAssetImageGenerator(asset: asset)
-        generator.maximumSize = CGSize(width: 120, height: 68)
+        thumbnailTask?.cancel()
+        guard let sourceURL, duration > 0 else {
+            thumbnails = []
+            return
+        }
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: sourceURL))
+        generator.maximumSize = CGSize(width: 160, height: 90)
         generator.appliesPreferredTrackTransform = true
+        generator.requestedTimeToleranceBefore = CMTime(value: 1, timescale: 2)
+        generator.requestedTimeToleranceAfter = CMTime(value: 1, timescale: 2)
 
         let count = 20
         let step = duration / Double(count)
+        let times = (0..<count).map { CMTime(seconds: step * Double($0), preferredTimescale: 600) }
 
-        Task.detached { [weak self] in
+        thumbnailTask = Task { @MainActor [weak self] in
             var images: [NSImage] = []
-            for i in 0..<count {
-                let time = CMTime(seconds: step * Double(i), preferredTimescale: 600)
-                if let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) {
-                    images.append(NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height)))
-                }
+            for await result in generator.images(for: times) {
+                guard !Task.isCancelled else { return }
+                guard let cgImage = try? result.image else { continue }
+                images.append(NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height)))
             }
-            await MainActor.run { self?.thumbnails = images }
+            guard let self, !Task.isCancelled else { return }
+            self.thumbnails = images
+            self.thumbnailTask = nil
         }
     }
 

@@ -3,7 +3,6 @@ import SwiftUI
 /// The in-session half of the recording bar: elapsed time plus pause/stop/restart/discard. Hosted by `RecordingBarPresenter` once a recording starts.
 struct RecordingSessionControls: View {
     @State private var recorder = ScreenRecordingManager.shared
-    @State private var isPulsing = false
 
     private var isPaused: Bool { recorder.state == .paused }
     private var isSettling: Bool { recorder.state == .preparing || recorder.state == .stopping }
@@ -19,26 +18,15 @@ struct RecordingSessionControls: View {
 
     private var elapsed: some View {
         HStack(spacing: 8) {
-            Circle()
-                .fill(Color(nsColor: .systemRed))
-                .frame(width: 8, height: 8)
-                .opacity(isPaused ? 0.4 : 1)
-                .shadow(color: .red.opacity(isPaused ? 0 : 0.5), radius: isPulsing ? 4 : 1)
-                .onAppear { isPulsing = true }
-                .animation(
-                    RecordingMotion.reduceMotion
-                        ? nil
-                        : .easeInOut(duration: 0.9).repeatForever(autoreverses: true),
-                    value: isPulsing
-                )
+            RecordingLiveDot(isPaused: isPaused)
 
             Text(formatTime(recorder.elapsedSeconds))
                 .font(.system(size: 13, weight: .medium, design: .monospaced))
                 .monospacedDigit()
                 .foregroundStyle(Color(nsColor: .labelColor))
-                .contentTransition(.numericText())
-                .animation(.default, value: recorder.elapsedSeconds)
-                .frame(minWidth: 40, alignment: .leading)
+                .contentTransition(.numericText(countsDown: false))
+                .animation(.easeOut(duration: 0.18), value: recorder.elapsedSeconds)
+                .frame(width: timeWidth, alignment: .leading)
         }
         .padding(.trailing, 2)
         .accessibilityElement(children: .ignore)
@@ -116,9 +104,43 @@ struct RecordingSessionControls: View {
         .padding(.trailing, 8)
     }
 
+    /// Fixed rather than intrinsic: the bar's panel is sized to its fitted content, so a growing label would resize the window every time the digit count changes.
+    private var timeWidth: CGFloat {
+        recorder.elapsedSeconds >= 3600 ? 66 : 44
+    }
+
     private func formatTime(_ seconds: Int) -> String {
-        let m = seconds / 60
-        let s = seconds % 60
-        return String(format: "%02d:%02d", m, s)
+        let s = max(0, seconds)
+        let hours = s / 3600
+        let minutes = (s % 3600) / 60
+        let secs = s % 60
+        return hours > 0
+            ? String(format: "%d:%02d:%02d", hours, minutes, secs)
+            : String(format: "%02d:%02d", minutes, secs)
+    }
+}
+
+/// Pulses only while actually recording: a paused session shows a steady dimmed dot, and reduced motion gets no pulse at all.
+private struct RecordingLiveDot: View {
+    let isPaused: Bool
+
+    @State private var isPulsing = false
+
+    var body: some View {
+        Circle()
+            .fill(Color(nsColor: .systemRed))
+            .frame(width: 8, height: 8)
+            .opacity(isPaused ? 0.4 : (isPulsing ? 0.55 : 1))
+            .shadow(color: .red.opacity(isPaused ? 0 : 0.55), radius: isPulsing ? 4 : 1)
+            .animation(pulse, value: isPulsing)
+            .onAppear { isPulsing = !isPaused && !RecordingMotion.reduceMotion }
+            .onChange(of: isPaused) { _, paused in
+                isPulsing = !paused && !RecordingMotion.reduceMotion
+            }
+    }
+
+    private var pulse: Animation? {
+        guard isPulsing else { return .easeOut(duration: 0.2) }
+        return .easeInOut(duration: 0.9).repeatForever(autoreverses: true)
     }
 }

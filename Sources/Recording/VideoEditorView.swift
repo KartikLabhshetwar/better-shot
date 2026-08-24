@@ -25,19 +25,20 @@ struct VideoEditorView: View {
     @State private var shareCredentials = R2CredentialStore.shared
     @State private var shareUploader = R2Uploader.shared
     @State private var shareItemID: UUID?
+    @State private var isConfirmingDelete = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HSplitView {
             videoInspector
-                .frame(width: 260)
+                .frame(minWidth: 250, idealWidth: 270, maxWidth: 380)
 
             VStack(spacing: 0) {
-                videoPreview
+                VideoPreviewCanvas(model: model)
                     .frame(minWidth: 460, minHeight: 280)
 
                 VStack(spacing: 8) {
-                    controlsBar
+                    VideoTransportBar(model: model)
                     timelineSection
                 }
                 .padding(.horizontal, 16)
@@ -82,11 +83,12 @@ struct VideoEditorView: View {
                 .keyboardShortcut(.escape, modifiers: [])
 
                 Button {
-                    deleteRecording()
+                    isConfirmingDelete = true
                 } label: {
                     Label("Delete", systemImage: "trash")
                         .foregroundStyle(.red)
                 }
+                .help("Delete this recording from disk")
 
                 if shareCredentials.isConfigured && shareCredentials.enabled {
                     Button {
@@ -124,6 +126,12 @@ struct VideoEditorView: View {
             }
         }
         .editorToast($model.toastMessage)
+        .confirmationDialog("Delete this recording?", isPresented: $isConfirmingDelete) {
+            Button("Delete Recording", role: .destructive) { deleteRecording() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The file is removed from disk. This cannot be undone.")
+        }
         .frame(minWidth: 780, minHeight: 520)
         .onAppear { model.loadVideo(from: url) }
         .onDisappear { model.cleanup() }
@@ -167,217 +175,13 @@ struct VideoEditorView: View {
         .background(InspectorMaterial().ignoresSafeArea())
     }
 
-    // MARK: - Video Preview with Effects
-
-    @ViewBuilder
-    private var videoPreview: some View {
-        GeometryReader { geo in
-            let config = model.config
-            let videoAspect: CGFloat = model.videoWidth > 0 && model.videoHeight > 0
-                ? CGFloat(model.videoWidth) / CGFloat(model.videoHeight)
-                : 16.0 / 9.0
-
-            let effectivePadding = (config.style != .none && config.padding <= 0) ? CGFloat(0.06) : config.padding
-            let layout = previewLayout(
-                bounds: geo.size,
-                videoAspect: videoAspect,
-                paddingFraction: effectivePadding,
-                canvasAspect: config.aspectRatio.numericValue
-            )
-            let videoW = layout.videoSize.width
-            let videoH = layout.videoSize.height
-            let canvasW = layout.canvasSize.width
-            let canvasH = layout.canvasSize.height
-            let cornerRadius = config.cornerRadius * min(videoW, videoH)
-            let zoomFrame = model.viewportFrame(at: model.currentTime)
-
-            ZStack {
-                EditorCanvasBackdrop()
-
-                ZStack {
-                    videoBackground(config.style, size: CGSize(width: canvasW, height: canvasH))
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-
-                    ZStack {
-                        Group {
-                            if let player = model.player {
-                                AVPlayerRepresentable(player: player)
-                            } else {
-                                ProgressView()
-                            }
-                        }
-                        .frame(width: videoW, height: videoH)
-                        .scaleEffect(zoomFrame.magnification, anchor: UnitPoint(x: zoomFrame.anchor.x, y: zoomFrame.anchor.y))
-                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                        .shadow(
-                            color: config.shadowStrength > 0 ? .black.opacity(Double(config.shadowStrength) * 0.4) : .clear,
-                            radius: config.shadowStrength > 0 ? max(4, 20 * config.shadowStrength) : 0,
-                            y: config.shadowStrength > 0 ? max(2, 8 * config.shadowStrength) : 0
-                        )
-
-                        if model.isCropping {
-                            VideoCropOverlay(cropRect: $model.cropRect, videoSize: CGSize(width: videoW, height: videoH))
-                        } else if model.hasCrop {
-                            VideoCropPreview(cropRect: model.cropRect, videoSize: CGSize(width: videoW, height: videoH))
-                        }
-                    }
-                }
-                .frame(width: canvasW, height: canvasH)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-                )
-                .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
-                .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 1), value: config.aspectRatio)
-            }
-        }
-    }
-
-    private struct PreviewLayout {
-        let videoSize: CGSize
-        let canvasSize: CGSize
-    }
-
-    private func previewLayout(
-        bounds: CGSize,
-        videoAspect: CGFloat,
-        paddingFraction: CGFloat,
-        canvasAspect: CGFloat?
-    ) -> PreviewLayout {
-        let shortEdge = min(bounds.width, bounds.height) * 0.8
-        var videoW = min(bounds.width * 0.7, shortEdge * videoAspect)
-        var videoH = videoW / videoAspect
-        let pad = min(videoW, videoH) * paddingFraction
-        var canvasW = videoW + pad * 2
-        var canvasH = videoH + pad * 2
-
-        if let canvasAspect, canvasAspect > 0 {
-            if canvasW / canvasH < canvasAspect {
-                canvasW = canvasH * canvasAspect
-            } else {
-                canvasH = canvasW / canvasAspect
-            }
-        }
-
-        let fit = min(1, bounds.width * 0.94 / max(canvasW, 1), bounds.height * 0.94 / max(canvasH, 1))
-        videoW *= fit
-        videoH *= fit
-        canvasW *= fit
-        canvasH *= fit
-
-        return PreviewLayout(
-            videoSize: CGSize(width: videoW, height: videoH),
-            canvasSize: CGSize(width: canvasW, height: canvasH)
-        )
-    }
-
-    @ViewBuilder
-    private func videoBackground(_ style: BackgroundStyle, size: CGSize) -> some View {
-        switch style {
-        case .none:
-            TransparencyGrid()
-        case .solid(let color):
-            Rectangle().fill(color.color)
-        case .gradient(let preset):
-            Rectangle().fill(preset.swiftUIGradient)
-        case .wallpaper(let source):
-            if let nsImage = NSImage(contentsOfFile: source.path) {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: size.width, height: size.height)
-                    .clipped()
-            } else {
-                Rectangle().fill(.quaternary)
-            }
-        case .bundledImage(let assetID):
-            if let asset = BundledBackgrounds.asset(byID: assetID),
-               let nsImage = asset.image {
-                Image(nsImage: nsImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: size.width, height: size.height)
-                    .clipped()
-            } else {
-                Rectangle().fill(.quaternary)
-            }
-        }
-    }
-
-    // MARK: - Transport Controls
-
-    private var controlsBar: some View {
-        HStack(spacing: 0) {
-            timecode(model.formattedCurrentTime, tint: .secondary)
-                .frame(alignment: .leading)
-
-            Spacer()
-
-            HStack(spacing: 14) {
-                transportButton("backward.fill", size: 13, label: "Step back") { model.stepBackward() }
-                    .keyboardShortcut(.leftArrow, modifiers: [])
-
-                Button { model.togglePlayback() } label: {
-                    Image(systemName: model.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                        .font(.system(size: 30))
-                        .contentTransition(.symbolEffect(.replace))
-                        .foregroundStyle(.primary)
-                }
-                .buttonStyle(.inspectorPress(scale: 0.9))
-                .keyboardShortcut(.space, modifiers: [])
-                .accessibilityLabel(model.isPlaying ? "Pause" : "Play")
-                .help(model.isPlaying ? "Pause" : "Play")
-
-                transportButton("forward.fill", size: 13, label: "Step forward") { model.stepForward() }
-                    .keyboardShortcut(.rightArrow, modifiers: [])
-            }
-
-            Spacer()
-
-            timecode(model.formattedDuration, tint: model.hasTrim ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
-        }
-        .animation(reduceMotion ? nil : InspectorMotion.press, value: model.isPlaying)
-    }
-
-    private func timecode(_ text: String, tint: some ShapeStyle) -> some View {
-        Text(text)
-            .font(.system(size: 11, weight: .medium, design: .monospaced))
-            .monospacedDigit()
-            .foregroundStyle(tint)
-            .frame(width: 56)
-    }
-
-    private func transportButton(
-        _ icon: String,
-        size: CGFloat,
-        label: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: size, weight: .medium))
-                .frame(width: 26, height: 26)
-                .contentShape(Circle())
-        }
-        .buttonStyle(.inspectorPress(scale: 0.85))
-        .foregroundStyle(.secondary)
-        .accessibilityLabel(label)
-        .help(label)
-    }
-
     // MARK: - Timeline
 
     private var timelineSection: some View {
         VStack(spacing: 6) {
             clipToolbar
 
-            if model.isClipMode {
-                ClipTimelineView(model: model)
-                    .frame(height: 54)
-            } else {
-                VideoTrimTimelineView(model: model)
-                    .frame(height: 54)
-            }
+            VideoTimelineTrack(model: model)
 
             if model.zoomEnabled {
                 ZoomCueLaneView(model: model)
@@ -500,6 +304,228 @@ struct VideoEditorView: View {
 
 // MARK: - Video Inspector Sections
 
+/// The preview reads the playhead to place the zoom viewport, so it lives in its own view: reading it in `VideoEditorView.body` re-evaluated the inspector and toolbar thirty times a second.
+private struct VideoPreviewCanvas: View {
+    @Bindable var model: VideoEditorModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        GeometryReader { geo in
+            let config = model.config
+            let videoAspect: CGFloat = model.videoWidth > 0 && model.videoHeight > 0
+                ? CGFloat(model.videoWidth) / CGFloat(model.videoHeight)
+                : 16.0 / 9.0
+
+            let effectivePadding = (config.style != .none && config.padding <= 0) ? CGFloat(0.06) : config.padding
+            let layout = previewLayout(
+                bounds: geo.size,
+                videoAspect: videoAspect,
+                paddingFraction: effectivePadding,
+                canvasAspect: config.aspectRatio.numericValue
+            )
+            let videoW = layout.videoSize.width
+            let videoH = layout.videoSize.height
+            let canvasW = layout.canvasSize.width
+            let canvasH = layout.canvasSize.height
+            let cornerRadius = config.cornerRadius * min(videoW, videoH)
+            let zoomFrame = model.viewportFrame(at: model.currentTime)
+
+            ZStack {
+                EditorCanvasBackdrop()
+
+                ZStack {
+                    videoBackground(config.style, size: CGSize(width: canvasW, height: canvasH))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                    ZStack {
+                        Group {
+                            if let player = model.player {
+                                AVPlayerRepresentable(player: player)
+                            } else {
+                                ProgressView()
+                            }
+                        }
+                        .frame(width: videoW, height: videoH)
+                        .scaleEffect(zoomFrame.magnification, anchor: UnitPoint(x: zoomFrame.anchor.x, y: zoomFrame.anchor.y))
+                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                        .shadow(
+                            color: config.shadowStrength > 0 ? .black.opacity(Double(config.shadowStrength) * 0.4) : .clear,
+                            radius: config.shadowStrength > 0 ? max(4, 20 * config.shadowStrength) : 0,
+                            y: config.shadowStrength > 0 ? max(2, 8 * config.shadowStrength) : 0
+                        )
+
+                        if model.isCropping {
+                            VideoCropOverlay(cropRect: $model.cropRect, videoSize: CGSize(width: videoW, height: videoH))
+                        } else if model.hasCrop {
+                            VideoCropPreview(cropRect: model.cropRect, videoSize: CGSize(width: videoW, height: videoH))
+                        }
+                    }
+                }
+                .frame(width: canvasW, height: canvasH)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                )
+                .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
+                .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 1), value: config.aspectRatio)
+            }
+        }
+    }
+
+    private struct PreviewLayout {
+        let videoSize: CGSize
+        let canvasSize: CGSize
+    }
+
+    private func previewLayout(
+        bounds: CGSize,
+        videoAspect: CGFloat,
+        paddingFraction: CGFloat,
+        canvasAspect: CGFloat?
+    ) -> PreviewLayout {
+        let shortEdge = min(bounds.width, bounds.height) * 0.8
+        var videoW = min(bounds.width * 0.7, shortEdge * videoAspect)
+        var videoH = videoW / videoAspect
+        let pad = min(videoW, videoH) * paddingFraction
+        var canvasW = videoW + pad * 2
+        var canvasH = videoH + pad * 2
+
+        if let canvasAspect, canvasAspect > 0 {
+            if canvasW / canvasH < canvasAspect {
+                canvasW = canvasH * canvasAspect
+            } else {
+                canvasH = canvasW / canvasAspect
+            }
+        }
+
+        let fit = min(1, bounds.width * 0.94 / max(canvasW, 1), bounds.height * 0.94 / max(canvasH, 1))
+        videoW *= fit
+        videoH *= fit
+        canvasW *= fit
+        canvasH *= fit
+
+        return PreviewLayout(
+            videoSize: CGSize(width: videoW, height: videoH),
+            canvasSize: CGSize(width: canvasW, height: canvasH)
+        )
+    }
+
+    @ViewBuilder
+    private func videoBackground(_ style: BackgroundStyle, size: CGSize) -> some View {
+        switch style {
+        case .none:
+            TransparencyGrid()
+        case .solid(let color):
+            Rectangle().fill(color.color)
+        case .gradient(let preset):
+            Rectangle().fill(preset.swiftUIGradient)
+        case .wallpaper(let source):
+            if let nsImage = ImageCache.shared.image(atPath: source.path) {
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: size.width, height: size.height)
+                    .clipped()
+            } else {
+                Rectangle().fill(.quaternary)
+            }
+        case .bundledImage(let assetID):
+            if let asset = BundledBackgrounds.asset(byID: assetID),
+               let nsImage = asset.image {
+                Image(nsImage: nsImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: size.width, height: size.height)
+                    .clipped()
+            } else {
+                Rectangle().fill(.quaternary)
+            }
+        }
+    }
+
+    // MARK: - Transport Controls
+}
+
+/// Same reason as the preview: the timecode ticks with playback and nothing else in the editor needs to.
+private struct VideoTransportBar: View {
+    let model: VideoEditorModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        HStack(spacing: 0) {
+            timecode(model.formattedCurrentTime, tint: .secondary)
+                .frame(alignment: .leading)
+
+            Spacer()
+
+            HStack(spacing: 14) {
+                transportButton("backward.fill", size: 13, label: "Step back") { model.stepBackward() }
+                    .keyboardShortcut(.leftArrow, modifiers: [])
+
+                Button { model.togglePlayback() } label: {
+                    Image(systemName: model.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                        .font(.system(size: 30))
+                        .contentTransition(.symbolEffect(.replace))
+                        .foregroundStyle(.primary)
+                }
+                .buttonStyle(.inspectorPress(scale: 0.9))
+                .keyboardShortcut(.space, modifiers: [])
+                .accessibilityLabel(model.isPlaying ? "Pause" : "Play")
+                .help(model.isPlaying ? "Pause" : "Play")
+
+                transportButton("forward.fill", size: 13, label: "Step forward") { model.stepForward() }
+                    .keyboardShortcut(.rightArrow, modifiers: [])
+            }
+
+            Spacer()
+
+            timecode(model.formattedDuration, tint: model.hasTrim ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+        }
+        .animation(reduceMotion ? nil : InspectorMotion.press, value: model.isPlaying)
+    }
+
+    private func timecode(_ text: String, tint: some ShapeStyle) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .medium, design: .monospaced))
+            .monospacedDigit()
+            .foregroundStyle(tint)
+            .frame(width: 56)
+    }
+
+    private func transportButton(
+        _ icon: String,
+        size: CGFloat,
+        label: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: size, weight: .medium))
+                .frame(width: 26, height: 26)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.inspectorPress(scale: 0.85))
+        .foregroundStyle(.secondary)
+        .accessibilityLabel(label)
+        .help(label)
+    }
+}
+
+/// Holds the playhead read that drives the timelines' redraw during playback.
+private struct VideoTimelineTrack: View {
+    let model: VideoEditorModel
+
+    var body: some View {
+        if model.isClipMode {
+            ClipTimelineView(model: model, playhead: model.currentTime)
+                .frame(height: 54)
+        } else {
+            VideoTrimTimelineView(model: model, playhead: model.currentTime)
+                .frame(height: 54)
+        }
+    }
+}
+
 private struct VideoTrimSection: View {
     @Bindable var model: VideoEditorModel
 
@@ -614,7 +640,7 @@ private struct VideoCropSection: View {
     @Bindable var model: VideoEditorModel
 
     var body: some View {
-        InspectorSection("Crop") {
+        InspectorSection("Crop", collapsedByDefault: true) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 6) {
                     InspectorPill(

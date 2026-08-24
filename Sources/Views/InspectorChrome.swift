@@ -64,40 +64,63 @@ struct InspectorDivider: View {
     }
 }
 
+/// Collapsible so the inspector shows the work at hand instead of eight sections deep of scrolling. Expansion is remembered per section title across launches.
 struct InspectorSection<Content: View>: View {
     let title: String
     let accessory: AnyView?
     @ViewBuilder let content: () -> Content
 
-    init(_ title: String, @ViewBuilder content: @escaping () -> Content) {
+    @AppStorage private var isExpanded: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init(_ title: String, collapsedByDefault: Bool = false, @ViewBuilder content: @escaping () -> Content) {
         self.title = title
         self.accessory = nil
         self.content = content
+        _isExpanded = AppStorage(wrappedValue: !collapsedByDefault, "inspector.\(title).expanded")
     }
 
     init<Accessory: View>(
         _ title: String,
+        collapsedByDefault: Bool = false,
         @ViewBuilder accessory: () -> Accessory,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.title = title
         self.accessory = AnyView(accessory())
         self.content = content
+        _isExpanded = AppStorage(wrappedValue: !collapsedByDefault, "inspector.\(title).expanded")
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: InspectorMetrics.sectionSpacing) {
             HStack(spacing: 6) {
-                InspectorSectionHeader(title)
+                Button {
+                    withAnimation(reduceMotion ? nil : InspectorMotion.reveal) { isExpanded.toggle() }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(.tertiary)
+                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        InspectorSectionHeader(title)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.inspectorPress(scale: 0.97))
+                .accessibilityLabel(title)
+                .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+
                 Spacer(minLength: 4)
-                accessory
+
+                if isExpanded { accessory }
             }
             .frame(minHeight: 18)
 
-            content()
+            if isExpanded { content() }
         }
         .padding(.horizontal, InspectorMetrics.gutter)
-        .padding(.vertical, InspectorMetrics.gutter)
+        .padding(.vertical, isExpanded ? InspectorMetrics.gutter : 8)
     }
 }
 

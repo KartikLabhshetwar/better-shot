@@ -8,18 +8,25 @@ struct EditorWindowView: View {
     @State private var shareCredentials = R2CredentialStore.shared
     @State private var shareUploader = R2Uploader.shared
     @State private var shareItemID: UUID?
+    @State private var isConfirmingDelete = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         HSplitView {
             EditorInspectorView(model: model)
-                .frame(width: 280)
+                .frame(minWidth: 260, idealWidth: 280, maxWidth: 380)
 
             EditorCanvasView(model: model)
                 .frame(minWidth: 500, minHeight: 400)
                 .background(EditorCanvasBackdrop())
         }
         .editorToast($model.toastMessage)
+        .confirmationDialog("Delete this capture?", isPresented: $isConfirmingDelete) {
+            Button("Delete Capture", role: .destructive) { deleteCapture() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The file is removed from disk. This cannot be undone.")
+        }
         .background {
             AnnotationKeyCommandHandler(
                 onDelete: { model.deleteSelectedAnnotation() },
@@ -57,11 +64,12 @@ struct EditorWindowView: View {
                 .keyboardShortcut(.escape, modifiers: [])
 
                 Button {
-                    deleteCapture()
+                    isConfirmingDelete = true
                 } label: {
                     Label("Delete", systemImage: "trash")
                         .foregroundStyle(.red)
                 }
+                .help("Delete this capture from disk")
 
                 Button {
                     Task { await copyToClipboard() }

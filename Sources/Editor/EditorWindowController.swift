@@ -54,22 +54,14 @@ final class EditorWindowController {
         }
 
         if windows.isEmpty {
-            DispatchQueue.main.async {
-                if !VideoEditorWindowController.shared.hasOpenWindow {
-                    NSApp.setActivationPolicy(.accessory)
-                }
-            }
+            ActivationPolicy.dropIfNoWindowsLeft()
         }
     }
 
     func windowDidClose(_ window: NSWindow) {
         windows.removeAll { $0 === window }
         if windows.isEmpty {
-            DispatchQueue.main.async {
-                if !VideoEditorWindowController.shared.hasOpenWindow {
-                    NSApp.setActivationPolicy(.accessory)
-                }
-            }
+            ActivationPolicy.dropIfNoWindowsLeft()
         }
     }
 
@@ -107,7 +99,7 @@ private final class EditorWindowDelegate: NSObject, NSWindowDelegate, @unchecked
 
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }
-        DispatchQueue.main.async {
+        MainActor.assumeIsolated {
             EditorWindowController.shared.windowDidClose(window)
         }
     }

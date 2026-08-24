@@ -248,7 +248,7 @@ private struct CanvasBackgroundView: View {
             Rectangle().fill(preset.swiftUIGradient)
 
         case .wallpaper(let source):
-            if let nsImage = NSImage(contentsOfFile: source.path) {
+            if let nsImage = ImageCache.shared.image(atPath: source.path) {
                 Image(nsImage: nsImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)

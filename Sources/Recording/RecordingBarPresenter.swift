@@ -35,17 +35,21 @@ final class RecordingBarPresenter {
 
         mode = .picker
         showTask?.cancel()
+
+        if AppPreferences.recordingShowCamera {
+            CameraBubbleController.shared.enable()
+        }
+        let panel = panel ?? makePanel()
+        applyFrame(to: panel, on: screen, keepingCurrentPosition: false, animated: false)
+        panel.orderFrontRegardless()
+        panel.makeKey()
+        RecordingBarPresentation.shared.isPresented = true
+
+        // Enumerating displays and windows takes long enough to be felt, so the bar goes up first and its source menus fill in behind it.
         showTask = Task { @MainActor [weak self] in
             await RecordingSourceCatalog.shared.refresh()
-            guard let self, !Task.isCancelled, self.mode == .picker else { return }
-            if AppPreferences.recordingShowCamera {
-                CameraBubbleController.shared.enable()
-            }
-            let panel = self.panel ?? self.makePanel()
-            self.applyFrame(to: panel, on: screen, keepingCurrentPosition: false, animated: false)
-            panel.orderFrontRegardless()
-            panel.makeKey()
-            RecordingBarPresentation.shared.isPresented = true
+            guard let self, !Task.isCancelled else { return }
+            self.reposition(panel, on: screen, keepingCurrentPosition: true, animated: true)
             self.showTask = nil
         }
     }
@@ -109,15 +113,18 @@ final class RecordingBarPresenter {
         }
         let frame = NSRect(origin: origin, size: size)
         isApplyingFrame = true
-        defer { isApplyingFrame = false }
         if animated, !RecordingMotion.reduceMotion {
+            // Held across the animation, not just the call: `didMove` fires per animation step and would otherwise save a position the user never chose.
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.28
                 context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                 panel.animator().setFrame(frame, display: true)
+            } completionHandler: {
+                MainActor.assumeIsolated { self.isApplyingFrame = false }
             }
         } else {
             panel.setFrame(frame, display: true)
+            isApplyingFrame = false
         }
     }
 
@@ -220,7 +227,7 @@ private struct RecordingBarRootView: View {
         .animation(RecordingMotion.modeChange, value: presenter.mode)
         .frame(height: RecordingBarMetrics.height)
         .fixedSize()
-        .background(barBackground)
+        .recordingBarSurface(isInteractive: true)
         .scaleEffect(presentation.isPresented ? 1 : 0.92, anchor: .bottom)
         .opacity(presentation.isPresented ? 1 : 0)
         .animation(RecordingMotion.showHideSpring, value: presentation.isPresented)
@@ -240,16 +247,6 @@ private struct RecordingBarRootView: View {
         .allowsHitTesting(false)
         .animation(.easeOut(duration: 0.12), value: tooltip.visible?.id)
         .animation(.easeOut(duration: 0.12), value: tooltip.visible?.text)
-    }
-
-    private var barBackground: some View {
-        RecordingBarMaterial()
-            .clipShape(RoundedRectangle(cornerRadius: RecordingBarMetrics.cornerRadius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: RecordingBarMetrics.cornerRadius, style: .continuous)
-                    .strokeBorder(RecordingBarMetrics.edge, lineWidth: 0.5)
-            )
-            .shadow(color: .black.opacity(RecordingBarMetrics.shadowOpacity), radius: RecordingBarMetrics.shadowRadius, y: RecordingBarMetrics.shadowY)
     }
 }
 

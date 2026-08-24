@@ -390,7 +390,7 @@ private struct DefaultBackgroundPicker: View {
     private var customImageRow: some View {
         if case .wallpaper(let source) = selectedStyle {
             HStack(spacing: 8) {
-                if let img = NSImage(contentsOfFile: source.path) {
+                if let img = ImageCache.shared.image(atPath: source.path) {
                     Image(nsImage: img)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
@@ -547,7 +547,7 @@ private struct DefaultConfigPreview: View {
         case .gradient(let preset):
             Rectangle().fill(preset.swiftUIGradient)
         case .wallpaper(let source):
-            if let nsImage = NSImage(contentsOfFile: source.path) {
+            if let nsImage = ImageCache.shared.image(atPath: source.path) {
                 Image(nsImage: nsImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)

@@ -1,8 +1,10 @@
 import SwiftUI
 import AppKit
 
+/// `playhead` exists so the enclosing view's read of it is what schedules `updateNSView` while playback advances.
 struct VideoTrimTimelineView: NSViewRepresentable {
     let model: VideoEditorModel
+    let playhead: Double
 
     func makeNSView(context: Context) -> VideoTrimTimelineControl {
         let control = VideoTrimTimelineControl()
@@ -12,39 +14,40 @@ struct VideoTrimTimelineView: NSViewRepresentable {
 
     func updateNSView(_ nsView: VideoTrimTimelineControl, context: Context) {
         nsView.model = model
-        nsView.needsDisplay = true
+        nsView.syncFromModel()
     }
 }
 
 final class VideoTrimTimelineControl: NSView {
-    var model: VideoEditorModel?
-
-    private enum DragTarget {
-        case startHandle
-        case endHandle
-        case playhead
-        case selectedRange
+    var model: VideoEditorModel? {
+        didSet { syncFromModel() }
     }
 
-    private var dragTarget: DragTarget?
-    private var dragStartPoint: CGPoint = .zero
-    private var dragStartSelection: (start: Double, end: Double) = (0, 0)
-    private var dragStartPlayhead: Double = 0
+    private struct RenderState: Equatable {
+        var trimStart = Double.nan
+        var trimEnd = Double.nan
+        var playhead = Double.nan
+        var duration = Double.nan
+        var thumbnailCount = -1
+        var activeTarget: TrimDragTarget?
+        var hoverTarget: TrimDragTarget?
+        var size = CGSize.zero
+    }
+
+    private var drag: TrimDrag?
+    private var dragStartX: CGFloat = 0
     private var dragDidActivate = false
+    private var hoverTarget: TrimDragTarget?
     private var trackingArea: NSTrackingArea?
+    private var rendered = RenderState()
+    private let filmstrip = TimelineFilmstrip()
 
     private let handleWidth: CGFloat = 12
     private let handleHitSlop: CGFloat = 14
-    private let gripBarWidth: CGFloat = 2
-    private let gripBarSpacing: CGFloat = 3
-    private let borderWidth: CGFloat = 3
+    private let borderWidth: CGFloat = 2.5
     private let playheadWidth: CGFloat = 2
     private let cornerRadius: CGFloat = 8
-    private let dragActivationDistance: CGFloat = 3
-
-    private var timelineRect: NSRect {
-        NSRect(x: handleWidth, y: 0, width: bounds.width - handleWidth * 2, height: bounds.height)
-    }
+    private let rangeDragThreshold: CGFloat = 3
 
     override var isFlipped: Bool { true }
 
@@ -52,56 +55,62 @@ final class VideoTrimTimelineControl: NSView {
         NSSize(width: NSView.noIntrinsicMetric, height: 54)
     }
 
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
     override init(frame: NSRect) {
         super.init(frame: frame)
     }
 
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError() }
+    // MARK: - Geometry
 
-    // MARK: - Coordinate conversion
-
-    private func xPosition(for seconds: Double) -> CGFloat {
-        guard let model, model.duration > 0 else { return timelineRect.minX }
-        return timelineRect.minX + timelineRect.width * CGFloat(seconds / model.duration)
+    private var trackRect: NSRect {
+        NSRect(x: handleWidth, y: 0, width: max(1, bounds.width - handleWidth * 2), height: bounds.height)
     }
 
-    private func time(for x: CGFloat) -> Double {
-        guard let model, model.duration > 0 else { return 0 }
-        return Double((x - timelineRect.minX) / timelineRect.width) * model.duration
+    private var geometry: TimelineGeometry {
+        TimelineGeometry(trackMinX: trackRect.minX, trackWidth: trackRect.width, duration: model?.duration ?? 0)
     }
 
-    // MARK: - Hit testing
+    private var selection: TrimSelection {
+        TrimSelection(start: model?.trimStart ?? 0, end: model?.trimEnd ?? 0)
+    }
 
-    private func hitTarget(at point: CGPoint) -> DragTarget? {
+    private func hitTarget(at x: CGFloat) -> TrimDragTarget? {
         guard let model else { return nil }
-
-        let startX = xPosition(for: model.trimStart)
-        if abs(point.x - startX) <= handleWidth / 2 + handleHitSlop {
-            return .startHandle
-        }
-
-        let endX = xPosition(for: model.trimEnd)
-        if abs(point.x - endX) <= handleWidth / 2 + handleHitSlop {
-            return .endHandle
-        }
-
-        let playheadX = xPosition(for: model.currentTime)
-        if abs(point.x - playheadX) <= 10 && point.x > startX && point.x < endX {
-            return .playhead
-        }
-
-        if point.x > startX && point.x < endX {
-            return .selectedRange
-        }
-
-        return nil
+        let tester = TrimHitTester(geometry: geometry, slop: handleWidth / 2 + handleHitSlop)
+        return tester.target(at: x, selection: selection, playhead: model.currentTime)
     }
 
-    // MARK: - Mouse events
+    // MARK: - Invalidation
+
+    /// Redraws only when something visible actually changed: SwiftUI re-runs `updateNSView` for every unrelated edit, and playback alone ticks it thirty times a second.
+    func syncFromModel() {
+        guard let model else { return }
+        let next = RenderState(
+            trimStart: model.trimStart,
+            trimEnd: model.trimEnd,
+            playhead: model.currentTime,
+            duration: model.duration,
+            thumbnailCount: model.thumbnails.count,
+            activeTarget: drag?.target,
+            hoverTarget: hoverTarget,
+            size: bounds.size
+        )
+        guard next != rendered else { return }
+        rendered = next
+        needsDisplay = true
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        syncFromModel()
+    }
+
+    // MARK: - Mouse
 
     override func updateTrackingAreas() {
-        if let existing = trackingArea { removeTrackingArea(existing) }
+        if let trackingArea { removeTrackingArea(trackingArea) }
         let area = NSTrackingArea(rect: bounds, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways], owner: self)
         addTrackingArea(area)
         trackingArea = area
@@ -110,109 +119,74 @@ final class VideoTrimTimelineControl: NSView {
 
     override func mouseMoved(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        if let target = hitTarget(at: point) {
-            switch target {
-            case .startHandle, .endHandle:
-                NSCursor.resizeLeftRight.set()
-            case .playhead:
-                NSCursor.resizeLeftRight.set()
-            case .selectedRange:
-                NSCursor.openHand.set()
-            }
-        } else {
-            NSCursor.arrow.set()
-        }
+        hoverTarget = hitTarget(at: point.x)
+        applyCursor(for: hoverTarget, isDragging: false)
+        syncFromModel()
     }
 
     override func mouseExited(with event: NSEvent) {
+        hoverTarget = nil
         NSCursor.arrow.set()
+        syncFromModel()
     }
 
     override func mouseDown(with event: NSEvent) {
         guard let model else { return }
         let point = convert(event.locationInWindow, from: nil)
+        let time = geometry.time(for: point.x)
 
-        dragTarget = hitTarget(at: point)
-        dragStartPoint = point
-        dragStartSelection = (model.trimStart, model.trimEnd)
-        dragStartPlayhead = model.currentTime
+        dragStartX = point.x
         dragDidActivate = false
 
-        if dragTarget == nil {
-            let t = time(for: point.x)
-            let clamped = max(model.trimStart, min(t, model.trimEnd))
-            DispatchQueue.main.async { model.seekTo(clamped) }
+        guard let target = hitTarget(at: point.x) else {
+            model.seekTo(min(max(time, model.trimStart), model.trimEnd))
+            syncFromModel()
+            return
         }
+
+        model.pauseForScrub()
+        drag = TrimDrag(target: target, grabbedAt: time, selection: selection, playhead: model.currentTime)
+        applyCursor(for: target, isDragging: true)
+        syncFromModel()
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard let model, let target = dragTarget else { return }
+        guard let model, let drag else { return }
         let point = convert(event.locationInWindow, from: nil)
 
-        if !dragDidActivate {
-            let dist = hypot(point.x - dragStartPoint.x, point.y - dragStartPoint.y)
-            if dist < dragActivationDistance { return }
+        if drag.target == .range, !dragDidActivate {
+            guard abs(point.x - dragStartX) >= rangeDragThreshold else { return }
             dragDidActivate = true
-            if target == .selectedRange {
-                NSCursor.closedHand.set()
-            }
         }
 
-        let t = time(for: point.x)
-        let minDuration = 0.25
-
-        DispatchQueue.main.async {
-            switch target {
-            case .startHandle:
-                let newStart = max(0, min(t, model.trimEnd - minDuration))
-                model.setTrimStart(newStart)
-                model.seekTo(newStart)
-
-            case .endHandle:
-                let newEnd = min(model.duration, max(t, model.trimStart + minDuration))
-                model.setTrimEnd(newEnd)
-                model.seekTo(newEnd)
-
-            case .playhead:
-                let clamped = max(model.trimStart, min(t, model.trimEnd))
-                model.seekTo(clamped)
-
-            case .selectedRange:
-                let dx = point.x - self.dragStartPoint.x
-                let dt = Double(dx / self.timelineRect.width) * model.duration
-                let rangeDuration = self.dragStartSelection.end - self.dragStartSelection.start
-                var newStart = self.dragStartSelection.start + dt
-                newStart = max(0, min(newStart, model.duration - rangeDuration))
-                model.trimStart = newStart
-                model.trimEnd = newStart + rangeDuration
-
-                let relativePlayhead = self.dragStartPlayhead - self.dragStartSelection.start
-                model.seekTo(newStart + relativePlayhead)
-            }
-            self.needsDisplay = true
-        }
+        let result = drag.apply(at: geometry.time(for: point.x), duration: model.duration)
+        model.applyTrimDrag(result.selection, playhead: result.playhead, precise: false)
+        syncFromModel()
     }
 
     override func mouseUp(with event: NSEvent) {
-        if dragTarget == .selectedRange && !dragDidActivate {
-            let point = convert(event.locationInWindow, from: nil)
-            let t = time(for: point.x)
-            if let model {
-                let clamped = max(model.trimStart, min(t, model.trimEnd))
-                DispatchQueue.main.async { model.seekTo(clamped) }
+        let point = convert(event.locationInWindow, from: nil)
+        if let model, let drag {
+            if drag.target == .range, !dragDidActivate {
+                model.seekTo(min(max(geometry.time(for: point.x), model.trimStart), model.trimEnd))
+            } else {
+                model.seekTo(model.currentTime)
             }
         }
+        drag = nil
+        dragDidActivate = false
+        hoverTarget = hitTarget(at: point.x)
+        applyCursor(for: hoverTarget, isDragging: false)
+        syncFromModel()
+    }
 
-        dragTarget = nil
-        let point = convert(event.locationInWindow, from: nil)
-        if let target = hitTarget(at: point) {
-            switch target {
-            case .startHandle, .endHandle, .playhead:
-                NSCursor.resizeLeftRight.set()
-            case .selectedRange:
-                NSCursor.openHand.set()
-            }
-        } else {
+    private func applyCursor(for target: TrimDragTarget?, isDragging: Bool) {
+        switch target {
+        case .start, .end, .playhead:
+            NSCursor.resizeLeftRight.set()
+        case .range:
+            (isDragging ? NSCursor.closedHand : NSCursor.openHand).set()
+        case nil:
             NSCursor.arrow.set()
         }
     }
@@ -220,122 +194,101 @@ final class VideoTrimTimelineControl: NSView {
     // MARK: - Drawing
 
     override func draw(_ dirtyRect: NSRect) {
-        guard let model else { return }
-        let ctx = NSGraphicsContext.current!.cgContext
+        guard let model, let ctx = NSGraphicsContext.current?.cgContext else { return }
 
-        let startX = xPosition(for: model.trimStart)
-        let endX = xPosition(for: model.trimEnd)
-        let tl = timelineRect
+        let track = trackRect
+        let startX = geometry.x(for: model.trimStart)
+        let endX = geometry.x(for: model.trimEnd)
 
-        // 1. Background
-        ctx.setFillColor(NSColor.black.withAlphaComponent(0.9).cgColor)
-        let bgPath = CGPath(roundedRect: bounds, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
-        ctx.addPath(bgPath)
+        ctx.setFillColor(NSColor.black.withAlphaComponent(0.85).cgColor)
+        ctx.addPath(CGPath(roundedRect: bounds, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil))
         ctx.fillPath()
 
-        // 2. Thumbnails
         ctx.saveGState()
-        let clipPath = CGPath(roundedRect: tl, cornerWidth: cornerRadius - 2, cornerHeight: cornerRadius - 2, transform: nil)
-        ctx.addPath(clipPath)
+        let trackPath = CGPath(roundedRect: track, cornerWidth: cornerRadius - 2, cornerHeight: cornerRadius - 2, transform: nil)
+        ctx.addPath(trackPath)
         ctx.clip()
 
-        let thumbCount = max(1, model.thumbnails.count)
-        let thumbW = tl.width / CGFloat(thumbCount)
-        for (i, thumb) in model.thumbnails.enumerated() {
-            let thumbRect = NSRect(x: tl.minX + CGFloat(i) * thumbW, y: tl.minY, width: thumbW, height: tl.height)
-            if let cgImage = thumb.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-                ctx.draw(cgImage, in: thumbRect)
-            }
+        if let strip = filmstrip.image(for: model.thumbnails, size: track.size, scale: window?.backingScaleFactor ?? 2) {
+            ctx.drawFlipped(strip, in: track)
+        } else {
+            ctx.setFillColor(NSColor.white.withAlphaComponent(0.06).cgColor)
+            ctx.fill(track)
+        }
+
+        ctx.setFillColor(NSColor.black.withAlphaComponent(0.6).cgColor)
+        if startX > track.minX {
+            ctx.fill(CGRect(x: track.minX, y: track.minY, width: startX - track.minX, height: track.height))
+        }
+        if endX < track.maxX {
+            ctx.fill(CGRect(x: endX, y: track.minY, width: track.maxX - endX, height: track.height))
         }
         ctx.restoreGState()
 
-        // 3. Dimmed regions outside selection
-        ctx.saveGState()
-        ctx.addPath(clipPath)
-        ctx.clip()
-
-        let dimColor = NSColor.black.withAlphaComponent(0.6).cgColor
-        if startX > tl.minX {
-            ctx.setFillColor(dimColor)
-            ctx.fill(CGRect(x: tl.minX, y: 0, width: startX - tl.minX, height: bounds.height))
-        }
-        if endX < tl.maxX {
-            ctx.setFillColor(dimColor)
-            ctx.fill(CGRect(x: endX, y: 0, width: tl.maxX - endX, height: bounds.height))
-        }
-        ctx.restoreGState()
-
-        // 4. Selection border (top and bottom lines)
-        let selColor = NSColor.systemOrange.cgColor
-        ctx.setFillColor(selColor)
+        ctx.setFillColor(NSColor.systemOrange.cgColor)
         ctx.fill(CGRect(x: startX, y: 0, width: endX - startX, height: borderWidth))
         ctx.fill(CGRect(x: startX, y: bounds.height - borderWidth, width: endX - startX, height: borderWidth))
 
-        // 5. Start handle
-        drawHandle(ctx: ctx, x: startX - handleWidth, isStart: true)
+        drawHandle(ctx: ctx, x: startX - handleWidth, isStart: true, isActive: isEmphasized(.start))
+        drawHandle(ctx: ctx, x: endX, isStart: false, isActive: isEmphasized(.end))
 
-        // 6. End handle
-        drawHandle(ctx: ctx, x: endX, isStart: false)
-
-        // 7. Playhead
-        if dragTarget != .startHandle && dragTarget != .endHandle {
-            let playheadX = xPosition(for: model.currentTime)
-            if playheadX >= startX && playheadX <= endX {
-                ctx.setShadow(offset: CGSize(width: 0, height: 0), blur: 3, color: NSColor.black.withAlphaComponent(0.5).cgColor)
-                ctx.setFillColor(NSColor.white.cgColor)
-                let playheadRect = CGRect(
-                    x: playheadX - playheadWidth / 2,
-                    y: -2,
-                    width: playheadWidth,
-                    height: bounds.height + 4
-                )
-                ctx.fill(playheadRect)
-                ctx.setShadow(offset: .zero, blur: 0)
-            }
+        if drag?.target != .start, drag?.target != .end {
+            drawPlayhead(ctx: ctx, x: geometry.x(for: model.currentTime), within: startX...max(startX, endX))
         }
     }
 
-    private func drawHandle(ctx: CGContext, x: CGFloat, isStart: Bool) {
-        let handleRect = CGRect(x: x, y: 0, width: handleWidth, height: bounds.height)
-        let handleColor = NSColor.systemOrange.cgColor
+    private func isEmphasized(_ target: TrimDragTarget) -> Bool {
+        drag?.target == target || (drag == nil && hoverTarget == target)
+    }
 
+    private func drawPlayhead(ctx: CGContext, x: CGFloat, within range: ClosedRange<CGFloat>) {
+        guard range.contains(x) else { return }
+        ctx.setShadow(offset: .zero, blur: 3, color: NSColor.black.withAlphaComponent(0.5).cgColor)
+        ctx.setFillColor(NSColor.white.cgColor)
+        ctx.addPath(CGPath(
+            roundedRect: CGRect(x: x - playheadWidth / 2, y: -2, width: playheadWidth, height: bounds.height + 4),
+            cornerWidth: playheadWidth / 2,
+            cornerHeight: playheadWidth / 2,
+            transform: nil
+        ))
+        ctx.fillPath()
+        ctx.setShadow(offset: .zero, blur: 0)
+    }
+
+    private func drawHandle(ctx: CGContext, x: CGFloat, isStart: Bool, isActive: Bool) {
+        let rect = CGRect(x: x, y: 0, width: handleWidth, height: bounds.height)
         let path = CGMutablePath()
         let r = cornerRadius
+
         if isStart {
-            path.move(to: CGPoint(x: handleRect.minX + r, y: handleRect.minY))
-            path.addLine(to: CGPoint(x: handleRect.maxX, y: handleRect.minY))
-            path.addLine(to: CGPoint(x: handleRect.maxX, y: handleRect.maxY))
-            path.addLine(to: CGPoint(x: handleRect.minX + r, y: handleRect.maxY))
-            path.addArc(center: CGPoint(x: handleRect.minX + r, y: handleRect.maxY - r), radius: r, startAngle: .pi / 2, endAngle: .pi, clockwise: false)
-            path.addLine(to: CGPoint(x: handleRect.minX, y: handleRect.minY + r))
-            path.addArc(center: CGPoint(x: handleRect.minX + r, y: handleRect.minY + r), radius: r, startAngle: .pi, endAngle: 3 * .pi / 2, clockwise: false)
+            path.move(to: CGPoint(x: rect.minX + r, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            path.addLine(to: CGPoint(x: rect.minX + r, y: rect.maxY))
+            path.addArc(center: CGPoint(x: rect.minX + r, y: rect.maxY - r), radius: r, startAngle: .pi / 2, endAngle: .pi, clockwise: false)
+            path.addLine(to: CGPoint(x: rect.minX, y: rect.minY + r))
+            path.addArc(center: CGPoint(x: rect.minX + r, y: rect.minY + r), radius: r, startAngle: .pi, endAngle: 3 * .pi / 2, clockwise: false)
         } else {
-            path.move(to: CGPoint(x: handleRect.minX, y: handleRect.minY))
-            path.addLine(to: CGPoint(x: handleRect.maxX - r, y: handleRect.minY))
-            path.addArc(center: CGPoint(x: handleRect.maxX - r, y: handleRect.minY + r), radius: r, startAngle: 3 * .pi / 2, endAngle: 0, clockwise: false)
-            path.addLine(to: CGPoint(x: handleRect.maxX, y: handleRect.maxY - r))
-            path.addArc(center: CGPoint(x: handleRect.maxX - r, y: handleRect.maxY - r), radius: r, startAngle: 0, endAngle: .pi / 2, clockwise: false)
-            path.addLine(to: CGPoint(x: handleRect.minX, y: handleRect.maxY))
+            path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.maxX - r, y: rect.minY))
+            path.addArc(center: CGPoint(x: rect.maxX - r, y: rect.minY + r), radius: r, startAngle: 3 * .pi / 2, endAngle: 0, clockwise: false)
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - r))
+            path.addArc(center: CGPoint(x: rect.maxX - r, y: rect.maxY - r), radius: r, startAngle: 0, endAngle: .pi / 2, clockwise: false)
+            path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
         }
         path.closeSubpath()
 
-        ctx.setFillColor(handleColor)
+        let fill = isActive ? NSColor.systemOrange.blended(withFraction: 0.25, of: .white) ?? .systemOrange : .systemOrange
+        ctx.setFillColor(fill.cgColor)
         ctx.addPath(path)
         ctx.fillPath()
 
-        // Grip bars
-        let centerX = handleRect.midX
-        let centerY = handleRect.midY
-        let barHeight: CGFloat = 16
-
-        ctx.setStrokeColor(NSColor.black.withAlphaComponent(0.4).cgColor)
-        ctx.setLineWidth(gripBarWidth)
+        ctx.setStrokeColor(NSColor.black.withAlphaComponent(0.45).cgColor)
+        ctx.setLineWidth(1.5)
         ctx.setLineCap(.round)
-
-        let offset = gripBarSpacing
-        for dx in [-offset, offset] {
-            ctx.move(to: CGPoint(x: centerX + dx, y: centerY - barHeight / 2))
-            ctx.addLine(to: CGPoint(x: centerX + dx, y: centerY + barHeight / 2))
+        for dx in [CGFloat(-2.5), 2.5] {
+            ctx.move(to: CGPoint(x: rect.midX + dx, y: rect.midY - 8))
+            ctx.addLine(to: CGPoint(x: rect.midX + dx, y: rect.midY + 8))
             ctx.strokePath()
         }
     }
@@ -366,32 +319,33 @@ struct ZoomCueLaneView: View {
                     )
                 }
             }
+            .coordinateSpace(.named(ZoomCuePillView.laneSpace))
         }
     }
 }
 
 private struct ZoomCuePillView: View {
+    static let laneSpace = "bs.zoomCueLane"
+
     let model: VideoEditorModel
     let cue: ZoomCue
     let trackWidth: CGFloat
     let sideInset: CGFloat
     let laneHeight: CGFloat
 
-    @State private var dragOriginalStart: TimeInterval?
-    @State private var dragOriginalEnd: TimeInterval?
+    @State private var dragOrigin: (start: TimeInterval, end: TimeInterval)?
 
     private enum DragKind { case move, resizeStart, resizeEnd }
 
     private var isSelected: Bool { model.selectedZoomCueID == cue.id }
 
-    private func x(for time: TimeInterval) -> CGFloat {
-        guard model.duration > 0 else { return sideInset }
-        return sideInset + trackWidth * CGFloat(time / model.duration)
+    private var geometry: TimelineGeometry {
+        TimelineGeometry(trackMinX: sideInset, trackWidth: trackWidth, duration: model.duration)
     }
 
     var body: some View {
-        let startX = x(for: cue.start)
-        let endX = x(for: cue.end)
+        let startX = geometry.x(for: cue.start)
+        let endX = geometry.x(for: cue.end)
         let width = max(6, endX - startX)
         let edgeWidth = min(6, width / 3)
 
@@ -421,32 +375,29 @@ private struct ZoomCuePillView: View {
     }
 
     private func dragGesture(kind: DragKind) -> some Gesture {
-        DragGesture(minimumDistance: 2)
+        DragGesture(minimumDistance: 2, coordinateSpace: .named(Self.laneSpace))
             .onChanged { value in
-                if dragOriginalStart == nil {
-                    dragOriginalStart = cue.start
-                    dragOriginalEnd = cue.end
-                }
-                guard let origStart = dragOriginalStart, let origEnd = dragOriginalEnd,
-                      model.duration > 0, trackWidth > 0 else { return }
-                let dt = Double(value.translation.width / trackWidth) * model.duration
+                let origin = dragOrigin ?? (cue.start, cue.end)
+                dragOrigin = origin
+                guard model.duration > 0 else { return }
+
+                let dt = geometry.seconds(forWidth: value.translation.width)
                 switch kind {
                 case .move:
-                    let cueDuration = origEnd - origStart
-                    let newStart = max(0, min(origStart + dt, model.duration - cueDuration))
-                    model.updateZoomCue(id: cue.id, start: newStart, end: newStart + cueDuration)
+                    let moved = TrimSelection(start: origin.start, end: origin.end)
+                        .shifted(by: dt, duration: model.duration)
+                    model.updateZoomCue(id: cue.id, start: moved.start, end: moved.end)
                 case .resizeStart:
-                    let newStart = max(0, min(origStart + dt, origEnd - ZoomCue.minimumDuration))
-                    model.updateZoomCue(id: cue.id, start: newStart, end: origEnd)
+                    let newStart = max(0, min(origin.start + dt, origin.end - ZoomCue.minimumDuration))
+                    model.updateZoomCue(id: cue.id, start: newStart, end: origin.end)
                 case .resizeEnd:
-                    let newEnd = min(model.duration, max(origEnd + dt, origStart + ZoomCue.minimumDuration))
-                    model.updateZoomCue(id: cue.id, start: origStart, end: newEnd)
+                    let newEnd = min(model.duration, max(origin.end + dt, origin.start + ZoomCue.minimumDuration))
+                    model.updateZoomCue(id: cue.id, start: origin.start, end: newEnd)
                 }
                 model.selectedZoomCueID = cue.id
             }
             .onEnded { _ in
-                dragOriginalStart = nil
-                dragOriginalEnd = nil
+                dragOrigin = nil
             }
     }
 }

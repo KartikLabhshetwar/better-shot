@@ -11,7 +11,7 @@ struct ColorGradeSection: View {
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 3)
 
     var body: some View {
-        InspectorSection("Color") {
+        InspectorSection("Color", collapsedByDefault: true) {
             if !correction.isIdentity {
                 InspectorPill("Reset", systemImage: "arrow.counterclockwise") {
                     onEditingChanged?(true)

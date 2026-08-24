@@ -53,7 +53,7 @@ struct LayoutSection: View {
     var showsAlignment = true
 
     var body: some View {
-        InspectorSection("Layout") {
+        InspectorSection("Layout", collapsedByDefault: true) {
             VStack(alignment: .leading, spacing: 10) {
                 InspectorRow("Ratio") {
                     InspectorMenuField(
@@ -283,7 +283,7 @@ struct BackgroundPickerSection: View {
     private var customImageSection: some View {
         if case .wallpaper(let source) = config.style {
             HStack(spacing: 8) {
-                if let image = NSImage(contentsOfFile: source.path) {
+                if let image = ImageCache.shared.image(atPath: source.path) {
                     Image(nsImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fill)

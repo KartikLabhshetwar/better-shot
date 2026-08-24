@@ -71,3 +71,16 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
         }
     }
 }
+
+/// Single owner of the Dock/menu-bar policy. Each window controller used to decide alone while checking only some of the others, so closing one window could demote the app while another was still on screen.
+@MainActor
+enum ActivationPolicy {
+    static func dropIfNoWindowsLeft() {
+        Task { @MainActor in
+            guard !EditorWindowController.shared.hasOpenWindows,
+                  !VideoEditorWindowController.shared.hasOpenWindow,
+                  !SettingsWindowController.shared.hasOpenWindow else { return }
+            NSApp.setActivationPolicy(.accessory)
+        }
+    }
+}

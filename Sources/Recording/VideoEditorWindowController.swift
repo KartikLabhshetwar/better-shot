@@ -44,11 +44,7 @@ final class VideoEditorWindowController: NSObject, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         window = nil
-        DispatchQueue.main.async {
-            if !EditorWindowController.shared.hasOpenWindows {
-                NSApp.setActivationPolicy(.accessory)
-            }
-        }
+        ActivationPolicy.dropIfNoWindowsLeft()
     }
 
     private func centerOnActiveScreen(_ window: NSWindow, preferring preferred: NSScreen? = nil) {
