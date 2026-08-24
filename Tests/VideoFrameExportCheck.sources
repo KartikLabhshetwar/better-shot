@@ -1,4 +1,5 @@
 Sources/Recording/VideoFrameExporter.swift
 Sources/Recording/VideoExportError.swift
 Sources/Models/BackgroundStyle.swift
+Sources/Models/ColorCorrection.swift
 Sources/Models/BundledBackgrounds.swift

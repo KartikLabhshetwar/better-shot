@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 /// Represents a captured screenshot or recording in the history.
@@ -49,6 +50,20 @@ struct BeautifierConfig: Codable, Equatable {
     var shadowStrength: CGFloat = 0.36
     var alignment: ImageAlignment = .center
     var aspectRatio: CanvasAspectRatio = .auto
+    var colorCorrection: ColorCorrection = .identity
 
     static let `default` = BeautifierConfig()
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        style = try container.decodeIfPresent(BackgroundStyle.self, forKey: .style) ?? .none
+        padding = try container.decodeIfPresent(CGFloat.self, forKey: .padding) ?? 0.08
+        cornerRadius = try container.decodeIfPresent(CGFloat.self, forKey: .cornerRadius) ?? 0.018
+        shadowStrength = try container.decodeIfPresent(CGFloat.self, forKey: .shadowStrength) ?? 0.36
+        alignment = try container.decodeIfPresent(ImageAlignment.self, forKey: .alignment) ?? .center
+        aspectRatio = try container.decodeIfPresent(CanvasAspectRatio.self, forKey: .aspectRatio) ?? .auto
+        colorCorrection = try container.decodeIfPresent(ColorCorrection.self, forKey: .colorCorrection) ?? .identity
+    }
 }

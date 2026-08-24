@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-/// Glues R2 upload to the UI: uploads a file, copies the resulting link, and toasts the result.
+/// Glues R2 upload to the UI: uploads a capture, copies its share page link, and toasts the result.
 @MainActor
 final class ShareService {
     static let shared = ShareService()
@@ -11,9 +11,13 @@ final class ShareService {
     private init() {}
 
     @discardableResult
-    func share(itemID: UUID, fileURL: URL) async -> URL? {
+    func share(itemID: UUID, fileURL: URL, title: String? = nil) async -> URL? {
         do {
-            let shareURL = try await uploader.upload(itemID: itemID, fileURL: fileURL)
+            let shareURL = try await uploader.uploadShare(
+                itemID: itemID,
+                fileURL: fileURL,
+                title: title ?? fileURL.deletingPathExtension().lastPathComponent
+            )
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(shareURL.absoluteString, forType: .string)
             ToastWindow.shared.show(title: "Link Copied", message: shareURL.absoluteString, systemIcon: "link")

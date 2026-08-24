@@ -25,6 +25,7 @@ struct VideoEditorView: View {
     @State private var shareCredentials = R2CredentialStore.shared
     @State private var shareUploader = R2Uploader.shared
     @State private var shareItemID: UUID?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HSplitView {
@@ -35,21 +36,43 @@ struct VideoEditorView: View {
                 videoPreview
                     .frame(minWidth: 460, minHeight: 280)
 
-                Divider()
-
-                controlsBar
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 16)
-
-                Divider()
-
-                timelineSection
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                VStack(spacing: 8) {
+                    controlsBar
+                    timelineSection
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background {
+                    InspectorBarMaterial()
+                        .overlay(alignment: .top) {
+                            Rectangle()
+                                .fill(Color.primary.opacity(0.09))
+                                .frame(height: 0.5)
+                        }
+                        .ignoresSafeArea()
+                }
             }
         }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    model.undo()
+                } label: {
+                    Label("Undo", systemImage: "arrow.uturn.backward")
+                }
+                .disabled(!model.canUndo)
+                .keyboardShortcut("z", modifiers: .command)
+                .help("Undo")
+
+                Button {
+                    model.redo()
+                } label: {
+                    Label("Redo", systemImage: "arrow.uturn.forward")
+                }
+                .disabled(!model.canRedo)
+                .keyboardShortcut("z", modifiers: [.command, .shift])
+                .help("Redo")
+
                 Spacer()
 
                 Button("Cancel") {
@@ -95,28 +118,12 @@ struct VideoEditorView: View {
                         Label("Export", systemImage: "square.and.arrow.down")
                     }
                 }
+                .buttonStyle(.borderedProminent)
                 .disabled(model.isExporting)
                 .keyboardShortcut("s", modifiers: .command)
             }
         }
-        .overlay(alignment: .bottom) {
-            if let message = model.toastMessage {
-                Text(message)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(.black.opacity(0.75), in: Capsule())
-                    .padding(.bottom, 60)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .onAppear {
-                        Task {
-                            try? await Task.sleep(for: .seconds(1.5))
-                            withAnimation { model.toastMessage = nil }
-                        }
-                    }
-            }
-        }
+        .editorToast($model.toastMessage)
         .frame(minWidth: 780, minHeight: 520)
         .onAppear { model.loadVideo(from: url) }
         .onDisappear { model.cleanup() }
@@ -129,27 +136,35 @@ struct VideoEditorView: View {
             VStack(alignment: .leading, spacing: 0) {
                 VideoTrimSection(model: model)
 
-                VideoInspectorDivider()
+                InspectorDivider()
 
                 VideoZoomSection(model: model)
 
-                VideoInspectorDivider()
-
-                VideoEffectsSection(model: model)
-
-                VideoInspectorDivider()
+                InspectorDivider()
 
                 VideoCropSection(model: model)
 
-                VideoInspectorDivider()
+                InspectorDivider()
 
-                VideoBackgroundSection(model: model)
+                EffectsSection(config: $model.config)
 
-                Spacer(minLength: 20)
+                InspectorDivider()
+
+                ColorGradeSection(correction: $model.config.colorCorrection)
+
+                InspectorDivider()
+
+                LayoutSection(config: $model.config, showsAlignment: false)
+
+                InspectorDivider()
+
+                BackgroundPickerSection(config: $model.config)
+
+                Spacer(minLength: 24)
             }
         }
         .scrollContentBackground(.hidden)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(InspectorMaterial().ignoresSafeArea())
     }
 
     // MARK: - Video Preview with Effects
@@ -162,22 +177,26 @@ struct VideoEditorView: View {
                 ? CGFloat(model.videoWidth) / CGFloat(model.videoHeight)
                 : 16.0 / 9.0
 
-            let shortEdge = min(geo.size.width, geo.size.height) * 0.8
-            let videoW = min(geo.size.width * 0.7, shortEdge * videoAspect)
-            let videoH = videoW / videoAspect
             let effectivePadding = (config.style != .none && config.padding <= 0) ? CGFloat(0.06) : config.padding
-            let pad = min(videoW, videoH) * effectivePadding
-            let canvasW = videoW + pad * 2
-            let canvasH = videoH + pad * 2
+            let layout = previewLayout(
+                bounds: geo.size,
+                videoAspect: videoAspect,
+                paddingFraction: effectivePadding,
+                canvasAspect: config.aspectRatio.numericValue
+            )
+            let videoW = layout.videoSize.width
+            let videoH = layout.videoSize.height
+            let canvasW = layout.canvasSize.width
+            let canvasH = layout.canvasSize.height
             let cornerRadius = config.cornerRadius * min(videoW, videoH)
             let zoomFrame = model.viewportFrame(at: model.currentTime)
 
             ZStack {
-                Color(nsColor: .windowBackgroundColor)
+                EditorCanvasBackdrop()
 
                 ZStack {
                     videoBackground(config.style, size: CGSize(width: canvasW, height: canvasH))
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                     ZStack {
                         Group {
@@ -204,15 +223,59 @@ struct VideoEditorView: View {
                     }
                 }
                 .frame(width: canvasW, height: canvasH)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                )
+                .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
+                .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 1), value: config.aspectRatio)
             }
         }
+    }
+
+    private struct PreviewLayout {
+        let videoSize: CGSize
+        let canvasSize: CGSize
+    }
+
+    private func previewLayout(
+        bounds: CGSize,
+        videoAspect: CGFloat,
+        paddingFraction: CGFloat,
+        canvasAspect: CGFloat?
+    ) -> PreviewLayout {
+        let shortEdge = min(bounds.width, bounds.height) * 0.8
+        var videoW = min(bounds.width * 0.7, shortEdge * videoAspect)
+        var videoH = videoW / videoAspect
+        let pad = min(videoW, videoH) * paddingFraction
+        var canvasW = videoW + pad * 2
+        var canvasH = videoH + pad * 2
+
+        if let canvasAspect, canvasAspect > 0 {
+            if canvasW / canvasH < canvasAspect {
+                canvasW = canvasH * canvasAspect
+            } else {
+                canvasH = canvasW / canvasAspect
+            }
+        }
+
+        let fit = min(1, bounds.width * 0.94 / max(canvasW, 1), bounds.height * 0.94 / max(canvasH, 1))
+        videoW *= fit
+        videoH *= fit
+        canvasW *= fit
+        canvasH *= fit
+
+        return PreviewLayout(
+            videoSize: CGSize(width: videoW, height: videoH),
+            canvasSize: CGSize(width: canvasW, height: canvasH)
+        )
     }
 
     @ViewBuilder
     private func videoBackground(_ style: BackgroundStyle, size: CGSize) -> some View {
         switch style {
         case .none:
-            Color.clear
+            TransparencyGrid()
         case .solid(let color):
             Rectangle().fill(color.color)
         case .gradient(let preset):
@@ -244,54 +307,62 @@ struct VideoEditorView: View {
     // MARK: - Transport Controls
 
     private var controlsBar: some View {
-        HStack {
-            Text(model.formattedCurrentTime)
-                .font(.system(size: 12, design: .monospaced))
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .frame(width: 50)
+        HStack(spacing: 0) {
+            timecode(model.formattedCurrentTime, tint: .secondary)
+                .frame(alignment: .leading)
 
             Spacer()
 
-            HStack(spacing: 16) {
-                Button { model.stepBackward() } label: {
-                    Image(systemName: "backward.fill")
-                        .font(.system(size: 14))
-                }
-                .buttonStyle(.plain)
-                .keyboardShortcut(.leftArrow, modifiers: [])
+            HStack(spacing: 14) {
+                transportButton("backward.fill", size: 13, label: "Step back") { model.stepBackward() }
+                    .keyboardShortcut(.leftArrow, modifiers: [])
 
                 Button { model.togglePlayback() } label: {
                     Image(systemName: model.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                        .font(.system(size: 28))
+                        .font(.system(size: 30))
+                        .contentTransition(.symbolEffect(.replace))
+                        .foregroundStyle(.primary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.inspectorPress(scale: 0.9))
                 .keyboardShortcut(.space, modifiers: [])
+                .accessibilityLabel(model.isPlaying ? "Pause" : "Play")
+                .help(model.isPlaying ? "Pause" : "Play")
 
-                Button { model.stepForward() } label: {
-                    Image(systemName: "forward.fill")
-                        .font(.system(size: 14))
-                }
-                .buttonStyle(.plain)
-                .keyboardShortcut(.rightArrow, modifiers: [])
+                transportButton("forward.fill", size: 13, label: "Step forward") { model.stepForward() }
+                    .keyboardShortcut(.rightArrow, modifiers: [])
             }
 
             Spacer()
 
-            if model.hasTrim {
-                Text(model.formattedDuration)
-                    .font(.system(size: 12, design: .monospaced))
-                    .monospacedDigit()
-                    .foregroundStyle(.orange)
-                    .frame(width: 50)
-            } else {
-                Text(model.formattedDuration)
-                    .font(.system(size: 12, design: .monospaced))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                    .frame(width: 50)
-            }
+            timecode(model.formattedDuration, tint: model.hasTrim ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
         }
+        .animation(reduceMotion ? nil : InspectorMotion.press, value: model.isPlaying)
+    }
+
+    private func timecode(_ text: String, tint: some ShapeStyle) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .medium, design: .monospaced))
+            .monospacedDigit()
+            .foregroundStyle(tint)
+            .frame(width: 56)
+    }
+
+    private func transportButton(
+        _ icon: String,
+        size: CGFloat,
+        label: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: size, weight: .medium))
+                .frame(width: 26, height: 26)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.inspectorPress(scale: 0.85))
+        .foregroundStyle(.secondary)
+        .accessibilityLabel(label)
+        .help(label)
     }
 
     // MARK: - Timeline
@@ -316,80 +387,39 @@ struct VideoEditorView: View {
     }
 
     private var clipToolbar: some View {
-        HStack(spacing: 8) {
-            Button {
+        HStack(spacing: 6) {
+            InspectorPill("Split", systemImage: "scissors") {
                 model.splitAtPlayhead()
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "scissors")
-                        .font(.caption)
-                    Text("Split")
-                        .font(.caption2)
-                }
-                .padding(.vertical, 4)
-                .padding(.horizontal, 8)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 5))
             }
-            .buttonStyle(.plain)
 
             if let selectedClip = model.clips.first(where: { $0.id == model.selectedClipID }) {
-                Button {
+                InspectorPill("Delete", systemImage: "trash", role: .destructive) {
                     model.deleteSelectedClip()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "trash")
-                            .font(.caption)
-                        Text("Delete")
-                            .font(.caption2)
-                    }
-                    .padding(.vertical, 4)
-                    .padding(.horizontal, 8)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 5))
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.red)
                 .disabled(!model.canDeleteSelectedClip)
 
-                Picker("", selection: Binding(
-                    get: { selectedClip.speed },
-                    set: { model.setSpeed($0, forClipID: selectedClip.id) }
-                )) {
-                    Text("0.5x").tag(0.5)
-                    Text("1x").tag(1.0)
-                    Text("1.5x").tag(1.5)
-                    Text("2x").tag(2.0)
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .frame(width: 70)
-                .controlSize(.small)
+                InspectorMenuField(
+                    values: Self.speedOptions,
+                    selection: Binding(
+                        get: { selectedClip.speed },
+                        set: { model.setSpeed($0, forClipID: selectedClip.id) }
+                    ),
+                    label: { "\($0.formatted())x" }
+                )
+                .frame(width: 76)
             }
 
             Spacer()
 
-            Button {
-                model.undo()
-            } label: {
-                Image(systemName: "arrow.uturn.backward")
-                    .font(.system(size: 12))
+            if model.isClipMode {
+                Text("\(model.clips.count) clips")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.tertiary)
             }
-            .buttonStyle(.plain)
-            .disabled(!model.canUndo)
-            .keyboardShortcut("z", modifiers: .command)
-            .help("Undo")
-
-            Button {
-                model.redo()
-            } label: {
-                Image(systemName: "arrow.uturn.forward")
-                    .font(.system(size: 12))
-            }
-            .buttonStyle(.plain)
-            .disabled(!model.canRedo)
-            .keyboardShortcut("z", modifiers: [.command, .shift])
-            .help("Redo")
         }
     }
+
+    private static let speedOptions: [Double] = [0.5, 1.0, 1.5, 2.0]
 
     // MARK: - Actions
 
@@ -468,25 +498,7 @@ struct VideoEditorView: View {
     }
 }
 
-// MARK: - Video Effects Section
-
-private struct VideoInspectorSectionHeader: View {
-    let title: String
-    init(_ title: String) { self.title = title }
-
-    var body: some View {
-        Text(title)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.tertiary)
-            .tracking(0.5)
-    }
-}
-
-private struct VideoInspectorDivider: View {
-    var body: some View {
-        Divider().padding(.horizontal, 14)
-    }
-}
+// MARK: - Video Inspector Sections
 
 private struct VideoTrimSection: View {
     @Bindable var model: VideoEditorModel
@@ -499,70 +511,47 @@ private struct VideoTrimSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                VideoInspectorSectionHeader("TRIM")
-                Spacer()
-                if model.hasTrim {
-                    Button {
-                        model.resetTrim()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.counterclockwise")
-                                .font(.caption)
-                            Text("Reset")
-                                .font(.caption2)
-                        }
-                        .padding(.vertical, 4)
-                        .padding(.horizontal, 8)
-                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 5))
-                    }
-                    .buttonStyle(.plain)
+        InspectorSection("Trim") {
+            if model.hasTrim {
+                InspectorPill("Reset", systemImage: "arrow.counterclockwise") {
+                    model.resetTrim()
                 }
             }
+        } content: {
+            VStack(alignment: .leading, spacing: 8) {
+                VStack(spacing: 4) {
+                    readout("Start", formatTime(model.trimStart), highlighted: false)
+                    readout("End", formatTime(model.trimEnd), highlighted: false)
+                    readout("Duration", formatTime(model.trimmedDuration), highlighted: true)
+                }
 
-            VStack(spacing: 4) {
-                HStack {
-                    Text("Start")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                    Spacer()
-                    Text(formatTime(model.trimStart))
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(model.hasTrim ? AnyShapeStyle(.secondary) : AnyShapeStyle(.quaternary))
-                }
-                HStack {
-                    Text("End")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                    Spacer()
-                    Text(formatTime(model.trimEnd))
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(model.hasTrim ? AnyShapeStyle(.secondary) : AnyShapeStyle(.quaternary))
-                }
-                HStack {
-                    Text("Duration")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                    Spacer()
-                    Text(formatTime(model.trimmedDuration))
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(model.hasTrim ? AnyShapeStyle(.orange) : AnyShapeStyle(.quaternary))
-                }
+                InspectorCaption("Drag the handles on the timeline to trim.")
             }
-
-            Text("Drag the yellow handles on the timeline to trim.")
-                .font(.caption2)
-                .foregroundStyle(.quaternary)
-                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 14)
+    }
+
+    private func readout(_ title: String, _ value: String, highlighted: Bool) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+            Spacer()
+            Text(value)
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(valueTint(highlighted: highlighted))
+        }
+    }
+
+    private func valueTint(highlighted: Bool) -> AnyShapeStyle {
+        guard model.hasTrim else { return AnyShapeStyle(.quaternary) }
+        return highlighted ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary)
     }
 }
 
 private struct VideoZoomSection: View {
     @Bindable var model: VideoEditorModel
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var selectedCue: ZoomCue? {
         guard let id = model.selectedZoomCueID else { return nil }
@@ -570,333 +559,52 @@ private struct VideoZoomSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                VideoInspectorSectionHeader("ZOOM")
-                Spacer()
-                Toggle("", isOn: $model.zoomEnabled)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-            }
-
+        InspectorSection("Zoom") {
+            Toggle("Zoom", isOn: $model.zoomEnabled)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+        } content: {
             if model.zoomEnabled {
-                if model.hasPointerCapture {
-                    Button {
-                        model.regenerateZoomCues()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "wand.and.stars")
-                                .font(.caption)
-                            Text("Auto Zoom")
-                                .font(.caption2)
+                VStack(alignment: .leading, spacing: 10) {
+                    if model.hasPointerCapture {
+                        InspectorPill("Auto Zoom", systemImage: "wand.and.stars", fillsWidth: true) {
+                            model.regenerateZoomCues()
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
-                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                    } else {
+                        InspectorCaption("No cursor data recorded for this clip.")
                     }
-                    .buttonStyle(.plain)
-                } else {
-                    Text("No cursor data recorded for this clip.")
-                        .font(.caption2)
-                        .foregroundStyle(.quaternary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
 
-                HStack(spacing: 8) {
-                    Button {
-                        model.addZoomCue(at: model.currentTime)
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "plus")
-                                .font(.caption)
-                            Text("Add")
-                                .font(.caption2)
+                    HStack(spacing: 6) {
+                        InspectorPill("Add", systemImage: "plus") {
+                            model.addZoomCue(at: model.currentTime)
                         }
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 10)
-                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+
+                        if let selectedCue {
+                            InspectorPill("Delete", systemImage: "trash", role: .destructive) {
+                                model.deleteZoomCue(selectedCue.id)
+                            }
+                        }
                     }
-                    .buttonStyle(.plain)
 
                     if let selectedCue {
-                        Button {
-                            model.deleteZoomCue(selectedCue.id)
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "trash")
-                                    .font(.caption)
-                                Text("Delete")
-                                    .font(.caption2)
-                            }
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 10)
-                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.red)
-                    }
-                }
-
-                if let selectedCue {
-                    InspectorSlider(
-                        "Zoom Amount",
-                        value: Binding(
-                            get: { CGFloat(selectedCue.zoom) },
-                            set: { model.setZoomAmount(Double($0), forCueID: selectedCue.id) }
-                        ),
-                        range: 1.0...4.0,
-                        format: .magnification(fractionDigits: 1)
-                    )
-                }
-
-                Text("\(model.zoomCues.count) zoom cue\(model.zoomCues.count == 1 ? "" : "s"). Drag pills on the timeline to adjust.")
-                    .font(.caption2)
-                    .foregroundStyle(.quaternary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 14)
-    }
-}
-
-private struct VideoEffectsSection: View {
-    @Bindable var model: VideoEditorModel
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VideoInspectorSectionHeader("EFFECTS")
-
-            InspectorSlider(
-                "Padding",
-                value: $model.config.padding,
-                range: 0.0...0.45,
-                format: .percent()
-            )
-
-            InspectorSlider(
-                "Corner Radius",
-                value: $model.config.cornerRadius,
-                range: 0.0...0.12,
-                format: .scaled(by: 1000)
-            )
-
-            InspectorSlider(
-                "Shadow",
-                value: $model.config.shadowStrength,
-                range: 0.0...1.0,
-                format: .percent()
-            )
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 14)
-    }
-}
-
-// MARK: - Video Background Section
-
-private struct VideoBackgroundSection: View {
-    @Bindable var model: VideoEditorModel
-
-    private let swatchColumns = Array(repeating: GridItem(.fixed(28), spacing: 6), count: 7)
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            VideoInspectorSectionHeader("BACKGROUND")
-
-            Text("Solid")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-
-            LazyVGrid(columns: swatchColumns, spacing: 6) {
-                noneButton
-
-                ForEach(SolidColor.presets) { color in
-                    solidButton(color)
-                }
-            }
-
-            Text("Gradients")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-
-            LazyVGrid(columns: swatchColumns, spacing: 6) {
-                ForEach(GradientPreset.presets) { preset in
-                    gradientButton(preset)
-                }
-            }
-
-            Text("macOS")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-
-            LazyVGrid(columns: Array(repeating: GridItem(.fixed(48), spacing: 6), count: 4), spacing: 6) {
-                ForEach(BundledBackgrounds.macAssets) { asset in
-                    bundledImageButton(asset)
-                }
-            }
-
-            customImageSection
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 14)
-    }
-
-    private var noneButton: some View {
-        Button {
-            model.config.style = .none
-        } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color.white)
-                    .frame(width: 28, height: 28)
-                Path { path in
-                    path.move(to: CGPoint(x: 26, y: 2))
-                    path.addLine(to: CGPoint(x: 2, y: 26))
-                }
-                .stroke(Color.red.opacity(0.6), lineWidth: 1.5)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(
-                        model.config.style == .none ? Color.accentColor : Color.primary.opacity(0.12),
-                        lineWidth: model.config.style == .none ? 2 : 0.5
-                    )
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func solidButton(_ color: SolidColor) -> some View {
-        let isSelected: Bool = {
-            if case .solid(let c) = model.config.style { return c.id == color.id }
-            return false
-        }()
-
-        return Button {
-            model.config.style = .solid(color)
-        } label: {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(color.color)
-                .frame(width: 28, height: 28)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: isSelected ? 2 : 0.5)
-                )
-        }
-        .buttonStyle(.plain)
-        .help(color.name)
-    }
-
-    private func gradientButton(_ preset: GradientPreset) -> some View {
-        let isSelected: Bool = {
-            if case .gradient(let g) = model.config.style { return g.id == preset.id }
-            return false
-        }()
-
-        return Button {
-            model.config.style = .gradient(preset)
-        } label: {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(preset.swiftUIGradient)
-                .frame(width: 28, height: 28)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: isSelected ? 2 : 0.5)
-                )
-        }
-        .buttonStyle(.plain)
-        .help(preset.name)
-    }
-
-    private func bundledImageButton(_ asset: BundledBackgrounds.ImageAsset) -> some View {
-        let isSelected: Bool = {
-            if case .bundledImage(let id) = model.config.style { return id == asset.id }
-            return false
-        }()
-
-        return Button {
-            model.config.style = .bundledImage(asset.id)
-        } label: {
-            Group {
-                if let image = asset.image {
-                    Image(nsImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } else {
-                    Rectangle().fill(.quaternary)
-                }
-            }
-            .frame(width: 48, height: 36)
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: isSelected ? 2 : 0.5)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    @ViewBuilder
-    private var customImageSection: some View {
-        if case .wallpaper(let source) = model.config.style {
-            HStack(spacing: 6) {
-                if let img = NSImage(contentsOfFile: source.path) {
-                    Image(nsImage: img)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 28, height: 28)
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .strokeBorder(Color.accentColor, lineWidth: 2)
+                        InspectorSlider(
+                            "Zoom Amount",
+                            value: Binding(
+                                get: { CGFloat(selectedCue.zoom) },
+                                set: { model.setZoomAmount(Double($0), forCueID: selectedCue.id) }
+                            ),
+                            range: 1.0...4.0,
+                            format: .magnification(fractionDigits: 1)
                         )
+                    }
+
+                    InspectorCaption("\(model.zoomCues.count) zoom cue\(model.zoomCues.count == 1 ? "" : "s"). Drag pills on the timeline to adjust.")
                 }
-
-                Text(URL(fileURLWithPath: source.path).lastPathComponent)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                Spacer()
-
-                Button { pickCustomWallpaper() } label: {
-                    Text("Change").font(.caption2)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
-        } else {
-            Button { pickCustomWallpaper() } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "plus").font(.caption2)
-                    Text("Custom Image...").font(.caption2)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.08), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                )
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
         }
-    }
-
-    private func pickCustomWallpaper() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image, .png, .jpeg]
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.canCreateDirectories = false
-        panel.title = "Choose Background Image"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        model.config.style = .wallpaper(WallpaperSource(path: url.path))
+        .animation(reduceMotion ? nil : InspectorMotion.reveal, value: model.zoomEnabled)
     }
 }
 
@@ -906,57 +614,34 @@ private struct VideoCropSection: View {
     @Bindable var model: VideoEditorModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VideoInspectorSectionHeader("CROP")
-
-            HStack {
-                Button {
-                    model.isCropping.toggle()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "crop")
-                            .font(.caption)
-                        Text(model.isCropping ? "Done" : "Crop")
-                            .font(.caption2)
+        InspectorSection("Crop") {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    InspectorPill(
+                        model.isCropping ? "Done" : "Crop",
+                        systemImage: "crop",
+                        isActive: model.isCropping,
+                        fillsWidth: true
+                    ) {
+                        model.isCropping.toggle()
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-                    .background(model.isCropping ? AnyShapeStyle(Color.accentColor.opacity(0.15)) : AnyShapeStyle(.quaternary), in: RoundedRectangle(cornerRadius: 6))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .strokeBorder(model.isCropping ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: model.isCropping ? 1.5 : 0.5)
-                    )
+
+                    if model.hasCrop {
+                        InspectorPill("Reset", systemImage: "arrow.counterclockwise") {
+                            model.resetCrop()
+                        }
+                    }
                 }
-                .buttonStyle(.plain)
 
                 if model.hasCrop {
-                    Button {
-                        model.resetCrop()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.counterclockwise")
-                                .font(.caption)
-                            Text("Reset")
-                                .font(.caption2)
-                        }
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 10)
-                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-                    }
-                    .buttonStyle(.plain)
+                    let width = Int(CGFloat(model.videoWidth) * model.cropRect.width)
+                    let height = Int(CGFloat(model.videoHeight) * model.cropRect.height)
+                    Text("\(width) x \(height)")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.tertiary)
                 }
             }
-
-            if model.hasCrop {
-                let w = Int(CGFloat(model.videoWidth) * model.cropRect.width)
-                let h = Int(CGFloat(model.videoHeight) * model.cropRect.height)
-                Text("\(w) × \(h)")
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-            }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 14)
     }
 }
 

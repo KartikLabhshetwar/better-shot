@@ -1,8 +1,13 @@
+import ImageIO
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct EditorWindowView: View {
     @Bindable var urlHolder: CurrentURL
     @State private var model = EditorModel()
+    @State private var shareCredentials = R2CredentialStore.shared
+    @State private var shareUploader = R2Uploader.shared
+    @State private var shareItemID: UUID?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -12,26 +17,9 @@ struct EditorWindowView: View {
 
             EditorCanvasView(model: model)
                 .frame(minWidth: 500, minHeight: 400)
-                .background(Color(nsColor: .windowBackgroundColor))
+                .background(EditorCanvasBackdrop())
         }
-        .overlay(alignment: .bottom) {
-            if let message = model.toastMessage {
-                Text(message)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(.black.opacity(0.75), in: Capsule())
-                    .padding(.bottom, 24)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .onAppear {
-                        Task {
-                            try? await Task.sleep(for: .seconds(1.5))
-                            withAnimation { model.toastMessage = nil }
-                        }
-                    }
-            }
-        }
+        .editorToast($model.toastMessage)
         .background {
             AnnotationKeyCommandHandler(
                 onDelete: { model.deleteSelectedAnnotation() },
@@ -46,18 +34,20 @@ struct EditorWindowView: View {
                 Button {
                     model.undo()
                 } label: {
-                    Image(systemName: "arrow.uturn.backward")
+                    Label("Undo", systemImage: "arrow.uturn.backward")
                 }
                 .disabled(!model.canUndo)
                 .keyboardShortcut("z", modifiers: .command)
+                .help("Undo")
 
                 Button {
                     model.redo()
                 } label: {
-                    Image(systemName: "arrow.uturn.forward")
+                    Label("Redo", systemImage: "arrow.uturn.forward")
                 }
                 .disabled(!model.canRedo)
                 .keyboardShortcut("z", modifiers: [.command, .shift])
+                .help("Redo")
 
                 Spacer()
 
@@ -80,11 +70,31 @@ struct EditorWindowView: View {
                 }
                 .keyboardShortcut("c", modifiers: [.command, .shift])
 
+                if shareCredentials.isConfigured && shareCredentials.enabled {
+                    Button {
+                        Task { await shareImage() }
+                    } label: {
+                        if let shareItemID, shareUploader.uploadingItems.contains(shareItemID) {
+                            HStack(spacing: 6) {
+                                ProgressView(value: shareUploader.uploadProgress[shareItemID] ?? 0)
+                                    .progressViewStyle(.circular)
+                                    .controlSize(.small)
+                                Text("\(Int((shareUploader.uploadProgress[shareItemID] ?? 0) * 100))%")
+                                    .font(.caption)
+                            }
+                        } else {
+                            Label("Share", systemImage: "link")
+                        }
+                    }
+                    .disabled(shareItemID != nil)
+                }
+
                 Button {
                     Task { await exportImage() }
                 } label: {
                     Label("Export", systemImage: "square.and.arrow.down")
                 }
+                .buttonStyle(.borderedProminent)
                 .keyboardShortcut("s", modifiers: .command)
             }
         }
@@ -94,6 +104,44 @@ struct EditorWindowView: View {
         .onChange(of: urlHolder.url) { _, newURL in
             model.loadImage(from: newURL)
         }
+    }
+
+    private func shareImage() async {
+        guard let rendered = model.renderFinal() else { return }
+
+        let itemID = UUID()
+        shareItemID = itemID
+        defer { shareItemID = nil }
+
+        let stagingDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BetterShotShare-\(itemID.uuidString)")
+        try? FileManager.default.createDirectory(at: stagingDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: stagingDir) }
+
+        let name = model.sourceURL?.deletingPathExtension().lastPathComponent ?? "screenshot"
+        let fileURL = stagingDir.appendingPathComponent("\(name).png")
+
+        guard let destination = CGImageDestinationCreateWithURL(
+            fileURL as CFURL, UTType.png.identifier as CFString, 1, nil
+        ) else {
+            ToastWindow.shared.show(
+                title: "Share Failed",
+                message: "Could not encode the image for upload.",
+                systemIcon: "exclamationmark.triangle"
+            )
+            return
+        }
+        CGImageDestinationAddImage(destination, rendered, nil)
+        guard CGImageDestinationFinalize(destination) else {
+            ToastWindow.shared.show(
+                title: "Share Failed",
+                message: "Could not write the image for upload.",
+                systemIcon: "exclamationmark.triangle"
+            )
+            return
+        }
+
+        _ = await ShareService.shared.share(itemID: itemID, fileURL: fileURL, title: name)
     }
 
     private func exportImage() async {

@@ -55,6 +55,7 @@ final class EditorModel {
 
     // Config undo/redo
     private var configPast: [BeautifierConfig] = []
+    private var configBeforeEdit: BeautifierConfig?
     private var configFuture: [BeautifierConfig] = []
 
     var canUndo: Bool { history.canUndo || !configPast.isEmpty }
@@ -127,6 +128,18 @@ final class EditorModel {
         if configPast.count > 50 { configPast.removeFirst() }
         configFuture.removeAll()
         update(&config)
+    }
+
+    /// Collapses a live slider drag into a single undo step.
+    func recordConfigEdit(_ editing: Bool) {
+        if editing {
+            configBeforeEdit = config
+        } else if let saved = configBeforeEdit {
+            let edited = config
+            config = saved
+            updateConfig { $0 = edited }
+            configBeforeEdit = nil
+        }
     }
 
     // MARK: - Undo / Redo

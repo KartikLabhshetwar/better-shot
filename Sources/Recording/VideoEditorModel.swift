@@ -23,7 +23,14 @@ final class VideoEditorModel {
     var isExporting = false
     var toastMessage: String?
     var thumbnails: [NSImage] = []
-    var config = BeautifierConfig()
+    var config = BeautifierConfig() {
+        didSet {
+            guard oldValue.colorCorrection != config.colorCorrection else { return }
+            previewGrade.correction = config.colorCorrection
+            refreshPreviewFrame()
+        }
+    }
+    private let previewGrade = LivePreviewGrade()
 
     var videoWidth: Int = 0
     var videoHeight: Int = 0
@@ -54,7 +61,8 @@ final class VideoEditorModel {
     var hasEdits: Bool {
         hasTrim || hasCrop || isClipMode
             || (zoomEnabled && !zoomCues.isEmpty)
-            || config.padding > 0 || config.cornerRadius > 0 || config.shadowStrength > 0 || config.style != .none
+            || config.padding > 0 || config.cornerRadius > 0 || config.shadowStrength > 0
+            || config.style != .none || config.aspectRatio != .auto || !config.colorCorrection.isIdentity
     }
     var hasPointerCapture: Bool {
         guard let pointerCapture else { return false }
@@ -87,6 +95,8 @@ final class VideoEditorModel {
         let item = AVPlayerItem(asset: asset)
         player = AVPlayer(playerItem: item)
         player?.actionAtItemEnd = .pause
+        previewGrade.correction = config.colorCorrection
+        attachPreviewGrade(to: item, url: url)
 
         Task {
             if let dur = try? await asset.load(.duration) {
@@ -107,6 +117,22 @@ final class VideoEditorModel {
             generateThumbnails()
             setupTimeObserver()
         }
+    }
+
+    private func attachPreviewGrade(to item: AVPlayerItem, url: URL) {
+        let grade = previewGrade
+        Task {
+            let composition = try? await AVMutableVideoComposition.videoComposition(with: AVURLAsset(url: url)) { request in
+                request.finish(with: ColorGrade.apply(grade.correction, to: request.sourceImage), context: nil)
+            }
+            guard let composition, player?.currentItem === item else { return }
+            item.videoComposition = composition
+        }
+    }
+
+    private func refreshPreviewFrame() {
+        guard let player, player.timeControlStatus != .playing else { return }
+        player.seek(to: player.currentTime(), toleranceBefore: .zero, toleranceAfter: .zero)
     }
 
     func viewportFrame(at time: Double) -> ViewportFrame {
@@ -339,7 +365,8 @@ final class VideoEditorModel {
             exportConfig.padding = 0.06
         }
 
-        let hasEffects = exportConfig.padding > 0 || exportConfig.cornerRadius > 0 || exportConfig.shadowStrength > 0 || exportConfig.style != .none
+        let hasEffects = exportConfig.padding > 0 || exportConfig.cornerRadius > 0 || exportConfig.shadowStrength > 0
+            || exportConfig.style != .none || exportConfig.aspectRatio != .auto || !exportConfig.colorCorrection.isIdentity
         let hasZoom = zoomEnabled && !zoomCues.isEmpty
 
         if isClipMode || hasEffects || hasCrop || hasZoom {
@@ -384,11 +411,13 @@ final class VideoEditorModel {
         let canvas = ExportCanvasGeometry.canvas(
             videoWidth: useZoom ? fullW : fullW * cropRect.width,
             videoHeight: useZoom ? fullH : fullH * cropRect.height,
-            paddingFraction: config.padding
+            paddingFraction: config.padding,
+            aspectRatio: config.aspectRatio.numericValue
         )
         let vidW = canvas.videoWidth
         let vidH = canvas.videoHeight
-        let pad = canvas.padding
+        let offsetX = canvas.offsetX
+        let offsetY = canvas.offsetY
         let canvasW = canvas.width
         let canvasH = canvas.height
         let shortEdge = min(vidW, vidH)
@@ -467,7 +496,7 @@ final class VideoEditorModel {
                     .concatenating(CGAffineTransform(translationX: anchorDisplay.x, y: anchorDisplay.y))
                 return transform
                     .concatenating(zoomTransform)
-                    .concatenating(CGAffineTransform(translationX: pad, y: pad))
+                    .concatenating(CGAffineTransform(translationX: offsetX, y: offsetY))
             }
 
             if compositionDuration > 0 {
@@ -493,12 +522,12 @@ final class VideoEditorModel {
             var finalTransform = transform
             let postCropTranslation: CGAffineTransform
             if transform == .identity {
-                postCropTranslation = CGAffineTransform(translationX: -cropOffsetX + pad, y: -cropOffsetY + pad)
+                postCropTranslation = CGAffineTransform(translationX: -cropOffsetX + offsetX, y: -cropOffsetY + offsetY)
             } else {
                 let originAfterTransform = CGPoint(x: cropOffsetX, y: cropOffsetY).applying(transform)
                 let fullOriginAfterTransform = CGPoint.zero.applying(transform)
-                let dx = fullOriginAfterTransform.x - originAfterTransform.x + pad
-                let dy = fullOriginAfterTransform.y - originAfterTransform.y + pad
+                let dx = fullOriginAfterTransform.x - originAfterTransform.x + offsetX
+                let dy = fullOriginAfterTransform.y - originAfterTransform.y + offsetY
                 postCropTranslation = CGAffineTransform(translationX: dx, y: dy)
             }
             finalTransform = finalTransform.concatenating(postCropTranslation)
@@ -508,7 +537,7 @@ final class VideoEditorModel {
         instruction.layerInstructions = [layerInstruction]
         videoComposition.instructions = [instruction]
 
-        let cardRect = CGRect(x: pad, y: pad, width: vidW, height: vidH)
+        let cardRect = CGRect(x: offsetX, y: offsetY, width: vidW, height: vidH)
         let exportConfig = VideoFrameExporter.Configuration(
             composition: composition,
             videoComposition: videoComposition,
@@ -517,6 +546,7 @@ final class VideoEditorModel {
             cornerRadius: cornerRadius,
             backgroundStyle: config.style,
             shadowStrength: config.shadowStrength,
+            colorCorrection: config.colorCorrection,
             outputURL: outputURL
         )
 
@@ -580,5 +610,16 @@ final class VideoEditorModel {
         let m = Int(seconds) / 60
         let s = Int(seconds) % 60
         return String(format: "%02d:%02d", m, s)
+    }
+}
+
+/// Thread-safe handoff of the live grade to the preview's Core Image compositor.
+private final class LivePreviewGrade: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = ColorCorrection.identity
+
+    var correction: ColorCorrection {
+        get { lock.withLock { value } }
+        set { lock.withLock { value = newValue } }
     }
 }

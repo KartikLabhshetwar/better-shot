@@ -5,55 +5,39 @@ struct EditorInspectorView: View {
     @Bindable var model: EditorModel
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
-                    // MARK: Tools
-                    VStack(alignment: .leading, spacing: 10) {
-                        InspectorSectionHeader("TOOLS")
-                        AnnotationInspectorToolGrid(selectedTool: model.selectedTool) { tool in
-                            model.selectTool(tool)
-                        }
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                InspectorSection("Tools") {
+                    AnnotationInspectorToolGrid(selectedTool: model.selectedTool) { tool in
+                        model.selectTool(tool)
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.top, 14)
-                    .padding(.bottom, 16)
+                }
 
-                    if !model.items.isEmpty {
-                        Button(role: .destructive) {
-                            model.clearAnnotations()
-                        } label: {
-                            Label("Clear All", systemImage: "trash")
-                                .font(.caption)
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .padding(.horizontal, 14)
-                        .padding(.bottom, 12)
+                if !model.items.isEmpty {
+                    InspectorPill("Clear All", systemImage: "trash", role: .destructive, fillsWidth: true) {
+                        model.clearAnnotations()
                     }
+                    .padding(.horizontal, InspectorMetrics.gutter)
+                    .padding(.bottom, InspectorMetrics.gutter)
+                }
 
-                    if model.inspectedTool != nil {
-                        InspectorDivider()
+                if model.inspectedTool != nil {
+                    InspectorDivider()
 
-                        // MARK: Style
+                    InspectorSection("Style") {
                         VStack(alignment: .leading, spacing: 10) {
-                            InspectorSectionHeader("STYLE")
-
                             if model.selectionCount > 1 {
-                                Text("\(model.selectionCount) annotations selected")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                InspectorCaption("\(model.selectionCount) annotations selected")
                             }
 
-                            InspectorRow(title: "Color") {
+                            InspectorRow("Color") {
                                 AnnotationColorMenu(selectedSwatch: model.selectedSwatch) { swatch in
                                     model.setSwatch(swatch)
                                 }
                             }
 
                             if model.isStrokeStyleAvailable {
-                                InspectorRow(title: "Stroke") {
+                                InspectorRow("Stroke") {
                                     AnnotationStrokeMenu(strokeWidth: model.strokeWidth) { strokeWidth in
                                         model.setStrokeWidth(strokeWidth)
                                     }
@@ -72,90 +56,61 @@ struct EditorInspectorView: View {
                                 )
                             }
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 14)
                     }
-
-                    if model.isTextStyleAvailable {
-                        InspectorDivider()
-
-                        // MARK: Text
-                        VStack(alignment: .leading, spacing: 10) {
-                            InspectorSectionHeader("TEXT")
-                            AnnotationTextStyleControls(model: model)
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 14)
-                    }
-
-                    InspectorDivider()
-
-                    // MARK: Crop
-                    ImageCropSection(model: model)
-
-                    InspectorDivider()
-
-                    // MARK: Effects
-                    BeautifierControlsSection(model: model)
-
-                    InspectorDivider()
-
-                    // MARK: Layout
-                    LayoutSection(model: model)
-
-                    InspectorDivider()
-
-                    // MARK: Background
-                    BackgroundPickerSection(model: model)
-
-                    Spacer(minLength: 20)
                 }
+
+                if model.isTextStyleAvailable {
+                    InspectorDivider()
+
+                    InspectorSection("Text") {
+                        AnnotationTextStyleControls(model: model)
+                    }
+                }
+
+                InspectorDivider()
+
+                ImageCropSection(model: model)
+
+                InspectorDivider()
+
+                EffectsSection(config: configBinding, onEditingChanged: model.recordConfigEdit)
+
+                InspectorDivider()
+
+                ColorGradeSection(
+                    correction: Binding(
+                        get: { model.config.colorCorrection },
+                        set: { model.config.colorCorrection = $0 }
+                    ),
+                    onEditingChanged: model.recordConfigEdit
+                )
+
+                InspectorDivider()
+
+                LayoutSection(config: configBinding, onEditingChanged: model.recordConfigEdit)
+
+                InspectorDivider()
+
+                BackgroundPickerSection(config: configBinding, onEditingChanged: model.recordConfigEdit)
+
+                Spacer(minLength: 24)
             }
-            .scrollContentBackground(.hidden)
         }
-        .background(Color(nsColor: .controlBackgroundColor))
+        .scrollContentBackground(.hidden)
+        .background(InspectorMaterial().ignoresSafeArea())
     }
-}
 
-// MARK: - Inspector Components
-
-private struct InspectorSectionHeader: View {
-    let title: String
-    init(_ title: String) { self.title = title }
-
-    var body: some View {
-        Text(title)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.tertiary)
-            .tracking(0.5)
-    }
-}
-
-private struct InspectorDivider: View {
-    var body: some View {
-        Divider().padding(.horizontal, 14)
-    }
-}
-
-private struct InspectorRow<Content: View>: View {
-    let title: String
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Text(title)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .frame(width: 52, alignment: .leading)
-            content()
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
+    private var configBinding: Binding<BeautifierConfig> {
+        Binding(get: { model.config }, set: { model.config = $0 })
     }
 }
 
 private struct AnnotationInspectorToolGrid: View {
     let selectedTool: AnnotationTool
     let onSelect: (AnnotationTool) -> Void
+
+    @State private var hoveredTool: AnnotationTool?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let columns: [GridItem] = Array(
         repeating: GridItem(.flexible(), spacing: 2), count: 5
@@ -164,29 +119,43 @@ private struct AnnotationInspectorToolGrid: View {
     var body: some View {
         LazyVGrid(columns: columns, spacing: 2) {
             ForEach(AnnotationTool.toolbarCases) { tool in
-                Button {
-                    onSelect(tool)
-                } label: {
-                    Image(systemName: tool.systemImage)
-                        .font(.system(size: 14, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 32)
-                        .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(selectedTool == tool ? Color.accentColor : .primary.opacity(0.7))
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(selectedTool == tool ? Color.accentColor.opacity(0.15) : .clear)
-                )
-                .help(tool.title)
+                toolButton(tool)
             }
         }
         .padding(4)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .fill(Color.primary.opacity(0.05))
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.5)
+        )
+        .animation(reduceMotion ? nil : InspectorMotion.press, value: selectedTool)
+    }
+
+    private func toolButton(_ tool: AnnotationTool) -> some View {
+        let isSelected = selectedTool == tool
+
+        return Button {
+            onSelect(tool)
+        } label: {
+            Image(systemName: tool.systemImage)
+                .font(.system(size: 14, weight: .medium))
+                .frame(maxWidth: .infinity)
+                .frame(height: 32)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(isSelected ? Color.accentColor.opacity(0.16) : (hoveredTool == tool ? Color.primary.opacity(0.07) : .clear))
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+        .buttonStyle(.inspectorPress(scale: 0.9))
+        .foregroundStyle(isSelected ? Color.accentColor : .primary.opacity(0.72))
+        .onHover { hoveredTool = $0 ? tool : nil }
+        .accessibilityLabel(tool.title)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .help(tool.title)
     }
 }
 
@@ -208,7 +177,7 @@ private struct AnnotationColorMenu: View {
                     .overlay(Circle().stroke(.white.opacity(0.15), lineWidth: 0.5))
 
                 Text(selectedSwatch.title)
-                    .font(.system(size: 12))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.primary.opacity(0.8))
 
                 Spacer()
@@ -218,18 +187,9 @@ private struct AnnotationColorMenu: View {
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 8)
-            .frame(height: 26)
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color(nsColor: .controlBackgroundColor).opacity(0.5))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 0.5)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .inspectorField()
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.inspectorPress(scale: 0.98))
         .popover(isPresented: $isPresented, arrowEdge: .trailing) {
             AnnotationColorPopover(
                 selectedSwatch: selectedSwatch,
@@ -340,16 +300,7 @@ private struct AnnotationStrokeMenu: View {
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 8)
-            .frame(height: 26)
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color(nsColor: .controlBackgroundColor).opacity(0.5))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 0.5)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .inspectorField()
         }
         .buttonStyle(.plain)
         .popover(isPresented: $isPresented, arrowEdge: .trailing) {
@@ -401,6 +352,7 @@ private struct AnnotationTextStyleControls: View {
     @Bindable var model: EditorModel
     @State private var fontSizeText = ""
     @FocusState private var isFontSizeFieldFocused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let fontFamilies: [String] = {
         NSFontManager.shared.availableFontFamilies.sorted()
@@ -457,7 +409,7 @@ private struct AnnotationTextStyleControls: View {
         } label: {
             HStack(spacing: 6) {
                 Text(model.selectedTextFontName)
-                    .font(.system(size: 12))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.primary.opacity(0.8))
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -468,16 +420,7 @@ private struct AnnotationTextStyleControls: View {
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 8)
-            .frame(height: 26)
-            .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color(nsColor: .controlBackgroundColor).opacity(0.5))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 0.5)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .inspectorField()
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
@@ -485,9 +428,7 @@ private struct AnnotationTextStyleControls: View {
 
     private var fontSizeStepper: some View {
         HStack(spacing: 0) {
-            Button { adjustFontSize(by: -1) } label: {
-                Image(systemName: "minus").font(.system(size: 10, weight: .medium)).frame(width: 22, height: 24).contentShape(Rectangle())
-            }.buttonStyle(.plain).foregroundStyle(.secondary)
+            stepperButton("minus") { adjustFontSize(by: -1) }
 
             Divider().frame(height: 14)
 
@@ -501,19 +442,21 @@ private struct AnnotationTextStyleControls: View {
 
             Divider().frame(height: 14)
 
-            Button { adjustFontSize(by: 1) } label: {
-                Image(systemName: "plus").font(.system(size: 10, weight: .medium)).frame(width: 22, height: 24).contentShape(Rectangle())
-            }.buttonStyle(.plain).foregroundStyle(.secondary)
+            stepperButton("plus") { adjustFontSize(by: 1) }
         }
-        .frame(height: 26)
-        .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.5))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 0.5)
-        )
+        .inspectorField(isFocused: isFontSizeFieldFocused)
+    }
+
+    private func stepperButton(_ icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .semibold))
+                .frame(width: 22, height: 24)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.inspectorPress(scale: 0.85))
+        .foregroundStyle(.secondary)
+        .accessibilityLabel(icon == "plus" ? "Increase font size" : "Decrease font size")
     }
 
     private var textStyleToggles: some View {
@@ -529,9 +472,9 @@ private struct AnnotationTextStyleControls: View {
             }
         }
         .padding(3)
-        .frame(height: 34)
-        .background(Capsule().fill(Color(nsColor: .controlBackgroundColor).opacity(0.65)))
-        .overlay(Capsule().stroke(Color(nsColor: .separatorColor).opacity(0.45), lineWidth: 0.5))
+        .frame(height: 30)
+        .background(Capsule().fill(Color.primary.opacity(0.05)))
+        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
     }
 
     private func styleToggle(_ label: String, isActive: Bool, font: Font, underline: Bool = false, action: @escaping () -> Void) -> some View {
@@ -540,12 +483,14 @@ private struct AnnotationTextStyleControls: View {
                 .font(font)
                 .underline(underline)
                 .frame(maxWidth: .infinity)
-                .frame(height: 28)
+                .frame(height: 24)
+                .background { if isActive { Capsule().fill(Color.accentColor) } }
                 .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(isActive ? Color.white : Color.primary)
-        .background { if isActive { Capsule().fill(Color.accentColor) } }
+        .buttonStyle(.inspectorPress(scale: 0.9))
+        .foregroundStyle(isActive ? Color.white : Color.primary.opacity(0.75))
+        .animation(reduceMotion ? nil : InspectorMotion.press, value: isActive)
+        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
     }
 
     private var textAlignmentControl: some View {
@@ -556,9 +501,9 @@ private struct AnnotationTextStyleControls: View {
             alignmentButton(.justified, "text.justify.leading")
         }
         .padding(3)
-        .frame(height: 34)
-        .background(Capsule().fill(Color(nsColor: .controlBackgroundColor).opacity(0.65)))
-        .overlay(Capsule().stroke(Color(nsColor: .separatorColor).opacity(0.45), lineWidth: 0.5))
+        .frame(height: 30)
+        .background(Capsule().fill(Color.primary.opacity(0.05)))
+        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
     }
 
     private func alignmentButton(_ alignment: NSTextAlignment, _ icon: String) -> some View {
@@ -569,12 +514,14 @@ private struct AnnotationTextStyleControls: View {
             Image(systemName: icon)
                 .font(.system(size: 12, weight: .semibold))
                 .frame(maxWidth: .infinity)
-                .frame(height: 28)
+                .frame(height: 24)
+                .background { if isSelected { Capsule().fill(Color.accentColor) } }
                 .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(isSelected ? Color.white : Color.primary)
-        .background { if isSelected { Capsule().fill(Color.accentColor) } }
+        .buttonStyle(.inspectorPress(scale: 0.9))
+        .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(0.75))
+        .animation(reduceMotion ? nil : InspectorMotion.press, value: isSelected)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 
     private func syncFontSizeText() {
@@ -611,7 +558,8 @@ private struct AnnotationColorWellMenu: View {
                 .frame(width: 28, height: 20)
                 .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).stroke(.white.opacity(0.15), lineWidth: 0.5))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.inspectorPress(scale: 0.9))
+        .accessibilityLabel("Text color: \(selectedSwatch.title)")
         .popover(isPresented: $isPresented, arrowEdge: .trailing) {
             AnnotationColorPopover(
                 selectedSwatch: selectedSwatch,
@@ -622,444 +570,37 @@ private struct AnnotationColorWellMenu: View {
     }
 }
 
-// MARK: - Layout Section
-
-private struct LayoutSection: View {
-    @Bindable var model: EditorModel
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            InspectorSectionHeader("LAYOUT")
-
-            HStack(spacing: 10) {
-                Text("Ratio")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 52, alignment: .leading)
-
-                Menu {
-                    ForEach(CanvasAspectRatio.allCases, id: \.self) { ratio in
-                        Button {
-                            model.updateConfig { $0.aspectRatio = ratio }
-                        } label: {
-                            if model.config.aspectRatio == ratio {
-                                Label(ratio.rawValue, systemImage: "checkmark")
-                            } else {
-                                Text(ratio.rawValue)
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Text(model.config.aspectRatio.rawValue)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.primary.opacity(0.8))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 8, weight: .semibold))
-                            .foregroundStyle(.tertiary)
-                    }
-                    .padding(.horizontal, 8)
-                    .frame(height: 26)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color(nsColor: .controlBackgroundColor).opacity(0.5))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .stroke(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 0.5)
-                    )
-                    .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-                .menuStyle(.button)
-                .buttonStyle(.plain)
-            }
-
-            HStack(alignment: .top, spacing: 10) {
-                Text("Align")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 52, alignment: .leading)
-                    .padding(.top, 6)
-
-                AlignmentGridPicker(selection: Binding(
-                    get: { model.config.alignment },
-                    set: { alignment in model.updateConfig { $0.alignment = alignment } }
-                ))
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 14)
-    }
-}
-
-private struct AlignmentGridPicker: View {
-    @Binding var selection: ImageAlignment
-
-    private static let rows: [[ImageAlignment]] = [
-        [.topLeading, .top, .topTrailing],
-        [.leading, .center, .trailing],
-        [.bottomLeading, .bottom, .bottomTrailing],
-    ]
-
-    var body: some View {
-        VStack(spacing: 0) {
-            ForEach(Self.rows, id: \.self) { row in
-                HStack(spacing: 0) {
-                    ForEach(row, id: \.self) { alignment in
-                        Button {
-                            selection = alignment
-                        } label: {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                    .fill(selection == alignment ? Color.accentColor.opacity(0.12) : .clear)
-
-                                Circle()
-                                    .fill(selection == alignment ? Color.accentColor : Color.primary.opacity(0.22))
-                                    .frame(width: selection == alignment ? 9 : 6, height: selection == alignment ? 9 : 6)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 28)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-        .padding(3)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.5))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color(nsColor: .separatorColor).opacity(0.3), lineWidth: 0.5)
-        )
-    }
-}
-
-// MARK: - Background Picker
-
-struct BackgroundPickerSection: View {
-    @Bindable var model: EditorModel
-
-    private let swatchColumns = Array(repeating: GridItem(.fixed(28), spacing: 6), count: 7)
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            InspectorSectionHeader("BACKGROUND")
-
-            Text("Solid")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-
-            LazyVGrid(columns: swatchColumns, spacing: 6) {
-                noneButton
-
-                ForEach(SolidColor.presets) { color in
-                    solidButton(color)
-                }
-            }
-
-            Text("Gradients")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-
-            LazyVGrid(columns: swatchColumns, spacing: 6) {
-                ForEach(GradientPreset.presets) { preset in
-                    gradientButton(preset)
-                }
-            }
-
-            Text("macOS")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-
-            LazyVGrid(columns: Array(repeating: GridItem(.fixed(48), spacing: 6), count: 4), spacing: 6) {
-                ForEach(BundledBackgrounds.macAssets) { asset in
-                    bundledImageButton(asset)
-                }
-            }
-
-            customImageSection
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 14)
-    }
-
-    private var noneButton: some View {
-        Button {
-            model.updateConfig { $0.style = .none }
-        } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color.white)
-                    .frame(width: 28, height: 28)
-                Path { path in
-                    path.move(to: CGPoint(x: 26, y: 2))
-                    path.addLine(to: CGPoint(x: 2, y: 26))
-                }
-                .stroke(Color.red.opacity(0.6), lineWidth: 1.5)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(
-                        model.config.style == .none ? Color.accentColor : Color.primary.opacity(0.12),
-                        lineWidth: model.config.style == .none ? 2 : 0.5
-                    )
-            )
-        }
-        .buttonStyle(.plain)
-        .help("No background")
-    }
-
-    private func solidButton(_ color: SolidColor) -> some View {
-        let isSelected: Bool = {
-            if case .solid(let c) = model.config.style { return c.id == color.id }
-            return false
-        }()
-
-        return Button {
-            model.updateConfig { $0.style = .solid(color) }
-        } label: {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(color.color)
-                .frame(width: 28, height: 28)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: isSelected ? 2 : 0.5)
-                )
-        }
-        .buttonStyle(.plain)
-        .help(color.name)
-    }
-
-    private func gradientButton(_ preset: GradientPreset) -> some View {
-        let isSelected: Bool = {
-            if case .gradient(let g) = model.config.style { return g.id == preset.id }
-            return false
-        }()
-
-        return Button {
-            model.updateConfig { $0.style = .gradient(preset) }
-        } label: {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(preset.swiftUIGradient)
-                .frame(width: 28, height: 28)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: isSelected ? 2 : 0.5)
-                )
-        }
-        .buttonStyle(.plain)
-        .help(preset.name)
-    }
-
-    private func bundledImageButton(_ asset: BundledBackgrounds.ImageAsset) -> some View {
-        let isSelected: Bool = {
-            if case .bundledImage(let id) = model.config.style { return id == asset.id }
-            return false
-        }()
-
-        return Button {
-            model.updateConfig { $0.style = .bundledImage(asset.id) }
-        } label: {
-            Group {
-                if let image = asset.image {
-                    Image(nsImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } else {
-                    Rectangle().fill(.quaternary)
-                }
-            }
-            .frame(width: 48, height: 36)
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(isSelected ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: isSelected ? 2 : 0.5)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    @ViewBuilder
-    private var customImageSection: some View {
-        if case .wallpaper(let source) = model.config.style {
-            HStack(spacing: 6) {
-                if let img = NSImage(contentsOfFile: source.path) {
-                    Image(nsImage: img)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 28, height: 28)
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .strokeBorder(Color.accentColor, lineWidth: 2)
-                        )
-                }
-
-                Text(URL(fileURLWithPath: source.path).lastPathComponent)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                Spacer()
-
-                Button {
-                    pickCustomWallpaper()
-                } label: {
-                    Text("Change")
-                        .font(.caption2)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-            }
-        } else {
-            Button {
-                pickCustomWallpaper()
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "plus").font(.caption2)
-                    Text("Custom Image...").font(.caption2)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
-                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.08), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                )
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-        }
-    }
-
-    private func pickCustomWallpaper() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image, .png, .jpeg]
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.canCreateDirectories = false
-        panel.title = "Choose Background Image"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        let path = url.path
-        model.updateConfig { $0.style = .wallpaper(WallpaperSource(path: path)) }
-    }
-}
-
-// MARK: - Crop Section
-
 private struct ImageCropSection: View {
     @Bindable var model: EditorModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            InspectorSectionHeader("CROP")
-
-            HStack {
-                Button {
-                    model.isCropping.toggle()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "crop")
-                            .font(.caption)
-                        Text(model.isCropping ? "Done" : "Crop")
-                            .font(.caption2)
+        InspectorSection("Crop") {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    InspectorPill(
+                        model.isCropping ? "Done" : "Crop",
+                        systemImage: "crop",
+                        isActive: model.isCropping,
+                        fillsWidth: true
+                    ) {
+                        model.isCropping.toggle()
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-                    .background(model.isCropping ? AnyShapeStyle(Color.accentColor.opacity(0.15)) : AnyShapeStyle(.quaternary), in: RoundedRectangle(cornerRadius: 6))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .strokeBorder(model.isCropping ? Color.accentColor : Color.primary.opacity(0.08), lineWidth: model.isCropping ? 1.5 : 0.5)
-                    )
+
+                    if model.hasCrop {
+                        InspectorPill("Reset", systemImage: "arrow.counterclockwise") {
+                            model.resetCrop()
+                        }
+                    }
                 }
-                .buttonStyle(.plain)
 
                 if model.hasCrop {
-                    Button {
-                        model.resetCrop()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.counterclockwise")
-                                .font(.caption)
-                            Text("Reset")
-                                .font(.caption2)
-                        }
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 10)
-                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
-                    }
-                    .buttonStyle(.plain)
+                    let width = Int(CGFloat(model.sourceImage?.width ?? 0) * model.cropRect.width)
+                    let height = Int(CGFloat(model.sourceImage?.height ?? 0) * model.cropRect.height)
+                    Text("\(width) x \(height)")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.tertiary)
                 }
             }
-
-            if model.hasCrop {
-                let w = Int(CGFloat(model.sourceImage?.width ?? 0) * model.cropRect.width)
-                let h = Int(CGFloat(model.sourceImage?.height ?? 0) * model.cropRect.height)
-                Text("\(w) × \(h)")
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 14)
-    }
-}
-
-// MARK: - Beautifier Controls
-
-struct BeautifierControlsSection: View {
-    @Bindable var model: EditorModel
-    @State private var configBeforeDrag: BeautifierConfig?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            InspectorSectionHeader("EFFECTS")
-
-            InspectorSlider(
-                "Padding",
-                value: Binding(get: { model.config.padding }, set: { model.config.padding = $0 }),
-                range: 0.0...0.45,
-                format: .percent(),
-                onEditingChanged: { handleSliderEditing($0) }
-            )
-
-            InspectorSlider(
-                "Corner Radius",
-                value: Binding(get: { model.config.cornerRadius }, set: { model.config.cornerRadius = $0 }),
-                range: 0.0...0.12,
-                format: .scaled(by: 1000),
-                onEditingChanged: { handleSliderEditing($0) }
-            )
-
-            InspectorSlider(
-                "Shadow",
-                value: Binding(get: { model.config.shadowStrength }, set: { model.config.shadowStrength = $0 }),
-                range: 0.0...1.0,
-                format: .percent(),
-                onEditingChanged: { handleSliderEditing($0) }
-            )
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 14)
-    }
-
-    private func handleSliderEditing(_ editing: Bool) {
-        if editing {
-            configBeforeDrag = model.config
-        } else if let saved = configBeforeDrag {
-            let current = model.config
-            model.config = saved
-            model.updateConfig { $0 = current }
-            configBeforeDrag = nil
         }
     }
 }
-

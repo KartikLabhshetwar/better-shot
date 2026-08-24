@@ -1,6 +1,5 @@
 import CryptoKit
 import Foundation
-import UniformTypeIdentifiers
 
 struct R2UploadError: LocalizedError {
     let message: String
@@ -129,7 +128,7 @@ final class R2Uploader {
 
     private init() {}
 
-    func upload(itemID: UUID, fileURL: URL) async throws -> URL {
+    func uploadShare(itemID: UUID, fileURL: URL, title: String?) async throws -> URL {
         let credentials = R2CredentialStore.shared.snapshot()
         guard credentials.isConfigured else {
             throw R2UploadError(message: "R2 sharing is not configured. Add your credentials in Settings > Sharing.")
@@ -141,7 +140,13 @@ final class R2Uploader {
 
         let session = session
         let task = Task<URL, Error> {
-            try await Self.performUpload(itemID: itemID, fileURL: fileURL, credentials: credentials, session: session) { fraction in
+            try await Self.performShareUpload(
+                itemID: itemID,
+                fileURL: fileURL,
+                title: title,
+                credentials: credentials,
+                session: session
+            ) { fraction in
                 Task { @MainActor in
                     R2Uploader.shared.uploadProgress[itemID] = fraction
                 }
@@ -212,21 +217,73 @@ final class R2Uploader {
         throw R2UploadError(message: parseErrorMessage(data: data, statusCode: http.statusCode))
     }
 
-    nonisolated private static func performUpload(
+    nonisolated private static func performShareUpload(
         itemID: UUID,
         fileURL: URL,
+        title: String?,
         credentials: R2Credentials,
         session: URLSession,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> URL {
-        let key = objectKey(for: itemID, fileURL: fileURL)
+        let id = ShareBundle.slug(for: itemID)
+        guard let pageURL = ShareBundle.pageURL(id: id, publicBaseURL: credentials.publicBaseURL) else {
+            throw R2UploadError(message: "The Public Base URL must start with https:// to build a share link.")
+        }
+
+        let contents = await ShareBundle.make(id: id, fileURL: fileURL, title: title)
+        let prefix = ShareBundle.objectPrefix(id: id)
+
+        try await putObject(
+            key: prefix + contents.mediaFilename,
+            payload: .file(fileURL),
+            contentType: contents.mediaMimeType,
+            credentials: credentials,
+            session: session,
+            progress: progress
+        )
+
+        if let posterData = contents.posterData {
+            try await putObject(
+                key: prefix + ShareBundle.posterFilename,
+                payload: .data(posterData),
+                contentType: "image/jpeg",
+                credentials: credentials,
+                session: session
+            )
+        }
+
+        let manifestData = try JSONEncoder().encode(contents.manifest)
+        try await putObject(
+            key: prefix + ShareBundle.manifestFilename,
+            payload: .data(manifestData),
+            contentType: "application/json",
+            credentials: credentials,
+            session: session
+        )
+
+        progress(1)
+        return pageURL
+    }
+
+    private enum Payload: Sendable {
+        case file(URL)
+        case data(Data)
+    }
+
+    nonisolated private static func putObject(
+        key: String,
+        payload: Payload,
+        contentType: String,
+        credentials: R2Credentials,
+        session: URLSession,
+        progress: (@Sendable (Double) -> Void)? = nil
+    ) async throws {
         let host = "\(credentials.accountID).r2.cloudflarestorage.com"
         let canonicalURI = "/" + uriEncodePath(credentials.bucket) + "/" + uriEncodePath(key)
         guard let uploadURL = URL(string: "https://\(host)\(canonicalURI)") else {
             throw R2UploadError(message: "Invalid R2 endpoint URL.")
         }
 
-        let contentType = mimeType(for: fileURL)
         let signature = R2SigV4.sign(
             method: "PUT",
             host: host,
@@ -244,8 +301,15 @@ final class R2Uploader {
         request.setValue(signature.authorizationHeader, forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 600
 
-        let delegate = R2UploadProgressDelegate(onProgress: progress)
-        let (data, response) = try await session.upload(for: request, fromFile: fileURL, delegate: delegate)
+        let data: Data
+        let response: URLResponse
+        switch payload {
+        case .file(let url):
+            let delegate = R2UploadProgressDelegate(onProgress: progress ?? { _ in })
+            (data, response) = try await session.upload(for: request, fromFile: url, delegate: delegate)
+        case .data(let body):
+            (data, response) = try await session.upload(for: request, from: body)
+        }
 
         guard let http = response as? HTTPURLResponse else {
             throw R2UploadError(message: "No response from R2.")
@@ -253,31 +317,6 @@ final class R2Uploader {
         guard (200..<300).contains(http.statusCode) else {
             throw R2UploadError(message: parseErrorMessage(data: data, statusCode: http.statusCode))
         }
-
-        progress(1)
-
-        let base = credentials.publicBaseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard let shareURL = URL(string: "\(base)/\(key)") else {
-            throw R2UploadError(message: "Could not build a share URL from the Public Base URL.")
-        }
-        return shareURL
-    }
-
-    nonisolated private static func objectKey(for itemID: UUID, fileURL: URL) -> String {
-        "recordings/\(itemID.uuidString)/\(sanitizedFilename(fileURL.lastPathComponent))"
-    }
-
-    nonisolated private static let filenameAllowedCharacters = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.-_")
-
-    nonisolated private static func sanitizedFilename(_ name: String) -> String {
-        String(name.unicodeScalars.map { filenameAllowedCharacters.contains($0) ? Character($0) : "-" })
-    }
-
-    nonisolated private static func mimeType(for url: URL) -> String {
-        if let type = UTType(filenameExtension: url.pathExtension.lowercased()), let mime = type.preferredMIMEType {
-            return mime
-        }
-        return "application/octet-stream"
     }
 
     nonisolated private static func uriEncodePath(_ path: String) -> String {

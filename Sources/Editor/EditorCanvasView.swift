@@ -6,6 +6,7 @@ struct EditorCanvasView: View {
     @State private var hasActiveInteraction = false
     @State private var hoveredLocation: CGPoint?
     @State private var currentCursor: AnnotationCanvasCursor = .arrow
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { proxy in
@@ -56,8 +57,14 @@ struct EditorCanvasView: View {
                     // Background layer
                     CanvasBackgroundView(style: model.config.style)
                         .frame(width: canvasFrame.width, height: canvasFrame.height)
-                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+                        )
+                        .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
                         .position(x: canvasFrame.midX, y: canvasFrame.midY)
+                        .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 1), value: model.config.aspectRatio)
 
                     // Shadow + Screenshot layer
                     CanvasScreenshotView(
