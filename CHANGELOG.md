@@ -13,6 +13,9 @@ transitions, scene changes, a tilted 3D card, color) now live in four tabs.
 
 ### Added
 
+- **Copy Only captures**: General settings now picks where a new screenshot goes: Save & Copy, Save Only, or Copy Only. Copy Only puts the finished image straight on the clipboard and leaves nothing in your save folder. The capture is still in the Library, and Export in the editor still writes a file whenever you ask for one
+- **Space switches to window capture**: Region capture is interactive rather than selection-only now, so space toggles between dragging a region and picking a whole window, exactly like the built-in screenshot tool. Escape still cancels
+- **Copy the result on the way out**: Turn on "Copy the result when the editor closes" in Capture settings and escape hands your annotated image to the clipboard as the editor closes, so a capture can go from screen to another app without ever touching your save folder. ⌘S still saves a file and closes
 - **Tabbed video inspector**: The right sidebar is now four tabs instead of one long scroll: Clip (scissors), Motion (arrow), Camera (person), and Style (paintbrush). Each tab holds only the controls that act on what you selected, so the sidebar stops being a wall of disclosure triangles
 - **Per-clip audio mode**: Speeding a clip up no longer forces one behavior on its audio. Each clip picks Mute, Keep Pitch, or Match Speed, so a 4x skim can stay silent while a 0.5x hold keeps a natural voice
 - **Transitions**: Adjacent clips can cross into each other with Crossfade or Fade Through Black, with an adjustable length. The transition is baked into the export rather than faked in the preview
@@ -29,6 +32,7 @@ transitions, scene changes, a tilted 3D card, color) now live in four tabs.
 
 ### Changed
 
+- **Copying after a save is now a destination**: The "Copy to the clipboard after saving" toggle became the three-way New screenshots picker, because a capture that is only copied has no save to happen after. Existing installs carry their old setting over
 - **Crop is a mode, not a permanent panel**: Entering crop shows the crop box, and leaving it puts the box away in both the image and the video editor. Crop handles stay flat while cropping even when a 3D pose is applied, so they remain grabbable
 - **The face cam bubble is draggable in the editor**: Position it in the preview and the export follows, instead of being locked to where capture left it
 - **Rebuilt clip timeline**: Cuts occupy real space on the timeline, delete works on the selected clip, and the drag math for trimming and scrubbing was rewritten so handles track the pointer 1:1
@@ -215,13 +219,13 @@ that survives a crash mid-recording.
 - **Crash on window close**: Fixed `EXC_BREAKPOINT` crash in `_postWindowNeedsUpdateConstraints` caused by `setActivationPolicy(.accessory)` triggering layout updates on a window mid-teardown. Deferred activation policy change to the next run loop iteration for editor, settings, and toast windows
 - **Double background on editor open**: Adopted ScreenDrop's base-image sidecar pattern — a `.base.png` copy of the raw capture is saved alongside every beautified output. The editor now resolves to the base image before loading, making it architecturally impossible to apply background/padding/shadow twice, regardless of which URL is passed to the editor
 - **Race condition fixes across the codebase**: Fixed multiple race conditions that could cause crashes:
-  - Menu bar popover: eliminated Task wrapper in close animation, captured panel reference before nil'ing to prevent use-after-free
-  - Editor window delegate: replaced `Task { @MainActor }` with `DispatchQueue.main.async` for deterministic ordering during window teardown
-  - Shortcut service: cached shortcuts on main thread to prevent `@MainActor`-isolated property access from CGEvent tap callback thread
-  - Toast window: added generation counter to prevent stale animated-dismiss completion handlers from nil'ing a newly created panel
-  - Countdown overlay: added cancellation guard against concurrent `showCountdown` calls that could stack overlapping countdowns
-  - Preview overlay: cancel pending dismiss task at the start of `show()` to prevent a stale dismiss from hiding a freshly shown preview
-  - Menu bar event monitor: replaced `Task { @MainActor }` with `DispatchQueue.main.async` for consistent dispatch ordering
+    - Menu bar popover: eliminated Task wrapper in close animation, captured panel reference before nil'ing to prevent use-after-free
+    - Editor window delegate: replaced `Task { @MainActor }` with `DispatchQueue.main.async` for deterministic ordering during window teardown
+    - Shortcut service: cached shortcuts on main thread to prevent `@MainActor`-isolated property access from CGEvent tap callback thread
+    - Toast window: added generation counter to prevent stale animated-dismiss completion handlers from nil'ing a newly created panel
+    - Countdown overlay: added cancellation guard against concurrent `showCountdown` calls that could stack overlapping countdowns
+    - Preview overlay: cancel pending dismiss task at the start of `show()` to prevent a stale dismiss from hiding a freshly shown preview
+    - Menu bar event monitor: replaced `Task { @MainActor }` with `DispatchQueue.main.async` for consistent dispatch ordering
 
 ### Removed
 
@@ -306,15 +310,15 @@ that survives a crash mid-recording.
 - **In-app update checker**: Check for Updates button in Preferences > About that queries GitHub releases API and links to the latest download
 - **Version tracking**: `version.json` file at project root for release management
 - **Professional annotation system**: Complete rewrite of annotation tools, adapted from Screendrop's implementation
-  - **Interactive canvas**: Annotations render as live SwiftUI views — click to select, drag to move, handles to resize
-  - **Selection system**: Single select, multi-select (Shift/Cmd+click), marquee drag selection, select all (Cmd+A)
-  - **Curved arrows**: Quadratic Bézier arrows with draggable curve control handle and snap-to-straight
-  - **Live text editing**: Text annotations use inline NSTextView with full font family, size, bold/italic/underline, and alignment controls
-  - **Numbered circles**: Auto-incrementing numbered badges with proper outline and contrast text
-  - **Redaction tools**: Pixelate and blur with adjustable density slider and cached preview generation
-  - **Resize handles**: Corner handles for shapes, endpoint handles for lines/arrows, curve handle for arrows
-  - **Color picker**: 10 named color presets with popover selector + custom ColorPicker
-  - **Stroke width picker**: Visual popover with 5 presets (2/4/6/8/12px)
+    - **Interactive canvas**: Annotations render as live SwiftUI views — click to select, drag to move, handles to resize
+    - **Selection system**: Single select, multi-select (Shift/Cmd+click), marquee drag selection, select all (Cmd+A)
+    - **Curved arrows**: Quadratic Bézier arrows with draggable curve control handle and snap-to-straight
+    - **Live text editing**: Text annotations use inline NSTextView with full font family, size, bold/italic/underline, and alignment controls
+    - **Numbered circles**: Auto-incrementing numbered badges with proper outline and contrast text
+    - **Redaction tools**: Pixelate and blur with adjustable density slider and cached preview generation
+    - **Resize handles**: Corner handles for shapes, endpoint handles for lines/arrows, curve handle for arrows
+    - **Color picker**: 10 named color presets with popover selector + custom ColorPicker
+    - **Stroke width picker**: Visual popover with 5 presets (2/4/6/8/12px)
 - **Aspect-ratio locking**: Hold Shift while drawing rectangles/ellipses to constrain to square/circle
 - **Arrow snap-to-straight**: Arrow curves snap to a straight line when dragged near the start-end axis
 - **Color Picker** (Cmd+Shift+C): Uses macOS native `NSColorSampler` for pixel-perfect color picking on any monitor. After picking, a floating HUD shows the color swatch and hex code (#RRGGBB) near the cursor. Hex is copied to clipboard.
@@ -369,24 +373,24 @@ that survives a crash mid-recording.
 
 - **Native Swift/SwiftUI rewrite**: Complete rewrite from Electron/Rust to pure Swift/SwiftUI + Go for video processing
 - **Screen recording**: Full screen and window recording via ScreenCaptureKit
-  - Floating control pill with pause/resume, stop, and discard controls
-  - Pulsing red dot indicator with MM:SS timer
-  - HEVC encoding at 60fps Retina resolution
-  - Post-recording compression via videokit (FFmpeg)
-  - Recordings saved to user's configured save directory
+    - Floating control pill with pause/resume, stop, and discard controls
+    - Pulsing red dot indicator with MM:SS timer
+    - HEVC encoding at 60fps Retina resolution
+    - Post-recording compression via videokit (FFmpeg)
+    - Recordings saved to user's configured save directory
 - **Preview overlay with editor access**: Floating preview card appears after capture
-  - Hover to reveal actions: edit (pencil), delete, dismiss
-  - Copy and Save pill buttons
-  - Draggable thumbnail
-  - Clicking pencil icon opens the annotation editor
+    - Hover to reveal actions: edit (pencil), delete, dismiss
+    - Copy and Save pill buttons
+    - Draggable thumbnail
+    - Clicking pencil icon opens the annotation editor
 - **Annotation editor window**: Opens from preview overlay with full beautifier controls
-  - Switches app to regular activation policy (visible in Dock/Cmd-Tab) while editing
+    - Switches app to regular activation policy (visible in Dock/Cmd-Tab) while editing
 - **Override macOS screenshot shortcuts**:
-  - Cmd+Shift+3 = Capture Screen
-  - Cmd+Shift+4 = Capture Region
-  - Cmd+Shift+5 = Capture Window
-  - Cmd+Shift+6 = Toggle Screen Recording
-  - Cmd+Shift+O = OCR Region
+    - Cmd+Shift+3 = Capture Screen
+    - Cmd+Shift+4 = Capture Region
+    - Cmd+Shift+5 = Capture Window
+    - Cmd+Shift+6 = Toggle Screen Recording
+    - Cmd+Shift+O = OCR Region
 - **Bundled background images**: Wallpapers, mesh gradients, and macOS assets now ship inside the app bundle
 - **videokit bundled**: Go-based FFmpeg wrapper included in the app for video compression
 
