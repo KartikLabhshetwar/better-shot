@@ -719,6 +719,7 @@ struct RecordingSettingsTab: View {
     @AppStorage("bs_recordingFPS") private var recordingFPS: Int = 30
     @AppStorage("bs_recordingShowCursor") private var showCursor: Bool = true
     @AppStorage(AppPreferences.recordingCaptureAudioKey) private var captureAudio: Bool = false
+    @AppStorage(AppPreferences.recordingCaptureKeystrokesKey) private var captureKeystrokes: Bool = false
     @AppStorage("bs_recordingOpenEditor") private var openEditor: Bool = true
     @State private var isConfirmingReset = false
 
@@ -740,10 +741,14 @@ struct RecordingSettingsTab: View {
             Section {
                 Toggle("The mouse cursor", isOn: $showCursor)
                 Toggle("System audio", isOn: $captureAudio)
+                Toggle("The keys I type", isOn: $captureKeystrokes)
+                    .onChange(of: captureKeystrokes) { _, isOn in
+                        if isOn && !KeystrokeRecorder.isPermitted { KeystrokeRecorder.requestPermission() }
+                    }
             } header: {
                 Text("Include")
             } footer: {
-                Text("Microphone input is picked separately from the recording bar, so you can decide right before you hit record.")
+                Text("Microphone input is picked separately from the recording bar, so you can decide right before you hit record. Recording keys needs Input Monitoring, saves what you type beside the recording, and stays off until you turn it on.")
             }
 
             Section {
@@ -766,6 +771,7 @@ struct RecordingSettingsTab: View {
                 recordingFPS = 30
                 showCursor = true
                 captureAudio = false
+                captureKeystrokes = false
                 openEditor = true
             }
             Button("Cancel", role: .cancel) {}

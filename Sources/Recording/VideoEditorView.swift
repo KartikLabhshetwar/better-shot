@@ -207,6 +207,8 @@ struct VideoEditorView: View {
             InspectorDivider()
             VideoCaptionSection(model: model)
             InspectorDivider()
+            VideoKeyboardSection(model: model)
+            InspectorDivider()
             VideoMaskSection(model: model)
         case .camera:
             if model.hasCamera {
@@ -465,7 +467,7 @@ private struct VideoPreviewCanvas: View {
                     .animation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 1), value: model.sceneAtPlayhead)
                     .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 1), value: model.isCropping)
 
-                    if (!model.texts.isEmpty || model.hasCaptions) && !model.isCropping {
+                    if (!model.texts.isEmpty || model.hasCaptions || model.hasKeystrokes) && !model.isCropping {
                         TextOverlayLayer(
                             model: model,
                             canvasSize: CGSize(width: canvasW, height: canvasH),

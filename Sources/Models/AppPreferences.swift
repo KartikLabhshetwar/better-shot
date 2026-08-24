@@ -15,6 +15,7 @@ enum AppPreferences {
     private static let selfTimerKey = "bs_selfTimerDelay"
     private static let recordingFPSKey = "bs_recordingFPS"
     private static let recordingShowCursorKey = "bs_recordingShowCursor"
+    static let recordingCaptureKeystrokesKey = "bs_recordingCaptureKeystrokes"
     static let recordingCaptureAudioKey = "bs_recordingCaptureAudio"
     private static let recordingOpenEditorKey = "bs_recordingOpenEditor"
     private static let openEditorAfterCaptureKey = "bs_openEditorAfterCapture"
@@ -114,6 +115,11 @@ enum AppPreferences {
     static var recordingShowCursor: Bool {
         get { UserDefaults.standard.object(forKey: recordingShowCursorKey) as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: recordingShowCursorKey) }
+    }
+
+    static var recordingCaptureKeystrokes: Bool {
+        get { UserDefaults.standard.object(forKey: recordingCaptureKeystrokesKey) as? Bool ?? false }
+        set { UserDefaults.standard.set(newValue, forKey: recordingCaptureKeystrokesKey) }
     }
 
     static var recordingCaptureAudio: Bool {

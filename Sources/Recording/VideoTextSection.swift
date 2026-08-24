@@ -263,6 +263,13 @@ struct TextOverlayLayer: View {
                 }
             }
 
+            ForEach(model.keystrokeOverlays) { overlay in
+                if let typed = TextOverlay.resolved([overlay], atSourceTime: model.currentTime, canvasSize: canvasSize).first {
+                    DrawnText(text: typed, isSelected: false, isEditing: false, canvasSize: canvasSize, select: {}, move: { _ in })
+                        .allowsHitTesting(false)
+                }
+            }
+
             if let caption = model.captionStyle.resolved(model.captions, atSourceTime: model.currentTime, canvasSize: canvasSize) {
                 DrawnText(text: caption, isSelected: false, isEditing: false, canvasSize: canvasSize, select: {}, move: { _ in })
                     .allowsHitTesting(false)

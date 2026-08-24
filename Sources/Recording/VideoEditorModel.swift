@@ -69,6 +69,11 @@ final class VideoEditorModel {
     var texts: [TextOverlay] = []
     var selectedTextID: UUID?
 
+    var keystrokeSegments: [KeystrokeSegment] = []
+    var keystrokeStyle = KeystrokeStyle()
+    var keystrokeOverlays: [TextOverlay] { keystrokeStyle.overlays(keystrokeSegments) }
+    var hasKeystrokes: Bool { keystrokeStyle.isEnabled && !keystrokeSegments.isEmpty }
+
     var captions: [CaptionCue] = []
     var captionStyle = CaptionStyle()
     var isTranscribing = false
@@ -119,7 +124,7 @@ final class VideoEditorModel {
             || zoomEnabled || showsClickHighlights
             || config.padding > 0 || config.cornerRadius > 0 || config.shadowStrength > 0
             || config.style != .none || config.aspectRatio != .auto
-            || !screenGrade.isNeutral || !cameraGrade.isNeutral || !pose.isNeutral || !masks.isEmpty || !texts.isEmpty || hasCaptions
+            || !screenGrade.isNeutral || !cameraGrade.isNeutral || !pose.isNeutral || !masks.isEmpty || !texts.isEmpty || hasCaptions || hasKeystrokes
     }
     /// Escape backs out of whatever is in flight before it reaches the window, the way it does everywhere else on the Mac.
     @discardableResult
@@ -231,6 +236,7 @@ final class VideoEditorModel {
             }
             guard !Task.isCancelled else { return }
             self.loadPointerCapture()
+            self.loadKeystrokeCapture()
             self.loadCameraSidecar()
             self.regenerateZoomCues()
             self.generateThumbnails()
@@ -302,6 +308,21 @@ final class VideoEditorModel {
 
     private func pointerSidecarURL(for videoURL: URL) -> URL {
         URL(fileURLWithPath: videoURL.deletingPathExtension().path + ".pointer.json")
+    }
+
+    /// Typing was recorded to its own sidecar, and only when the user asked for it in Settings.
+    private func loadKeystrokeCapture() {
+        guard let sourceURL else {
+            keystrokeSegments = []
+            return
+        }
+        let url = URL(fileURLWithPath: sourceURL.deletingPathExtension().path + ".keys.json")
+        guard let data = try? Data(contentsOf: url),
+              let decoded = try? JSONDecoder().decode(KeystrokeCaptureFile.self, from: data) else {
+            keystrokeSegments = []
+            return
+        }
+        keystrokeSegments = KeystrokeSegment.grouped(decoded.presses)
     }
 
     private func loadPointerCapture() {
@@ -387,6 +408,15 @@ final class VideoEditorModel {
     func deleteText(_ id: UUID) {
         texts.removeAll { $0.id == id }
         if selectedTextID == id { selectedTextID = nil }
+    }
+
+    func updateKeystroke(_ segment: KeystrokeSegment) {
+        guard let index = keystrokeSegments.firstIndex(where: { $0.id == segment.id }) else { return }
+        keystrokeSegments[index] = segment
+    }
+
+    func deleteKeystroke(_ id: UUID) {
+        keystrokeSegments.removeAll { $0.id == id }
     }
 
     /// Captions come off the recording's own audio, so they land already lined up with the source clock the overlays use.
@@ -836,7 +866,7 @@ final class VideoEditorModel {
             || exportConfig.style != .none || exportConfig.aspectRatio != .auto
         let hasZoom = zoomEnabled
 
-        if isClipMode || hasEffects || hasCrop || hasZoom || isCameraVisible || showsClickHighlights || !masks.isEmpty || !texts.isEmpty || hasCaptions {
+        if isClipMode || hasEffects || hasCrop || hasZoom || isCameraVisible || showsClickHighlights || !masks.isEmpty || !texts.isEmpty || hasCaptions || hasKeystrokes {
             return try await exportWithEffects(asset: asset, outputURL: outputURL, config: exportConfig)
         }
 
@@ -1135,7 +1165,7 @@ final class VideoEditorModel {
             }
         }
 
-        let exportTexts = texts
+        let exportTexts = texts + (hasKeystrokes ? keystrokeOverlays : [])
         let exportCaptions = hasCaptions ? captions : []
         let captionLook = captionStyle
         let canvasSize = CGSize(width: canvasW, height: canvasH)

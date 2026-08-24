@@ -87,6 +87,7 @@ nonisolated struct TextOverlay: Identifiable, Equatable, Sendable {
     var blue: CGFloat = 1
     var opacity: CGFloat = 1
     var shadow: CGFloat = 0.5
+    var backgroundOpacity: CGFloat = 0
     var lineHeight: CGFloat = 1.2
     var animationIn: Motion = .fade
     var animationOut: Motion = .fade
@@ -129,7 +130,8 @@ nonisolated struct TextOverlay: Identifiable, Equatable, Sendable {
             green: green,
             blue: blue,
             shadow: min(max(shadow, 0), 1),
-            lineHeight: min(max(lineHeight, 0.6), 3)
+            lineHeight: min(max(lineHeight, 0.6), 3),
+            backgroundOpacity: min(max(backgroundOpacity, 0), 1)
         )
     }
 

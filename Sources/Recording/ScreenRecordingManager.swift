@@ -138,6 +138,7 @@ final class ScreenRecordingManager {
     private var elapsedAnchor: ContinuousClock.Instant?
     private var elapsedBeforePause: Duration = .zero
     private let pointerCapture = PointerCaptureRecorder()
+    private let keystrokeCapture = KeystrokeRecorder()
     private(set) var activeRegionRect: CGRect?
     private(set) var isRestarting = false
     private var lastSource: RecordingSource?
@@ -507,6 +508,7 @@ final class ScreenRecordingManager {
             let stream = try capture.makeStream(filter: filter, configuration: config, includeSystemAudio: audio.systemAudio)
             try await stream.startCapture()
             pointerCapture.start(captureRect: pointerCaptureRect)
+            if AppPreferences.recordingCaptureKeystrokes { keystrokeCapture.start() }
         } catch {
             capture.detachHandlers()
             recordingSession.cancelWriting()
@@ -546,6 +548,7 @@ final class ScreenRecordingManager {
         session = nil
         let cameraURL = await CameraBubbleController.shared.finishRecording()
         let capturedPointerData = pointerCapture.stop()
+        let capturedKeystrokes = keystrokeCapture.stop()
         activeRegionRect = nil
 
         state = .idle
@@ -560,6 +563,7 @@ final class ScreenRecordingManager {
             return nil
         }
         writePointerSidecar(capturedPointerData, alongside: url)
+        writeKeystrokeSidecar(capturedKeystrokes, alongside: url)
         if let cameraURL, cameraURL != Self.cameraSidecarURL(for: url) {
             try? FileManager.default.removeItem(at: cameraURL)
         }
@@ -572,6 +576,12 @@ final class ScreenRecordingManager {
         try? data.write(to: url.deletingPathExtension().appendingPathExtension("pointer.json"))
     }
 
+    private func writeKeystrokeSidecar(_ capture: KeystrokeCaptureFile, alongside url: URL) {
+        guard !capture.presses.isEmpty else { return }
+        guard let data = try? JSONEncoder().encode(capture) else { return }
+        try? data.write(to: url.deletingPathExtension().appendingPathExtension("keys.json"))
+    }
+
     // MARK: - Pause / Resume
 
     func pauseRecording() {
@@ -579,6 +589,7 @@ final class ScreenRecordingManager {
         session?.pause()
         CameraBubbleController.shared.pauseRecording()
         pointerCapture.pause()
+        keystrokeCapture.pause()
         state = .paused
         stopTimer()
     }
@@ -588,6 +599,7 @@ final class ScreenRecordingManager {
         session?.resume()
         CameraBubbleController.shared.resumeRecording()
         pointerCapture.resume()
+        keystrokeCapture.resume()
         state = .recording
         startTimer()
     }
@@ -611,6 +623,7 @@ final class ScreenRecordingManager {
         session = nil
         await CameraBubbleController.shared.discardRecording()
         _ = pointerCapture.stop()
+        _ = keystrokeCapture.stop()
         activeRegionRect = nil
 
         if let url = outputURL {
