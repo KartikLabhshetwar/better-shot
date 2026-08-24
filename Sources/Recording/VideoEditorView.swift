@@ -5,27 +5,22 @@ import AVFoundation
 struct AVPlayerRepresentable: NSViewRepresentable {
     let player: AVPlayer
 
-    func makeNSView(context: Context) -> AVPlayerView {
-        let view = AVPlayerView()
+    func makeNSView(context: Context) -> PassthroughPlayerView {
+        let view = PassthroughPlayerView()
         view.player = player
         view.controlsStyle = .none
         view.showsFullScreenToggleButton = false
         return view
     }
 
-    func updateNSView(_ nsView: AVPlayerView, context: Context) {
+    func updateNSView(_ nsView: PassthroughPlayerView, context: Context) {
         nsView.player = player
     }
 }
 
-private enum VideoSidebarTab: Hashable {
-    case clip, zoom, style
-
-    static let tabs: [InspectorTab<VideoSidebarTab>] = [
-        InspectorTab(.clip, systemImage: "scissors", title: "Clip"),
-        InspectorTab(.zoom, systemImage: "plus.magnifyingglass", title: "Zoom"),
-        InspectorTab(.style, systemImage: "photo.on.rectangle.angled", title: "Style")
-    ]
+/// AppKit hit testing runs before SwiftUI sees the click, so a plain player view swallows every drag aimed at the overlays stacked on top of it.
+final class PassthroughPlayerView: AVPlayerView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 struct VideoEditorView: View {
@@ -39,7 +34,6 @@ struct VideoEditorView: View {
     @State private var isConfirmingDiscard = false
     @State private var hostWindow: NSWindow?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var sidebarTab: VideoSidebarTab = .clip
     @AppStorage("editor.video.timelineHeight") private var storedTimelineHeight = EditorPanelMetrics.defaultTimelineHeight
 
     private var timelineHeight: Binding<CGFloat> {
@@ -164,35 +158,28 @@ struct VideoEditorView: View {
     // MARK: - Inspector Sidebar
 
     private var videoInspector: some View {
-        VStack(spacing: 0) {
-            InspectorTabBar(tabs: VideoSidebarTab.tabs, selection: $sidebarTab)
-
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
-                    switch sidebarTab {
-                    case .clip:
-                        VideoTrimSection(model: model)
-                        InspectorDivider()
-                        VideoCropSection(model: model)
-                    case .zoom:
-                        VideoZoomSection(model: model)
-                    case .style:
-                        if model.hasCamera {
-                            VideoCameraSection(model: model)
-                            InspectorDivider()
-                        }
-                        EffectsSection(config: $model.config)
-                        InspectorDivider()
-                        LayoutSection(config: $model.config, showsAlignment: false)
-                        InspectorDivider()
-                        BackgroundPickerSection(config: $model.config)
-                    }
-
-                    Spacer(minLength: 24)
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                VideoTrimSection(model: model)
+                InspectorDivider()
+                VideoZoomSection(model: model)
+                if model.hasCamera {
+                    InspectorDivider()
+                    VideoCameraSection(model: model)
                 }
+                InspectorDivider()
+                VideoCropSection(model: model)
+                InspectorDivider()
+                EffectsSection(config: $model.config)
+                InspectorDivider()
+                LayoutSection(config: $model.config, showsAlignment: false)
+                InspectorDivider()
+                BackgroundPickerSection(config: $model.config)
+
+                Spacer(minLength: 24)
             }
-            .scrollContentBackground(.hidden)
         }
+        .scrollContentBackground(.hidden)
         .background(InspectorMaterial())
     }
 
@@ -350,8 +337,9 @@ private struct VideoPreviewCanvas: View {
     var body: some View {
         GeometryReader { geo in
             let config = model.config
+            let visible = model.isCropping ? CropGeometry.identity : model.cropRect
             let videoAspect: CGFloat = model.videoWidth > 0 && model.videoHeight > 0
-                ? CGFloat(model.videoWidth) / CGFloat(model.videoHeight)
+                ? (CGFloat(model.videoWidth) * visible.width) / (CGFloat(model.videoHeight) * visible.height)
                 : 16.0 / 9.0
 
             let effectivePadding = (config.style != .none && config.padding <= 0) ? CGFloat(0.06) : config.padding
@@ -383,6 +371,11 @@ private struct VideoPreviewCanvas: View {
                                 ProgressView()
                             }
                         }
+                        .frame(width: videoW / visible.width, height: videoH / visible.height)
+                        .offset(
+                            x: -(visible.midX - 0.5) * videoW / visible.width,
+                            y: -(visible.midY - 0.5) * videoH / visible.height
+                        )
                         .frame(width: videoW, height: videoH)
                         .scaleEffect(zoomFrame.magnification, anchor: UnitPoint(x: zoomFrame.anchor.x, y: zoomFrame.anchor.y))
                         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -398,9 +391,7 @@ private struct VideoPreviewCanvas: View {
                         }
 
                         if model.isCropping {
-                            VideoCropOverlay(cropRect: $model.cropRect, videoSize: CGSize(width: videoW, height: videoH))
-                        } else if model.hasCrop {
-                            VideoCropPreview(cropRect: model.cropRect, videoSize: CGSize(width: videoW, height: videoH))
+                            CropBox(rect: $model.cropRect, frameSize: CGSize(width: videoW, height: videoH))
                         }
                     }
                 }
@@ -411,7 +402,22 @@ private struct VideoPreviewCanvas: View {
                 )
                 .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
                 .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 1), value: config.aspectRatio)
+                .animation(reduceMotion ? nil : .spring(response: 0.36, dampingFraction: 0.88), value: visible)
+                .animation(reduceMotion ? nil : InspectorMotion.reveal, value: model.isCropping)
             }
+            .overlay(alignment: .bottom) {
+                if model.isCropping {
+                    CropToolbar(
+                        dimensions: "\(Int(model.croppedSize.width)) x \(Int(model.croppedSize.height))",
+                        canReset: model.hasCrop,
+                        onReset: { withAnimation(reduceMotion ? nil : InspectorMotion.reveal) { model.resetCrop() } },
+                        onCancel: { withAnimation(reduceMotion ? nil : InspectorMotion.reveal) { model.cancelCrop() } },
+                        onApply: { withAnimation(reduceMotion ? nil : InspectorMotion.reveal) { model.commitCrop() } }
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(reduceMotion ? nil : InspectorMotion.reveal, value: model.isCropping)
         }
     }
 
@@ -680,12 +686,13 @@ private struct CameraBubbleOverlay: View {
         }
         .frame(width: rect.width, height: rect.height)
         .clipShape(Circle())
-        .overlay(Circle().strokeBorder(.white.opacity(0.9), lineWidth: max(1.5, rect.width * 0.022)))
-        .overlay(alignment: .bottomTrailing) { resizeHandle }
-        .shadow(color: .black.opacity(0.35), radius: 12, y: 4)
         .contentShape(Circle())
-        .onHover { isHovering = $0 }
         .gesture(moveGesture)
+        .overlay(Circle().strokeBorder(.white.opacity(0.9), lineWidth: max(1.5, rect.width * 0.022)).allowsHitTesting(false))
+        .overlay(alignment: .bottomTrailing) { resizeHandle(onCircleOfDiameter: rect.width) }
+        .shadow(color: .black.opacity(0.35), radius: 12, y: 4)
+        .onHover { isHovering = $0 }
+        .help("Drag to move the camera, drag the corner handle to resize")
         .position(x: rect.midX, y: rect.midY)
     }
 
@@ -705,8 +712,10 @@ private struct CameraBubbleOverlay: View {
             .onEnded { _ in dragStartCenter = nil }
     }
 
-    private var resizeHandle: some View {
-        Circle()
+    /// Sits on the circle's lower-right edge rather than the bounding box corner, which is where the eye expects a resize grip on a round bubble.
+    private func resizeHandle(onCircleOfDiameter diameter: CGFloat) -> some View {
+        let inset = 7 - diameter * 0.1465
+        return Circle()
             .fill(.white)
             .frame(width: 14, height: 14)
             .overlay(
@@ -715,7 +724,7 @@ private struct CameraBubbleOverlay: View {
                     .foregroundStyle(.black.opacity(0.7))
             )
             .shadow(color: .black.opacity(0.3), radius: 3, y: 1)
-            .offset(x: 2, y: 2)
+            .offset(x: inset, y: inset)
             .opacity(isHovering ? 1 : 0)
             .highPriorityGesture(resizeGesture)
     }
@@ -757,6 +766,8 @@ final class CameraPlayerLayerView: NSView {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
     override func layout() {
         super.layout()
@@ -804,227 +815,32 @@ private struct VideoCameraSection: View {
 private struct VideoCropSection: View {
     @Bindable var model: VideoEditorModel
 
-    var body: some View {
-        InspectorSection("Crop", collapsedByDefault: true) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
-                    InspectorPill(
-                        model.isCropping ? "Done" : "Crop",
-                        systemImage: "crop",
-                        isActive: model.isCropping,
-                        fillsWidth: true
-                    ) {
-                        model.isCropping.toggle()
-                    }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-                    if model.hasCrop {
-                        InspectorPill("Reset", systemImage: "arrow.counterclockwise") {
-                            model.resetCrop()
+    var body: some View {
+        InspectorSection("Crop") {
+            VStack(alignment: .leading, spacing: 8) {
+                if model.isCropping {
+                    InspectorCaption("Drag the frame on the preview, then press Done.")
+                } else {
+                    HStack(spacing: 6) {
+                        InspectorPill("Crop Video", systemImage: "crop", fillsWidth: true) {
+                            withAnimation(reduceMotion ? nil : InspectorMotion.reveal) { model.beginCrop() }
+                        }
+
+                        if model.hasCrop {
+                            InspectorPill("Reset", systemImage: "arrow.counterclockwise") {
+                                withAnimation(reduceMotion ? nil : InspectorMotion.reveal) { model.resetCrop() }
+                            }
                         }
                     }
-                }
 
-                if model.hasCrop {
-                    let width = Int(CGFloat(model.videoWidth) * model.cropRect.width)
-                    let height = Int(CGFloat(model.videoHeight) * model.cropRect.height)
-                    Text("\(width) x \(height)")
+                    Text("\(Int(model.croppedSize.width)) x \(Int(model.croppedSize.height)) px")
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.tertiary)
+                        .contentTransition(.numericText())
                 }
             }
         }
-    }
-}
-
-// MARK: - Video Crop Overlay
-
-private struct VideoCropOverlay: View {
-    @Binding var cropRect: CGRect
-    let videoSize: CGSize
-
-    private let handleSize: CGFloat = 10
-    private let minCropFraction: CGFloat = 0.1
-    @State private var startRect: CGRect = .zero
-
-    var body: some View {
-        Canvas { context, size in
-            let crop = pixelRect(in: size)
-
-            var dimPath = Path()
-            dimPath.addRect(CGRect(origin: .zero, size: size))
-            dimPath.addRect(crop)
-            context.fill(dimPath, with: .color(.black.opacity(0.5)), style: FillStyle(eoFill: true))
-
-            let border = crop.insetBy(dx: -1, dy: -1)
-            context.stroke(Path(border), with: .color(.white), lineWidth: 1.5)
-
-            let dashes: [CGFloat] = [4, 4]
-            let thirdW = crop.width / 3
-            let thirdH = crop.height / 3
-            for i in 1...2 {
-                var vLine = Path()
-                vLine.move(to: CGPoint(x: crop.minX + thirdW * CGFloat(i), y: crop.minY))
-                vLine.addLine(to: CGPoint(x: crop.minX + thirdW * CGFloat(i), y: crop.maxY))
-                context.stroke(vLine, with: .color(.white.opacity(0.3)), style: StrokeStyle(lineWidth: 0.5, dash: dashes))
-
-                var hLine = Path()
-                hLine.move(to: CGPoint(x: crop.minX, y: crop.minY + thirdH * CGFloat(i)))
-                hLine.addLine(to: CGPoint(x: crop.maxX, y: crop.minY + thirdH * CGFloat(i)))
-                context.stroke(hLine, with: .color(.white.opacity(0.3)), style: StrokeStyle(lineWidth: 0.5, dash: dashes))
-            }
-        }
-        .allowsHitTesting(false)
-        .frame(width: videoSize.width, height: videoSize.height)
-        .overlay {
-            GeometryReader { geo in
-                let size = geo.size
-                let crop = pixelRect(in: size)
-
-                Rectangle()
-                    .fill(Color.clear)
-                    .contentShape(Rectangle())
-                    .frame(width: crop.width, height: crop.height)
-                    .position(x: crop.midX, y: crop.midY)
-                    .gesture(dragGesture(size: size))
-
-                cornerHandle(at: CGPoint(x: crop.minX, y: crop.minY), corner: .topLeft, size: size)
-                cornerHandle(at: CGPoint(x: crop.maxX, y: crop.minY), corner: .topRight, size: size)
-                cornerHandle(at: CGPoint(x: crop.minX, y: crop.maxY), corner: .bottomLeft, size: size)
-                cornerHandle(at: CGPoint(x: crop.maxX, y: crop.maxY), corner: .bottomRight, size: size)
-
-                edgeHandle(at: CGPoint(x: crop.midX, y: crop.minY), edge: .top, size: size)
-                edgeHandle(at: CGPoint(x: crop.midX, y: crop.maxY), edge: .bottom, size: size)
-                edgeHandle(at: CGPoint(x: crop.minX, y: crop.midY), edge: .left, size: size)
-                edgeHandle(at: CGPoint(x: crop.maxX, y: crop.midY), edge: .right, size: size)
-            }
-            .frame(width: videoSize.width, height: videoSize.height)
-        }
-    }
-
-    private func pixelRect(in size: CGSize) -> CGRect {
-        CGRect(
-            x: cropRect.origin.x * size.width,
-            y: cropRect.origin.y * size.height,
-            width: cropRect.width * size.width,
-            height: cropRect.height * size.height
-        )
-    }
-
-    private func cornerHandle(at point: CGPoint, corner: Corner, size: CGSize) -> some View {
-        Circle()
-            .fill(.white)
-            .frame(width: handleSize, height: handleSize)
-            .shadow(color: .black.opacity(0.3), radius: 2)
-            .position(point)
-            .gesture(
-                DragGesture()
-                    .onChanged { value in
-                        let nx = value.location.x / size.width
-                        let ny = value.location.y / size.height
-                        var r = cropRect
-                        switch corner {
-                        case .topLeft:
-                            let newX = min(nx, r.maxX - minCropFraction)
-                            let newY = min(ny, r.maxY - minCropFraction)
-                            r.size.width += r.origin.x - max(0, newX)
-                            r.size.height += r.origin.y - max(0, newY)
-                            r.origin.x = max(0, newX)
-                            r.origin.y = max(0, newY)
-                        case .topRight:
-                            r.size.width = max(minCropFraction, min(1 - r.origin.x, nx - r.origin.x))
-                            let newY = min(ny, r.maxY - minCropFraction)
-                            r.size.height += r.origin.y - max(0, newY)
-                            r.origin.y = max(0, newY)
-                        case .bottomLeft:
-                            let newX = min(nx, r.maxX - minCropFraction)
-                            r.size.width += r.origin.x - max(0, newX)
-                            r.origin.x = max(0, newX)
-                            r.size.height = max(minCropFraction, min(1 - r.origin.y, ny - r.origin.y))
-                        case .bottomRight:
-                            r.size.width = max(minCropFraction, min(1 - r.origin.x, nx - r.origin.x))
-                            r.size.height = max(minCropFraction, min(1 - r.origin.y, ny - r.origin.y))
-                        }
-                        cropRect = r
-                    }
-            )
-    }
-
-    private func edgeHandle(at point: CGPoint, edge: Edge, size: CGSize) -> some View {
-        Capsule()
-            .fill(.white)
-            .frame(
-                width: edge == .top || edge == .bottom ? 24 : 6,
-                height: edge == .left || edge == .right ? 24 : 6
-            )
-            .shadow(color: .black.opacity(0.3), radius: 2)
-            .position(point)
-            .gesture(
-                DragGesture()
-                    .onChanged { value in
-                        let nx = value.location.x / size.width
-                        let ny = value.location.y / size.height
-                        var r = cropRect
-                        switch edge {
-                        case .top:
-                            let newY = min(ny, r.maxY - minCropFraction)
-                            r.size.height += r.origin.y - max(0, newY)
-                            r.origin.y = max(0, newY)
-                        case .bottom:
-                            r.size.height = max(minCropFraction, min(1 - r.origin.y, ny - r.origin.y))
-                        case .left:
-                            let newX = min(nx, r.maxX - minCropFraction)
-                            r.size.width += r.origin.x - max(0, newX)
-                            r.origin.x = max(0, newX)
-                        case .right:
-                            r.size.width = max(minCropFraction, min(1 - r.origin.x, nx - r.origin.x))
-                        }
-                        cropRect = r
-                    }
-            )
-    }
-
-    private func dragGesture(size: CGSize) -> some Gesture {
-        DragGesture()
-            .onChanged { value in
-                if startRect == .zero { startRect = cropRect }
-                let dx = value.translation.width / size.width
-                let dy = value.translation.height / size.height
-                var r = startRect
-                r.origin.x = max(0, min(1 - r.width, startRect.origin.x + dx))
-                r.origin.y = max(0, min(1 - r.height, startRect.origin.y + dy))
-                cropRect = r
-            }
-            .onEnded { _ in startRect = .zero }
-    }
-
-    private enum Corner { case topLeft, topRight, bottomLeft, bottomRight }
-    private enum Edge { case top, bottom, left, right }
-}
-
-// MARK: - Crop Preview (non-interactive, shows crop when not editing)
-
-private struct VideoCropPreview: View {
-    let cropRect: CGRect
-    let videoSize: CGSize
-
-    var body: some View {
-        Canvas { context, size in
-            let crop = CGRect(
-                x: cropRect.origin.x * size.width,
-                y: cropRect.origin.y * size.height,
-                width: cropRect.width * size.width,
-                height: cropRect.height * size.height
-            )
-
-            var dimPath = Path()
-            dimPath.addRect(CGRect(origin: .zero, size: size))
-            dimPath.addRect(crop)
-            context.fill(dimPath, with: .color(.black.opacity(0.5)), style: FillStyle(eoFill: true))
-
-            let border = crop.insetBy(dx: -1, dy: -1)
-            context.stroke(Path(border), with: .color(.white.opacity(0.5)), lineWidth: 1)
-        }
-        .allowsHitTesting(false)
-        .frame(width: videoSize.width, height: videoSize.height)
     }
 }

@@ -26,6 +26,12 @@ struct AnnotationHistory {
     var canUndo: Bool { !undoStack.isEmpty }
     var canRedo: Bool { !redoStack.isEmpty }
 
+    /// Keeps undo honest after a destructive edit (a crop) rewrites every stored coordinate.
+    mutating func remapAll(_ transform: (AnnotationItem) -> AnnotationItem) {
+        undoStack = undoStack.map { $0.map(transform) }
+        redoStack = redoStack.map { $0.map(transform) }
+    }
+
     mutating func reset() {
         undoStack = []
         redoStack = []

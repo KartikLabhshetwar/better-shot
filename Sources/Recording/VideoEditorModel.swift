@@ -35,7 +35,8 @@ final class VideoEditorModel {
 
     var isTrimming = false
     var isCropping = false
-    var cropRect = CGRect(x: 0, y: 0, width: 1, height: 1)
+    var cropRect = CropGeometry.identity
+    private var cropRectBeforeEditing = CropGeometry.identity
 
     var zoomCues: [ZoomCue] = []
     var selectedZoomCueID: UUID?
@@ -63,7 +64,15 @@ final class VideoEditorModel {
     }
 
     var hasTrim: Bool { trimStart > 0.01 || (duration > 0 && trimEnd < duration - 0.01) }
-    var hasCrop: Bool { cropRect != CGRect(x: 0, y: 0, width: 1, height: 1) }
+    var hasCrop: Bool { cropRect != CropGeometry.identity }
+
+    /// The frame the preview and the export both work in: the crop when there is one, the whole video otherwise.
+    var croppedSize: CGSize {
+        CGSize(
+            width: (CGFloat(videoWidth) * cropRect.width).rounded(),
+            height: (CGFloat(videoHeight) * cropRect.height).rounded()
+        )
+    }
     var isClipMode: Bool { !clips.isEmpty }
     var canUndo: Bool { !undoStack.isEmpty }
     var canRedo: Bool { !redoStack.isEmpty }
@@ -77,6 +86,10 @@ final class VideoEditorModel {
     /// Escape backs out of whatever is in flight before it reaches the window, the way it does everywhere else on the Mac.
     @discardableResult
     func cancelCurrentOperation() -> Bool {
+        if isCropping {
+            cancelCrop()
+            return true
+        }
         if timelineSplitMode {
             timelineSplitMode = false
             return true
@@ -356,7 +369,25 @@ final class VideoEditorModel {
         applyTrim(trimSelection.settingEnd(value, duration: duration))
     }
 
-    func resetCrop() { cropRect = CGRect(x: 0, y: 0, width: 1, height: 1) }
+    func beginCrop() {
+        cropRectBeforeEditing = cropRect
+        selectedClipID = nil
+        selectedZoomCueID = nil
+        pauseForScrub()
+        isCropping = true
+    }
+
+    func commitCrop() { isCropping = false }
+
+    func cancelCrop() {
+        cropRect = cropRectBeforeEditing
+        isCropping = false
+    }
+
+    func resetCrop() {
+        cropRect = CropGeometry.identity
+        cropRectBeforeEditing = CropGeometry.identity
+    }
 
     var trimSelection: TrimSelection { TrimSelection(start: trimStart, end: trimEnd) }
 
@@ -533,8 +564,8 @@ final class VideoEditorModel {
 
         let useZoom = zoomEnabled
         let canvas = ExportCanvasGeometry.canvas(
-            videoWidth: useZoom ? fullW : fullW * cropRect.width,
-            videoHeight: useZoom ? fullH : fullH * cropRect.height,
+            videoWidth: fullW * cropRect.width,
+            videoHeight: fullH * cropRect.height,
             paddingFraction: config.padding,
             aspectRatio: config.aspectRatio.numericValue
         )
@@ -620,6 +651,13 @@ final class VideoEditorModel {
 
         let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: compVideoTrack)
 
+        let cropOrigin = CGPoint(x: fullW * cropRect.origin.x, y: fullH * cropRect.origin.y).applying(transform)
+        let untranslatedOrigin = CGPoint.zero.applying(transform)
+        let cropShift = CGAffineTransform(
+            translationX: untranslatedOrigin.x - cropOrigin.x + offsetX,
+            y: untranslatedOrigin.y - cropOrigin.y + offsetY
+        )
+
         if useZoom {
             let timeline = viewportTimeline
             let compositionDuration = composition.duration.seconds
@@ -628,14 +666,17 @@ final class VideoEditorModel {
             func frameTransform(atEditorTime editorTime: TimeInterval) -> CGAffineTransform {
                 let sourceTime = mapToSourceTime(editorTime)
                 let viewport = timeline.frame(at: sourceTime)
-                let anchorDisplay = CGPoint(x: viewport.anchor.x * fullW, y: viewport.anchor.y * fullH)
+                let anchorDisplay = CGPoint(
+                    x: (cropRect.origin.x + viewport.anchor.x * cropRect.width) * fullW,
+                    y: (cropRect.origin.y + viewport.anchor.y * cropRect.height) * fullH
+                )
                 let magnification = max(1, viewport.magnification)
                 let zoomTransform = CGAffineTransform(translationX: -anchorDisplay.x, y: -anchorDisplay.y)
                     .concatenating(CGAffineTransform(scaleX: magnification, y: magnification))
                     .concatenating(CGAffineTransform(translationX: anchorDisplay.x, y: anchorDisplay.y))
                 return transform
                     .concatenating(zoomTransform)
-                    .concatenating(CGAffineTransform(translationX: offsetX, y: offsetY))
+                    .concatenating(cropShift)
             }
 
             if compositionDuration > 0 {
@@ -656,21 +697,7 @@ final class VideoEditorModel {
                 layerInstruction.setTransform(frameTransform(atEditorTime: 0), at: .zero)
             }
         } else {
-            let cropOffsetX = fullW * cropRect.origin.x
-            let cropOffsetY = fullH * cropRect.origin.y
-            var finalTransform = transform
-            let postCropTranslation: CGAffineTransform
-            if transform == .identity {
-                postCropTranslation = CGAffineTransform(translationX: -cropOffsetX + offsetX, y: -cropOffsetY + offsetY)
-            } else {
-                let originAfterTransform = CGPoint(x: cropOffsetX, y: cropOffsetY).applying(transform)
-                let fullOriginAfterTransform = CGPoint.zero.applying(transform)
-                let dx = fullOriginAfterTransform.x - originAfterTransform.x + offsetX
-                let dy = fullOriginAfterTransform.y - originAfterTransform.y + offsetY
-                postCropTranslation = CGAffineTransform(translationX: dx, y: dy)
-            }
-            finalTransform = finalTransform.concatenating(postCropTranslation)
-            layerInstruction.setTransform(finalTransform, at: .zero)
+            layerInstruction.setTransform(transform.concatenating(cropShift), at: .zero)
         }
 
         instruction.layerInstructions = [layerInstruction]

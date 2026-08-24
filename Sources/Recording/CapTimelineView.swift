@@ -22,12 +22,10 @@ struct CapTimelineView: NSViewRepresentable {
     }
 }
 
-/// The whole timeline surface: minimap, ruler, track gutter, clip and zoom lanes, playhead and split preview.
+/// The whole timeline surface: minimap, ruler, clip and zoom lanes, playhead and split preview.
 final class CapTimelineControl: NSView {
     enum Metrics {
         static let padding: CGFloat = 16
-        static let gutter: CGFloat = 112
-        static let iconWidth: CGFloat = 104
         static let headerHeight: CGFloat = 32
         static let playheadTop: CGFloat = 24
         static let trackHeight: CGFloat = 52
@@ -164,7 +162,7 @@ final class CapTimelineControl: NSView {
         (model?.zoomEnabled ?? false) ? [.clips, .zoom] : [.clips]
     }
 
-    private var contentX: CGFloat { Metrics.padding + Metrics.gutter }
+    private var contentX: CGFloat { Metrics.padding }
 
     private var trackWidth: CGFloat { max(1, bounds.width - contentX - Metrics.padding) }
 
@@ -597,7 +595,6 @@ final class CapTimelineControl: NSView {
 
         for (index, row) in rows.enumerated() {
             let rect = rowRect(index)
-            drawGutter(ctx: ctx, rect: rect, row: row)
             ctx.saveGState()
             ctx.addPath(CGPath(roundedRect: rect, cornerWidth: Metrics.segmentRadius, cornerHeight: Metrics.segmentRadius, transform: nil))
             ctx.clip()
@@ -616,7 +613,6 @@ final class CapTimelineControl: NSView {
     private enum Palette {
         static let surface = NSColor.black.withAlphaComponent(0.22)
         static let trackWell = NSColor.white.withAlphaComponent(0.05)
-        static let gutter = NSColor.white.withAlphaComponent(0.07)
         static let clip = NSColor(srgbRed: 0.29, green: 0.45, blue: 0.98, alpha: 1)
         static let cue = NSColor(srgbRed: 0.62, green: 0.42, blue: 0.96, alpha: 1)
         static let playhead = NSColor(srgbRed: 226 / 255, green: 64 / 255, blue: 64 / 255, alpha: 1)
@@ -672,35 +668,6 @@ final class CapTimelineControl: NSView {
         ctx.setLineWidth(1)
         ctx.addPath(CGPath(roundedRect: chipRect.insetBy(dx: 0.5, dy: 0.5), cornerWidth: radius, cornerHeight: radius, transform: nil))
         ctx.strokePath()
-    }
-
-    private func drawGutter(ctx: CGContext, rect: CGRect, row: Row) {
-        let iconRect = CGRect(x: Metrics.padding, y: rect.minY, width: Metrics.iconWidth, height: rect.height)
-        ctx.setFillColor(Palette.gutter.cgColor)
-        ctx.addPath(CGPath(roundedRect: iconRect, cornerWidth: Metrics.segmentRadius, cornerHeight: Metrics.segmentRadius, transform: nil))
-        ctx.fillPath()
-
-        let symbolName = row == .clips ? "film.stack" : "plus.magnifyingglass"
-        let title = row == .clips ? "Video" : "Zoom"
-
-        if let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: title) {
-            symbol.isTemplate = true
-            let tinted = NSImage(size: NSSize(width: 16, height: 16), flipped: false) { box in
-                symbol.draw(in: box)
-                NSColor.white.withAlphaComponent(0.75).set()
-                box.fill(using: .sourceAtop)
-                return true
-            }
-            tinted.draw(in: CGRect(x: iconRect.midX - 8, y: iconRect.minY + 10, width: 16, height: 16))
-        }
-
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 10, weight: .medium),
-            .foregroundColor: NSColor.white.withAlphaComponent(0.6)
-        ]
-        let label = title as NSString
-        let size = label.size(withAttributes: attributes)
-        label.draw(at: CGPoint(x: iconRect.midX - size.width / 2, y: iconRect.minY + 30), withAttributes: attributes)
     }
 
     private func drawClipTrack(ctx: CGContext, rect: CGRect, model: VideoEditorModel) {

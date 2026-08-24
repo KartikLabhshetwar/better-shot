@@ -43,9 +43,65 @@ final class EditorModel {
     var textAlignment: NSTextAlignment = .left
 
     var isCropping = false
-    var cropRect = CGRect(x: 0, y: 0, width: 1, height: 1)
-    var hasCrop: Bool { cropRect != CGRect(x: 0, y: 0, width: 1, height: 1) }
-    func resetCrop() { cropRect = CGRect(x: 0, y: 0, width: 1, height: 1) }
+    var cropRect = CropGeometry.identity
+    private var uncroppedImage: CGImage?
+    private var appliedCrop = CropGeometry.identity
+    var hasCrop: Bool { uncroppedImage != nil }
+    var isCropRectPristine: Bool { cropRect == CropGeometry.identity }
+
+    var cropDimensions: CGSize {
+        CGSize(
+            width: (CGFloat(sourceImage?.width ?? 0) * cropRect.width).rounded(),
+            height: (CGFloat(sourceImage?.height ?? 0) * cropRect.height).rounded()
+        )
+    }
+
+    func beginCrop() {
+        cropRect = CropGeometry.identity
+        clearSelection()
+        isCropping = true
+    }
+
+    func cancelCrop() {
+        cropRect = CropGeometry.identity
+        isCropping = false
+    }
+
+    /// Bakes the crop into the source so the discarded pixels stop rendering; `uncroppedImage` is what Reset restores.
+    func commitCrop() {
+        isCropping = false
+        guard let image = sourceImage, !isCropRectPristine else { return }
+
+        let applied = cropRect
+        cropRect = CropGeometry.identity
+        if uncroppedImage == nil { uncroppedImage = image }
+        appliedCrop = CropGeometry.composed(appliedCrop, applied)
+        replaceSource(with: cropImage(image, to: applied))
+        remapEverything(from: applied)
+    }
+
+    /// Reset restores the full frame without discarding annotations drawn since the crop, so it undoes the framing and nothing else.
+    func resetCrop() {
+        guard let original = uncroppedImage else { return }
+        cropRect = CropGeometry.identity
+        isCropping = false
+        replaceSource(with: original)
+        remapEverything(from: CropGeometry.inverted(appliedCrop))
+        appliedCrop = CropGeometry.identity
+        uncroppedImage = nil
+    }
+
+    private func remapEverything(from fraction: CGRect) {
+        items = items.map { $0.remapped(from: fraction) }
+        history.remapAll { $0.remapped(from: fraction) }
+    }
+
+    private func replaceSource(with image: CGImage) {
+        sourceImage = image
+        imageSize = CGSize(width: image.width, height: image.height)
+        previewImage = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+        RedactionImageProcessor.removeAllCachedPreviewImages()
+    }
 
     private var interaction: AnnotationInteraction?
     var history = AnnotationHistory()
@@ -67,7 +123,7 @@ final class EditorModel {
     @discardableResult
     func cancelCurrentOperation() -> Bool {
         if isCropping {
-            isCropping = false
+            cancelCrop()
             return true
         }
         if editingTextItemID != nil {
@@ -128,6 +184,10 @@ final class EditorModel {
 
         config = AppPreferences.defaultBeautifierConfig
 
+        uncroppedImage = nil
+        appliedCrop = CropGeometry.identity
+        cropRect = CropGeometry.identity
+        isCropping = false
         items = []
         draftItem = nil
         selectedItemIDs = []
@@ -200,6 +260,7 @@ final class EditorModel {
     // MARK: - Interaction Pipeline
 
     func beginInteraction(at location: CGPoint, imageFrame: CGRect, boundaryFrame: CGRect) {
+        guard !isCropping else { return }
         let isExtendingSelection = isMultiSelectionModifierPressed
 
         guard let point = normalizedPoint(location, in: imageFrame, boundedBy: boundaryFrame, clamped: false) else {
@@ -228,6 +289,7 @@ final class EditorModel {
     }
 
     func updateInteraction(to location: CGPoint, imageFrame: CGRect, boundaryFrame: CGRect) {
+        guard !isCropping else { return }
         guard let interaction,
               let point = normalizedPoint(location, in: imageFrame, boundedBy: boundaryFrame, clamped: true) else { return }
         let allowedBounds = annotationBounds(for: imageFrame, boundaryFrame: boundaryFrame)
@@ -252,6 +314,7 @@ final class EditorModel {
     }
 
     func endInteraction(at location: CGPoint, imageFrame: CGRect, boundaryFrame: CGRect) {
+        guard !isCropping else { return }
         defer { interaction = nil }
 
         guard let interaction,
@@ -536,18 +599,17 @@ final class EditorModel {
 
     func renderFinal() -> CGImage? {
         guard let image = sourceImage else { return nil }
-        let cropped = hasCrop ? cropImage(image) : image
-        let remappedAnnotations = hasCrop ? items.map { $0.remapped(from: cropRect) } : items
-        return BeautifierRenderer.render(image: cropped, config: config, annotations: remappedAnnotations)
+        return BeautifierRenderer.render(image: image, config: config, annotations: items)
     }
 
-    private func cropImage(_ image: CGImage) -> CGImage {
-        let x = Int(cropRect.origin.x * CGFloat(image.width))
-        let y = Int(cropRect.origin.y * CGFloat(image.height))
-        let w = Int(cropRect.width * CGFloat(image.width))
-        let h = Int(cropRect.height * CGFloat(image.height))
-        let pixelRect = CGRect(x: x, y: y, width: max(1, w), height: max(1, h))
-        return image.cropping(to: pixelRect) ?? image
+    private func cropImage(_ image: CGImage, to fraction: CGRect) -> CGImage {
+        let pixels = CropGeometry.pixels(fraction, in: CGSize(width: image.width, height: image.height))
+        return image.cropping(to: CGRect(
+            x: pixels.minX.rounded(),
+            y: pixels.minY.rounded(),
+            width: max(1, pixels.width.rounded()),
+            height: max(1, pixels.height.rounded())
+        )) ?? image
     }
 
     func saveConfigAsDefault() {

@@ -36,10 +36,10 @@ nonisolated final class ScreenCaptureStream: NSObject, SCStreamOutput, SCStreamD
         try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
     }
 
-    func makeStream(filter: SCContentFilter, configuration: SCStreamConfiguration) throws -> SCStream {
+    func makeStream(filter: SCContentFilter, configuration: SCStreamConfiguration, includeSystemAudio: Bool) throws -> SCStream {
         let stream = SCStream(filter: filter, configuration: configuration, delegate: self)
         try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: videoQueue)
-        let hasAudio = configuration.capturesAudio
+        let hasAudio = includeSystemAudio
         if hasAudio {
             try stream.addStreamOutput(self, type: .audio, sampleHandlerQueue: audioQueue)
         }
@@ -418,7 +418,6 @@ final class ScreenRecordingManager {
         sourceRect: CGRect? = nil,
         pointerCaptureRect: CGRect
     ) async throws -> Bool {
-        let captureAudio = AppPreferences.recordingCaptureAudio
         let microphoneRequested = AppPreferences.recordingCaptureMicrophone
         let microphoneAuthorized = microphoneRequested ? await AVCaptureDevice.requestAccess(for: .audio) : false
         let microphoneDevice = microphoneRequested && ScreenCaptureStream.supportsMicrophoneCapture && microphoneAuthorized
@@ -440,6 +439,10 @@ final class ScreenRecordingManager {
                 systemIcon: "mic.slash"
             )
         }
+        let audio = RecordingAudioPlan(
+            systemAudio: AppPreferences.recordingCaptureAudio,
+            microphone: captureMicrophone
+        )
         let fps = AppPreferences.recordingFPS
 
         let config = SCStreamConfiguration()
@@ -450,7 +453,7 @@ final class ScreenRecordingManager {
         config.pixelFormat = kCVPixelFormatType_32BGRA
         config.queueDepth = 3
         config.showsCursor = AppPreferences.recordingShowCursor
-        if captureAudio {
+        if audio.capturesAudio {
             config.capturesAudio = true
             config.excludesCurrentProcessAudio = true
             config.sampleRate = 48_000
@@ -470,8 +473,8 @@ final class ScreenRecordingManager {
             width: width,
             height: height,
             fps: fps,
-            includeAudio: captureAudio,
-            includeMicrophone: captureMicrophone
+            includeAudio: audio.systemAudio,
+            includeMicrophone: audio.microphone
         )
 
         guard recordingSession.startWriting() else {
@@ -501,7 +504,7 @@ final class ScreenRecordingManager {
         ))
 
         do {
-            let stream = try capture.makeStream(filter: filter, configuration: config)
+            let stream = try capture.makeStream(filter: filter, configuration: config, includeSystemAudio: audio.systemAudio)
             try await stream.startCapture()
             pointerCapture.start(captureRect: pointerCaptureRect)
         } catch {

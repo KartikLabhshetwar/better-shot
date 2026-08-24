@@ -1,50 +1,31 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-private enum ImageSidebarTab: Hashable {
-    case annotate, image, background
-
-    static let tabs: [InspectorTab<ImageSidebarTab>] = [
-        InspectorTab(.annotate, systemImage: "pencil.tip", title: "Annotate"),
-        InspectorTab(.image, systemImage: "crop", title: "Image"),
-        InspectorTab(.background, systemImage: "photo.on.rectangle.angled", title: "Background")
-    ]
-}
-
 struct EditorInspectorView: View {
     @Bindable var model: EditorModel
 
-    @State private var tab: ImageSidebarTab = .annotate
-
     var body: some View {
-        VStack(spacing: 0) {
-            InspectorTabBar(tabs: ImageSidebarTab.tabs, selection: $tab)
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                annotationSections
+                InspectorDivider()
+                ImageCropSection(model: model)
+                InspectorDivider()
+                EffectsSection(config: configBinding, onEditingChanged: model.recordConfigEdit)
+                InspectorDivider()
+                LayoutSection(config: configBinding, onEditingChanged: model.recordConfigEdit)
+                InspectorDivider()
+                BackgroundPickerSection(config: configBinding, onEditingChanged: model.recordConfigEdit)
 
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
-                    switch tab {
-                    case .annotate:
-                        annotateTab
-                    case .image:
-                        ImageCropSection(model: model)
-                        InspectorDivider()
-                        EffectsSection(config: configBinding, onEditingChanged: model.recordConfigEdit)
-                    case .background:
-                        LayoutSection(config: configBinding, onEditingChanged: model.recordConfigEdit)
-                        InspectorDivider()
-                        BackgroundPickerSection(config: configBinding, onEditingChanged: model.recordConfigEdit)
-                    }
-
-                    Spacer(minLength: 24)
-                }
+                Spacer(minLength: 24)
             }
-            .scrollContentBackground(.hidden)
         }
+        .scrollContentBackground(.hidden)
         .background(InspectorMaterial())
     }
 
     @ViewBuilder
-    private var annotateTab: some View {
+    private var annotationSections: some View {
         InspectorSection("Tools") {
             AnnotationInspectorToolGrid(selectedTool: model.selectedTool) { tool in
                 model.selectTool(tool)
@@ -579,32 +560,30 @@ private struct AnnotationColorWellMenu: View {
 private struct ImageCropSection: View {
     @Bindable var model: EditorModel
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         InspectorSection("Crop", collapsedByDefault: true) {
             VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
-                    InspectorPill(
-                        model.isCropping ? "Done" : "Crop",
-                        systemImage: "crop",
-                        isActive: model.isCropping,
-                        fillsWidth: true
-                    ) {
-                        model.isCropping.toggle()
-                    }
+                if model.isCropping {
+                    InspectorCaption("Drag the frame on the canvas, then press Done.")
+                } else {
+                    HStack(spacing: 6) {
+                        InspectorPill("Crop Image", systemImage: "crop", fillsWidth: true) {
+                            withAnimation(reduceMotion ? nil : InspectorMotion.reveal) { model.beginCrop() }
+                        }
 
-                    if model.hasCrop {
-                        InspectorPill("Reset", systemImage: "arrow.counterclockwise") {
-                            model.resetCrop()
+                        if model.hasCrop {
+                            InspectorPill("Reset", systemImage: "arrow.counterclockwise") {
+                                withAnimation(reduceMotion ? nil : InspectorMotion.reveal) { model.resetCrop() }
+                            }
                         }
                     }
-                }
 
-                if model.hasCrop {
-                    let width = Int(CGFloat(model.sourceImage?.width ?? 0) * model.cropRect.width)
-                    let height = Int(CGFloat(model.sourceImage?.height ?? 0) * model.cropRect.height)
-                    Text("\(width) x \(height)")
+                    Text("\(model.sourceImage?.width ?? 0) x \(model.sourceImage?.height ?? 0) px")
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.tertiary)
+                        .contentTransition(.numericText())
                 }
             }
         }
