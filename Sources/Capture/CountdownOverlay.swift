@@ -1,8 +1,6 @@
 import AppKit
 import SwiftUI
 
-// MARK: - Observable Model
-
 @MainActor
 @Observable
 final class CountdownModel {
@@ -11,28 +9,27 @@ final class CountdownModel {
     var opacity: Double = 1.0
 }
 
-// MARK: - SwiftUI View
-
 private struct CountdownView: View {
     let model: CountdownModel
 
     var body: some View {
         ZStack {
-            Color.clear
+            Color.black.opacity(0.16)
 
             Text("\(model.currentNumber)")
-                .font(.system(size: 120, weight: .bold, design: .rounded))
+                .font(.system(size: 76, weight: .semibold, design: .rounded))
+                .monospacedDigit()
                 .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.6), radius: 12, x: 0, y: 4)
+                .frame(width: 156, height: 156)
+                .glassSurface(in: Circle(), material: .hudWindow, depth: .floating)
                 .scaleEffect(model.scale)
                 .opacity(model.opacity)
+                .accessibilityLabel("Capturing in \(model.currentNumber) seconds")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .ignoresSafeArea()
     }
 }
-
-// MARK: - Overlay Controller
 
 @MainActor
 final class CountdownOverlay {
@@ -43,9 +40,8 @@ final class CountdownOverlay {
 
     private init() {}
 
-    /// Shows a countdown from `seconds` down to 1, then dismisses the overlay.
-    /// Awaits the full countdown before returning so the caller can proceed with capture.
-    func showCountdown(seconds: Int) async {
+    /// Counts down from `seconds` to 1 on `screen`, returning once the overlay is gone.
+    func showCountdown(seconds: Int, on screen: NSScreen? = nil) async {
         guard seconds > 0 else { return }
 
         dismiss()
@@ -53,23 +49,26 @@ final class CountdownOverlay {
         let countdownModel = CountdownModel()
         self.model = countdownModel
 
-        createPanel(model: countdownModel)
+        createPanel(model: countdownModel, on: screen)
         panel?.orderFront(nil)
+
+        let fade = RecordingMotion.reduceMotion
+            ? Animation.easeOut(duration: 0.2).delay(0.6)
+            : Animation.easeIn(duration: 0.75)
 
         for tick in stride(from: seconds, through: 1, by: -1) {
             countdownModel.currentNumber = tick
             countdownModel.scale = 1.0
             countdownModel.opacity = 1.0
 
-            withAnimation(.easeIn(duration: 0.8)) {
-                countdownModel.scale = 0.6
+            withAnimation(fade) {
+                countdownModel.scale = RecordingMotion.reduceMotion ? 1.0 : 0.72
                 countdownModel.opacity = 0.0
             }
 
             try? await Task.sleep(for: .milliseconds(1000))
         }
 
-        try? await Task.sleep(for: .milliseconds(100))
         dismiss()
     }
 
@@ -79,28 +78,29 @@ final class CountdownOverlay {
         model = nil
     }
 
-    // MARK: - Private
-
-    private func createPanel(model: CountdownModel) {
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
-        let frame = screen.frame
+    private func createPanel(model: CountdownModel, on preferred: NSScreen?) {
+        let mouseLocation = NSEvent.mouseLocation
+        let target = preferred
+            ?? NSScreen.screens.first { $0.frame.contains(mouseLocation) }
+            ?? NSScreen.main
+            ?? NSScreen.screens.first
+        guard let screen = target else { return }
 
         let newPanel = NSPanel(
-            contentRect: frame,
+            contentRect: screen.frame,
             styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         newPanel.isOpaque = false
-        newPanel.backgroundColor = NSColor.black.withAlphaComponent(0.35)
+        newPanel.backgroundColor = .clear
         newPanel.hasShadow = false
         newPanel.level = .floating
         newPanel.hidesOnDeactivate = false
         newPanel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         newPanel.ignoresMouseEvents = true
 
-        let hostingView = NSHostingView(rootView: CountdownView(model: model))
-        newPanel.contentView = hostingView
+        newPanel.contentView = NSHostingView(rootView: CountdownView(model: model))
 
         self.panel = newPanel
     }

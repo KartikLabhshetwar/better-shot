@@ -11,12 +11,7 @@ enum RecordingBarMetrics {
     static let horizontalPadding: CGFloat = 14
     static let bottomInset: CGFloat = 64
     static let hoverDiameter: CGFloat = 32
-    static let edge = Color(nsColor: .separatorColor).opacity(0.5)
-    static let shadowOpacity: Double = 0.35
-    static let shadowRadius: CGFloat = 16
-    static let shadowY: CGFloat = 5
-    /// Liquid Glass carries its own edge shading, so it needs far less of a cast shadow to separate from the desktop.
-    static let glassShadowOpacity: Double = 0.18
+    static let edge = GlassPalette.edge
     static let activeTint = Color(nsColor: .labelColor)
     static let inactiveTint = Color(nsColor: .labelColor).opacity(0.4)
 
@@ -53,53 +48,9 @@ final class RecordingBarPresentation {
     private init() {}
 }
 
-/// Frosted HUD-style backing, the pre-Liquid-Glass fallback for `recordingBarSurface`.
-struct RecordingBarMaterial: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.material = .hudWindow
-        view.blendingMode = .behindWindow
-        view.state = .active
-        view.wantsLayer = true
-        return view
-    }
-
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
-}
-
-/// Liquid Glass on macOS 26, the HUD material below that, and an opaque fill when the user reduces transparency. Never layered on itself: whichever branch runs is the only translucent surface in the stack.
-struct RecordingBarSurface: ViewModifier {
-    var cornerRadius: CGFloat = RecordingBarMetrics.cornerRadius
-    var isInteractive = false
-    var castsShadow = true
-
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-
-        if reduceTransparency {
-            content
-                .background(shape.fill(Color(nsColor: .windowBackgroundColor)))
-                .overlay(shape.strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1))
-                .shadow(color: .black.opacity(castsShadow ? RecordingBarMetrics.shadowOpacity : 0), radius: RecordingBarMetrics.shadowRadius, y: RecordingBarMetrics.shadowY)
-        } else if #available(macOS 26.0, *) {
-            content
-                .glassEffect(isInteractive ? .regular.interactive() : .regular, in: shape)
-                .shadow(color: .black.opacity(castsShadow ? RecordingBarMetrics.glassShadowOpacity : 0), radius: RecordingBarMetrics.shadowRadius, y: RecordingBarMetrics.shadowY)
-        } else {
-            content
-                .background(RecordingBarMaterial().clipShape(shape))
-                .overlay(shape.strokeBorder(RecordingBarMetrics.edge, lineWidth: 0.5))
-                .shadow(color: .black.opacity(castsShadow ? RecordingBarMetrics.shadowOpacity : 0), radius: RecordingBarMetrics.shadowRadius, y: RecordingBarMetrics.shadowY)
-        }
-    }
-}
-
 extension View {
     func recordingBarSurface(cornerRadius: CGFloat = RecordingBarMetrics.cornerRadius, isInteractive: Bool = false, castsShadow: Bool = true) -> some View {
-        modifier(RecordingBarSurface(cornerRadius: cornerRadius, isInteractive: isInteractive, castsShadow: castsShadow))
+        glassSurface(cornerRadius: cornerRadius, depth: castsShadow ? .floating : .flush, isInteractive: isInteractive)
     }
 }
 

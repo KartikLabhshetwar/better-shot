@@ -53,7 +53,7 @@ final class CaptureOrchestrator {
     private func captureAndProcess(_ capture: () async throws -> URL?) async {
         let delay = AppPreferences.selfTimerDelay
         if delay != .off {
-            await CountdownOverlay.shared.showCountdown(seconds: delay.rawValue)
+            await CountdownOverlay.shared.showCountdown(seconds: delay.rawValue, on: captureScreen)
         }
 
         do {

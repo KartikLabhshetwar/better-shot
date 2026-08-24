@@ -77,6 +77,7 @@
 		F425B700C7B4E08A43AAF173 /* R2Uploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 861CE2F486701322F7B4FAD3 /* R2Uploader.swift */; };
 		F5F0FA6599AB12F8B47278B0 /* ColorPickerOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E1907B91A013BCA494AB08A /* ColorPickerOverlay.swift */; };
 		F624776F3B0A0526D8C35911 /* VideoExportError.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED95760D56AC3DD0DAB3150 /* VideoExportError.swift */; };
+		F87FBF6D449686856AD05561 /* GlassSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = B82D1374FAD185152D19D7E7 /* GlassSurface.swift */; };
 		FC247F5E7814E3D4E253A582 /* RecordingStatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C72B137FE8A09ED62E3E58DF /* RecordingStatusBar.swift */; };
 		FE59D61ABB427B6DFC1D377A /* CaptureOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B626577BDFABF32D144DC8B /* CaptureOrchestrator.swift */; };
 /* End PBXBuildFile section */
@@ -132,6 +133,7 @@
 		AED95760D56AC3DD0DAB3150 /* VideoExportError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoExportError.swift; sourceTree = "<group>"; };
 		B350EE68E3E974004660FC0A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B5FC4CD374D6C387202BB773 /* EditorWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorWindowView.swift; sourceTree = "<group>"; };
+		B82D1374FAD185152D19D7E7 /* GlassSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassSurface.swift; sourceTree = "<group>"; };
 		B88A8ED1633D6E01CE4EE0FA /* MicrophoneCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophoneCatalog.swift; sourceTree = "<group>"; };
 		BAE1EE5C32D7D0D099A88951 /* ShortcutService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutService.swift; sourceTree = "<group>"; };
 		BD21E8B1BB111C9A2991D570 /* AnnotationItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationItemView.swift; sourceTree = "<group>"; };
@@ -242,6 +244,7 @@
 			children = (
 				6F7B294E86E2F726C2001616 /* ColorGradeSection.swift */,
 				C6F4C7B311224A83B9D10097 /* EditorSharedSections.swift */,
+				B82D1374FAD185152D19D7E7 /* GlassSurface.swift */,
 				D6B3B484A34F96CA7461389C /* InspectorChrome.swift */,
 				EF9F61AFB543497004AF4EB3 /* InspectorSlider.swift */,
 				52E6D8AFD167052CD093BDBB /* InspectorValueFormat.swift */,
@@ -445,6 +448,7 @@
 				87B41081A50FF4716E4423EC /* EditorWindowController.swift in Sources */,
 				3F10E4A10ECE3E37549B99BA /* EditorWindowView.swift in Sources */,
 				E661ECE91CC81C278EB539B0 /* ExportCanvasGeometry.swift in Sources */,
+				F87FBF6D449686856AD05561 /* GlassSurface.swift in Sources */,
 				13B8472EC13ED5548E55212F /* HistoryStore.swift in Sources */,
 				B89AAE0FC436D51766C43D3C /* InspectorChrome.swift in Sources */,
 				A75C4FCCE3EE54A0AB010297 /* InspectorSlider.swift in Sources */,

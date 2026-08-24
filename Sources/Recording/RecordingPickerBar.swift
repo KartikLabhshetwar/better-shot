@@ -248,7 +248,7 @@ struct RecordingPickerControls: View {
     private func startAreaRecording() {
         RecordingBarPresenter.shared.hide()
         Task {
-            let started = (try? await ScreenRecordingManager.shared.startAreaRecording(afterSelection: runStartDelay)) ?? false
+            let started = (try? await ScreenRecordingManager.shared.startAreaRecording(afterSelection: { await runStartDelay(on: nil) })) ?? false
             if started {
                 RecordingBarPresenter.shared.showRecording()
             }
@@ -257,7 +257,7 @@ struct RecordingPickerControls: View {
 
     private func beginRecording(on screen: NSScreen?, _ start: @escaping () async throws -> Bool) {
         Task {
-            await runStartDelay()
+            await runStartDelay(on: screen)
             let started = (try? await start()) ?? false
             if started {
                 RecordingBarPresenter.shared.showRecording(on: screen)
@@ -265,9 +265,9 @@ struct RecordingPickerControls: View {
         }
     }
 
-    private func runStartDelay() async {
+    private func runStartDelay(on screen: NSScreen?) async {
         let delay = AppPreferences.recordingStartDelaySeconds
         guard delay > 0 else { return }
-        await CountdownOverlay.shared.showCountdown(seconds: delay)
+        await CountdownOverlay.shared.showCountdown(seconds: delay, on: screen)
     }
 }

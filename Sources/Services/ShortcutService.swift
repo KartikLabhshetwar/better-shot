@@ -170,3 +170,71 @@ final class ShortcutService {
         return Unmanaged.passUnretained(event)
     }
 }
+
+extension ShortcutService.Action {
+    var defaultShortcut: ShortcutService.Shortcut? {
+        switch self {
+        case .region: .defaultRegion
+        case .fullscreen: .defaultFullscreen
+        case .ocr: .defaultOCR
+        case .colorPicker: .defaultColorPicker
+        case .recording: .defaultRecording
+        case .window: nil
+        }
+    }
+}
+
+extension ShortcutService.Shortcut {
+    /// Modifiers in the order macOS renders them: control, option, shift, command.
+    var displayString: String {
+        var parts: [String] = []
+        if modifiers & UInt32(controlKey) != 0 { parts.append("\u{2303}") }
+        if modifiers & UInt32(optionKey) != 0 { parts.append("\u{2325}") }
+        if modifiers & UInt32(shiftKey) != 0 { parts.append("\u{21E7}") }
+        if modifiers & UInt32(cmdKey) != 0 { parts.append("\u{2318}") }
+        parts.append(Self.keyName(for: keyCode))
+        return parts.joined()
+    }
+
+    /// Spelled out for VoiceOver, which reads the symbol glyphs as nothing.
+    var accessibilityDescription: String {
+        var parts: [String] = []
+        if modifiers & UInt32(controlKey) != 0 { parts.append("Control") }
+        if modifiers & UInt32(optionKey) != 0 { parts.append("Option") }
+        if modifiers & UInt32(shiftKey) != 0 { parts.append("Shift") }
+        if modifiers & UInt32(cmdKey) != 0 { parts.append("Command") }
+        parts.append(Self.keyName(for: keyCode))
+        return parts.joined(separator: " ")
+    }
+
+    static func keyName(for code: UInt32) -> String {
+        let map: [UInt32: String] = [
+            0x00: "A", 0x01: "S", 0x02: "D", 0x03: "F",
+            0x04: "H", 0x05: "G", 0x06: "Z", 0x07: "X",
+            0x08: "C", 0x09: "V", 0x0B: "B", 0x0C: "Q",
+            0x0D: "W", 0x0E: "E", 0x0F: "R", 0x10: "Y",
+            0x11: "T", 0x12: "1", 0x13: "2", 0x14: "3",
+            0x15: "4", 0x17: "5", 0x16: "6", 0x1A: "7",
+            0x1C: "8", 0x19: "9", 0x1D: "0", 0x1E: "]",
+            0x1F: "O", 0x20: "U", 0x21: "[", 0x22: "I",
+            0x23: "P", 0x25: "L", 0x26: "J", 0x28: "K",
+            0x2C: "/", 0x2D: "N", 0x2E: "M",
+        ]
+        return map[code] ?? "?"
+    }
+}
+
+extension ShortcutService {
+    func effectiveShortcut(for action: Action) -> Shortcut? {
+        guard let shortcut = loadShortcut(for: action) ?? action.defaultShortcut, shortcut.enabled else { return nil }
+        return shortcut
+    }
+
+    func restoreDefaults() {
+        for action in Action.allCases {
+            guard let fallback = action.defaultShortcut else { continue }
+            saveShortcut(fallback, for: action)
+        }
+        registerAll()
+    }
+}

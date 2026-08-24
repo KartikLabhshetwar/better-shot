@@ -22,94 +22,85 @@ struct SharingSettingsTab: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Enable sharing", isOn: $enabled)
+                Toggle("Upload captures to my own storage", isOn: $enabled)
                     .onChange(of: enabled) { _, _ in save() }
-
-                HStack(spacing: 12) {
-                    Text("Account ID")
-                        .frame(width: 130, alignment: .leading)
-                    TextField("Account ID", text: $accountID, prompt: Text("your-account-id"))
-                        .labelsHidden()
-                        .textFieldStyle(.roundedBorder)
-                        .onChange(of: accountID) { _, _ in save() }
-                }
-
-                HStack(spacing: 12) {
-                    Text("Access Key ID")
-                        .frame(width: 130, alignment: .leading)
-                    SecureField("Access Key ID", text: $accessKeyID, prompt: Text("Access key ID"))
-                        .labelsHidden()
-                        .textFieldStyle(.roundedBorder)
-                        .onChange(of: accessKeyID) { _, _ in save() }
-                }
-
-                HStack(spacing: 12) {
-                    Text("Secret Access Key")
-                        .frame(width: 130, alignment: .leading)
-                    SecureField("Secret Access Key", text: $secretAccessKey, prompt: Text("Secret access key"))
-                        .labelsHidden()
-                        .textFieldStyle(.roundedBorder)
-                        .onChange(of: secretAccessKey) { _, _ in save() }
-                }
-
-                HStack(spacing: 12) {
-                    Text("Bucket")
-                        .frame(width: 130, alignment: .leading)
-                    TextField("Bucket", text: $bucket, prompt: Text("my-bucket"))
-                        .labelsHidden()
-                        .textFieldStyle(.roundedBorder)
-                        .onChange(of: bucket) { _, _ in save() }
-                }
-
-                HStack(spacing: 12) {
-                    Text("Public Base URL")
-                        .frame(width: 130, alignment: .leading)
-                    TextField("Public Base URL", text: $publicBaseURL, prompt: Text("https://share.example.com"))
-                        .labelsHidden()
-                        .textFieldStyle(.roundedBorder)
-                        .onChange(of: publicBaseURL) { _, _ in save() }
-                }
             } header: {
-                Text("Cloudflare R2")
+                Text("Share Links")
             } footer: {
-                Text("Create an API token in the Cloudflare dashboard under R2 > Manage API Tokens, scoped to Object Read & Write. The bucket needs public access enabled, or a custom domain bound to it, for share links to resolve in a browser.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text("Off, BetterShot keeps everything on this Mac. On, sharing a capture uploads it to your Cloudflare R2 bucket and copies a link.")
             }
 
             Section {
-                HStack(spacing: 10) {
+                credentialField("Account ID", text: $accountID, prompt: "your-account-id")
+                secureField("Access Key ID", text: $accessKeyID, prompt: "Access key ID")
+                secureField("Secret Access Key", text: $secretAccessKey, prompt: "Secret access key")
+                credentialField("Bucket", text: $bucket, prompt: "my-bucket")
+                credentialField("Public Base URL", text: $publicBaseURL, prompt: "https://share.example.com")
+            } header: {
+                Text("Cloudflare R2")
+            } footer: {
+                Text("Create an API token in the Cloudflare dashboard under R2 \u{203A} Manage API Tokens, scoped to Object Read & Write. Your bucket needs public access turned on, or a custom domain bound to it, for links to open in a browser. Keys are stored in your login Keychain.")
+            }
+            .disabled(!enabled)
+
+            Section {
+                HStack(spacing: 12) {
                     Button {
                         Task { await testConnection() }
                     } label: {
                         if isTesting {
                             ProgressView()
                                 .controlSize(.small)
-                                .frame(width: 40)
+                                .frame(width: 44)
                         } else {
                             Text("Test Connection")
                         }
                     }
-                    .disabled(isTesting || !store.isConfigured)
+                    .disabled(isTesting || !enabled || !store.isConfigured)
 
                     switch testStatus {
                     case .idle:
                         EmptyView()
                     case .success:
-                        Label("Connected", systemImage: "checkmark.circle.fill")
+                        Label("Connected. Share links are ready to use.", systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.green)
-                            .font(.caption)
+                            .font(.callout)
                     case .failed(let message):
-                        Label(message, systemImage: "xmark.circle.fill")
+                        Label(message, systemImage: "exclamationmark.triangle.fill")
                             .foregroundStyle(.red)
-                            .font(.caption)
-                            .lineLimit(2)
+                            .font(.callout)
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
+
+                    Spacer(minLength: 0)
+                }
+            } footer: {
+                if enabled && !store.isConfigured {
+                    Text("Fill in all five fields above to test the connection.")
                 }
             }
         }
         .formStyle(.grouped)
         .onAppear { loadFromStore() }
+    }
+
+    private func credentialField(_ label: String, text: Binding<String>, prompt: String) -> some View {
+        LabeledContent(label) {
+            TextField(label, text: text, prompt: Text(prompt))
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .onChange(of: text.wrappedValue) { _, _ in save() }
+        }
+    }
+
+    private func secureField(_ label: String, text: Binding<String>, prompt: String) -> some View {
+        LabeledContent(label) {
+            SecureField(label, text: text, prompt: Text(prompt))
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .onChange(of: text.wrappedValue) { _, _ in save() }
+        }
     }
 
     private func loadFromStore() {

@@ -19,15 +19,12 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             return
         }
 
-        let hostingView = NSHostingView(rootView: PreferencesView())
+        let controller = NSHostingController(rootView: PreferencesView())
 
-        let win = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 680, height: 560),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        win.contentView = hostingView
+        let win = NSWindow(contentViewController: controller)
+        win.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        win.setContentSize(NSSize(width: 820, height: 660))
+        win.titlebarAppearsTransparent = true
         win.title = "Settings"
         win.isReleasedWhenClosed = false
         win.delegate = self
@@ -41,6 +38,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         NSApp.setActivationPolicy(.regular)
         win.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func close() {
+        window?.performClose(nil)
     }
 
     func windowWillClose(_ notification: Notification) {
