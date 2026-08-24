@@ -39,6 +39,16 @@ final class R2CredentialStore {
     private(set) var _enabled: Bool = false
     private(set) var _accessKeyID: String = ""
     private(set) var _secretAccessKey: String = ""
+    private(set) var keychainAccess: KeychainAccess = .empty
+
+    /// A blocked read means the keys are on disk but this build cannot open them, which looks nothing like never having set them.
+    enum KeychainAccess: Equatable {
+        case stored
+        case empty
+        case blocked(OSStatus)
+
+        var isBlocked: Bool { if case .blocked = self { return true } else { return false } }
+    }
 
     var accountID: String {
         get { _accountID }
@@ -76,7 +86,7 @@ final class R2CredentialStore {
         get { _accessKeyID }
         set {
             _accessKeyID = newValue
-            Self.setKeychainItem(key: Keys.accessKeyID, value: newValue)
+            keychainAccess = Self.setKeychainItem(key: Keys.accessKeyID, value: newValue)
         }
     }
 
@@ -84,7 +94,7 @@ final class R2CredentialStore {
         get { _secretAccessKey }
         set {
             _secretAccessKey = newValue
-            Self.setKeychainItem(key: Keys.secretAccessKey, value: newValue)
+            keychainAccess = Self.setKeychainItem(key: Keys.secretAccessKey, value: newValue)
         }
     }
 
@@ -108,11 +118,40 @@ final class R2CredentialStore {
         _bucket = defaults.string(forKey: Keys.bucket) ?? ""
         _publicBaseURL = defaults.string(forKey: Keys.publicBaseURL) ?? ""
         _enabled = defaults.bool(forKey: Keys.enabled)
-        _accessKeyID = Self.getKeychainItem(key: Keys.accessKeyID) ?? ""
-        _secretAccessKey = Self.getKeychainItem(key: Keys.secretAccessKey) ?? ""
+
+        let accessKey = Self.getKeychainItem(key: Keys.accessKeyID)
+        let secret = Self.getKeychainItem(key: Keys.secretAccessKey)
+        _accessKeyID = accessKey.value ?? ""
+        _secretAccessKey = secret.value ?? ""
+        keychainAccess = Self.access(of: [accessKey.status, secret.status])
     }
 
-    private static func setKeychainItem(key: String, value: String) {
+    /// Wipes the stored keys so the next save writes a fresh item owned by this build, which is the only way past an access list a re-signed app no longer matches.
+    func forgetStoredKeys() {
+        Self.deleteKeychainItem(key: Keys.accessKeyID)
+        Self.deleteKeychainItem(key: Keys.secretAccessKey)
+        _accessKeyID = ""
+        _secretAccessKey = ""
+        keychainAccess = .empty
+    }
+
+    static func access(of statuses: [OSStatus]) -> KeychainAccess {
+        if let blocked = statuses.first(where: { $0 != errSecSuccess && $0 != errSecItemNotFound }) {
+            return .blocked(blocked)
+        }
+        return statuses.contains(errSecSuccess) ? .stored : .empty
+    }
+
+    static func explain(_ status: OSStatus) -> String {
+        switch status {
+        case errSecAuthFailed, errSecUserCanceled, errSecInteractionNotAllowed:
+            "macOS asked for your Mac login password to unlock these keys and the request was cancelled."
+        default:
+            "The Keychain refused to open these keys (error \(status))."
+        }
+    }
+
+    private static func setKeychainItem(key: String, value: String) -> KeychainAccess {
         let data = Data(value.utf8)
 
         let query: [String: Any] = [
@@ -125,10 +164,18 @@ final class R2CredentialStore {
 
         var newQuery = query
         newQuery[kSecValueData as String] = data
-        SecItemAdd(newQuery as CFDictionary, nil)
+        return access(of: [SecItemAdd(newQuery as CFDictionary, nil)])
     }
 
-    private static func getKeychainItem(key: String) -> String? {
+    private static func deleteKeychainItem(key: String) {
+        SecItemDelete([
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: key,
+            kSecAttrService as String: keychainService,
+        ] as CFDictionary)
+    }
+
+    private static func getKeychainItem(key: String) -> (value: String?, status: OSStatus) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
@@ -140,9 +187,9 @@ final class R2CredentialStore {
         let status = SecItemCopyMatching(query as CFDictionary, &result)
 
         guard status == errSecSuccess, let data = result as? Data else {
-            return nil
+            return (nil, status)
         }
 
-        return String(data: data, encoding: .utf8)
+        return (String(data: data, encoding: .utf8), status)
     }
 }

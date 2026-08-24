@@ -30,6 +30,29 @@ struct SharingSettingsTab: View {
                 Text("Off, BetterShot keeps everything on this Mac. On, sharing a capture uploads it to your Cloudflare R2 bucket and copies a link.")
             }
 
+            if case .blocked(let status) = store.keychainAccess {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Your R2 keys are locked", systemImage: "key.slash")
+                            .font(.callout.weight(.semibold))
+                            .foregroundStyle(.orange)
+
+                        Text("\(R2CredentialStore.explain(status)) This happens after BetterShot is rebuilt or reinstalled, because the Keychain ties saved keys to the exact copy of the app that wrote them. Clear them and paste them in again, and the new copy owns them.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Button("Clear Locked Keys") {
+                            store.forgetStoredKeys()
+                            accessKeyID = ""
+                            secretAccessKey = ""
+                            testStatus = .idle
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+
             Section {
                 credentialField("Account ID", text: $accountID, prompt: "your-account-id")
                 secureField("Access Key ID", text: $accessKeyID, prompt: "Access key ID")
@@ -76,7 +99,7 @@ struct SharingSettingsTab: View {
                     Spacer(minLength: 0)
                 }
             } footer: {
-                if enabled && !store.isConfigured {
+                if enabled && !store.isConfigured && !store.keychainAccess.isBlocked {
                     Text("Fill in all five fields above to test the connection.")
                 }
             }
