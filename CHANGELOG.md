@@ -5,6 +5,35 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+The editor release. The video editor's right sidebar became a proper inspector,
+and the parts of a screencast that used to need After Effects (speed ramps,
+transitions, scene changes, a tilted 3D card, color) now live in four tabs.
+
+### Added
+
+- **Tabbed video inspector**: The right sidebar is now four tabs instead of one long scroll: Clip (scissors), Motion (arrow), Camera (person), and Style (paintbrush). Each tab holds only the controls that act on what you selected, so the sidebar stops being a wall of disclosure triangles
+- **Per-clip audio mode**: Speeding a clip up no longer forces one behavior on its audio. Each clip picks Mute, Keep Pitch, or Match Speed, so a 4x skim can stay silent while a 0.5x hold keeps a natural voice
+- **Transitions**: Adjacent clips can cross into each other with Crossfade or Fade Through Black, with an adjustable length. The transition is baked into the export rather than faked in the preview
+- **Scene modes and split screen**: Every clip carries its own scene: Both (screen with the floating face cam), Screen only, Camera only, or Split, which drops the bubble and gives the screen and the camera a pane each. Change scenes mid-recording and the export cuts between them
+- **3D camera**: A Perspective section in the Style tab tips the whole card in space. Drag the tilt pad for pitch and yaw, add Roll, and pull Depth for how hard the lens sells it. One pinhole projection drives both the live preview and the export, so combined tilts stay square and the drop shadow follows the pose
+- **Color correction**: Exposure, contrast, saturation, temperature, tint, highlights, shadows, and vignette, with separate grades for the screen and the face cam
+- **Click highlights**: Clicks recorded in the pointer sidecar now render as expanding rings in the export, derived from the same capture that drives auto-zoom
+- **Export progress**: Exporting shows a live progress overlay instead of a frozen window, with the spring timing and reduced-motion fallback the rest of the app uses
+- **Countdown overlay**: The start delay now draws a full-screen countdown so you know exactly when capture begins
+- **Escape closes editors**: Escape dismisses the image and video editors, and an unsaved editor asks before it closes rather than discarding your work
+
+### Changed
+
+- **Crop is a mode, not a permanent panel**: Entering crop shows the crop box, and leaving it puts the box away in both the image and the video editor. Crop handles stay flat while cropping even when a 3D pose is applied, so they remain grabbable
+- **The face cam bubble is draggable in the editor**: Position it in the preview and the export follows, instead of being locked to where capture left it
+- **Rebuilt clip timeline**: Cuts occupy real space on the timeline, delete works on the selected clip, and the drag math for trimming and scrubbing was rewritten so handles track the pointer 1:1
+
+### Fixed
+
+- **Zoom no longer needs a switch**: The zoom inspector acts on cues directly rather than gating them behind a toggle
+
 ## [4.0.0] - 2026-08-23
 
 The recording release. Better Shot's capture pipeline, floating bar, and video
