@@ -31,7 +31,6 @@ export default async function Home() {
       <SiteNav />
 
       <main className="pt-14">
-        {/* ─── HERO ─── */}
         <section className="flex flex-col items-center px-5 sm:px-6 pt-20 pb-14 sm:pt-28 sm:pb-16">
           <Link
             href="/changelog"
@@ -56,7 +55,7 @@ export default async function Home() {
             editing. Everything stays on your Mac. Free and open source.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-9 w-full max-w-[340px] sm:max-w-none">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 mt-9 w-full max-w-[340px] sm:w-auto sm:max-w-none">
             <DownloadDropdown release={release} source="hero" className="w-full sm:w-auto" />
             <a
               href="https://github.com/KartikLabhshetwar/better-shot"
@@ -77,14 +76,12 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* ─── PRODUCT SHOT ─── */}
         <section className="max-w-[1000px] mx-auto px-5 sm:px-6 pb-14">
           <div className="rounded-2xl border border-ink/[0.07] bg-ink/[0.02] p-1.5 sm:p-2 shadow-[0_16px_60px_rgba(0,0,0,0.07)] overflow-hidden">
             <EditorPreview />
           </div>
         </section>
 
-        {/* ─── SOCIAL PROOF ─── */}
         <section className="border-y border-ink/[0.06] bg-white/60">
           <div className="max-w-[960px] mx-auto px-5 sm:px-6 py-8">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
@@ -108,7 +105,6 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* ─── PROBLEM ─── */}
         <section className="py-20 sm:py-28">
           <div className="max-w-[960px] mx-auto px-5 sm:px-6">
             <div className="max-w-[620px]">
@@ -141,7 +137,6 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* ─── FEATURE 1: CAPTURE ─── */}
         <section id="features" className="border-t border-ink/[0.06] py-20 sm:py-28 scroll-mt-14">
           <div className="max-w-[960px] mx-auto px-5 sm:px-6">
             <div className="flex flex-col md:flex-row md:items-center gap-12 md:gap-20">
@@ -173,7 +168,6 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* ─── FEATURE 2: RECORDING ─── */}
         <section className="border-t border-ink/[0.06] bg-ink/[0.015] py-20 sm:py-28">
           <div className="max-w-[960px] mx-auto px-5 sm:px-6">
             <div className="flex flex-col md:flex-row-reverse md:items-center gap-12 md:gap-20">
@@ -205,7 +199,6 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* ─── FEATURE 3: EDIT & BEAUTIFY ─── */}
         <section className="border-t border-ink/[0.06] py-20 sm:py-28">
           <div className="max-w-[960px] mx-auto px-5 sm:px-6">
             <div className="flex flex-col md:flex-row md:items-center gap-12 md:gap-20">
@@ -237,7 +230,6 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* ─── SECONDARY FEATURES ─── */}
         <section className="border-t border-ink/[0.06] bg-ink/[0.015] py-20 sm:py-24">
           <div className="max-w-[960px] mx-auto px-5 sm:px-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-16 gap-y-14">
@@ -272,7 +264,6 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* ─── HOW IT WORKS ─── */}
         <section className="border-t border-ink/[0.06] py-20 sm:py-28">
           <div className="max-w-[960px] mx-auto px-5 sm:px-6">
             <div className="max-w-[560px] mb-12">
@@ -301,10 +292,8 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* ─── COMPARISON ─── */}
         <Comparison />
 
-        {/* ─── VALUES ─── */}
         <section className="border-t border-ink/[0.06] py-20 sm:py-24">
           <div className="max-w-[960px] mx-auto px-5 sm:px-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-10 sm:gap-12">
@@ -327,7 +316,6 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* ─── SHORTCUTS ─── */}
         <section className="border-t border-ink/[0.06] py-20 sm:py-24">
           <div className="max-w-[560px] mx-auto px-5 sm:px-6">
             <h2 className="text-[13px] font-semibold text-ink/30 tracking-[0.12em] uppercase text-center mb-8">
@@ -347,10 +335,8 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* ─── FAQ ─── */}
         <FaqSection />
 
-        {/* ─── FINAL CTA ─── */}
         <section className="border-t border-ink/[0.06] bg-ink/[0.015] py-24">
           <div className="text-center px-5 sm:px-6">
             <h2 className="text-[28px] sm:text-[36px] font-bold tracking-[-0.03em] text-ink mb-4">
