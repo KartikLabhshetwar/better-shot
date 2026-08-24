@@ -9,6 +9,7 @@ struct EditorWindowView: View {
     @State private var shareUploader = R2Uploader.shared
     @State private var shareItemID: UUID?
     @State private var isConfirmingDelete = false
+    @State private var hostWindow: NSWindow?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -24,6 +25,7 @@ struct EditorWindowView: View {
         }
         .padding(EditorPanelMetrics.gap)
         .background(EditorCanvasBackdrop())
+        .hostWindow($hostWindow)
         .editorToast($model.toastMessage)
         .confirmationDialog("Delete this capture?", isPresented: $isConfirmingDelete) {
             Button("Delete Capture", role: .destructive) { deleteCapture() }
@@ -63,7 +65,7 @@ struct EditorWindowView: View {
                 Spacer()
 
                 Button("Cancel") {
-                    NSApp.keyWindow?.close()
+                    hostWindow?.close()
                 }
                 .keyboardShortcut(.escape, modifiers: [])
 
@@ -198,7 +200,7 @@ struct EditorWindowView: View {
 
         withAnimation { model.toastMessage = "Exported" }
         try? await Task.sleep(for: .seconds(1.0))
-        NSApp.keyWindow?.close()
+        hostWindow?.close()
     }
 
     private func deleteCapture() {
@@ -210,7 +212,7 @@ struct EditorWindowView: View {
             HistoryStore.shared.deleteRecord(record)
         }
         try? FileManager.default.removeItem(at: url)
-        NSApp.keyWindow?.close()
+        hostWindow?.close()
     }
 
     private func copyToClipboard() async {

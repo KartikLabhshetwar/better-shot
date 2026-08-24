@@ -41,6 +41,7 @@ final class VideoEditorModel {
 
     var clips: [Clip] = []
     var selectedClipID: UUID?
+    var timelineSplitMode = false
     private var undoStack: [ClipEditSnapshot] = []
     private var redoStack: [ClipEditSnapshot] = []
 
@@ -295,8 +296,12 @@ final class VideoEditorModel {
     }
 
     func splitAtPlayhead() {
+        split(at: currentTime)
+    }
+
+    func split(at time: Double) {
         let base = clips.isEmpty ? [Clip(sourceStart: trimStart, sourceEnd: trimEnd)] : clips
-        guard let result = ClipTimeline(clips: base).split(at: currentTime) else { return }
+        guard let result = ClipTimeline(clips: base).split(at: time) else { return }
         commitClips(result.clips, selecting: result.selectedID)
     }
 

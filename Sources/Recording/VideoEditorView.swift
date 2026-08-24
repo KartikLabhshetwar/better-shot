@@ -36,6 +36,7 @@ struct VideoEditorView: View {
     @State private var shareUploader = R2Uploader.shared
     @State private var shareItemID: UUID?
     @State private var isConfirmingDelete = false
+    @State private var hostWindow: NSWindow?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var sidebarTab: VideoSidebarTab = .clip
     @AppStorage("editor.video.timelineHeight") private var storedTimelineHeight = EditorPanelMetrics.defaultTimelineHeight
@@ -75,6 +76,7 @@ struct VideoEditorView: View {
         }
         .padding(EditorPanelMetrics.gap)
         .background(EditorCanvasBackdrop())
+        .hostWindow($hostWindow)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
@@ -99,7 +101,7 @@ struct VideoEditorView: View {
 
                 Button("Cancel") {
                     model.cleanup()
-                    NSApp.keyWindow?.close()
+                    hostWindow?.close()
                 }
                 .keyboardShortcut(.escape, modifiers: [])
 
@@ -195,20 +197,17 @@ struct VideoEditorView: View {
         VStack(spacing: 6) {
             clipToolbar
 
-            VideoTimelineTrack(model: model)
-
-            if model.zoomEnabled {
-                ZoomCueLaneView(model: model)
-                    .frame(height: 18)
-            }
+            CapTimelineView(model: model, playhead: model.currentTime)
+                .frame(height: CapTimelineView.height(zoomEnabled: model.zoomEnabled))
         }
     }
 
     private var clipToolbar: some View {
         HStack(spacing: 6) {
-            InspectorPill("Split", systemImage: "scissors") {
-                model.splitAtPlayhead()
+            InspectorPill("Split", systemImage: "scissors", isActive: model.timelineSplitMode) {
+                model.timelineSplitMode.toggle()
             }
+            .help("Click a clip on the timeline to cut it")
 
             if let selectedClip = model.clips.first(where: { $0.id == model.selectedClipID }) {
                 InspectorPill("Delete", systemImage: "trash", role: .destructive) {
@@ -251,7 +250,7 @@ struct VideoEditorView: View {
         }
         try? FileManager.default.removeItem(at: sourceURL)
         model.cleanup()
-        NSApp.keyWindow?.close()
+        hostWindow?.close()
     }
 
     private func shareRecording() async {
@@ -312,7 +311,7 @@ struct VideoEditorView: View {
         let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage
         ToastWindow.shared.show(message: "Recording exported!", icon: appIcon)
         model.cleanup()
-        NSApp.keyWindow?.close()
+        hostWindow?.close()
     }
 }
 
@@ -525,21 +524,6 @@ private struct VideoTransportBar: View {
     }
 }
 
-/// Holds the playhead read that drives the timelines' redraw during playback.
-private struct VideoTimelineTrack: View {
-    let model: VideoEditorModel
-
-    var body: some View {
-        if model.isClipMode {
-            ClipTimelineView(model: model, playhead: model.currentTime)
-                .frame(height: 54)
-        } else {
-            VideoTrimTimelineView(model: model, playhead: model.currentTime)
-                .frame(height: 54)
-        }
-    }
-}
-
 private struct VideoTrimSection: View {
     @Bindable var model: VideoEditorModel
 
@@ -565,7 +549,7 @@ private struct VideoTrimSection: View {
                     readout("Duration", formatTime(model.trimmedDuration), highlighted: true)
                 }
 
-                InspectorCaption("Drag the handles on the timeline to trim.")
+                InspectorCaption("Drag the clip handles on the timeline. Scroll to pan, hold Control to zoom.")
             }
         }
     }
