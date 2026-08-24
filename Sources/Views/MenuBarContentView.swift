@@ -137,7 +137,7 @@ struct MenuBarContentView: View {
     private var utilityStack: some View {
         VStack(spacing: 6) {
             LazyVGrid(columns: Self.columns, spacing: 6) {
-                TrayGridButton(title: "Copy Text", icon: "doc.text.viewfinder", action: .ocr) {
+                TrayGridButton(title: "OCR", icon: "doc.text.viewfinder", action: .ocr) {
                     dismissAndRun(.ocr)
                 }
 
@@ -159,7 +159,7 @@ struct MenuBarContentView: View {
                 openSettings()
             }
 
-            TrayGridButton(title: "Quit BetterShot", icon: "power") {
+            TrayGridButton(title: "Quit", icon: "power") {
                 NSApplication.shared.terminate(nil)
             }
         }
@@ -284,7 +284,7 @@ struct TrayGridButton: View {
 
                 Text(title)
                     .font(.system(size: 12, weight: .medium))
-                    .lineLimit(1)
+                    .fixedSize()
 
                 Spacer(minLength: 2)
 
@@ -292,6 +292,7 @@ struct TrayGridButton: View {
                     Text(shortcut.displayString)
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.tertiary)
+                        .fixedSize()
                 }
             }
             .padding(.horizontal, 9)

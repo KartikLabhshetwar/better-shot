@@ -782,7 +782,7 @@ struct ShortcutSettingsTab: View {
     private static let rows: [(label: String, help: String, action: ShortcutService.Action)] = [
         ("Capture Region", "Drag out the area you want", .region),
         ("Capture Screen", "Grab the whole display at once", .fullscreen),
-        ("Copy Text", "Read the text out of any region", .ocr),
+        ("OCR", "Read the text out of any region", .ocr),
         ("Pick Color", "Sample a color from anywhere on screen", .colorPicker),
         ("Record Screen", "Open the recording bar", .recording),
     ]
