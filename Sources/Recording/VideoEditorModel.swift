@@ -33,7 +33,6 @@ final class VideoEditorModel {
     var isCropping = false
     var cropRect = CGRect(x: 0, y: 0, width: 1, height: 1)
 
-    var zoomEnabled = false
     var zoomCues: [ZoomCue] = []
     var selectedZoomCueID: UUID?
     private var pointerCapture: PointerCaptureFile?
@@ -45,6 +44,20 @@ final class VideoEditorModel {
     private var undoStack: [ClipEditSnapshot] = []
     private var redoStack: [ClipEditSnapshot] = []
 
+    var zoomEnabled: Bool { !zoomCues.isEmpty }
+    var clipTimeline: ClipTimeline { ClipTimeline(clips: clips) }
+
+    /// What the timeline spans once the cuts are applied, which is shorter than the asset as soon as anything is removed.
+    var timelineDuration: Double { clips.isEmpty ? duration : clipTimeline.duration }
+
+    func editorTime(forSourceTime time: Double) -> Double {
+        clips.isEmpty ? time : clipTimeline.clampedEditorTime(forSourceTime: time)
+    }
+
+    func sourceTime(atEditorTime time: Double) -> Double {
+        clips.isEmpty ? time : clipTimeline.sourceTime(at: time)
+    }
+
     var hasTrim: Bool { trimStart > 0.01 || (duration > 0 && trimEnd < duration - 0.01) }
     var hasCrop: Bool { cropRect != CGRect(x: 0, y: 0, width: 1, height: 1) }
     var isClipMode: Bool { !clips.isEmpty }
@@ -53,7 +66,7 @@ final class VideoEditorModel {
     var canDeleteSelectedClip: Bool { clips.count > 1 && selectedClipID != nil }
     var hasEdits: Bool {
         hasTrim || hasCrop || isClipMode
-            || (zoomEnabled && !zoomCues.isEmpty)
+            || zoomEnabled
             || config.padding > 0 || config.cornerRadius > 0 || config.shadowStrength > 0
             || config.style != .none || config.aspectRatio != .auto
     }
@@ -408,7 +421,7 @@ final class VideoEditorModel {
 
         let hasEffects = exportConfig.padding > 0 || exportConfig.cornerRadius > 0 || exportConfig.shadowStrength > 0
             || exportConfig.style != .none || exportConfig.aspectRatio != .auto
-        let hasZoom = zoomEnabled && !zoomCues.isEmpty
+        let hasZoom = zoomEnabled
 
         if isClipMode || hasEffects || hasCrop || hasZoom {
             return try await exportWithEffects(asset: asset, outputURL: outputURL, config: exportConfig)
@@ -618,6 +631,10 @@ final class VideoEditorModel {
             MainActor.assumeIsolated {
                 guard let self, !self.isSeekInFlight, self.pendingSeek == nil else { return }
                 self.currentTime = time.seconds
+                if self.isPlaying, let resume = self.clipTimeline.playbackTime(after: self.currentTime) {
+                    self.seekTo(resume, precise: false)
+                    return
+                }
                 if self.currentTime >= self.trimEnd && self.isPlaying {
                     self.player?.pause()
                     self.isPlaying = false

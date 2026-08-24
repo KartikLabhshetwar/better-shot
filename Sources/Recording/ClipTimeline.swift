@@ -105,6 +105,27 @@ nonisolated struct ClipTimeline: Equatable, Sendable {
         return nil
     }
 
+    /// A deleted stretch has no place on the editor axis, so a source time inside one lands on the cut it left behind.
+    func clampedEditorTime(forSourceTime sourceTime: TimeInterval) -> TimeInterval {
+        var editorStart: TimeInterval = 0
+        for clip in clips {
+            if sourceTime < clip.sourceStart { return editorStart }
+            if sourceTime <= clip.sourceEnd {
+                let speed = min(max(clip.speed, Clip.minimumSpeed), Clip.maximumSpeed)
+                return editorStart + (sourceTime - clip.sourceStart) / speed
+            }
+            editorStart += clip.editorDuration
+        }
+        return editorStart
+    }
+
+    /// Preview plays the untouched asset, so a playhead that wanders into a deleted stretch has to be pushed to the next clip.
+    func playbackTime(after sourceTime: TimeInterval) -> TimeInterval? {
+        guard !clips.isEmpty else { return nil }
+        guard !clips.contains(where: { $0.sourceStart <= sourceTime && sourceTime < $0.sourceEnd }) else { return nil }
+        return clips.first { $0.sourceStart > sourceTime }?.sourceStart
+    }
+
     func sourceTime(at editorTime: TimeInterval) -> TimeInterval {
         guard !clips.isEmpty, duration > 0 else { return 0 }
         let clamped = min(max(editorTime, 0), duration)

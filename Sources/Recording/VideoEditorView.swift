@@ -584,51 +584,45 @@ private struct VideoZoomSection: View {
 
     var body: some View {
         InspectorSection("Zoom") {
-            Toggle("Zoom", isOn: $model.zoomEnabled)
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.mini)
-        } content: {
-            if model.zoomEnabled {
-                VStack(alignment: .leading, spacing: 10) {
-                    if model.hasPointerCapture {
-                        InspectorPill("Auto Zoom", systemImage: "wand.and.stars", fillsWidth: true) {
-                            model.regenerateZoomCues()
-                        }
-                    } else {
-                        InspectorCaption("No cursor data recorded for this clip.")
-                    }
-
-                    HStack(spacing: 6) {
-                        InspectorPill("Add", systemImage: "plus") {
-                            model.addZoomCue(at: model.currentTime)
-                        }
-
-                        if let selectedCue {
-                            InspectorPill("Delete", systemImage: "trash", role: .destructive) {
-                                model.deleteZoomCue(selectedCue.id)
-                            }
-                        }
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 6) {
+                    InspectorPill("Add Zoom", systemImage: "plus.magnifyingglass") {
+                        model.addZoomCue(at: model.currentTime)
                     }
 
                     if let selectedCue {
-                        InspectorSlider(
-                            "Zoom Amount",
-                            value: Binding(
-                                get: { CGFloat(selectedCue.zoom) },
-                                set: { model.setZoomAmount(Double($0), forCueID: selectedCue.id) }
-                            ),
-                            range: 1.0...4.0,
-                            format: .magnification(fractionDigits: 1)
-                        )
+                        InspectorPill("Delete", systemImage: "trash", role: .destructive) {
+                            model.deleteZoomCue(selectedCue.id)
+                        }
                     }
-
-                    InspectorCaption("\(model.zoomCues.count) zoom cue\(model.zoomCues.count == 1 ? "" : "s"). Drag pills on the timeline to adjust.")
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
+
+                if model.hasPointerCapture {
+                    InspectorPill("Auto Zoom", systemImage: "wand.and.stars", fillsWidth: true) {
+                        model.regenerateZoomCues()
+                    }
+                }
+
+                if let selectedCue {
+                    InspectorSlider(
+                        "Zoom Amount",
+                        value: Binding(
+                            get: { CGFloat(selectedCue.zoom) },
+                            set: { model.setZoomAmount(Double($0), forCueID: selectedCue.id) }
+                        ),
+                        range: 1.0...4.0,
+                        format: .magnification(fractionDigits: 1)
+                    )
+                }
+
+                InspectorCaption(
+                    model.zoomCues.isEmpty
+                        ? "Adds a zoom at the playhead. Drag it on the timeline to adjust."
+                        : "\(model.zoomCues.count) zoom cue\(model.zoomCues.count == 1 ? "" : "s"). Drag pills on the timeline to adjust."
+                )
             }
         }
-        .animation(reduceMotion ? nil : InspectorMotion.reveal, value: model.zoomEnabled)
+        .animation(reduceMotion ? nil : InspectorMotion.reveal, value: model.zoomCues.count)
     }
 }
 

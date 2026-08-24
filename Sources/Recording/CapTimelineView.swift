@@ -80,6 +80,7 @@ final class CapTimelineControl: NSView {
     private struct DragState {
         let target: Target
         var grabTime: TimeInterval = 0
+        var originSpeed: Double = 1
         var originStart: TimeInterval = 0
         var originEnd: TimeInterval = 0
         var originPosition: TimeInterval = 0
@@ -167,7 +168,10 @@ final class CapTimelineControl: NSView {
 
     private var trackWidth: CGFloat { max(1, bounds.width - contentX - Metrics.padding) }
 
-    private var duration: TimeInterval { model?.duration ?? 0 }
+    /// The timeline draws the cut recording, so its axis is editor time and every model value crosses through the mapping below.
+    private var duration: TimeInterval { model?.timelineDuration ?? 0 }
+
+    private var sourceDuration: TimeInterval { model?.duration ?? 0 }
 
     private func rowRect(_ index: Int) -> CGRect {
         CGRect(
@@ -191,18 +195,27 @@ final class CapTimelineControl: NSView {
         rowRect(rows.count - 1).maxY
     }
 
-    private func x(for time: TimeInterval) -> CGFloat {
+    private func editorTime(_ sourceTime: TimeInterval) -> TimeInterval {
+        model?.editorTime(forSourceTime: sourceTime) ?? sourceTime
+    }
+
+    private func sourceTime(_ editorTime: TimeInterval) -> TimeInterval {
+        model?.sourceTime(atEditorTime: editorTime) ?? editorTime
+    }
+
+    private func x(editor time: TimeInterval) -> CGFloat {
         contentX + transform.x(for: time, trackWidth: trackWidth)
     }
 
-    private func time(at pointX: CGFloat) -> TimeInterval {
-        transform.time(atOffset: pointX - contentX, trackWidth: trackWidth)
+    private func x(for sourceTime: TimeInterval) -> CGFloat {
+        x(editor: editorTime(sourceTime))
     }
 
     /// Cap pulls the first ten pixels of the recording to zero, so the origin is always exactly reachable.
-    private func snappedToStart(_ time: TimeInterval) -> TimeInterval {
-        let pixelsFromOrigin = CGFloat(time / transform.secondsPerPixel(trackWidth: trackWidth))
-        return pixelsFromOrigin <= Metrics.startSnapPixels ? 0 : max(0, time)
+    private func time(at pointX: CGFloat) -> TimeInterval {
+        let editor = transform.time(atOffset: pointX - contentX, trackWidth: trackWidth)
+        let pixelsFromOrigin = CGFloat(editor / transform.secondsPerPixel(trackWidth: trackWidth))
+        return sourceTime(pixelsFromOrigin <= Metrics.startSnapPixels ? 0 : max(0, editor))
     }
 
     private var segments: [Segment] {
@@ -232,8 +245,12 @@ final class CapTimelineControl: NSView {
 
         if fittedDuration != model.duration {
             fittedDuration = model.duration
-            transform = .fitting(duration: model.duration)
+            transform = .fitting(duration: duration)
             invalidateIntrinsicContentSize()
+        } else if transform.zoom > TimelineTransform.zoomOutLimit(duration: duration) {
+            transform = .fitting(duration: duration)
+        } else {
+            transform = transform.positioned(at: transform.position, duration: duration)
         }
 
         let next = RenderState(
@@ -243,7 +260,7 @@ final class CapTimelineControl: NSView {
             selectedCueID: model.selectedZoomCueID,
             trim: model.trimSelection,
             playhead: model.currentTime,
-            duration: model.duration,
+            duration: duration,
             thumbnailCount: model.thumbnails.count,
             transform: transform,
             splitMode: model.timelineSplitMode,
@@ -353,7 +370,7 @@ final class CapTimelineControl: NSView {
         let inTracks = point.y >= Metrics.headerHeight && point.y <= tracksBottom
         let overContent = point.x >= contentX && point.x <= contentX + trackWidth
         previewTime = (!model.isPlaying && (inTracks || hit == .ruler) && overContent)
-            ? snappedToStart(time(at: point.x))
+            ? time(at: point.x)
             : nil
 
         splitPreview = model.timelineSplitMode ? splitCandidate(at: point) : nil
@@ -373,7 +390,7 @@ final class CapTimelineControl: NSView {
         let snapper = SplitSnapper(
             clipStart: hit.start,
             clipEnd: hit.end,
-            radius: transform.seconds(forWidth: SplitSnapper.snapPixels, trackWidth: trackWidth)
+            radius: transform.seconds(forWidth: SplitSnapper.snapPixels, trackWidth: trackWidth) * hit.speed
         )
         let result = snapper.snap(time(at: point.x), candidates: snapCandidates)
         guard result.time > hit.start + SplitSnapper.edgeEpsilon, result.time < hit.end - SplitSnapper.edgeEpsilon else { return nil }
@@ -419,27 +436,26 @@ final class CapTimelineControl: NSView {
             model.pauseForScrub()
             if hit == .clipTrack { model.selectClip(nil) }
             if hit == .zoomTrack { model.selectedZoomCueID = nil }
-            model.seekTo(snappedToStart(pressTime))
+            model.seekTo(pressTime)
             drag = DragState(target: .ruler)
 
         case .segmentStart(let id), .segmentEnd(let id):
             guard let hitSegment = segment(id) else { return }
-            var anchor = hitSegment.end
-            if case .segmentStart = hit { anchor = hitSegment.start }
             model.pauseForScrub()
             model.beginClipTrim()
             if !hitSegment.isTrim { model.selectClip(id) }
             drag = DragState(
                 target: hit,
-                grabTime: pressTime - anchor,
+                originSpeed: hitSegment.speed,
                 originStart: hitSegment.start,
-                originEnd: hitSegment.end
+                originEnd: hitSegment.end,
+                grabX: point.x
             )
 
         case .segmentBody(let id):
             model.pauseForScrub()
             if segment(id)?.isTrim == false { model.selectClip(id) }
-            model.seekTo(snappedToStart(pressTime))
+            model.seekTo(pressTime)
             drag = DragState(target: .ruler)
 
         case .cueStart(let id), .cueEnd(let id), .cueBody(let id):
@@ -458,7 +474,7 @@ final class CapTimelineControl: NSView {
 
         switch drag.target {
         case .ruler:
-            model.seekTo(snappedToStart(pointerTime), precise: false)
+            model.seekTo(pointerTime, precise: false)
 
         case .minimapChip:
             let scale = transform.minimapMoveScale(barWidth: minimapRect.width, duration: duration)
@@ -471,10 +487,10 @@ final class CapTimelineControl: NSView {
             resizeWindowFromMinimap(at: point, drag: drag)
 
         case .segmentStart(let id):
-            applySegmentTrim(id: id, movingStart: true, to: pointerTime - drag.grabTime, opposite: drag.originEnd)
+            applySegmentTrim(id: id, movingStart: true, to: drag.originStart + sourceDelta(to: point, drag: drag), opposite: drag.originEnd)
 
         case .segmentEnd(let id):
-            applySegmentTrim(id: id, movingStart: false, to: pointerTime - drag.grabTime, opposite: drag.originStart)
+            applySegmentTrim(id: id, movingStart: false, to: drag.originEnd + sourceDelta(to: point, drag: drag), opposite: drag.originStart)
 
         case .cueStart(let id):
             let delta = pointerTime - drag.grabTime
@@ -483,12 +499,12 @@ final class CapTimelineControl: NSView {
 
         case .cueEnd(let id):
             let delta = pointerTime - drag.grabTime
-            let end = min(duration, max(drag.originEnd + delta, drag.originStart + ZoomCue.minimumDuration))
+            let end = min(sourceDuration, max(drag.originEnd + delta, drag.originStart + ZoomCue.minimumDuration))
             model.updateZoomCue(id: id, start: drag.originStart, end: end)
 
         case .cueBody(let id):
             let delta = pointerTime - drag.grabTime
-            let moved = TrimSelection(start: drag.originStart, end: drag.originEnd).shifted(by: delta, duration: duration)
+            let moved = TrimSelection(start: drag.originStart, end: drag.originEnd).shifted(by: delta, duration: sourceDuration)
             model.updateZoomCue(id: id, start: moved.start, end: moved.end)
 
         default:
@@ -520,12 +536,17 @@ final class CapTimelineControl: NSView {
         }
     }
 
+    /// A pixel of the editor axis is one clip-speed of source second, so a handle keeps up with the pointer whatever the clip is playing at.
+    private func sourceDelta(to point: CGPoint, drag: DragState) -> TimeInterval {
+        transform.seconds(forWidth: point.x - drag.grabX, trackWidth: trackWidth) * drag.originSpeed
+    }
+
     private func applySegmentTrim(id: UUID, movingStart: Bool, to edgeTime: TimeInterval, opposite: TimeInterval) {
         guard let model, let hit = segment(id) else { return }
         if hit.isTrim {
             let selection = movingStart
-                ? model.trimSelection.settingStart(edgeTime, duration: duration)
-                : model.trimSelection.settingEnd(edgeTime, duration: duration)
+                ? model.trimSelection.settingStart(edgeTime, duration: sourceDuration)
+                : model.trimSelection.settingEnd(edgeTime, duration: sourceDuration)
             model.applyTrimDrag(selection, playhead: movingStart ? selection.start : selection.end, precise: false)
         } else {
             model.updateClipTrim(id, start: movingStart ? edgeTime : opposite, end: movingStart ? opposite : edgeTime)
@@ -541,7 +562,7 @@ final class CapTimelineControl: NSView {
 
         let scale: CGFloat = event.hasPreciseScrollingDeltas ? 1 : 10
         if event.modifierFlags.contains(.control) {
-            let origin = previewTime ?? model?.currentTime ?? transform.position
+            let origin = editorTime(previewTime ?? model?.currentTime ?? sourceTime(transform.position))
             let delta = Double(-event.scrollingDeltaY * scale) * transform.zoom.squareRoot() / 30
             transform = transform.zoomed(to: transform.zoom + delta, origin: origin, duration: duration)
         } else {
@@ -557,7 +578,7 @@ final class CapTimelineControl: NSView {
 
     override func magnify(with event: NSEvent) {
         guard duration > 0 else { return }
-        let origin = previewTime ?? model?.currentTime ?? transform.position
+        let origin = editorTime(previewTime ?? model?.currentTime ?? sourceTime(transform.position))
         transform = transform.zoomed(to: transform.zoom / (1 + event.magnification), origin: origin, duration: duration)
         syncFromModel()
     }
@@ -614,7 +635,7 @@ final class CapTimelineControl: NSView {
         for index in 0..<transform.markingCount {
             let time = transform.markingTime(index: index)
             guard time >= 0 else { continue }
-            let markX = x(for: time)
+            let markX = x(editor: time)
             ctx.setFillColor(NSColor.white.withAlphaComponent(0.35).cgColor)
             ctx.fillEllipse(in: CGRect(x: markX - 1, y: Metrics.headerHeight - 8, width: 2, height: 2))
 
@@ -637,7 +658,7 @@ final class CapTimelineControl: NSView {
 
         let total = max(duration, TimelineTransform.minimumZoom)
         ctx.setFillColor(NSColor.white.withAlphaComponent(0.2).cgColor)
-        for boundary in segments.dropFirst().map(\.start) {
+        for boundary in segments.dropFirst().map({ editorTime($0.start) }) {
             let tickX = rect.minX + rect.width * CGFloat(min(max(boundary / total, 0), 1))
             ctx.fill(CGRect(x: tickX - 0.5, y: rect.minY + 2, width: 1, height: rect.height - 4))
         }
@@ -685,7 +706,7 @@ final class CapTimelineControl: NSView {
     private func drawClipTrack(ctx: CGContext, rect: CGRect, model: VideoEditorModel) {
         drawFilmstrip(ctx: ctx, rect: rect, model: model)
 
-        for segment in segments where transform.isVisible(start: segment.start, end: segment.end) {
+        for segment in segments where transform.isVisible(start: editorTime(segment.start), end: editorTime(segment.end)) {
             let box = CGRect(
                 x: x(for: segment.start),
                 y: rect.minY,
@@ -707,7 +728,7 @@ final class CapTimelineControl: NSView {
     }
 
     private func drawZoomTrack(ctx: CGContext, rect: CGRect, model: VideoEditorModel) {
-        for cue in model.zoomCues where transform.isVisible(start: cue.start, end: cue.end) {
+        for cue in model.zoomCues where transform.isVisible(start: editorTime(cue.start), end: editorTime(cue.end)) {
             let box = CGRect(
                 x: x(for: cue.start),
                 y: rect.minY,
@@ -727,8 +748,9 @@ final class CapTimelineControl: NSView {
         }
     }
 
+    /// Drawn per segment against the source strip, so a cut hides the frames it removed instead of sliding them along.
     private func drawFilmstrip(ctx: CGContext, rect: CGRect, model: VideoEditorModel) {
-        guard duration > 0 else { return }
+        guard sourceDuration > 0 else { return }
         let referenceWidth: CGFloat = 2048
         guard let strip = filmstrip.image(
             for: model.thumbnails,
@@ -736,27 +758,30 @@ final class CapTimelineControl: NSView {
             scale: 1
         ) else { return }
 
-        let visibleStart = max(0, min(transform.position, duration))
-        let visibleEnd = max(visibleStart, min(transform.position + transform.zoom, duration))
-        guard visibleEnd > visibleStart else { return }
+        let windowStart = sourceTime(transform.position)
+        let windowEnd = sourceTime(transform.position + transform.zoom)
 
-        let source = CGRect(
-            x: CGFloat(visibleStart / duration) * CGFloat(strip.width),
-            y: 0,
-            width: max(1, CGFloat((visibleEnd - visibleStart) / duration) * CGFloat(strip.width)),
-            height: CGFloat(strip.height)
-        )
-        guard let cropped = strip.cropping(to: source) else { return }
-
-        let destination = CGRect(
-            x: x(for: visibleStart),
-            y: rect.minY,
-            width: max(1, x(for: visibleEnd) - x(for: visibleStart)),
-            height: rect.height
-        )
         ctx.saveGState()
         ctx.setAlpha(0.5)
-        ctx.drawFlipped(cropped, in: destination)
+        for segment in segments {
+            let start = max(segment.start, windowStart)
+            let end = min(segment.end, windowEnd)
+            guard end > start else { continue }
+
+            let source = CGRect(
+                x: CGFloat(start / sourceDuration) * CGFloat(strip.width),
+                y: 0,
+                width: max(1, CGFloat((end - start) / sourceDuration) * CGFloat(strip.width)),
+                height: CGFloat(strip.height)
+            )
+            guard let cropped = strip.cropping(to: source) else { continue }
+            ctx.drawFlipped(cropped, in: CGRect(
+                x: x(for: start),
+                y: rect.minY,
+                width: max(1, x(for: end) - x(for: start)),
+                height: rect.height
+            ))
+        }
         ctx.restoreGState()
     }
 
