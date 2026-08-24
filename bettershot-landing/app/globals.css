@@ -134,6 +134,10 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
+  --color-ink: #111111;
+  --color-canvas: #fafaf9;
+  --color-brand: #e78a53;
+
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);

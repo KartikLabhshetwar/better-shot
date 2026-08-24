@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Better Shot — Screenshots & screen recording for macOS";
+export const alt = "Better Shot: screenshots and screen recording for macOS";
 export const size = {
   width: 1200,
   height: 630,

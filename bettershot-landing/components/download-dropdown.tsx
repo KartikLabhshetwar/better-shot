@@ -11,6 +11,13 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { trackDownload } from "@/lib/analytics"
 import type { ReleaseInfo } from "@/lib/downloads"
+import { cn } from "@/lib/utils"
+
+const sizeClass = {
+  sm: "h-9 px-3.5 text-[12.5px] rounded-lg",
+  default: "h-11 px-5 text-[13.5px] rounded-lg",
+  lg: "h-12 px-6 text-[14px] rounded-xl",
+}
 
 interface DownloadDropdownProps {
   release: ReleaseInfo
@@ -19,6 +26,7 @@ interface DownloadDropdownProps {
   size?: "default" | "sm" | "lg"
   className?: string
   showLabel?: boolean
+  label?: string
 }
 
 export function DownloadDropdown({
@@ -28,6 +36,7 @@ export function DownloadDropdown({
   size = "lg",
   className,
   showLabel = true,
+  label,
 }: DownloadDropdownProps) {
   const handleDownload = (arch: "appleSilicon" | "intel") => {
     trackDownload(source)
@@ -42,11 +51,22 @@ export function DownloadDropdown({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size={size} variant={variant === "outline" ? "outline" : "default"} className={className}>
+        <Button
+          size={size}
+          variant={variant === "outline" ? "outline" : "default"}
+          className={cn(
+            "font-medium tracking-[-0.01em] transition-all",
+            sizeClass[size],
+            variant === "outline"
+              ? "border-ink/[0.12] bg-white text-ink/70 hover:bg-ink/[0.03] hover:text-ink"
+              : "bg-ink text-white hover:bg-ink/85 shadow-[0_1px_2px_rgba(0,0,0,0.2)]",
+            className,
+          )}
+        >
           {showLabel ? (
             <>
               <Download className="mr-2 h-4 w-4" />
-              Download
+              {label ?? "Download for macOS"}
             </>
           ) : (
             <Download className="h-4 w-4" />
@@ -54,7 +74,10 @@ export function DownloadDropdown({
           <ChevronDown className="ml-1.5 h-3 w-3 opacity-50" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 border-none shadow-lg bg-white rounded-lg p-1">
+      <DropdownMenuContent
+        align="end"
+        className="w-60 border border-ink/[0.08] shadow-[0_8px_30px_rgba(0,0,0,0.10)] bg-white rounded-xl p-1.5"
+      >
         <DropdownMenuItem onClick={() => handleDownload("appleSilicon")} className="cursor-pointer rounded-md">
           <Download className="mr-2 h-4 w-4" />
           <div className="flex flex-col">
