@@ -20,6 +20,7 @@ final class VideoEditorModel {
     var trimEnd: Double = 0
     var isPlaying = false
     var isExporting = false
+    var exportProgress: Double = 0
     var toastMessage: String?
     var thumbnails: [NSImage] = []
     var config = BeautifierConfig()
@@ -32,6 +33,24 @@ final class VideoEditorModel {
     var cameraURL: URL?
     var cameraLayout = CameraOverlayLayout()
     var cameraPlayer: AVPlayer?
+
+    var screenGrade = ColorGrade.neutral {
+        didSet {
+            guard screenGrade != oldValue else { return }
+            gradeBox.screenGrade = screenGrade
+            syncGradePreview()
+        }
+    }
+    var cameraGrade = ColorGrade.neutral {
+        didSet {
+            guard cameraGrade != oldValue else { return }
+            gradeBox.cameraGrade = cameraGrade
+            syncGradePreview()
+        }
+    }
+    @ObservationIgnored private let gradeBox = ColorGradeBox()
+
+    var pose = Camera3D.neutral
 
     var isTrimming = false
     var isCropping = false
@@ -79,9 +98,10 @@ final class VideoEditorModel {
     var canDeleteSelectedClip: Bool { clips.count > 1 && selectedClipID != nil }
     var hasEdits: Bool {
         hasTrim || hasCrop || isClipMode
-            || zoomEnabled
+            || zoomEnabled || showsClickHighlights
             || config.padding > 0 || config.cornerRadius > 0 || config.shadowStrength > 0
             || config.style != .none || config.aspectRatio != .auto
+            || !screenGrade.isNeutral || !cameraGrade.isNeutral || !pose.isNeutral
     }
     /// Escape backs out of whatever is in flight before it reaches the window, the way it does everywhere else on the Mac.
     @discardableResult
@@ -106,11 +126,22 @@ final class VideoEditorModel {
     }
 
     var hasCamera: Bool { cameraURL != nil }
-    var isCameraVisible: Bool { cameraURL != nil && cameraLayout.isVisible }
+    var isCameraVisible: Bool { cameraURL != nil && sceneAtPlayhead.needsCamera }
     var hasPointerCapture: Bool {
         guard let pointerCapture else { return false }
         return !pointerCapture.travel.isEmpty || !pointerCapture.presses.isEmpty
     }
+
+    var clickPresses: [ClickHighlight] {
+        (pointerCapture?.presses ?? []).map { ClickHighlight(time: $0.time, point: CGPoint(x: $0.x, y: $0.y)) }
+    }
+    var hasClicks: Bool { !clickPresses.isEmpty }
+    var clickHighlightsEnabled = true
+    var clickHighlightScale: CGFloat = 1
+
+    var showsClickHighlights: Bool { clickHighlightsEnabled && hasClicks }
+
+    static let clickHighlightRadiusFraction: CGFloat = 0.05
 
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
@@ -134,6 +165,9 @@ final class VideoEditorModel {
         cameraPlayer = nil
         cameraURL = nil
         cameraLayout = CameraOverlayLayout()
+        screenGrade = .neutral
+        cameraGrade = .neutral
+        pose = .neutral
         currentTime = 0
         trimStart = 0
         trimEnd = 0
@@ -151,6 +185,7 @@ final class VideoEditorModel {
         config = AppPreferences.defaultBeautifierConfig
         let asset = AVURLAsset(url: url)
         let item = AVPlayerItem(asset: asset)
+        item.audioTimePitchAlgorithm = .spectral
         player = AVPlayer(playerItem: item)
         player?.actionAtItemEnd = .pause
 
@@ -270,6 +305,7 @@ final class VideoEditorModel {
         player.isMuted = true
         player.actionAtItemEnd = .pause
         cameraPlayer = player
+        syncGradePreview()
     }
 
     func setCameraCenter(_ center: CGPoint, in card: CGRect) {
@@ -278,6 +314,57 @@ final class VideoEditorModel {
 
     func setCameraDiameter(_ value: CGFloat) {
         cameraLayout.diameter = CameraOverlayLayout.clampedDiameter(value)
+    }
+
+    func applyGradePreset(_ preset: ColorGrade.Preset, toCamera: Bool) {
+        if toCamera {
+            cameraGrade = preset.grade
+        } else {
+            screenGrade = preset.grade
+        }
+    }
+
+    /// The grade filter reads a locked box, so a slider drag only swaps values: the composition is built once, when the grade first stops being neutral.
+    private func syncGradePreview() {
+        attachGrade(to: player?.currentItem, isNeutral: screenGrade.isNeutral) { [gradeBox] in gradeBox.screenGrade }
+        attachGrade(to: cameraPlayer?.currentItem, isNeutral: cameraGrade.isNeutral) { [gradeBox] in gradeBox.cameraGrade }
+        guard !isPlaying else { return }
+        enqueueSeek(currentTime, precise: true)
+    }
+
+    private func attachGrade(
+        to item: AVPlayerItem?,
+        isNeutral: Bool,
+        grade: @escaping @Sendable () -> ColorGrade
+    ) {
+        guard let item else { return }
+        guard !isNeutral else {
+            item.videoComposition = nil
+            return
+        }
+        guard item.videoComposition == nil else { return }
+        item.videoComposition = AVMutableVideoComposition(asset: item.asset) { request in
+            let source = request.sourceImage
+            request.finish(
+                with: grade().applied(to: source, extent: source.extent, frameTime: request.compositionTime.seconds),
+                context: nil
+            )
+        }
+    }
+
+    /// A sped-up clip has to play sped up, so the rate follows whichever clip the playhead sits in.
+    private func syncPlaybackRate() {
+        guard let player, isPlaying else { return }
+        let mode = clipTimeline.audioMode(atSourceTime: currentTime)
+        player.isMuted = mode == .mute
+        if player.currentItem?.audioTimePitchAlgorithm != mode.pitchAlgorithm {
+            player.currentItem?.audioTimePitchAlgorithm = mode.pitchAlgorithm
+        }
+        let target = Float(clipTimeline.speed(atSourceTime: currentTime))
+        if abs(player.rate - target) > 0.01 { player.rate = target }
+        if let cameraPlayer, cameraPlayer.rate != 0, abs(cameraPlayer.rate - target) > 0.01 {
+            cameraPlayer.rate = target
+        }
     }
 
     /// Two players over one timeline drift, so the cam is nudged back whenever it strays past a few frames.
@@ -311,6 +398,7 @@ final class VideoEditorModel {
             isPlaying = true
         }
         syncCameraPlayback()
+        syncPlaybackRate()
     }
 
     /// `precise` off is for scrubbing: a tolerant seek lands on the nearest decoded frame instead of forcing a full decode per pointer move.
@@ -429,8 +517,109 @@ final class VideoEditorModel {
     func setSpeed(_ speed: Double, forClipID id: UUID) {
         guard let clip = clips.first(where: { $0.id == id }) else { return }
         var updated = clip
-        updated.speed = min(max(speed, Clip.minimumSpeed), Clip.maximumSpeed)
+        updated.speed = Clip.clampedSpeed(speed)
         commitClips(ClipTimeline(clips: clips).replacing(updated), selecting: id)
+    }
+
+    var activeSpeed: Double {
+        if let id = selectedClipID, let clip = clips.first(where: { $0.id == id }) { return clip.speed }
+        return clips.first?.speed ?? 1
+    }
+
+    /// Speed belongs to the whole recording until it is split, so the first change materializes the implicit clip.
+    func setSpeed(_ speed: Double) {
+        if let id = selectedClipID, clips.contains(where: { $0.id == id }) {
+            setSpeed(speed, forClipID: id)
+            return
+        }
+        let clamped = Clip.clampedSpeed(speed)
+        guard !clips.isEmpty || clamped != 1 else { return }
+        let base = clips.isEmpty ? [Clip(sourceStart: trimStart, sourceEnd: trimEnd)] : clips
+        commitClips(base.map { clip in
+            var updated = clip
+            updated.speed = clamped
+            return updated
+        }, selecting: nil)
+    }
+
+    var activeAudioMode: ClipSpeedAudioMode {
+        if let id = selectedClipID, let clip = clips.first(where: { $0.id == id }) { return clip.audioMode }
+        return clips.first?.audioMode ?? .maintainPitch
+    }
+
+    /// Mirrors `setSpeed`: the mode belongs to the whole recording until the timeline is cut, then to the selected clip.
+    func setAudioMode(_ mode: ClipSpeedAudioMode) {
+        if let id = selectedClipID, let clip = clips.first(where: { $0.id == id }) {
+            var updated = clip
+            updated.audioMode = mode
+            commitClips(ClipTimeline(clips: clips).replacing(updated), selecting: id)
+            return
+        }
+        guard !clips.isEmpty || mode != .maintainPitch else { return }
+        let base = clips.isEmpty ? [Clip(sourceStart: trimStart, sourceEnd: trimEnd)] : clips
+        commitClips(base.map { clip in
+            var updated = clip
+            updated.audioMode = mode
+            return updated
+        }, selecting: nil)
+        syncPlaybackRate()
+    }
+
+    var activeScene: SceneMode {
+        if let id = selectedClipID, let clip = clips.first(where: { $0.id == id }) { return clip.scene }
+        return clips.first?.scene ?? .screenAndCamera
+    }
+
+    /// Mirrors `setSpeed`: the scene belongs to the whole recording until the timeline is cut, then to the selected clip.
+    func setScene(_ scene: SceneMode) {
+        guard hasCamera || !scene.needsCamera else { return }
+        if let id = selectedClipID, let clip = clips.first(where: { $0.id == id }) {
+            var updated = clip
+            updated.scene = scene
+            commitClips(ClipTimeline(clips: clips).replacing(updated), selecting: id)
+            return
+        }
+        guard !clips.isEmpty || scene != .screenAndCamera else { return }
+        let base = clips.isEmpty ? [Clip(sourceStart: trimStart, sourceEnd: trimEnd)] : clips
+        commitClips(base.map { clip in
+            var updated = clip
+            updated.scene = scene
+            return updated
+        }, selecting: nil)
+    }
+
+    var sceneAtPlayhead: SceneMode {
+        guard hasCamera else { return .screenOnly }
+        return clips.isEmpty ? .screenAndCamera : clipTimeline.scene(atSourceTime: currentTime)
+    }
+
+    private var selectedClipIndex: Int? {
+        guard let id = selectedClipID else { return nil }
+        return clips.firstIndex { $0.id == id }
+    }
+
+    /// Only a clip with something before it can be handed over to, so the first clip never offers one.
+    var canSetTransition: Bool { (selectedClipIndex ?? 0) > 0 }
+
+    var activeTransition: ClipTransition? {
+        guard let index = selectedClipIndex, index > 0 else { return nil }
+        return clips[index].transitionIn
+    }
+
+    var maximumTransitionDuration: TimeInterval {
+        guard let index = selectedClipIndex else { return 0 }
+        return clipTimeline.maximumTransitionDuration(at: index)
+    }
+
+    func setTransition(_ transition: ClipTransition?) {
+        guard let index = selectedClipIndex, index > 0 else { return }
+        var updated = clips[index]
+        updated.transitionIn = transition.map {
+            var clamped = $0
+            clamped.duration = min(max($0.duration, ClipTransition.minimumDuration), max(ClipTransition.minimumDuration, maximumTransitionDuration))
+            return clamped
+        }
+        commitClips(ClipTimeline(clips: clips).replacing(updated), selecting: updated.id)
     }
 
     func beginClipTrim() {
@@ -524,7 +713,7 @@ final class VideoEditorModel {
             || exportConfig.style != .none || exportConfig.aspectRatio != .auto
         let hasZoom = zoomEnabled
 
-        if isClipMode || hasEffects || hasCrop || hasZoom || isCameraVisible {
+        if isClipMode || hasEffects || hasCrop || hasZoom || isCameraVisible || showsClickHighlights {
             return try await exportWithEffects(asset: asset, outputURL: outputURL, config: exportConfig)
         }
 
@@ -582,7 +771,11 @@ final class VideoEditorModel {
 
         let composition: AVMutableComposition
         let mapToSourceTime: (TimeInterval) -> TimeInterval
+        let mapToEditorTime: (TimeInterval) -> TimeInterval?
         var cameraTrackID: CMPersistentTrackID?
+        var audioMix: AVAudioMix?
+        var exportClips: [Clip] = []
+        var laneTrackIDs: [CMPersistentTrackID] = []
 
         if isClipMode {
             let normalizedClips = ClipTimeline(clips: clips).normalized(to: duration)
@@ -601,8 +794,12 @@ final class VideoEditorModel {
             }
             composition = built.composition
             cameraTrackID = built.cameraTrackID
+            audioMix = built.audioMix
+            exportClips = normalizedClips
+            laneTrackIDs = built.videoTrackIDs
             let timeline = ClipTimeline(clips: normalizedClips)
             mapToSourceTime = { timeline.sourceTime(at: $0) }
+            mapToEditorTime = { timeline.editorTime(forSourceTime: $0) }
         } else {
             let legacyComposition = AVMutableComposition()
 
@@ -621,6 +818,9 @@ final class VideoEditorModel {
                 throw VideoExportError.trimInsertFailed(error)
             }
 
+            exportClips = [Clip(sourceStart: trimStart, sourceEnd: trimEnd)]
+            laneTrackIDs = [compVideoTrack.trackID]
+
             if let cameraSource,
                let compCameraTrack = legacyComposition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) {
                 ClipCompositionBuilder.insertCamera(cameraSource, into: compCameraTrack, sourceRange: timeRange, at: .zero)
@@ -634,22 +834,21 @@ final class VideoEditorModel {
 
             composition = legacyComposition
             let baseTrimStart = trimStart
+            let baseTrimEnd = trimEnd
             mapToSourceTime = { $0 + baseTrimStart }
+            mapToEditorTime = { $0 >= baseTrimStart && $0 <= baseTrimEnd ? $0 - baseTrimStart : nil }
         }
 
-        guard let compVideoTrack = composition.tracks(withMediaType: .video).first(where: { $0.trackID != cameraTrackID }) else {
+        let laneTracks = laneTrackIDs.compactMap { id in
+            composition.tracks(withMediaType: .video).first { $0.trackID == id }
+        }
+        guard !laneTracks.isEmpty, !exportClips.isEmpty else {
             throw VideoExportError.compositionTrackUnavailable
         }
 
         let videoComposition = AVMutableVideoComposition()
         videoComposition.renderSize = CGSize(width: canvasW, height: canvasH)
         videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
-
-        let instruction = AVMutableVideoCompositionInstruction()
-        instruction.timeRange = CMTimeRange(start: .zero, duration: composition.duration)
-        instruction.backgroundColor = CGColor.clear
-
-        let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: compVideoTrack)
 
         let cropOrigin = CGPoint(x: fullW * cropRect.origin.x, y: fullH * cropRect.origin.y).applying(transform)
         let untranslatedOrigin = CGPoint.zero.applying(transform)
@@ -658,50 +857,141 @@ final class VideoEditorModel {
             y: untranslatedOrigin.y - cropOrigin.y + offsetY
         )
 
-        if useZoom {
-            let timeline = viewportTimeline
-            let compositionDuration = composition.duration.seconds
-            let step: TimeInterval = 0.1
+        let timeline = viewportTimeline
 
-            func frameTransform(atEditorTime editorTime: TimeInterval) -> CGAffineTransform {
-                let sourceTime = mapToSourceTime(editorTime)
-                let viewport = timeline.frame(at: sourceTime)
-                let anchorDisplay = CGPoint(
-                    x: (cropRect.origin.x + viewport.anchor.x * cropRect.width) * fullW,
-                    y: (cropRect.origin.y + viewport.anchor.y * cropRect.height) * fullH
-                )
-                let magnification = max(1, viewport.magnification)
-                let zoomTransform = CGAffineTransform(translationX: -anchorDisplay.x, y: -anchorDisplay.y)
-                    .concatenating(CGAffineTransform(scaleX: magnification, y: magnification))
-                    .concatenating(CGAffineTransform(translationX: anchorDisplay.x, y: anchorDisplay.y))
-                return transform
-                    .concatenating(zoomTransform)
-                    .concatenating(cropShift)
-            }
-
-            if compositionDuration > 0 {
-                var t: TimeInterval = 0
-                var previousTransform = frameTransform(atEditorTime: 0)
-                while t < compositionDuration {
-                    let nextT = min(t + step, compositionDuration)
-                    let toTransform = frameTransform(atEditorTime: nextT)
-                    let range = CMTimeRange(
-                        start: CMTime(seconds: t, preferredTimescale: 600),
-                        end: CMTime(seconds: nextT, preferredTimescale: 600)
-                    )
-                    layerInstruction.setTransformRamp(fromStart: previousTransform, toEnd: toTransform, timeRange: range)
-                    previousTransform = toTransform
-                    t = nextT
-                }
-            } else {
-                layerInstruction.setTransform(frameTransform(atEditorTime: 0), at: .zero)
-            }
-        } else {
-            layerInstruction.setTransform(transform.concatenating(cropShift), at: .zero)
+        func frameTransform(atSourceTime sourceTime: TimeInterval) -> CGAffineTransform {
+            let viewport = useZoom ? timeline.frame(at: sourceTime) : .identity
+            let anchorDisplay = CGPoint(
+                x: (cropRect.origin.x + viewport.anchor.x * cropRect.width) * fullW,
+                y: (cropRect.origin.y + viewport.anchor.y * cropRect.height) * fullH
+            )
+            let magnification = max(1, viewport.magnification)
+            let zoomTransform = CGAffineTransform(translationX: -anchorDisplay.x, y: -anchorDisplay.y)
+                .concatenating(CGAffineTransform(scaleX: magnification, y: magnification))
+                .concatenating(CGAffineTransform(translationX: anchorDisplay.x, y: anchorDisplay.y))
+            return transform
+                .concatenating(zoomTransform)
+                .concatenating(cropShift)
         }
 
-        instruction.layerInstructions = [layerInstruction]
-        videoComposition.instructions = [instruction]
+        func frameTransform(atEditorTime editorTime: TimeInterval) -> CGAffineTransform {
+            frameTransform(atSourceTime: mapToSourceTime(editorTime))
+        }
+
+        let exportTimeline = ClipTimeline(clips: exportClips)
+        let exportStarts = exportTimeline.outputStarts
+
+        func outputRange(_ start: TimeInterval, _ end: TimeInterval) -> CMTimeRange {
+            CMTimeRange(
+                start: CMTime(seconds: start, preferredTimescale: 600),
+                end: CMTime(seconds: end, preferredTimescale: 600)
+            )
+        }
+
+        func layer(_ index: Int, span: CMTimeRange, fadingOut: Bool) -> AVMutableVideoCompositionLayerInstruction {
+            let clip = exportClips[index]
+            let instruction = AVMutableVideoCompositionLayerInstruction(assetTrack: laneTracks[index % laneTracks.count])
+            let clipStart = exportStarts[index]
+            let speed = Clip.clampedSpeed(clip.speed)
+            let spanStart = span.start.seconds
+            let spanEnd = CMTimeRangeGetEnd(span).seconds
+
+            func placement(atOutputTime time: TimeInterval) -> CGAffineTransform {
+                frameTransform(atSourceTime: clip.sourceStart + max(0, time - clipStart) * speed)
+            }
+
+            if useZoom, spanEnd > spanStart {
+                let step: TimeInterval = 0.1
+                var time = spanStart
+                var previous = placement(atOutputTime: time)
+                while time < spanEnd {
+                    let next = min(time + step, spanEnd)
+                    let target = placement(atOutputTime: next)
+                    instruction.setTransformRamp(fromStart: previous, toEnd: target, timeRange: outputRange(time, next))
+                    previous = target
+                    time = next
+                }
+            } else {
+                instruction.setTransform(placement(atOutputTime: spanStart), at: span.start)
+            }
+
+            if fadingOut {
+                instruction.setOpacityRamp(fromStartOpacity: 1, toEndOpacity: 0, timeRange: span)
+            }
+            return instruction
+        }
+
+        func spanInstruction(_ span: CMTimeRange, layers: [AVMutableVideoCompositionLayerInstruction]) -> AVMutableVideoCompositionInstruction {
+            let instruction = AVMutableVideoCompositionInstruction()
+            instruction.timeRange = span
+            instruction.backgroundColor = CGColor.clear
+            instruction.layerInstructions = layers
+            return instruction
+        }
+
+        var instructions: [AVMutableVideoCompositionInstruction] = []
+        var dimWindows: [TransitionDim] = []
+
+        for index in exportClips.indices {
+            let clipStart = exportStarts[index]
+            var soloStart = clipStart
+            if let handover = exportTimeline.effectiveTransition(at: index) {
+                let middle = clipStart + handover.duration / 2
+                let end = clipStart + handover.duration
+                switch handover.kind {
+                case .crossFade:
+                    let span = outputRange(clipStart, end)
+                    instructions.append(spanInstruction(span, layers: [
+                        layer(index - 1, span: span, fadingOut: true),
+                        layer(index, span: span, fadingOut: false)
+                    ]))
+                case .fadeThroughBlack:
+                    let leaving = outputRange(clipStart, middle)
+                    let arriving = outputRange(middle, end)
+                    instructions.append(spanInstruction(leaving, layers: [layer(index - 1, span: leaving, fadingOut: false)]))
+                    instructions.append(spanInstruction(arriving, layers: [layer(index, span: arriving, fadingOut: false)]))
+                    dimWindows.append(TransitionDim(start: clipStart, duration: handover.duration))
+                }
+                soloStart = end
+            }
+            let soloEnd = clipStart + exportClips[index].editorDuration
+                - (exportTimeline.effectiveTransition(at: index + 1)?.duration ?? 0)
+            guard soloEnd > soloStart else { continue }
+            let span = outputRange(soloStart, soloEnd)
+            instructions.append(spanInstruction(span, layers: [layer(index, span: span, fadingOut: false)]))
+        }
+
+        guard let first = instructions.first else { throw VideoExportError.emptyClipTimeline }
+        first.timeRange = CMTimeRange(start: .zero, end: CMTimeRangeGetEnd(first.timeRange))
+        if let last = instructions.last, composition.duration > last.timeRange.start {
+            last.timeRange = CMTimeRange(start: last.timeRange.start, end: composition.duration)
+        }
+        videoComposition.instructions = instructions
+
+        let scenes = hasCamera
+            ? exportClips.indices.map { index in
+                SceneWindow(
+                    start: exportStarts[index],
+                    end: exportStarts[index] + exportClips[index].editorDuration,
+                    mode: exportClips[index].scene
+                )
+            }
+            : []
+
+        let clicks = showsClickHighlights
+            ? ClickHighlight.highlights(
+                presses: clickPresses,
+                editorTime: mapToEditorTime,
+                project: { point, editorTime in
+                    ClickHighlight.canvasPoint(
+                        normalized: point,
+                        videoSize: CGSize(width: fullW, height: fullH),
+                        transform: frameTransform(atEditorTime: editorTime),
+                        canvasHeight: canvasH
+                    )
+                }
+            )
+            : []
 
         let cardRect = CGRect(x: offsetX, y: offsetY, width: vidW, height: vidH)
         let exportConfig = VideoFrameExporter.Configuration(
@@ -715,14 +1005,24 @@ final class VideoEditorModel {
             outputURL: outputURL,
             camera: cameraTrackID.map {
                 VideoFrameExporter.Configuration.Camera(trackID: $0, rect: cameraLayout.flippedRect(in: cardRect))
-            }
+            },
+            clicks: clicks,
+            clickRadius: min(vidW, vidH) * Self.clickHighlightRadiusFraction * clickHighlightScale,
+            audioMix: audioMix,
+            screenGrade: screenGrade,
+            cameraGrade: cameraGrade,
+            dimWindows: dimWindows,
+            scenes: scenes,
+            pose: pose
         )
 
-        return try await VideoFrameExporter().export(exportConfig) { _ in }
+        return try await VideoFrameExporter().export(exportConfig) { [weak self] fraction in
+            Task { @MainActor in self?.exportProgress = fraction }
+        }
     }
 
     private func loadCameraSource() async -> CameraSource? {
-        guard isCameraVisible, let cameraURL else { return nil }
+        guard let cameraURL, clips.isEmpty || clips.contains(where: { $0.scene.needsCamera }) else { return nil }
         let asset = AVURLAsset(url: cameraURL)
         guard let track = try? await asset.loadTracks(withMediaType: .video).first,
               let duration = try? await asset.load(.duration) else { return nil }
@@ -757,6 +1057,7 @@ final class VideoEditorModel {
                 guard let self, !self.isSeekInFlight, self.pendingSeek == nil else { return }
                 self.currentTime = time.seconds
                 self.syncCameraPlayback()
+                self.syncPlaybackRate()
                 if self.isPlaying, let resume = self.clipTimeline.playbackTime(after: self.currentTime) {
                     self.seekTo(resume, precise: false)
                     return

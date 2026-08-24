@@ -26,6 +26,15 @@ struct InspectorValueFormat {
         acceptedSuffixes: ["pixels", "pixel", "px"]
     )
 
+    static let degrees = InspectorValueFormat(
+        multiplier: 1,
+        fractionDigits: 0,
+        suffix: "°",
+        showsPositiveSign: true,
+        step: 1,
+        acceptedSuffixes: ["°", "deg", "degrees"]
+    )
+
     static func percent(signed: Bool = false, fractionDigits: Int = 0) -> InspectorValueFormat {
         InspectorValueFormat(
             multiplier: 100,

@@ -1,8 +1,8 @@
+Sources/Recording/ClipTimeline.swift
 Sources/Recording/VideoFrameExporter.swift
 Sources/Recording/VideoExportError.swift
-Sources/Models/BackgroundStyle.swift
-Sources/Models/BundledBackgrounds.swift
 Sources/Recording/ClickHighlight.swift
 Sources/Recording/ColorGrade.swift
-Sources/Recording/ClipTimeline.swift
+Sources/Models/BackgroundStyle.swift
+Sources/Models/BundledBackgrounds.swift
 Sources/Recording/Camera3D.swift

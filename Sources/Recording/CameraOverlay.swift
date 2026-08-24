@@ -9,7 +9,6 @@ struct CameraOverlayLayout: Equatable {
     var center = CGPoint(x: 0.16, y: 0.8)
     /// Fraction of the card's short edge, so the bubble stays a circle at any aspect ratio.
     var diameter: CGFloat = 0.22
-    var isVisible = true
 
     func side(in card: CGRect) -> CGFloat {
         min(card.width, card.height) * Self.clampedDiameter(diameter)

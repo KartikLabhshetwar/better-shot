@@ -119,6 +119,9 @@ enum VideoFrameExportCheck {
         try compCamera.insertTimeRange(range, of: cameraTrack, at: .zero)
 
         let canvasSize = CGSize(width: CGFloat(sourceWidth) + pad * 2, height: CGFloat(sourceHeight) + pad * 2)
+        let clickPoint = CGPoint(x: pad + 900, y: pad + 160)
+        let clickRadius: CGFloat = 60
+        let clickTime: TimeInterval = 2
         let cameraRect = CGRect(x: pad + 120, y: pad + 100, width: 200, height: 200)
         let videoComposition = AVMutableVideoComposition()
         videoComposition.renderSize = canvasSize
@@ -139,7 +142,9 @@ enum VideoFrameExportCheck {
             backgroundStyle: .gradient(GradientPreset.presets[0]),
             shadowStrength: 0.6,
             outputURL: outputURL,
-            camera: VideoFrameExporter.Configuration.Camera(trackID: compCamera.trackID, rect: cameraRect)
+            camera: VideoFrameExporter.Configuration.Camera(trackID: compCamera.trackID, rect: cameraRect),
+            clicks: [ClickHighlight(time: clickTime, point: clickPoint)],
+            clickRadius: clickRadius
         )
 
         let result = try await VideoFrameExporter().export(configuration) { _ in }
@@ -172,6 +177,32 @@ enum VideoFrameExportCheck {
         let outside = try sample(frame, at: CGPoint(x: cameraRect.midX, y: cameraRect.midY + cameraRect.height), canvasSize: canvasSize)
         precondition(inside.blue > 180 && inside.red < 80, "the face cam must be composited into its circle, sampled \(inside)")
         precondition(!(outside.blue > 180 && outside.red < 80), "the face cam must stay inside its circle, sampled \(outside)")
+
+        // The click ring is the only bright thing on a flat gray frame, so its own mirror image is the control sample.
+        let ringTime = clickTime + ClickHighlight.duration * 0.48
+        guard let ringPhase = ClickHighlight(time: clickTime, point: clickPoint).phase(at: ringTime) else {
+            preconditionFailure("expected the ring to still be alive at \(ringTime)")
+        }
+        let strokeOffset = (clickRadius - max(2, clickRadius * 0.16) / 2) * ringPhase.scale
+        let ringFrame = try await generator.image(at: CMTime(seconds: ringTime, preferredTimescale: 600)).image
+        let onRing = try sample(ringFrame, at: CGPoint(x: clickPoint.x + strokeOffset, y: clickPoint.y), canvasSize: canvasSize)
+        let mirrored = try sample(
+            ringFrame,
+            at: CGPoint(x: clickPoint.x + strokeOffset, y: canvasSize.height - clickPoint.y),
+            canvasSize: canvasSize
+        )
+        precondition(
+            onRing.red > mirrored.red + 15,
+            "the click ring must land at its own y, not mirrored: on-ring \(onRing) vs mirrored \(mirrored)"
+        )
+
+        let afterRing = try await generator.image(at: CMTime(seconds: clickTime + ClickHighlight.duration + 0.2, preferredTimescale: 600)).image
+        let faded = try sample(afterRing, at: CGPoint(x: clickPoint.x + strokeOffset, y: clickPoint.y), canvasSize: canvasSize)
+        let fadedControl = try sample(afterRing, at: CGPoint(x: clickPoint.x + strokeOffset, y: canvasSize.height - clickPoint.y), canvasSize: canvasSize)
+        precondition(
+            abs(faded.red - fadedControl.red) < 12,
+            "the ring must be gone once its window closes: \(faded) vs \(fadedControl)"
+        )
 
         print("VideoFrameExportCheck: exported \(Int(size.width))x\(Int(size.height)) \(String(format: "%.1f", exportedDuration))s with audio (\(bytes / 1024) KB)")
     }

@@ -4,6 +4,32 @@ import CoreGraphics
 import CoreImage
 import CoreImage.CIFilterBuiltins
 
+/// A fade-through-black handover dips the whole canvas, so the compositor darkens every layer at once instead of the screen track alone.
+nonisolated struct TransitionDim: Equatable, Sendable {
+    let start: TimeInterval
+    let duration: TimeInterval
+
+    func brightness(at time: TimeInterval) -> CGFloat {
+        guard duration > 0, time >= start, time < start + duration else { return 1 }
+        return abs((time - start) / duration * 2 - 1)
+    }
+
+    static func brightness(of windows: [TransitionDim], at time: TimeInterval) -> CGFloat {
+        windows.reduce(1) { min($0, $1.brightness(at: time)) }
+    }
+}
+
+/// The stretch of output time over which one scene mode holds, so a cut can swap layouts mid-export.
+nonisolated struct SceneWindow: Equatable, Sendable {
+    let start: TimeInterval
+    let end: TimeInterval
+    let mode: SceneMode
+
+    static func mode(of windows: [SceneWindow], at time: TimeInterval) -> SceneMode {
+        windows.last { time >= $0.start && time < $0.end }?.mode ?? .screenAndCamera
+    }
+}
+
 nonisolated final class VideoFrameExporter: @unchecked Sendable {
     struct Configuration: @unchecked Sendable {
         let composition: AVMutableComposition
@@ -15,6 +41,14 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
         let shadowStrength: CGFloat
         let outputURL: URL
         var camera: Camera?
+        var clicks: [ClickHighlight] = []
+        var clickRadius: CGFloat = 0
+        var audioMix: AVAudioMix?
+        var screenGrade = ColorGrade.neutral
+        var cameraGrade = ColorGrade.neutral
+        var dimWindows: [TransitionDim] = []
+        var scenes: [SceneWindow] = []
+        var pose: Camera3D = .neutral
 
         /// The face cam rides in the same composition as a second video track, so the compositor can draw it as a circle wherever the editor put it.
         struct Camera: Sendable {
@@ -79,6 +113,8 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
         let audioTracks = composition.tracks(withMediaType: .audio)
         if !audioTracks.isEmpty {
             let output = AVAssetReaderAudioMixOutput(audioTracks: audioTracks, audioSettings: nil)
+            output.audioMix = configuration.audioMix
+            output.audioTimePitchAlgorithm = .spectral
             output.alwaysCopiesSampleData = false
             reader.add(output)
             audioOutput = output
@@ -141,7 +177,14 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
             cornerRadius: configuration.cornerRadius,
             backgroundStyle: configuration.backgroundStyle,
             shadowStrength: configuration.shadowStrength,
-            cameraRect: configuration.camera?.rect
+            cameraRect: configuration.camera?.rect,
+            clicks: configuration.clicks,
+            clickRadius: configuration.clickRadius,
+            screenGrade: configuration.screenGrade,
+            cameraGrade: configuration.cameraGrade,
+            dimWindows: configuration.dimWindows,
+            scenes: configuration.scenes,
+            pose: configuration.pose
         )
 
         let frameCount = max(1, Int((composition.duration.seconds * 30).rounded()))
@@ -227,7 +270,12 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
                             guard let buffer = CMSampleBufferGetImageBuffer(cameraSample) else { continue }
                             cameraLookahead = (buffer, CMSampleBufferGetPresentationTimeStamp(cameraSample))
                         }
-                        compositor.render(videoFrame: sourceBuffer, cameraFrame: cameraFrame, into: destinationBuffer)
+                        compositor.render(
+                            videoFrame: sourceBuffer,
+                            cameraFrame: cameraFrame,
+                            at: presentationTime.seconds,
+                            into: destinationBuffer
+                        )
                         if !adaptor.append(destinationBuffer, withPresentationTime: presentationTime) {
                             throw VideoExportError.exportFailed(nil)
                         }
@@ -274,11 +322,46 @@ private final class FrameCompositor: @unchecked Sendable {
     private let cameraRect: CGRect?
     private let cameraMask: CIImage?
     private let cameraRing: CIImage?
+    private let clicks: [ClickHighlight]
+    private let clickRing: CIImage?
+    private let clickRadius: CGFloat
+    private let screenGrade: ColorGrade
+    private let cameraGrade: ColorGrade
+    private let cardRect: CGRect
+    private let dimWindows: [TransitionDim]
+    private let scenes: [SceneWindow]
+    private let posedCorners: [CGPoint]?
+    private let layouts: [SceneMode: SceneLayout]
+    private let sceneMasks: [SceneMode: SceneMasks]
 
-    init(canvasSize: CGSize, cardRect: CGRect, cornerRadius: CGFloat, backgroundStyle: BackgroundStyle, shadowStrength: CGFloat, cameraRect: CGRect?) {
+    private struct SceneMasks {
+        var screen: CIImage?
+        var camera: CIImage?
+    }
+
+    init(
+        canvasSize: CGSize,
+        cardRect: CGRect,
+        cornerRadius: CGFloat,
+        backgroundStyle: BackgroundStyle,
+        shadowStrength: CGFloat,
+        cameraRect: CGRect?,
+        clicks: [ClickHighlight] = [],
+        clickRadius: CGFloat = 0,
+        screenGrade: ColorGrade = .neutral,
+        cameraGrade: ColorGrade = .neutral,
+        dimWindows: [TransitionDim] = [],
+        scenes: [SceneWindow] = [],
+        pose: Camera3D = .neutral
+    ) {
         self.canvasSize = canvasSize
+        self.cardRect = cardRect
+        self.screenGrade = screenGrade
+        self.cameraGrade = cameraGrade
+        self.dimWindows = dimWindows
         let canvasRect = CGRect(origin: .zero, size: canvasSize)
-        if let backdropImage = Self.renderBackdrop(canvasSize: canvasSize, cardRect: cardRect, cornerRadius: cornerRadius, backgroundStyle: backgroundStyle, shadowStrength: shadowStrength) {
+        posedCorners = pose.isNeutral ? nil : pose.corners(in: cardRect, flipped: true)
+        if let backdropImage = Self.renderBackdrop(canvasSize: canvasSize, cardRect: cardRect, cornerRadius: cornerRadius, backgroundStyle: backgroundStyle, shadowStrength: shadowStrength, posedCorners: posedCorners) {
             backdrop = CIImage(cgImage: backdropImage)
         } else {
             backdrop = CIImage(color: .black).cropped(to: canvasRect)
@@ -295,28 +378,126 @@ private final class FrameCompositor: @unchecked Sendable {
         cameraRing = cameraRect
             .flatMap { Self.renderCircleRing(canvasSize: canvasSize, circle: $0) }
             .map { CIImage(cgImage: $0) }
+        self.clicks = clicks
+        self.clickRadius = clickRadius
+        clickRing = clicks.isEmpty || clickRadius <= 0
+            ? nil
+            : Self.renderClickRing(radius: clickRadius).map { CIImage(cgImage: $0) }
+
+        self.scenes = scenes
+        let bubble = cameraRect ?? .zero
+        let modes = Set(scenes.map(\.mode)).union([.screenAndCamera])
+        var layouts: [SceneMode: SceneLayout] = [:]
+        var masks: [SceneMode: SceneMasks] = [:]
+        for mode in modes {
+            let layout = mode.layout(card: cardRect, bubble: bubble, flipped: true)
+            layouts[mode] = layout
+            masks[mode] = SceneMasks(
+                screen: Self.paneMask(layout.screen, isCircle: false, canvasSize: canvasSize, cardRect: cardRect, cardMask: cardMask, circleMask: cameraMask, cornerRadius: cornerRadius),
+                camera: Self.paneMask(layout.camera, isCircle: layout.cameraIsCircle, canvasSize: canvasSize, cardRect: cardRect, cardMask: cardMask, circleMask: cameraMask, cornerRadius: cornerRadius)
+            )
+        }
+        self.layouts = layouts
+        sceneMasks = masks
     }
 
-    func render(videoFrame: CVPixelBuffer, cameraFrame: CVPixelBuffer?, into destination: CVPixelBuffer) {
+    func render(videoFrame: CVPixelBuffer, cameraFrame: CVPixelBuffer?, at frameTime: TimeInterval, into destination: CVPixelBuffer) {
         let canvasRect = CGRect(origin: .zero, size: canvasSize)
-        let filter = CIFilter.blendWithMask()
-        filter.inputImage = CIImage(cvPixelBuffer: videoFrame)
-        filter.backgroundImage = backdrop
-        filter.maskImage = cardMask
-        var output = (filter.outputImage ?? backdrop).cropped(to: canvasRect)
+        let mode = SceneWindow.mode(of: scenes, at: frameTime)
+        let layout = layouts[mode] ?? SceneLayout(screen: cardRect, camera: cameraRect, cameraIsCircle: true)
+        let masks = sceneMasks[mode] ?? SceneMasks(screen: cardMask, camera: cameraMask)
+        var content = CIImage.clear.cropped(to: canvasRect)
 
-        if let cameraFrame, let cameraRect, let cameraMask {
-            let bubble = CIFilter.blendWithMask()
-            bubble.inputImage = Self.aspectFilled(CIImage(cvPixelBuffer: cameraFrame), into: cameraRect)
-            bubble.backgroundImage = output
-            bubble.maskImage = cameraMask
-            output = (bubble.outputImage ?? output).cropped(to: canvasRect)
-            if let cameraRing {
-                output = cameraRing.composited(over: output).cropped(to: canvasRect)
+        if let screenRect = layout.screen, let screenMask = masks.screen {
+            let source = CIImage(cvPixelBuffer: videoFrame)
+            let fit = Self.aspectFillTransform(from: cardRect, into: screenRect)
+            let placed = screenRect == cardRect ? source : source.cropped(to: cardRect).transformed(by: fit)
+            let filter = CIFilter.blendWithMask()
+            filter.inputImage = screenGrade.applied(to: placed, extent: screenRect, frameTime: frameTime)
+            filter.backgroundImage = content
+            filter.maskImage = screenMask
+            content = (filter.outputImage ?? content).cropped(to: canvasRect)
+
+            if let clickRing {
+                for (highlight, phase) in ClickHighlight.active(in: clicks, at: frameTime) {
+                    let scaled = clickRing.transformed(by: CGAffineTransform(scaleX: phase.scale * fit.a, y: phase.scale * fit.d))
+                    let center = highlight.point.applying(fit)
+                    let placedRing = scaled.transformed(by: CGAffineTransform(
+                        translationX: center.x - scaled.extent.midX,
+                        y: center.y - scaled.extent.midY
+                    ))
+                    let fade = CIFilter.colorMatrix()
+                    fade.inputImage = placedRing
+                    fade.aVector = CIVector(x: 0, y: 0, z: 0, w: phase.opacity)
+                    guard let faded = fade.outputImage else { continue }
+                    content = faded.composited(over: content).cropped(to: canvasRect)
+                }
             }
         }
 
+        if let cameraFrame, let rect = layout.camera, let cameraMask = masks.camera {
+            let bubble = CIFilter.blendWithMask()
+            bubble.inputImage = cameraGrade.applied(
+                to: Self.aspectFilled(CIImage(cvPixelBuffer: cameraFrame), into: rect),
+                extent: rect,
+                frameTime: frameTime
+            )
+            bubble.backgroundImage = content
+            bubble.maskImage = cameraMask
+            content = (bubble.outputImage ?? content).cropped(to: canvasRect)
+            if layout.cameraIsCircle, let cameraRing {
+                content = cameraRing.composited(over: content).cropped(to: canvasRect)
+            }
+        }
+
+        var output = posed(content).composited(over: backdrop).cropped(to: canvasRect)
+
+        let brightness = TransitionDim.brightness(of: dimWindows, at: frameTime)
+        if brightness < 1 {
+            let dim = CIFilter.colorMatrix()
+            dim.inputImage = output
+            dim.rVector = CIVector(x: brightness, y: 0, z: 0, w: 0)
+            dim.gVector = CIVector(x: 0, y: brightness, z: 0, w: 0)
+            dim.bVector = CIVector(x: 0, y: 0, z: brightness, w: 0)
+            output = (dim.outputImage ?? output).cropped(to: canvasRect)
+        }
+
         ciContext.render(output, to: destination, bounds: canvasRect, colorSpace: colorSpace)
+    }
+
+    private func posed(_ content: CIImage) -> CIImage {
+        guard let posedCorners else { return content }
+        let filter = CIFilter.perspectiveTransform()
+        filter.inputImage = content.cropped(to: cardRect)
+        filter.bottomLeft = posedCorners[0]
+        filter.bottomRight = posedCorners[1]
+        filter.topRight = posedCorners[2]
+        filter.topLeft = posedCorners[3]
+        return filter.outputImage ?? content
+    }
+
+    private static func paneMask(
+        _ rect: CGRect?,
+        isCircle: Bool,
+        canvasSize: CGSize,
+        cardRect: CGRect,
+        cardMask: CIImage,
+        circleMask: CIImage?,
+        cornerRadius: CGFloat
+    ) -> CIImage? {
+        guard let rect, rect.width > 0, rect.height > 0 else { return nil }
+        if isCircle { return circleMask }
+        if rect == cardRect { return cardMask }
+        return renderCardMask(canvasSize: canvasSize, cardRect: rect, cornerRadius: cornerRadius)
+            .map { CIImage(cgImage: $0) }
+    }
+
+    private static func aspectFillTransform(from extent: CGRect, into rect: CGRect) -> CGAffineTransform {
+        guard extent.width > 0, extent.height > 0 else { return .identity }
+        let scale = max(rect.width / extent.width, rect.height / extent.height)
+        return CGAffineTransform(translationX: rect.midX, y: rect.midY)
+            .scaledBy(x: scale, y: scale)
+            .translatedBy(x: -extent.midX, y: -extent.midY)
     }
 
     private static func aspectFilled(_ image: CIImage, into rect: CGRect) -> CIImage {
@@ -328,6 +509,34 @@ private final class FrameCompositor: @unchecked Sendable {
             translationX: rect.midX - scaled.extent.midX,
             y: rect.midY - scaled.extent.midY
         ))
+    }
+
+    private static func renderClickRing(radius: CGFloat) -> CGImage? {
+        let side = Int((radius * 2).rounded(.up)) + 4
+        guard side > 4, let context = CGContext(
+            data: nil,
+            width: side,
+            height: side,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+
+        let center = CGPoint(x: CGFloat(side) / 2, y: CGFloat(side) / 2)
+        let lineWidth = max(2, radius * 0.16)
+        let circle = CGRect(
+            x: center.x - radius + lineWidth / 2,
+            y: center.y - radius + lineWidth / 2,
+            width: (radius - lineWidth / 2) * 2,
+            height: (radius - lineWidth / 2) * 2
+        )
+        context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 0.18))
+        context.fillEllipse(in: circle)
+        context.setStrokeColor(CGColor(red: 1, green: 1, blue: 1, alpha: 0.9))
+        context.setLineWidth(lineWidth)
+        context.strokeEllipse(in: circle)
+        return context.makeImage()
     }
 
     private static func renderCircleMask(canvasSize: CGSize, circle: CGRect) -> CGImage? {
@@ -364,6 +573,14 @@ private final class FrameCompositor: @unchecked Sendable {
         return context.makeImage()
     }
 
+    private static func quadPath(_ corners: [CGPoint], canvasHeight: CGFloat) -> CGPath {
+        let path = CGMutablePath()
+        let flipped = corners.map { CGPoint(x: $0.x, y: canvasHeight - $0.y) }
+        path.addLines(between: flipped)
+        path.closeSubpath()
+        return path
+    }
+
     private static func flipped(_ rect: CGRect, canvasHeight: CGFloat) -> CGRect {
         CGRect(x: rect.minX, y: canvasHeight - rect.maxY, width: rect.width, height: rect.height)
     }
@@ -387,7 +604,8 @@ private final class FrameCompositor: @unchecked Sendable {
         cardRect: CGRect,
         cornerRadius: CGFloat,
         backgroundStyle: BackgroundStyle,
-        shadowStrength: CGFloat
+        shadowStrength: CGFloat,
+        posedCorners: [CGPoint]?
     ) -> CGImage? {
         let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
         guard let context = CGContext(
@@ -433,9 +651,10 @@ private final class FrameCompositor: @unchecked Sendable {
             let blur = minDimension * 0.045 * shadowStrength
             let flippedCard = flipped(cardRect, canvasHeight: canvasSize.height)
             let radius = min(cornerRadius, min(flippedCard.width, flippedCard.height) / 2)
-            let path = radius > 0.5
-                ? CGPath(roundedRect: flippedCard, cornerWidth: radius, cornerHeight: radius, transform: nil)
-                : CGPath(rect: flippedCard, transform: nil)
+            let path = posedCorners.map { quadPath($0, canvasHeight: canvasSize.height) }
+                ?? (radius > 0.5
+                    ? CGPath(roundedRect: flippedCard, cornerWidth: radius, cornerHeight: radius, transform: nil)
+                    : CGPath(rect: flippedCard, transform: nil))
 
             context.saveGState()
             context.setShadow(

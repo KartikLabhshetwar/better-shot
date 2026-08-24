@@ -209,6 +209,7 @@ final class CameraBubbleController {
         panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isMovableByWindowBackground = true
+        panel.sharingType = .none
         panel.contentView = CameraBubbleView(session: session)
 
         panel.orderFrontRegardless()

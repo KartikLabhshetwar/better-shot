@@ -33,6 +33,8 @@ struct VideoEditorView: View {
     @State private var isConfirmingDelete = false
     @State private var isConfirmingDiscard = false
     @State private var hostWindow: NSWindow?
+    @State private var exportTask: Task<Void, Never>?
+    @AppStorage("videoInspector.tab") private var inspectorTab: VideoInspectorTab = .clip
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("editor.video.timelineHeight") private var storedTimelineHeight = EditorPanelMetrics.defaultTimelineHeight
 
@@ -71,6 +73,14 @@ struct VideoEditorView: View {
         }
         .padding(EditorPanelMetrics.gap)
         .background(EditorCanvasBackdrop())
+        .overlay {
+            if model.isExporting {
+                ExportProgressOverlay(progress: model.exportProgress) {
+                    exportTask?.cancel()
+                }
+            }
+        }
+        .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 1), value: model.isExporting)
         .hostWindow($hostWindow)
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
@@ -125,7 +135,7 @@ struct VideoEditorView: View {
                 }
 
                 Button {
-                    Task { await exportRecording() }
+                    exportTask = Task { await exportRecording() }
                 } label: {
                     Label(model.isExporting ? "Exporting\u{2026}" : "Export", systemImage: "square.and.arrow.down")
                 }
@@ -158,29 +168,58 @@ struct VideoEditorView: View {
     // MARK: - Inspector Sidebar
 
     private var videoInspector: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 0) {
-                VideoTrimSection(model: model)
-                InspectorDivider()
-                VideoZoomSection(model: model)
-                if model.hasCamera {
-                    InspectorDivider()
-                    VideoCameraSection(model: model)
-                }
-                InspectorDivider()
-                VideoCropSection(model: model)
-                InspectorDivider()
-                EffectsSection(config: $model.config)
-                InspectorDivider()
-                LayoutSection(config: $model.config, showsAlignment: false)
-                InspectorDivider()
-                BackgroundPickerSection(config: $model.config)
+        VStack(spacing: 0) {
+            InspectorTabBar(selection: $inspectorTab) { $0 != .camera || model.hasCamera }
 
-                Spacer(minLength: 24)
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    inspectorTabContent
+                    Spacer(minLength: 24)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .scrollContentBackground(.hidden)
         }
-        .scrollContentBackground(.hidden)
         .background(InspectorMaterial())
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: inspectorTab)
+        .onChange(of: model.hasCamera) { _, hasCamera in
+            if !hasCamera && inspectorTab == .camera { inspectorTab = .clip }
+        }
+    }
+
+    @ViewBuilder
+    private var inspectorTabContent: some View {
+        switch inspectorTab {
+        case .clip:
+            VideoTrimSection(model: model)
+            InspectorDivider()
+            VideoSpeedSection(model: model)
+            InspectorDivider()
+            VideoTransitionSection(model: model)
+            InspectorDivider()
+            VideoCropSection(model: model)
+        case .motion:
+            VideoZoomSection(model: model)
+            InspectorDivider()
+            VideoCursorSection(model: model)
+        case .camera:
+            if model.hasCamera {
+                VideoCameraSection(model: model)
+            } else {
+                InspectorCaption("This recording has no face cam. Turn the camera on before you record.")
+                    .padding(InspectorMetrics.gutter)
+            }
+        case .style:
+            EffectsSection(config: $model.config)
+            InspectorDivider()
+            VideoPerspectiveSection(model: model)
+            InspectorDivider()
+            VideoColorSection(model: model)
+            InspectorDivider()
+            LayoutSection(config: $model.config, showsAlignment: false)
+            InspectorDivider()
+            BackgroundPickerSection(config: $model.config)
+        }
     }
 
     // MARK: - Timeline
@@ -201,21 +240,11 @@ struct VideoEditorView: View {
             }
             .help("Click a clip on the timeline to cut it")
 
-            if let selectedClip = model.clips.first(where: { $0.id == model.selectedClipID }) {
+            if model.selectedClipID != nil {
                 InspectorPill("Delete", systemImage: "trash", role: .destructive) {
                     model.deleteSelectedClip()
                 }
                 .disabled(!model.canDeleteSelectedClip)
-
-                InspectorMenuField(
-                    values: Self.speedOptions,
-                    selection: Binding(
-                        get: { selectedClip.speed },
-                        set: { model.setSpeed($0, forClipID: selectedClip.id) }
-                    ),
-                    label: { "\($0.formatted())x" }
-                )
-                .frame(width: 76)
             }
 
             Spacer()
@@ -227,8 +256,6 @@ struct VideoEditorView: View {
             }
         }
     }
-
-    private static let speedOptions: [Double] = [0.5, 1.0, 1.5, 2.0]
 
     // MARK: - Actions
 
@@ -296,6 +323,7 @@ struct VideoEditorView: View {
     }
 
     private func exportRecording() async {
+        model.exportProgress = 0
         model.isExporting = true
         defer { model.isExporting = false }
         let sourceURL = model.sourceURL
@@ -303,7 +331,10 @@ struct VideoEditorView: View {
         let exportedURL: URL
         do {
             exportedURL = try await model.exportTrimmed()
+        } catch is CancellationError {
+            return
         } catch {
+            guard !Task.isCancelled else { return }
             ToastWindow.shared.show(
                 title: "Export Failed",
                 message: error.localizedDescription,
@@ -363,36 +394,60 @@ private struct VideoPreviewCanvas: View {
                     videoBackground(config.style, size: CGSize(width: canvasW, height: canvasH))
                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
+                    let cardSize = CGSize(width: videoW, height: videoH)
+                    let card = CGRect(origin: .zero, size: cardSize)
+                    let sceneLayout = model.sceneAtPlayhead.layout(card: card, bubble: model.cameraLayout.rect(in: card))
+
                     ZStack {
-                        Group {
-                            if let player = model.player {
-                                AVPlayerRepresentable(player: player)
+                        if let screenRect = sceneLayout.screen {
+                            ZStack {
+                                if let player = model.player {
+                                    AVPlayerRepresentable(player: player)
+                                } else {
+                                    ProgressView()
+                                }
+
+                                if model.showsClickHighlights {
+                                    ClickHighlightLayer(
+                                        presses: model.clickPresses,
+                                        time: model.currentTime,
+                                        radius: min(videoW, videoH) * VideoEditorModel.clickHighlightRadiusFraction * model.clickHighlightScale
+                                    )
+                                    .allowsHitTesting(false)
+                                }
+                            }
+                            .frame(width: videoW / visible.width, height: videoH / visible.height)
+                            .offset(
+                                x: -(visible.midX - 0.5) * videoW / visible.width,
+                                y: -(visible.midY - 0.5) * videoH / visible.height
+                            )
+                            .frame(width: videoW, height: videoH)
+                            .scaleEffect(zoomFrame.magnification, anchor: UnitPoint(x: zoomFrame.anchor.x, y: zoomFrame.anchor.y))
+                            .modifier(ScenePane(rect: screenRect, source: cardSize, cornerRadius: cornerRadius))
+                            .frame(width: videoW, height: videoH)
+                            .shadow(
+                                color: config.shadowStrength > 0 ? .black.opacity(Double(config.shadowStrength) * 0.4) : .clear,
+                                radius: config.shadowStrength > 0 ? max(4, 20 * config.shadowStrength) : 0,
+                                y: config.shadowStrength > 0 ? max(2, 8 * config.shadowStrength) : 0
+                            )
+                        }
+
+                        if let cameraRect = sceneLayout.camera, model.cameraPlayer != nil {
+                            if sceneLayout.cameraIsCircle {
+                                CameraBubbleOverlay(model: model, cardSize: cardSize)
+                                    .frame(width: videoW, height: videoH)
                             } else {
-                                ProgressView()
+                                CameraScenePane(model: model, rect: cameraRect, cornerRadius: cornerRadius)
+                                    .frame(width: videoW, height: videoH)
                             }
                         }
-                        .frame(width: videoW / visible.width, height: videoH / visible.height)
-                        .offset(
-                            x: -(visible.midX - 0.5) * videoW / visible.width,
-                            y: -(visible.midY - 0.5) * videoH / visible.height
-                        )
-                        .frame(width: videoW, height: videoH)
-                        .scaleEffect(zoomFrame.magnification, anchor: UnitPoint(x: zoomFrame.anchor.x, y: zoomFrame.anchor.y))
-                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                        .shadow(
-                            color: config.shadowStrength > 0 ? .black.opacity(Double(config.shadowStrength) * 0.4) : .clear,
-                            radius: config.shadowStrength > 0 ? max(4, 20 * config.shadowStrength) : 0,
-                            y: config.shadowStrength > 0 ? max(2, 8 * config.shadowStrength) : 0
-                        )
+                    }
+                    .modifier(CardPose(pose: model.isCropping ? .neutral : model.pose, card: card))
+                    .animation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 1), value: model.sceneAtPlayhead)
+                    .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 1), value: model.isCropping)
 
-                        if model.isCameraVisible {
-                            CameraBubbleOverlay(model: model, cardSize: CGSize(width: videoW, height: videoH))
-                                .frame(width: videoW, height: videoH)
-                        }
-
-                        if model.isCropping {
-                            CropBox(rect: $model.cropRect, frameSize: CGSize(width: videoW, height: videoH))
-                        }
+                    if model.isCropping {
+                        CropBox(rect: $model.cropRect, frameSize: CGSize(width: videoW, height: videoH))
                     }
                 }
                 .frame(width: canvasW, height: canvasH)
@@ -726,6 +781,7 @@ private struct CameraBubbleOverlay: View {
             .shadow(color: .black.opacity(0.3), radius: 3, y: 1)
             .offset(x: inset, y: inset)
             .opacity(isHovering ? 1 : 0)
+            .allowsHitTesting(isHovering)
             .highPriorityGesture(resizeGesture)
     }
 
@@ -738,6 +794,85 @@ private struct CameraBubbleOverlay: View {
                 model.setCameraDiameter(start + (value.translation.width + value.translation.height) / shortEdge)
             }
             .onEnded { _ in resizeStartDiameter = nil }
+    }
+}
+
+/// The same ring the exporter burns in, so what the editor previews is what the file ships with.
+private struct ClickHighlightLayer: View {
+    let presses: [ClickHighlight]
+    let time: Double
+    let radius: CGFloat
+
+    var body: some View {
+        GeometryReader { geo in
+            ForEach(Array(presses.enumerated()), id: \.offset) { _, press in
+                if let phase = press.phase(at: time) {
+                    Circle()
+                        .fill(Color.white.opacity(0.18))
+                        .overlay(Circle().strokeBorder(Color.white.opacity(0.9), lineWidth: max(2, radius * 0.16)))
+                        .frame(width: radius * 2, height: radius * 2)
+                        .scaleEffect(phase.scale)
+                        .opacity(phase.opacity)
+                        .position(x: press.point.x * geo.size.width, y: press.point.y * geo.size.height)
+                }
+            }
+        }
+    }
+}
+
+/// Aspect-fills a pane into the card the same way the exporter's CoreImage pass does, so the preview and the file agree.
+/// Bends the card with the exact projection the exporter uses, so what you tilt in the preview is what lands in the file.
+private struct CardPose: ViewModifier {
+    let pose: Camera3D
+    let card: CGRect
+
+    func body(content: Content) -> some View {
+        let projection = pose.projection(in: card)
+        var transform = ProjectionTransform()
+        transform.m11 = projection.m11
+        transform.m12 = projection.m12
+        transform.m13 = projection.m14
+        transform.m21 = projection.m21
+        transform.m22 = projection.m22
+        transform.m23 = projection.m24
+        transform.m31 = projection.m41
+        transform.m32 = projection.m42
+        transform.m33 = projection.m44
+        return content.projectionEffect(transform)
+    }
+}
+
+private struct ScenePane: ViewModifier {
+    let rect: CGRect
+    let source: CGSize
+    let cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        let scale = max(rect.width / max(source.width, 1), rect.height / max(source.height, 1))
+        content
+            .scaleEffect(scale)
+            .frame(width: rect.width, height: rect.height)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .position(x: rect.midX, y: rect.midY)
+    }
+}
+
+private struct CameraScenePane: View {
+    @Bindable var model: VideoEditorModel
+    let rect: CGRect
+    let cornerRadius: CGFloat
+
+    var body: some View {
+        Group {
+            if let player = model.cameraPlayer {
+                CameraPlayerLayer(player: player)
+            } else {
+                Color.black
+            }
+        }
+        .frame(width: rect.width, height: rect.height)
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .position(x: rect.midX, y: rect.midY)
     }
 }
 
@@ -780,19 +915,44 @@ final class CameraPlayerLayerView: NSView {
 private struct VideoCameraSection: View {
     @Bindable var model: VideoEditorModel
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var caption: String {
+        switch model.activeScene {
+        case .screenAndCamera: "Drag the bubble in the preview to move it, or its corner handle to resize."
+        case .screenOnly: "The face cam is left out of this range."
+        case .cameraOnly: "The face cam fills the frame and the screen is left out."
+        case .splitScreen: "Screen and face cam share the frame."
+        }
+    }
+
+    private static func help(_ scene: SceneMode) -> String {
+        switch scene {
+        case .screenAndCamera: "Screen with the face cam floating over it."
+        case .screenOnly: "Screen only."
+        case .cameraOnly: "Face cam only, filling the frame."
+        case .splitScreen: "Screen and face cam side by side."
+        }
+    }
+
     var body: some View {
         InspectorSection("Camera") {
             VStack(alignment: .leading, spacing: 10) {
-                InspectorPill(
-                    model.cameraLayout.isVisible ? "Hide Camera" : "Show Camera",
-                    systemImage: model.cameraLayout.isVisible ? "video.slash" : "video",
-                    isActive: model.cameraLayout.isVisible,
-                    fillsWidth: true
-                ) {
-                    model.cameraLayout.isVisible.toggle()
+                HStack(spacing: 3) {
+                    ForEach(SceneMode.allCases) { scene in
+                        InspectorPill(
+                            scene.title,
+                            systemImage: scene.icon,
+                            isActive: model.activeScene == scene,
+                            fillsWidth: true
+                        ) {
+                            model.setScene(scene)
+                        }
+                        .help(Self.help(scene))
+                    }
                 }
 
-                if model.cameraLayout.isVisible {
+                if model.activeScene == .screenAndCamera {
                     InspectorSlider(
                         "Size",
                         value: Binding(
@@ -802,10 +962,11 @@ private struct VideoCameraSection: View {
                         range: CameraOverlayLayout.minDiameter...CameraOverlayLayout.maxDiameter,
                         format: .percent()
                     )
-
-                    InspectorCaption("Drag the bubble in the preview to move it, or its corner handle to resize.")
                 }
+
+                InspectorCaption(caption)
             }
+            .animation(reduceMotion ? nil : InspectorMotion.reveal, value: model.activeScene)
         }
     }
 }

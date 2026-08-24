@@ -57,9 +57,10 @@ struct RecordingSessionControls: View {
                 accessibilityLabel: "Stop and save recording"
             ) {
                 Task {
-                    CameraBubbleController.shared.suspend()
                     RecordingBarPresenter.shared.hide()
-                    if let url = await recorder.stopRecording() {
+                    let stopped = await recorder.stopRecording()
+                    CameraBubbleController.shared.suspend()
+                    if let url = stopped {
                         let record = HistoryStore.shared.referenceCapture(at: url, kind: .recording)
                         if let record {
                             let storeURL = HistoryStore.shared.urlForRecord(record)
@@ -92,9 +93,9 @@ struct RecordingSessionControls: View {
                 accessibilityLabel: "Discard recording"
             ) {
                 Task {
-                    CameraBubbleController.shared.suspend()
                     RecordingBarPresenter.shared.hide()
                     await recorder.cancelRecording()
+                    CameraBubbleController.shared.suspend()
                 }
             }
             .disabled(recorder.state == .preparing)
