@@ -262,6 +262,11 @@ struct TextOverlayLayer: View {
                     )
                 }
             }
+
+            if let caption = model.captionStyle.resolved(model.captions, atSourceTime: model.currentTime, canvasSize: canvasSize) {
+                DrawnText(text: caption, isSelected: false, isEditing: false, canvasSize: canvasSize, select: {}, move: { _ in })
+                    .allowsHitTesting(false)
+            }
         }
         .frame(width: canvasSize.width, height: canvasSize.height)
         .allowsHitTesting(isEditing)
@@ -292,7 +297,12 @@ private struct DrawnText: View {
             )
             .frame(maxWidth: text.maxWidth)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(6)
+            .padding(.horizontal, text.backgroundOpacity > 0 ? text.fontSize * 0.3 : 6)
+            .padding(.vertical, text.backgroundOpacity > 0 ? text.fontSize * 0.18 : 6)
+            .background {
+                RoundedRectangle(cornerRadius: text.fontSize * 0.3, style: .continuous)
+                    .fill(Color.black.opacity(text.backgroundOpacity))
+            }
             .background {
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
                     .strokeBorder(Color.accentColor.opacity(isSelected ? 0.9 : (isHovering ? 0.5 : 0)), lineWidth: 1)

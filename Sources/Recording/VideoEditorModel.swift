@@ -69,6 +69,12 @@ final class VideoEditorModel {
     var texts: [TextOverlay] = []
     var selectedTextID: UUID?
 
+    var captions: [CaptionCue] = []
+    var captionStyle = CaptionStyle()
+    var isTranscribing = false
+    var transcriptionError: String?
+    var hasCaptions: Bool { captionStyle.isEnabled && !captions.isEmpty }
+
     var zoomCues: [ZoomCue] = []
     var selectedZoomCueID: UUID?
     private var pointerCapture: PointerCaptureFile?
@@ -113,7 +119,7 @@ final class VideoEditorModel {
             || zoomEnabled || showsClickHighlights
             || config.padding > 0 || config.cornerRadius > 0 || config.shadowStrength > 0
             || config.style != .none || config.aspectRatio != .auto
-            || !screenGrade.isNeutral || !cameraGrade.isNeutral || !pose.isNeutral || !masks.isEmpty || !texts.isEmpty
+            || !screenGrade.isNeutral || !cameraGrade.isNeutral || !pose.isNeutral || !masks.isEmpty || !texts.isEmpty || hasCaptions
     }
     /// Escape backs out of whatever is in flight before it reaches the window, the way it does everywhere else on the Mac.
     @discardableResult
@@ -381,6 +387,31 @@ final class VideoEditorModel {
     func deleteText(_ id: UUID) {
         texts.removeAll { $0.id == id }
         if selectedTextID == id { selectedTextID = nil }
+    }
+
+    /// Captions come off the recording's own audio, so they land already lined up with the source clock the overlays use.
+    func transcribeCaptions() async {
+        guard let sourceURL, !isTranscribing else { return }
+        isTranscribing = true
+        transcriptionError = nil
+        do {
+            let cues = try await CaptionTranscriber.transcribe(sourceURL)
+            captions = cues
+            transcriptionError = cues.isEmpty ? "No speech was found in this recording." : nil
+        } catch {
+            transcriptionError = error.localizedDescription
+        }
+        isTranscribing = false
+    }
+
+    func clearCaptions() {
+        captions = []
+        transcriptionError = nil
+    }
+
+    func updateCaption(_ cue: CaptionCue) {
+        guard let index = captions.firstIndex(where: { $0.id == cue.id }) else { return }
+        captions[index] = cue
     }
 
     func setCameraCenter(_ center: CGPoint, in card: CGRect) {
@@ -805,7 +836,7 @@ final class VideoEditorModel {
             || exportConfig.style != .none || exportConfig.aspectRatio != .auto
         let hasZoom = zoomEnabled
 
-        if isClipMode || hasEffects || hasCrop || hasZoom || isCameraVisible || showsClickHighlights || !masks.isEmpty || !texts.isEmpty {
+        if isClipMode || hasEffects || hasCrop || hasZoom || isCameraVisible || showsClickHighlights || !masks.isEmpty || !texts.isEmpty || hasCaptions {
             return try await exportWithEffects(asset: asset, outputURL: outputURL, config: exportConfig)
         }
 
@@ -1105,9 +1136,16 @@ final class VideoEditorModel {
         }
 
         let exportTexts = texts
+        let exportCaptions = hasCaptions ? captions : []
+        let captionLook = captionStyle
         let canvasSize = CGSize(width: canvasW, height: canvasH)
         let resolveTexts: @Sendable (TimeInterval) -> [ResolvedText] = { editorTime in
-            TextOverlay.resolved(exportTexts, atSourceTime: mapToSourceTime(editorTime), canvasSize: canvasSize)
+            let sourceTime = mapToSourceTime(editorTime)
+            var drawn = TextOverlay.resolved(exportTexts, atSourceTime: sourceTime, canvasSize: canvasSize)
+            if let caption = captionLook.resolved(exportCaptions, atSourceTime: sourceTime, canvasSize: canvasSize) {
+                drawn.append(caption)
+            }
+            return drawn
         }
 
         let cardRect = CGRect(x: offsetX, y: offsetY, width: vidW, height: vidH)
@@ -1132,7 +1170,7 @@ final class VideoEditorModel {
             scenes: scenes,
             pose: pose,
             resolveMasks: exportMasks.isEmpty ? nil : resolveMasks,
-            resolveTexts: exportTexts.isEmpty ? nil : resolveTexts
+            resolveTexts: exportTexts.isEmpty && exportCaptions.isEmpty ? nil : resolveTexts
         )
 
         return try await VideoFrameExporter().export(exportConfig) { [weak self] fraction in

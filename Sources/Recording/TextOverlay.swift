@@ -194,6 +194,7 @@ nonisolated struct ResolvedText: Equatable, Sendable {
     var blue: CGFloat
     var shadow: CGFloat
     var lineHeight: CGFloat
+    var backgroundOpacity: CGFloat = 0
 
     var placement: CGPoint {
         CGPoint(x: center.x + offset.width, y: center.y + offset.height)
@@ -231,6 +232,15 @@ nonisolated struct ResolvedText: Equatable, Sendable {
             context.translateBy(x: text.placement.x, y: canvasSize.height - text.placement.y)
             context.scaleBy(x: text.scale, y: text.scale)
             context.setAlpha(text.opacity)
+
+            if text.backgroundOpacity > 0 {
+                let padding = text.fontSize * 0.3
+                let plate = box.insetBy(dx: -padding, dy: -padding * 0.6)
+                context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: text.backgroundOpacity))
+                context.addPath(CGPath(roundedRect: plate, cornerWidth: padding, cornerHeight: padding, transform: nil))
+                context.fillPath()
+            }
+
             if text.shadow > 0 {
                 context.setShadow(
                     offset: CGSize(width: 0, height: -text.fontSize * 0.06),
