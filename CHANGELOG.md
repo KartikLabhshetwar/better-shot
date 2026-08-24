@@ -23,6 +23,9 @@ transitions, scene changes, a tilted 3D card, color) now live in four tabs.
 - **Export progress**: Exporting shows a live progress overlay instead of a frozen window, with the spring timing and reduced-motion fallback the rest of the app uses
 - **Countdown overlay**: The start delay now draws a full-screen countdown so you know exactly when capture begins
 - **Escape closes editors**: Escape dismisses the image and video editors, and an unsaved editor asks before it closes rather than discarding your work
+- **Cut at the playhead**: The video editor's Split button now cuts where the playhead sits, on click or with `S`. Cut Anywhere is a separate toggle for slicing a clip at the point you click, and it turns itself off once the cut lands, so you never get stuck in a cutting mode. `Delete` removes the selected clip
+- **Inspector tab shortcuts**: Command 1 through Command 4 jump between Clip, Motion, Camera, and Style
+- **Annotation keys are visible**: The image editor's tools always had single-key shortcuts, but nothing said so. Each tool now carries its key in the corner of its button and in its tooltip, read from the same table the keyboard uses, so the two cannot drift apart
 
 ### Changed
 
