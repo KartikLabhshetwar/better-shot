@@ -748,7 +748,7 @@ struct RecordingSettingsTab: View {
             } header: {
                 Text("Include")
             } footer: {
-                Text("Microphone input is picked separately from the recording bar, so you can decide right before you hit record. Recording keys needs Input Monitoring, saves what you type beside the recording, and stays off until you turn it on.")
+                Text("Microphone input is picked separately from the recording bar, so you can decide right before you hit record. Leaving the mouse cursor out lets the editor draw a smoothed one in its place. Recording keys needs Input Monitoring, saves what you type beside the recording, and stays off until you turn it on.")
             }
 
             Section {

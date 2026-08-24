@@ -170,7 +170,7 @@ struct VideoSpeedSection: View {
     }
 }
 
-/// Cap draws its own cursor; ours is already burned into the capture, so the click ring is what is left to add.
+/// A ring where each recorded press landed, so a viewer can see the pointer act.
 struct VideoCursorSection: View {
     @Bindable var model: VideoEditorModel
 
@@ -194,6 +194,46 @@ struct VideoCursorSection: View {
                 }
             } else {
                 InspectorCaption("No clicks were recorded. Pointer capture has to be on before you record.")
+            }
+        }
+    }
+}
+
+/// Cap re-draws the pointer from the recorded path, and so can we, but only when the recording left the real one out.
+struct VideoPointerSection: View {
+    @Bindable var model: VideoEditorModel
+
+    var body: some View {
+        InspectorSection("Pointer") {
+            Toggle("", isOn: $model.cursorStyle.isEnabled)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .disabled(!model.canDrawCursor)
+        } content: {
+            if model.canDrawCursor {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 3) {
+                        ForEach(CursorStyle.Motion.allCases) { motion in
+                            InspectorPill(motion.title, isActive: model.cursorStyle.motion == motion, fillsWidth: true) {
+                                model.cursorStyle.motion = motion
+                            }
+                        }
+                    }
+                    .disabled(!model.cursorStyle.isEnabled)
+
+                    InspectorRow("Size") {
+                        Slider(value: $model.cursorStyle.size, in: 0.5...2)
+                            .controlSize(.small)
+                            .disabled(!model.cursorStyle.isEnabled)
+                    }
+
+                    InspectorCaption(model.recordedSystemCursor
+                        ? "This recording kept the real pointer, so a drawn one lands on top of it. Turn off \u{201C}The mouse cursor\u{201D} in Settings, Recording to draw a smoothed one instead."
+                        : "The pointer is drawn from the path you moved, so a shaky hand glides and a click lands on the spot.")
+                }
+            } else {
+                InspectorCaption("No pointer movement was recorded, so there is nothing to draw a cursor from.")
             }
         }
     }

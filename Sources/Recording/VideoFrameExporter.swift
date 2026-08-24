@@ -51,6 +51,8 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
         var pose: Camera3D = .neutral
         var resolveMasks: (@Sendable (TimeInterval) -> [ResolvedMask])?
         var resolveTexts: (@Sendable (TimeInterval) -> [ResolvedText])?
+        var cursorSprite: CursorSprite?
+        var resolveCursor: (@Sendable (TimeInterval) -> ResolvedCursor?)?
 
         /// The face cam rides in the same composition as a second video track, so the compositor can draw it as a circle wherever the editor put it.
         struct Camera: Sendable {
@@ -188,7 +190,9 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
             scenes: configuration.scenes,
             pose: configuration.pose,
             resolveMasks: configuration.resolveMasks,
-            resolveTexts: configuration.resolveTexts
+            resolveTexts: configuration.resolveTexts,
+            cursorSprite: configuration.cursorSprite,
+            resolveCursor: configuration.resolveCursor
         )
 
         let frameCount = max(1, Int((composition.duration.seconds * 30).rounded()))
@@ -339,6 +343,9 @@ private final class FrameCompositor: @unchecked Sendable {
     private let sceneMasks: [SceneMode: SceneMasks]
     private let resolveMasks: (@Sendable (TimeInterval) -> [ResolvedMask])?
     private let resolveTexts: (@Sendable (TimeInterval) -> [ResolvedText])?
+    private let cursorImage: CIImage?
+    private let cursorHotspot: CGPoint
+    private let resolveCursor: (@Sendable (TimeInterval) -> ResolvedCursor?)?
 
     private struct SceneMasks {
         var screen: CIImage?
@@ -360,8 +367,13 @@ private final class FrameCompositor: @unchecked Sendable {
         scenes: [SceneWindow] = [],
         pose: Camera3D = .neutral,
         resolveMasks: (@Sendable (TimeInterval) -> [ResolvedMask])? = nil,
-        resolveTexts: (@Sendable (TimeInterval) -> [ResolvedText])? = nil
+        resolveTexts: (@Sendable (TimeInterval) -> [ResolvedText])? = nil,
+        cursorSprite: CursorSprite? = nil,
+        resolveCursor: (@Sendable (TimeInterval) -> ResolvedCursor?)? = nil
     ) {
+        cursorImage = cursorSprite.map { CIImage(cgImage: $0.image) }
+        cursorHotspot = cursorSprite?.hotspot ?? .zero
+        self.resolveCursor = resolveCursor
         self.canvasSize = canvasSize
         self.cardRect = cardRect
         self.resolveMasks = resolveMasks
@@ -443,6 +455,17 @@ private final class FrameCompositor: @unchecked Sendable {
                     guard let faded = fade.outputImage else { continue }
                     content = faded.composited(over: content).cropped(to: canvasRect)
                 }
+            }
+
+            if let cursorImage, let cursor = resolveCursor?(frameTime), cursor.scale > 0 {
+                let scale = cursor.scale * fit.a
+                let sprite = cursorImage.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+                let tip = cursor.point.applying(fit)
+                let placed = sprite.transformed(by: CGAffineTransform(
+                    translationX: tip.x - cursorHotspot.x * sprite.extent.width - sprite.extent.minX,
+                    y: tip.y + cursorHotspot.y * sprite.extent.height - sprite.extent.height - sprite.extent.minY
+                ))
+                content = placed.composited(over: content).cropped(to: canvasRect)
             }
         }
 

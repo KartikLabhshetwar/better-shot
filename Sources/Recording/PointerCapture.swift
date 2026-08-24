@@ -22,6 +22,8 @@ nonisolated struct PointerPressEvent: Codable, Sendable {
 nonisolated struct PointerCaptureFile: Codable, Sendable {
     var travel: [PointerTravelSample] = []
     var presses: [PointerPressEvent] = []
+    /// Recordings made before this was written say nothing, and those all burned the system pointer in.
+    var systemCursorVisible: Bool?
 }
 
 final class PointerCaptureRecorder: @unchecked Sendable {

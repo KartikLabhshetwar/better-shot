@@ -121,7 +121,7 @@ final class VideoEditorModel {
     var canDeleteSelectedClip: Bool { clips.count > 1 && selectedClipID != nil }
     var hasEdits: Bool {
         hasTrim || hasCrop || isClipMode
-            || zoomEnabled || showsClickHighlights
+            || zoomEnabled || showsClickHighlights || showsDrawnCursor
             || config.padding > 0 || config.cornerRadius > 0 || config.shadowStrength > 0
             || config.style != .none || config.aspectRatio != .auto
             || !screenGrade.isNeutral || !cameraGrade.isNeutral || !pose.isNeutral || !masks.isEmpty || !texts.isEmpty || hasCaptions || hasKeystrokes
@@ -170,6 +170,30 @@ final class VideoEditorModel {
     var showsClickHighlights: Bool { clickHighlightsEnabled && hasClicks }
 
     static let clickHighlightRadiusFraction: CGFloat = 0.05
+
+    var cursorStyle = CursorStyle() {
+        didSet {
+            guard oldValue.motion != cursorStyle.motion else { return }
+            rebuildCursorPath()
+        }
+    }
+    private(set) var cursorPath = SmoothedCursorPath()
+    /// A recording that burned the system pointer in already has a cursor, and drawing a second one would show two.
+    var recordedSystemCursor: Bool { pointerCapture?.systemCursorVisible ?? true }
+    var canDrawCursor: Bool { !cursorPath.isEmpty }
+    var showsDrawnCursor: Bool { cursorStyle.isEnabled && canDrawCursor }
+
+    private func rebuildCursorPath() {
+        guard let pointerCapture, !pointerCapture.travel.isEmpty else {
+            cursorPath = SmoothedCursorPath()
+            return
+        }
+        cursorPath = SmoothedCursorPath.build(
+            travel: pointerCapture.travel,
+            presses: pointerCapture.presses,
+            spring: cursorStyle.motion.spring
+        )
+    }
 
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
@@ -337,6 +361,8 @@ final class VideoEditorModel {
             return
         }
         pointerCapture = decoded
+        cursorStyle.isEnabled = decoded.systemCursorVisible == false
+        rebuildCursorPath()
     }
 
     /// The face cam was recorded to its own file rather than burned into the screen capture, which is what lets the editor move it.
@@ -866,7 +892,7 @@ final class VideoEditorModel {
             || exportConfig.style != .none || exportConfig.aspectRatio != .auto
         let hasZoom = zoomEnabled
 
-        if isClipMode || hasEffects || hasCrop || hasZoom || isCameraVisible || showsClickHighlights || !masks.isEmpty || !texts.isEmpty || hasCaptions || hasKeystrokes {
+        if isClipMode || hasEffects || hasCrop || hasZoom || isCameraVisible || showsClickHighlights || showsDrawnCursor || !masks.isEmpty || !texts.isEmpty || hasCaptions || hasKeystrokes {
             return try await exportWithEffects(asset: asset, outputURL: outputURL, config: exportConfig)
         }
 
@@ -1165,6 +1191,24 @@ final class VideoEditorModel {
             }
         }
 
+        let cursorTrack = cursorPath
+        let drawnCursor = showsDrawnCursor
+            ? CursorSprite.arrow(pixelHeight: cursorStyle.sourceHeight(in: sourceSize) * CursorStyle.spriteOversample)
+            : nil
+        let resolveCursor: @Sendable (TimeInterval) -> ResolvedCursor? = { editorTime in
+            guard let normalized = cursorTrack.position(at: mapToSourceTime(editorTime)) else { return nil }
+            let transform = frameTransform(atEditorTime: editorTime)
+            return ResolvedCursor(
+                point: ClickHighlight.canvasPoint(
+                    normalized: normalized,
+                    videoSize: sourceSize,
+                    transform: transform,
+                    canvasHeight: canvasH
+                ),
+                scale: transform.a / CursorStyle.spriteOversample
+            )
+        }
+
         let exportTexts = texts + (hasKeystrokes ? keystrokeOverlays : [])
         let exportCaptions = hasCaptions ? captions : []
         let captionLook = captionStyle
@@ -1200,7 +1244,9 @@ final class VideoEditorModel {
             scenes: scenes,
             pose: pose,
             resolveMasks: exportMasks.isEmpty ? nil : resolveMasks,
-            resolveTexts: exportTexts.isEmpty && exportCaptions.isEmpty ? nil : resolveTexts
+            resolveTexts: exportTexts.isEmpty && exportCaptions.isEmpty ? nil : resolveTexts,
+            cursorSprite: drawnCursor,
+            resolveCursor: drawnCursor == nil ? nil : resolveCursor
         )
 
         return try await VideoFrameExporter().export(exportConfig) { [weak self] fraction in

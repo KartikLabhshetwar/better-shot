@@ -572,7 +572,9 @@ final class ScreenRecordingManager {
 
     private func writePointerSidecar(_ capture: PointerCaptureFile, alongside url: URL) {
         guard !capture.travel.isEmpty || !capture.presses.isEmpty else { return }
-        guard let data = try? JSONEncoder().encode(capture) else { return }
+        var stamped = capture
+        stamped.systemCursorVisible = AppPreferences.recordingShowCursor
+        guard let data = try? JSONEncoder().encode(stamped) else { return }
         try? data.write(to: url.deletingPathExtension().appendingPathExtension("pointer.json"))
     }
 

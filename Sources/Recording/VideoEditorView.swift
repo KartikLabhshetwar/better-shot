@@ -201,6 +201,8 @@ struct VideoEditorView: View {
         case .motion:
             VideoZoomSection(model: model)
             InspectorDivider()
+            VideoPointerSection(model: model)
+            InspectorDivider()
             VideoCursorSection(model: model)
         case .overlay:
             VideoTextSection(model: model)
@@ -429,6 +431,15 @@ private struct VideoPreviewCanvas: View {
                                         presses: model.clickPresses,
                                         time: model.currentTime,
                                         radius: min(videoW, videoH) * VideoEditorModel.clickHighlightRadiusFraction * model.clickHighlightScale
+                                    )
+                                    .allowsHitTesting(false)
+                                }
+
+                                if model.showsDrawnCursor {
+                                    CursorLayer(
+                                        path: model.cursorPath,
+                                        time: model.currentTime,
+                                        size: model.cursorStyle.size
                                     )
                                     .allowsHitTesting(false)
                                 }
@@ -844,6 +855,32 @@ private struct ClickHighlightLayer: View {
                         .opacity(phase.opacity)
                         .position(x: press.point.x * geo.size.width, y: press.point.y * geo.size.height)
                 }
+            }
+        }
+    }
+}
+
+/// The same pointer the exporter burns in, drawn from the smoothed path so the preview matches the file.
+private struct CursorLayer: View {
+    let path: SmoothedCursorPath
+    let time: Double
+    let size: CGFloat
+
+    var body: some View {
+        GeometryReader { geo in
+            if let point = path.position(at: time) {
+                let cursor = NSCursor.arrow
+                let source = cursor.image.size
+                let height = geo.size.height * CursorStyle.heightFraction * size
+                let width = source.height > 0 ? height * source.width / source.height : height
+                Image(nsImage: cursor.image)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: width, height: height)
+                    .position(
+                        x: point.x * geo.size.width + width * (0.5 - cursor.hotSpot.x / max(source.width, 1)),
+                        y: point.y * geo.size.height + height * (0.5 - cursor.hotSpot.y / max(source.height, 1))
+                    )
             }
         }
     }
