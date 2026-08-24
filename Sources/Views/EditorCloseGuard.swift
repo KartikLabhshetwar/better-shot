@@ -26,6 +26,7 @@ final class EditorCloseGuard {
 private struct EditorCloseGuardModifier: ViewModifier {
     let window: NSWindow?
     let hasEdits: Bool
+    let willClose: (() -> Void)?
     let confirmDiscard: () -> Void
 
     func body(content: Content) -> some View {
@@ -41,7 +42,10 @@ private struct EditorCloseGuardModifier: ViewModifier {
         guard let window else { return }
         window.isDocumentEdited = hasEdits
         EditorCloseGuard.shared.register(window) {
-            guard hasEdits else { return true }
+            guard hasEdits else {
+                willClose?()
+                return true
+            }
             confirmDiscard()
             return false
         }
@@ -49,12 +53,18 @@ private struct EditorCloseGuardModifier: ViewModifier {
 }
 
 extension View {
-    /// Shows the standard unsaved dot in the close button and diverts a close into `confirmDiscard` while edits are pending.
+    /// Shows the standard unsaved dot in the close button and diverts a close into `confirmDiscard` while edits are pending. `willClose` runs on the closes that are allowed through, which is the last chance to keep anything the window is about to drop.
     func editorCloseGuard(
         window: NSWindow?,
         hasEdits: Bool,
+        willClose: (() -> Void)? = nil,
         confirmDiscard: @escaping () -> Void
     ) -> some View {
-        modifier(EditorCloseGuardModifier(window: window, hasEdits: hasEdits, confirmDiscard: confirmDiscard))
+        modifier(EditorCloseGuardModifier(
+            window: window,
+            hasEdits: hasEdits,
+            willClose: willClose,
+            confirmDiscard: confirmDiscard
+        ))
     }
 }

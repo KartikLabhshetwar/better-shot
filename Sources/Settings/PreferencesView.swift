@@ -88,7 +88,7 @@ struct PreferencesView: View {
 struct GeneralSettingsTab: View {
     @AppStorage("bs_appAppearance") private var appAppearanceRaw: String = AppAppearance.system.rawValue
     @AppStorage("bs_saveDirectory") private var saveDir = NSHomeDirectory() + "/Desktop"
-    @AppStorage("bs_copyAfterSave") private var copyAfterSave = true
+    @AppStorage("bs_captureDestination") private var captureDestinationRaw = AppPreferences.captureDestination.rawValue
     @AppStorage("bs_playSound") private var playSound = true
     @AppStorage("bs_exportFormat") private var exportFormatRaw: String = ExportFormat.png.rawValue
     @AppStorage("bs_exportQuality") private var exportQuality: Double = 0.9
@@ -111,6 +111,13 @@ struct GeneralSettingsTab: View {
         Binding(
             get: { ExportFormat(rawValue: exportFormatRaw) ?? .png },
             set: { exportFormatRaw = $0.rawValue }
+        )
+    }
+
+    private var captureDestination: Binding<CaptureDestination> {
+        Binding(
+            get: { CaptureDestination(rawValue: captureDestinationRaw) ?? .saveAndCopy },
+            set: { captureDestinationRaw = $0.rawValue }
         )
     }
 
@@ -146,10 +153,20 @@ struct GeneralSettingsTab: View {
                     }
                 }
 
-                Toggle("Copy to the clipboard after saving", isOn: $copyAfterSave)
+                Picker("New screenshots", selection: captureDestination) {
+                    ForEach(CaptureDestination.allCases) { destination in
+                        Text(destination.label).tag(destination)
+                    }
+                }
+                .pickerStyle(.segmented)
+
                 Toggle("Play a shutter sound when capturing", isOn: $playSound)
             } header: {
                 Text("Saving")
+            } footer: {
+                Text(captureDestinationRaw == CaptureDestination.copyOnly.rawValue
+                     ? "Copy Only leaves nothing in your save folder. The capture is still in the Library, and Export in the editor still writes a file whenever you ask for one."
+                     : "Where a screenshot goes the moment it is taken.")
             }
 
             Section {
@@ -265,7 +282,7 @@ struct GeneralSettingsTab: View {
         appAppearanceRaw = AppAppearance.system.rawValue
         AppPreferences.applyAppearance()
         saveDir = NSHomeDirectory() + "/Desktop"
-        copyAfterSave = true
+        captureDestinationRaw = CaptureDestination.saveAndCopy.rawValue
         playSound = true
         exportFormatRaw = ExportFormat.png.rawValue
         exportQuality = 0.9
@@ -632,6 +649,7 @@ struct CaptureSettingsTab: View {
     @AppStorage("bs_overlayPosition") private var overlayPositionRaw: String = OverlayPosition.bottomRight.rawValue
     @AppStorage("bs_overlayDismissDelay") private var overlayDismissDelay: Double = 5.0
     @AppStorage("bs_openEditorAfterCapture") private var openEditorAfterCapture = false
+    @AppStorage(AppPreferences.copyResultOnCloseKey) private var copyResultOnClose = false
     @State private var isConfirmingReset = false
 
     private var selfTimerDelay: Binding<SelfTimerDelay> {
@@ -686,10 +704,13 @@ struct CaptureSettingsTab: View {
 
             Section {
                 Toggle("Open the editor straight away", isOn: $openEditorAfterCapture)
+                Toggle("Copy the result when the editor closes", isOn: $copyResultOnClose)
             } header: {
                 Text("After Capture")
             } footer: {
-                Text("Off by default: the screenshot is saved and copied immediately, and the thumbnail is there if you want to edit it.")
+                Text(copyResultOnClose
+                     ? "Escape puts your annotated image on the clipboard and closes the editor, so nothing has to be exported first. \u{2318}S still saves a file and closes."
+                     : "Off by default: the screenshot is saved and copied immediately, and the thumbnail is there if you want to edit it.")
             }
 
             Section {
@@ -707,6 +728,7 @@ struct CaptureSettingsTab: View {
                 overlayPositionRaw = OverlayPosition.bottomRight.rawValue
                 overlayDismissDelay = 5.0
                 openEditorAfterCapture = false
+                copyResultOnClose = false
             }
             Button("Cancel", role: .cancel) {}
         }

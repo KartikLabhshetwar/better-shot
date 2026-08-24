@@ -34,7 +34,7 @@ final class ScreenCapture {
         defer { isCapturing = false }
 
         let tempPath = makeTempPath()
-        let success = await runScreencapture(["-s", "-x", "-t", "png", tempPath])
+        let success = await runScreencapture(["-i", "-J", "selection", "-o", "-x", "-t", "png", tempPath])
         guard success, FileManager.default.fileExists(atPath: tempPath) else { return nil }
         return URL(fileURLWithPath: tempPath)
     }

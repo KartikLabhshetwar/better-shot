@@ -117,22 +117,23 @@ final class CaptureOrchestrator {
 
         guard let rendered else { return }
 
-        let savedURL = saveImage(rendered)
+        let destination = AppPreferences.captureDestination
+        let savedURL = destination.savesFile ? saveImage(rendered) : nil
 
         if let savedURL, let recordID {
             HistoryStore.shared.setBeautifiedPath(savedURL.path, for: recordID)
         }
 
-        if AppPreferences.copyAfterSave, let savedURL {
-            copyToClipboard(savedURL)
+        if destination.copiesToClipboard {
+            copyToClipboard(rendered)
         }
 
         let displayURL = savedURL ?? url
 
-        if savedURL != nil {
+        if savedURL != nil || !destination.savesFile {
             let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage
             ToastWindow.shared.show(
-                message: AppPreferences.copyAfterSave ? "Screenshot saved & copied!" : "Screenshot saved!",
+                message: destination.toastMessage,
                 icon: appIcon,
                 on: captureScreen
             )
@@ -207,9 +208,7 @@ final class CaptureOrchestrator {
         return url
     }
 
-    private func copyToClipboard(_ url: URL) {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return }
+    private func copyToClipboard(_ cgImage: CGImage) {
         let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
         let pb = NSPasteboard.general
         pb.clearContents()

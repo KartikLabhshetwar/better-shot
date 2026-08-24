@@ -7,6 +7,7 @@ enum AppPreferences {
     private static let appearanceKey = "bs_appAppearance"
     private static let saveDirKey = "bs_saveDirectory"
     private static let copyAfterSaveKey = "bs_copyAfterSave"
+    private static let captureDestinationKey = "bs_captureDestination"
     private static let playSoundKey = "bs_playSound"
     private static let overlayPositionKey = "bs_overlayPosition"
     private static let overlayDismissDelayKey = "bs_overlayDismissDelay"
@@ -18,6 +19,7 @@ enum AppPreferences {
     static let recordingCaptureAudioKey = "bs_recordingCaptureAudio"
     private static let recordingOpenEditorKey = "bs_recordingOpenEditor"
     private static let openEditorAfterCaptureKey = "bs_openEditorAfterCapture"
+    static let copyResultOnCloseKey = "bs_copyResultOnClose"
     private static let historyRetentionKey = "bs_historyRetentionLimit"
     private static let recordingCaptureMicrophoneKey = "bs_recordingCaptureMicrophone"
     private static let recordingStartDelaySecondsKey = "bs_recordingStartDelaySeconds"
@@ -47,9 +49,16 @@ enum AppPreferences {
         set { UserDefaults.standard.set(newValue, forKey: saveDirKey) }
     }
 
-    static var copyAfterSave: Bool {
-        get { UserDefaults.standard.object(forKey: copyAfterSaveKey) as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: copyAfterSaveKey) }
+    static var captureDestination: CaptureDestination {
+        get {
+            if let raw = UserDefaults.standard.string(forKey: captureDestinationKey),
+               let destination = CaptureDestination(rawValue: raw) {
+                return destination
+            }
+            let copiedAfterSave = UserDefaults.standard.object(forKey: copyAfterSaveKey) as? Bool ?? true
+            return copiedAfterSave ? .saveAndCopy : .saveOnly
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: captureDestinationKey) }
     }
 
     static var playSound: Bool {
@@ -214,6 +223,34 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 enum OverlayPosition: String, CaseIterable, Codable {
     case bottomRight = "bottomRight"
     case bottomLeft = "bottomLeft"
+}
+
+enum CaptureDestination: String, CaseIterable, Identifiable {
+    case saveAndCopy
+    case saveOnly
+    case copyOnly
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .saveAndCopy: return "Save & Copy"
+        case .saveOnly: return "Save Only"
+        case .copyOnly: return "Copy Only"
+        }
+    }
+
+    var savesFile: Bool { self != .copyOnly }
+
+    var copiesToClipboard: Bool { self != .saveOnly }
+
+    var toastMessage: String {
+        switch self {
+        case .saveAndCopy: return "Screenshot saved & copied!"
+        case .saveOnly: return "Screenshot saved!"
+        case .copyOnly: return "Screenshot copied!"
+        }
+    }
 }
 
 enum ExportFormat: String, CaseIterable {

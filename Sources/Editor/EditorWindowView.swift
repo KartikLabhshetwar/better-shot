@@ -11,6 +11,7 @@ struct EditorWindowView: View {
     @State private var isConfirmingDelete = false
     @State private var isConfirmingDiscard = false
     @State private var hostWindow: NSWindow?
+    @AppStorage(AppPreferences.copyResultOnCloseKey) private var copyResultOnClose = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -27,7 +28,11 @@ struct EditorWindowView: View {
         .padding(EditorPanelMetrics.gap)
         .background(EditorCanvasBackdrop())
         .hostWindow($hostWindow)
-        .editorCloseGuard(window: hostWindow, hasEdits: model.hasEdits) { isConfirmingDiscard = true }
+        .editorCloseGuard(
+            window: hostWindow,
+            hasEdits: model.hasEdits && !copyResultOnClose,
+            willClose: { carryResultToClipboard() }
+        ) { isConfirmingDiscard = true }
         .editorToast($model.toastMessage)
         .confirmationDialog("Delete this capture?", isPresented: $isConfirmingDelete) {
             Button("Delete Capture", role: .destructive) { deleteCapture() }
@@ -85,7 +90,7 @@ struct EditorWindowView: View {
                 } label: {
                     Label("Close", systemImage: "xmark")
                 }
-                .help("Close without exporting (esc)")
+                .help(copyResultOnClose ? "Copy the result and close (esc)" : "Close without exporting (esc)")
 
                 Button {
                     Task { await copyToClipboard() }
@@ -137,11 +142,26 @@ struct EditorWindowView: View {
     }
 
     private func attemptClose() {
-        if model.hasEdits {
+        if copyResultOnClose {
+            carryResultToClipboard()
+            hostWindow?.close()
+        } else if model.hasEdits {
             isConfirmingDiscard = true
         } else {
             hostWindow?.close()
         }
+    }
+
+    private func carryResultToClipboard() {
+        guard copyResultOnClose, let rendered = model.renderFinal() else { return }
+        writeToPasteboard(rendered)
+    }
+
+    private func writeToPasteboard(_ image: CGImage) {
+        let nsImage = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.writeObjects([nsImage])
     }
 
     private func shareImage() async {
@@ -214,12 +234,8 @@ struct EditorWindowView: View {
             _ = HistoryStore.shared.referenceCapture(at: url, kind: .screenshot)
         }
 
-        if AppPreferences.copyAfterSave {
-            let pb = NSPasteboard.general
-            pb.clearContents()
-            if let nsImage = NSImage(contentsOf: url) {
-                pb.writeObjects([nsImage])
-            }
+        if AppPreferences.captureDestination.copiesToClipboard {
+            writeToPasteboard(rendered)
         }
 
         withAnimation { model.toastMessage = "Exported" }
@@ -242,10 +258,7 @@ struct EditorWindowView: View {
     private func copyToClipboard() async {
         guard let rendered = model.renderFinal() else { return }
 
-        let nsImage = NSImage(cgImage: rendered, size: NSSize(width: rendered.width, height: rendered.height))
-        let pb = NSPasteboard.general
-        pb.clearContents()
-        pb.writeObjects([nsImage])
+        writeToPasteboard(rendered)
         withAnimation { model.toastMessage = "Copied to clipboard" }
     }
 }
