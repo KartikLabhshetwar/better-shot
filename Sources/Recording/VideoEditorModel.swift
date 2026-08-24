@@ -29,6 +29,10 @@ final class VideoEditorModel {
 
     var sourceURL: URL?
 
+    var cameraURL: URL?
+    var cameraLayout = CameraOverlayLayout()
+    var cameraPlayer: AVPlayer?
+
     var isTrimming = false
     var isCropping = false
     var cropRect = CGRect(x: 0, y: 0, width: 1, height: 1)
@@ -70,6 +74,26 @@ final class VideoEditorModel {
             || config.padding > 0 || config.cornerRadius > 0 || config.shadowStrength > 0
             || config.style != .none || config.aspectRatio != .auto
     }
+    /// Escape backs out of whatever is in flight before it reaches the window, the way it does everywhere else on the Mac.
+    @discardableResult
+    func cancelCurrentOperation() -> Bool {
+        if timelineSplitMode {
+            timelineSplitMode = false
+            return true
+        }
+        if selectedZoomCueID != nil {
+            selectedZoomCueID = nil
+            return true
+        }
+        if selectedClipID != nil {
+            selectedClipID = nil
+            return true
+        }
+        return false
+    }
+
+    var hasCamera: Bool { cameraURL != nil }
+    var isCameraVisible: Bool { cameraURL != nil && cameraLayout.isVisible }
     var hasPointerCapture: Bool {
         guard let pointerCapture else { return false }
         return !pointerCapture.travel.isEmpty || !pointerCapture.presses.isEmpty
@@ -93,6 +117,10 @@ final class VideoEditorModel {
         pendingSeek = nil
         isSeekInFlight = false
         thumbnails = []
+        cameraPlayer?.pause()
+        cameraPlayer = nil
+        cameraURL = nil
+        cameraLayout = CameraOverlayLayout()
         currentTime = 0
         trimStart = 0
         trimEnd = 0
@@ -132,6 +160,7 @@ final class VideoEditorModel {
             }
             guard !Task.isCancelled else { return }
             self.loadPointerCapture()
+            self.loadCameraSidecar()
             self.regenerateZoomCues()
             self.generateThumbnails()
             self.setupTimeObserver()
@@ -218,6 +247,44 @@ final class VideoEditorModel {
         pointerCapture = decoded
     }
 
+    /// The face cam was recorded to its own file rather than burned into the screen capture, which is what lets the editor move it.
+    private func loadCameraSidecar() {
+        guard let sourceURL else { return }
+        let url = ScreenRecordingManager.cameraSidecarURL(for: sourceURL)
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        cameraURL = url
+        let player = AVPlayer(url: url)
+        player.isMuted = true
+        player.actionAtItemEnd = .pause
+        cameraPlayer = player
+    }
+
+    func setCameraCenter(_ center: CGPoint, in card: CGRect) {
+        cameraLayout.center = cameraLayout.clamping(center, in: card)
+    }
+
+    func setCameraDiameter(_ value: CGFloat) {
+        cameraLayout.diameter = CameraOverlayLayout.clampedDiameter(value)
+    }
+
+    /// Two players over one timeline drift, so the cam is nudged back whenever it strays past a few frames.
+    private func syncCameraPlayback() {
+        guard let cameraPlayer else { return }
+        if isPlaying, cameraPlayer.rate == 0 {
+            cameraPlayer.play()
+        } else if !isPlaying, cameraPlayer.rate != 0 {
+            cameraPlayer.pause()
+        }
+        let camTime = cameraPlayer.currentTime().seconds
+        guard camTime.isFinite else { return }
+        guard abs(camTime - currentTime) > 0.15 else { return }
+        cameraPlayer.seek(
+            to: CMTime(seconds: currentTime, preferredTimescale: 600),
+            toleranceBefore: .zero,
+            toleranceAfter: CMTime(value: 1, timescale: 30)
+        )
+    }
+
     func togglePlayback() {
         guard let player else { return }
         if isPlaying {
@@ -230,6 +297,7 @@ final class VideoEditorModel {
             player.play()
             isPlaying = true
         }
+        syncCameraPlayback()
     }
 
     /// `precise` off is for scrubbing: a tolerant seek lands on the nearest decoded frame instead of forcing a full decode per pointer move.
@@ -237,12 +305,14 @@ final class VideoEditorModel {
         let clamped = duration > 0 ? min(max(time, 0), duration) : max(time, 0)
         currentTime = clamped
         enqueueSeek(clamped, precise: precise)
+        syncCameraPlayback()
     }
 
     func pauseForScrub() {
         guard isPlaying else { return }
         player?.pause()
         isPlaying = false
+        syncCameraPlayback()
     }
 
     /// One seek in flight at a time, with only the newest request queued behind it, so a drag never builds a backlog the player has to work through after the pointer stops.
@@ -423,7 +493,7 @@ final class VideoEditorModel {
             || exportConfig.style != .none || exportConfig.aspectRatio != .auto
         let hasZoom = zoomEnabled
 
-        if isClipMode || hasEffects || hasCrop || hasZoom {
+        if isClipMode || hasEffects || hasCrop || hasZoom || isCameraVisible {
             return try await exportWithEffects(asset: asset, outputURL: outputURL, config: exportConfig)
         }
 
@@ -477,20 +547,29 @@ final class VideoEditorModel {
         let shortEdge = min(vidW, vidH)
         let cornerRadius = config.cornerRadius * shortEdge
 
+        let cameraSource = await loadCameraSource()
+
         let composition: AVMutableComposition
         let mapToSourceTime: (TimeInterval) -> TimeInterval
+        var cameraTrackID: CMPersistentTrackID?
 
         if isClipMode {
             let normalizedClips = ClipTimeline(clips: clips).normalized(to: duration)
             guard !normalizedClips.isEmpty else { throw VideoExportError.emptyClipTimeline }
             let audioTracks = (try? await asset.loadTracks(withMediaType: .audio)) ?? []
-            let built: AVMutableComposition
+            let built: ClipCompositionBuilder.Built
             do {
-                built = try ClipCompositionBuilder.makeComposition(videoTrack: videoTrack, audioTracks: audioTracks, clips: normalizedClips)
+                built = try ClipCompositionBuilder.makeComposition(
+                    videoTrack: videoTrack,
+                    audioTracks: audioTracks,
+                    camera: cameraSource,
+                    clips: normalizedClips
+                )
             } catch {
                 throw VideoExportError.clipCompositionFailed(error)
             }
-            composition = built
+            composition = built.composition
+            cameraTrackID = built.cameraTrackID
             let timeline = ClipTimeline(clips: normalizedClips)
             mapToSourceTime = { timeline.sourceTime(at: $0) }
         } else {
@@ -511,6 +590,12 @@ final class VideoEditorModel {
                 throw VideoExportError.trimInsertFailed(error)
             }
 
+            if let cameraSource,
+               let compCameraTrack = legacyComposition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) {
+                ClipCompositionBuilder.insertCamera(cameraSource, into: compCameraTrack, sourceRange: timeRange, at: .zero)
+                cameraTrackID = compCameraTrack.trackID
+            }
+
             for audioTrack in (try? await asset.loadTracks(withMediaType: .audio)) ?? [] {
                 guard let compAudioTrack = legacyComposition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { continue }
                 try? compAudioTrack.insertTimeRange(timeRange, of: audioTrack, at: .zero)
@@ -521,7 +606,7 @@ final class VideoEditorModel {
             mapToSourceTime = { $0 + baseTrimStart }
         }
 
-        guard let compVideoTrack = composition.tracks(withMediaType: .video).first else {
+        guard let compVideoTrack = composition.tracks(withMediaType: .video).first(where: { $0.trackID != cameraTrackID }) else {
             throw VideoExportError.compositionTrackUnavailable
         }
 
@@ -600,10 +685,21 @@ final class VideoEditorModel {
             cornerRadius: cornerRadius,
             backgroundStyle: config.style,
             shadowStrength: config.shadowStrength,
-            outputURL: outputURL
+            outputURL: outputURL,
+            camera: cameraTrackID.map {
+                VideoFrameExporter.Configuration.Camera(trackID: $0, rect: cameraLayout.flippedRect(in: cardRect))
+            }
         )
 
         return try await VideoFrameExporter().export(exportConfig) { _ in }
+    }
+
+    private func loadCameraSource() async -> CameraSource? {
+        guard isCameraVisible, let cameraURL else { return nil }
+        let asset = AVURLAsset(url: cameraURL)
+        guard let track = try? await asset.loadTracks(withMediaType: .video).first,
+              let duration = try? await asset.load(.duration) else { return nil }
+        return CameraSource(track: track, duration: duration)
     }
 
     func cleanup() {
@@ -611,8 +707,10 @@ final class VideoEditorModel {
         thumbnailTask?.cancel()
         pendingSeek = nil
         player?.pause()
+        cameraPlayer?.pause()
         removeTimeObserver()
         player = nil
+        cameraPlayer = nil
     }
 
     // MARK: - Private
@@ -631,6 +729,7 @@ final class VideoEditorModel {
             MainActor.assumeIsolated {
                 guard let self, !self.isSeekInFlight, self.pendingSeek == nil else { return }
                 self.currentTime = time.seconds
+                self.syncCameraPlayback()
                 if self.isPlaying, let resume = self.clipTimeline.playbackTime(after: self.currentTime) {
                     self.seekTo(resume, precise: false)
                     return

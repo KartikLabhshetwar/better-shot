@@ -27,6 +27,8 @@ final class EditorWindowController {
         )
         win.contentView = hostingView
         win.title = url.deletingPathExtension().lastPathComponent
+        win.subtitle = "Screenshot"
+        win.minSize = NSSize(width: 800, height: 550)
         win.isReleasedWhenClosed = false
         win.delegate = EditorWindowDelegate.shared
         win.collectionBehavior = [.transient, .moveToActiveSpace]
@@ -97,9 +99,14 @@ final class CurrentURL {
 private final class EditorWindowDelegate: NSObject, NSWindowDelegate, @unchecked Sendable {
     static let shared = EditorWindowDelegate()
 
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        MainActor.assumeIsolated { EditorCloseGuard.shared.shouldClose(sender) }
+    }
+
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }
         MainActor.assumeIsolated {
+            EditorCloseGuard.shared.unregister(window)
             EditorWindowController.shared.windowDidClose(window)
         }
     }

@@ -12,7 +12,15 @@ final class RecordingBarPresenter {
         case recording
     }
 
-    private(set) var mode: Mode = .picker
+    /// Derived from the recorder rather than set by hand, so the bar cannot show picker controls over a live session no matter which path started it.
+    var mode: Mode {
+        if let frozenMode { return frozenMode }
+        return ScreenRecordingManager.shared.isSessionActive ? .recording : .picker
+    }
+
+    /// Held only while the bar animates out, so the contents do not swap back to the picker mid-fade when the recording ends.
+    private var frozenMode: Mode?
+    @ObservationIgnored private var contentSize: NSSize?
 
     @ObservationIgnored private var panel: NSPanel?
     @ObservationIgnored private var hideTask: Task<Void, Never>?
@@ -32,8 +40,7 @@ final class RecordingBarPresenter {
     func showPicker(on screen: NSScreen? = nil) {
         hideTask?.cancel()
         hideTask = nil
-
-        mode = .picker
+        frozenMode = nil
         showTask?.cancel()
 
         if AppPreferences.recordingShowCamera {
@@ -59,11 +66,11 @@ final class RecordingBarPresenter {
         hideTask = nil
         showTask?.cancel()
         showTask = nil
+        frozenMode = nil
 
         let panel = panel ?? makePanel()
-        let isMorphing = panel.isVisible && mode == .picker
-        mode = .recording
-        reposition(panel, on: screen, keepingCurrentPosition: isMorphing, animated: isMorphing)
+        let wasVisible = panel.isVisible
+        reposition(panel, on: screen, keepingCurrentPosition: wasVisible, animated: false)
         panel.orderFrontRegardless()
 
         if let rect = ScreenRecordingManager.shared.activeRegionRect {
@@ -75,6 +82,7 @@ final class RecordingBarPresenter {
     func hide() {
         showTask?.cancel()
         showTask = nil
+        frozenMode = mode
         RecordingBarHoverView.endActiveHover()
         RecordingAreaHighlightPresenter.shared.hide()
         RecordingBarPresentation.shared.isPresented = false
@@ -85,9 +93,22 @@ final class RecordingBarPresenter {
             try? await Task.sleep(nanoseconds: nanoseconds)
             guard !Task.isCancelled else { return }
             panel?.orderOut(nil)
-            self?.mode = .picker
+            self?.frozenMode = nil
             self?.hideTask = nil
         }
+    }
+
+    /// SwiftUI reports what the bar actually measures, so the panel tracks a mode swap or a widening timecode instead of keeping whatever it fitted to first.
+    func barContentSizeChanged(_ size: CGSize) {
+        let measured = NSSize(
+            width: size.width.rounded(.up),
+            height: size.height.rounded(.up) + RecordingBarMetrics.tooltipReservedHeight
+        )
+        guard measured.width > 1, measured != contentSize else { return }
+        let hadSize = contentSize != nil
+        contentSize = measured
+        guard hadSize, let panel, panel.isVisible else { return }
+        applyFrame(to: panel, on: nil, keepingCurrentPosition: true, animated: false)
     }
 
     private func reposition(_ panel: NSPanel, on screen: NSScreen?, keepingCurrentPosition: Bool, animated: Bool) {
@@ -102,16 +123,10 @@ final class RecordingBarPresenter {
 
     private func applyFrame(to panel: NSPanel, on screen: NSScreen?, keepingCurrentPosition: Bool, animated: Bool) {
         guard let contentView = panel.contentView else { return }
-        contentView.layoutSubtreeIfNeeded()
-        let size = contentView.fittingSize
-        let origin: NSPoint
-        if keepingCurrentPosition {
-            let current = panel.frame
-            origin = NSPoint(x: current.midX - size.width / 2, y: current.minY)
-        } else {
-            origin = resolvedOrigin(for: size, preferredScreen: screen)
-        }
-        let frame = NSRect(origin: origin, size: size)
+        let size = measuredSize(of: contentView)
+        let frame = resolvedFrame(for: size, panel: panel, screen: screen, keepingCurrentPosition: keepingCurrentPosition)
+        guard frame != panel.frame else { return }
+
         isApplyingFrame = true
         if animated, !RecordingMotion.reduceMotion {
             // Held across the animation, not just the call: `didMove` fires per animation step and would otherwise save a position the user never chose.
@@ -128,20 +143,30 @@ final class RecordingBarPresenter {
         }
     }
 
-    private func resolvedOrigin(for panelSize: NSSize, preferredScreen: NSScreen?) -> NSPoint {
-        if let saved = RecordingBarPositionStore.load() {
-            let savedFrame = NSRect(origin: saved, size: panelSize)
-            if NSScreen.screens.contains(where: { $0.visibleFrame.contains(savedFrame) }) {
-                return saved
-            }
+    private func measuredSize(of contentView: NSView) -> NSSize {
+        if let contentSize { return contentSize }
+        contentView.layoutSubtreeIfNeeded()
+        return contentView.fittingSize
+    }
+
+    private func resolvedFrame(for size: NSSize, panel: NSPanel, screen: NSScreen?, keepingCurrentPosition: Bool) -> NSRect {
+        if keepingCurrentPosition {
+            let visible = (panel.screen ?? screen)?.visibleFrame ?? Self.fallbackVisibleFrame
+            return RecordingBarFrame.resized(panel.frame, to: size, in: visible)
         }
-        let screen = preferredScreen ?? ActiveDisplayResolver.activeScreen(preferPointer: false) ?? NSScreen.main
-        let screenFrame = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 800, height: 600)
-        return NSPoint(
-            x: screenFrame.midX - panelSize.width / 2,
-            y: screenFrame.minY + RecordingBarMetrics.bottomInset
+        if let saved = RecordingBarPositionStore.load(),
+           let savedScreen = NSScreen.screens.first(where: { $0.visibleFrame.contains(saved) }) {
+            return RecordingBarFrame.clamped(NSRect(origin: saved, size: size), in: savedScreen.visibleFrame)
+        }
+        let target = screen ?? ActiveDisplayResolver.activeScreen(preferPointer: false) ?? NSScreen.main
+        return RecordingBarFrame.centered(
+            size: size,
+            in: target?.visibleFrame ?? Self.fallbackVisibleFrame,
+            bottomInset: RecordingBarMetrics.bottomInset
         )
     }
+
+    private static let fallbackVisibleFrame = NSRect(x: 0, y: 0, width: 1512, height: 948)
 
     private func makePanel() -> NSPanel {
         let rootView = RecordingBarRootView()
@@ -223,14 +248,22 @@ private struct RecordingBarRootView: View {
                 RecordingSessionControls()
             }
         }
-        .transition(.asymmetric(insertion: .opacity, removal: .identity))
-        .animation(RecordingMotion.modeChange, value: presenter.mode)
         .frame(height: RecordingBarMetrics.height)
         .fixedSize()
+        .background(sizeReader)
         .recordingBarSurface(isInteractive: true)
         .scaleEffect(presentation.isPresented ? 1 : 0.92, anchor: .bottom)
         .opacity(presentation.isPresented ? 1 : 0)
         .animation(RecordingMotion.showHideSpring, value: presentation.isPresented)
+    }
+
+    private var sizeReader: some View {
+        GeometryReader { proxy in
+            Color.clear
+                .onChange(of: proxy.size, initial: true) { _, size in
+                    presenter.barContentSizeChanged(size)
+                }
+        }
     }
 
     /// Positioned off the hovered control's measured frame rather than a hardcoded index, so it keeps tracking when the bar's contents change - a mode swap, or a menu label swapping in.

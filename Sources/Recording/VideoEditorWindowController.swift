@@ -25,10 +25,11 @@ final class VideoEditorWindowController: NSObject, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        win.title = "Video Editor"
+        win.title = url.deletingPathExtension().lastPathComponent
+        win.subtitle = "Recording"
         win.contentView = hostingView
         win.isReleasedWhenClosed = false
-        win.minSize = NSSize(width: 780, height: 520)
+        win.minSize = NSSize(width: 900, height: 640)
         win.delegate = self
         win.collectionBehavior = [.transient, .moveToActiveSpace]
 
@@ -42,7 +43,14 @@ final class VideoEditorWindowController: NSObject, NSWindowDelegate {
         self.window = win
     }
 
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        EditorCloseGuard.shared.shouldClose(sender)
+    }
+
     func windowWillClose(_ notification: Notification) {
+        if let closing = notification.object as? NSWindow {
+            EditorCloseGuard.shared.unregister(closing)
+        }
         window = nil
         ActivationPolicy.dropIfNoWindowsLeft()
     }

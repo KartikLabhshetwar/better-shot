@@ -31,10 +31,6 @@ enum RecordingMotion {
     static var showHideSpring: Animation {
         reduceMotion ? .linear(duration: 0.01) : .spring(response: 0.32, dampingFraction: 0.82)
     }
-
-    static var modeChange: Animation {
-        reduceMotion ? .linear(duration: 0.01) : .easeInOut(duration: 0.28)
-    }
 }
 
 /// Drives the bar's spring show/hide, separate from `ScreenRecordingManager` so the panel can animate before ordering out.

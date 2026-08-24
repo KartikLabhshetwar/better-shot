@@ -36,6 +36,7 @@ struct VideoEditorView: View {
     @State private var shareUploader = R2Uploader.shared
     @State private var shareItemID: UUID?
     @State private var isConfirmingDelete = false
+    @State private var isConfirmingDiscard = false
     @State private var hostWindow: NSWindow?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var sidebarTab: VideoSidebarTab = .clip
@@ -78,7 +79,7 @@ struct VideoEditorView: View {
         .background(EditorCanvasBackdrop())
         .hostWindow($hostWindow)
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .navigation) {
                 Button {
                     model.undo()
                 } label: {
@@ -86,7 +87,7 @@ struct VideoEditorView: View {
                 }
                 .disabled(!model.canUndo)
                 .keyboardShortcut("z", modifiers: .command)
-                .help("Undo")
+                .help("Undo (\u{2318}Z)")
 
                 Button {
                     model.redo()
@@ -95,57 +96,49 @@ struct VideoEditorView: View {
                 }
                 .disabled(!model.canRedo)
                 .keyboardShortcut("z", modifiers: [.command, .shift])
-                .help("Redo")
+                .help("Redo (\u{21E7}\u{2318}Z)")
+            }
 
-                Spacer()
-
-                Button("Cancel") {
-                    model.cleanup()
-                    hostWindow?.close()
-                }
-                .keyboardShortcut(.escape, modifiers: [])
-
-                Button {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button(role: .destructive) {
                     isConfirmingDelete = true
                 } label: {
                     Label("Delete", systemImage: "trash")
-                        .foregroundStyle(.red)
                 }
                 .help("Delete this recording from disk")
+
+                Button {
+                    attemptClose()
+                } label: {
+                    Label("Close", systemImage: "xmark")
+                }
+                .help("Close without exporting (esc)")
 
                 if shareCredentials.isConfigured && shareCredentials.enabled {
                     Button {
                         Task { await shareRecording() }
                     } label: {
                         if let shareItemID, shareUploader.uploadingItems.contains(shareItemID) {
-                            HStack(spacing: 6) {
-                                ProgressView(value: shareUploader.uploadProgress[shareItemID] ?? 0)
-                                    .progressViewStyle(.circular)
-                                    .controlSize(.small)
-                                Text("\(Int((shareUploader.uploadProgress[shareItemID] ?? 0) * 100))%")
-                                    .font(.caption)
-                            }
+                            ProgressView(value: shareUploader.uploadProgress[shareItemID] ?? 0)
+                                .progressViewStyle(.circular)
+                                .controlSize(.small)
                         } else {
                             Label("Share", systemImage: "link")
                         }
                     }
-                    .disabled(shareItemID != nil)
+                    .disabled(shareItemID != nil || model.isExporting)
+                    .help("Upload and copy a share link")
                 }
 
                 Button {
                     Task { await exportRecording() }
                 } label: {
-                    if model.isExporting {
-                        ProgressView()
-                            .controlSize(.small)
-                            .padding(.horizontal, 8)
-                    } else {
-                        Label("Export", systemImage: "square.and.arrow.down")
-                    }
+                    Label(model.isExporting ? "Exporting\u{2026}" : "Export", systemImage: "square.and.arrow.down")
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(model.isExporting)
                 .keyboardShortcut("s", modifiers: .command)
+                .help("Render and save this recording (\u{2318}S)")
             }
         }
         .editorToast($model.toastMessage)
@@ -155,6 +148,14 @@ struct VideoEditorView: View {
         } message: {
             Text("The file is removed from disk. This cannot be undone.")
         }
+        .confirmationDialog("Discard your edits?", isPresented: $isConfirmingDiscard) {
+            Button("Discard Edits", role: .destructive) { closeNow() }
+            Button("Keep Editing", role: .cancel) {}
+        } message: {
+            Text("The recording stays on disk, but these cuts, zooms and styling are not saved.")
+        }
+        .editorCloseGuard(window: hostWindow, hasEdits: model.hasEdits) { isConfirmingDiscard = true }
+        .onEscapeKey { escapePressed() }
         .frame(minWidth: 900, minHeight: 640)
         .onAppear { model.loadVideo(from: url) }
         .onDisappear { model.cleanup() }
@@ -176,6 +177,10 @@ struct VideoEditorView: View {
                     case .zoom:
                         VideoZoomSection(model: model)
                     case .style:
+                        if model.hasCamera {
+                            VideoCameraSection(model: model)
+                            InspectorDivider()
+                        }
                         EffectsSection(config: $model.config)
                         InspectorDivider()
                         LayoutSection(config: $model.config, showsAlignment: false)
@@ -283,6 +288,26 @@ struct VideoEditorView: View {
         _ = await ShareService.shared.share(itemID: itemID, fileURL: renderedURL)
     }
 
+    /// Escape peels back the current operation first, so it only reaches the window once there is nothing left to cancel.
+    private func escapePressed() -> Bool {
+        if model.cancelCurrentOperation() { return true }
+        attemptClose()
+        return true
+    }
+
+    private func attemptClose() {
+        if model.hasEdits {
+            isConfirmingDiscard = true
+        } else {
+            closeNow()
+        }
+    }
+
+    private func closeNow() {
+        model.cleanup()
+        hostWindow?.close()
+    }
+
     private func exportRecording() async {
         model.isExporting = true
         defer { model.isExporting = false }
@@ -366,6 +391,11 @@ private struct VideoPreviewCanvas: View {
                             radius: config.shadowStrength > 0 ? max(4, 20 * config.shadowStrength) : 0,
                             y: config.shadowStrength > 0 ? max(2, 8 * config.shadowStrength) : 0
                         )
+
+                        if model.isCameraVisible {
+                            CameraBubbleOverlay(model: model, cardSize: CGSize(width: videoW, height: videoH))
+                                .frame(width: videoW, height: videoH)
+                        }
 
                         if model.isCropping {
                             VideoCropOverlay(cropRect: $model.cropRect, videoSize: CGSize(width: videoW, height: videoH))
@@ -623,6 +653,149 @@ private struct VideoZoomSection: View {
             }
         }
         .animation(reduceMotion ? nil : InspectorMotion.reveal, value: model.zoomCues.count)
+    }
+}
+
+// MARK: - Camera Bubble
+
+/// The face cam is a separate video track, so the editor can put it anywhere instead of living with wherever the bubble floated during the recording.
+private struct CameraBubbleOverlay: View {
+    @Bindable var model: VideoEditorModel
+    let cardSize: CGSize
+
+    @State private var dragStartCenter: CGPoint?
+    @State private var resizeStartDiameter: CGFloat?
+    @State private var isHovering = false
+
+    private var card: CGRect { CGRect(origin: .zero, size: cardSize) }
+
+    var body: some View {
+        let rect = model.cameraLayout.rect(in: card)
+        Group {
+            if let player = model.cameraPlayer {
+                CameraPlayerLayer(player: player)
+            } else {
+                Color.black
+            }
+        }
+        .frame(width: rect.width, height: rect.height)
+        .clipShape(Circle())
+        .overlay(Circle().strokeBorder(.white.opacity(0.9), lineWidth: max(1.5, rect.width * 0.022)))
+        .overlay(alignment: .bottomTrailing) { resizeHandle }
+        .shadow(color: .black.opacity(0.35), radius: 12, y: 4)
+        .contentShape(Circle())
+        .onHover { isHovering = $0 }
+        .gesture(moveGesture)
+        .position(x: rect.midX, y: rect.midY)
+    }
+
+    private var moveGesture: some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { value in
+                let start = dragStartCenter ?? model.cameraLayout.center
+                dragStartCenter = start
+                model.setCameraCenter(
+                    CGPoint(
+                        x: start.x + value.translation.width / max(cardSize.width, 1),
+                        y: start.y + value.translation.height / max(cardSize.height, 1)
+                    ),
+                    in: card
+                )
+            }
+            .onEnded { _ in dragStartCenter = nil }
+    }
+
+    private var resizeHandle: some View {
+        Circle()
+            .fill(.white)
+            .frame(width: 14, height: 14)
+            .overlay(
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 7, weight: .bold))
+                    .foregroundStyle(.black.opacity(0.7))
+            )
+            .shadow(color: .black.opacity(0.3), radius: 3, y: 1)
+            .offset(x: 2, y: 2)
+            .opacity(isHovering ? 1 : 0)
+            .highPriorityGesture(resizeGesture)
+    }
+
+    private var resizeGesture: some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { value in
+                let start = resizeStartDiameter ?? model.cameraLayout.diameter
+                resizeStartDiameter = start
+                let shortEdge = max(min(cardSize.width, cardSize.height), 1)
+                model.setCameraDiameter(start + (value.translation.width + value.translation.height) / shortEdge)
+            }
+            .onEnded { _ in resizeStartDiameter = nil }
+    }
+}
+
+private struct CameraPlayerLayer: NSViewRepresentable {
+    let player: AVPlayer
+
+    func makeNSView(context: Context) -> CameraPlayerLayerView {
+        CameraPlayerLayerView(player: player)
+    }
+
+    func updateNSView(_ nsView: CameraPlayerLayerView, context: Context) {
+        nsView.playerLayer.player = player
+    }
+}
+
+final class CameraPlayerLayerView: NSView {
+    let playerLayer = AVPlayerLayer()
+
+    init(player: AVPlayer) {
+        super.init(frame: .zero)
+        wantsLayer = true
+        playerLayer.player = player
+        playerLayer.videoGravity = .resizeAspectFill
+        layer = playerLayer
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    override func layout() {
+        super.layout()
+        playerLayer.frame = bounds
+    }
+}
+
+// MARK: - Video Camera Section
+
+private struct VideoCameraSection: View {
+    @Bindable var model: VideoEditorModel
+
+    var body: some View {
+        InspectorSection("Camera") {
+            VStack(alignment: .leading, spacing: 10) {
+                InspectorPill(
+                    model.cameraLayout.isVisible ? "Hide Camera" : "Show Camera",
+                    systemImage: model.cameraLayout.isVisible ? "video.slash" : "video",
+                    isActive: model.cameraLayout.isVisible,
+                    fillsWidth: true
+                ) {
+                    model.cameraLayout.isVisible.toggle()
+                }
+
+                if model.cameraLayout.isVisible {
+                    InspectorSlider(
+                        "Size",
+                        value: Binding(
+                            get: { model.cameraLayout.diameter },
+                            set: { model.setCameraDiameter($0) }
+                        ),
+                        range: CameraOverlayLayout.minDiameter...CameraOverlayLayout.maxDiameter,
+                        format: .percent()
+                    )
+
+                    InspectorCaption("Drag the bubble in the preview to move it, or its corner handle to resize.")
+                }
+            }
+        }
     }
 }
 

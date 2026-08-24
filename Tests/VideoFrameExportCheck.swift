@@ -10,12 +10,12 @@ enum VideoFrameExportCheck {
     static let sourceHeight = 720
     static let pad: CGFloat = 60
 
-    static func makeVideo(at url: URL) throws {
+    static func makeVideo(at url: URL, width: Int = sourceWidth, height: Int = sourceHeight, blue: Bool = false) throws {
         let writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: AVVideoCodecType.h264,
-            AVVideoWidthKey: sourceWidth,
-            AVVideoHeightKey: sourceHeight
+            AVVideoWidthKey: width,
+            AVVideoHeightKey: height
         ])
         input.expectsMediaDataInRealTime = false
         writer.add(input)
@@ -23,8 +23,8 @@ enum VideoFrameExportCheck {
             assetWriterInput: input,
             sourcePixelBufferAttributes: [
                 kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
-                kCVPixelBufferWidthKey as String: sourceWidth,
-                kCVPixelBufferHeightKey as String: sourceHeight
+                kCVPixelBufferWidthKey as String: width,
+                kCVPixelBufferHeightKey as String: height
             ]
         )
         precondition(writer.startWriting(), "test video writer failed to start")
@@ -39,8 +39,19 @@ enum VideoFrameExportCheck {
             guard let buffer else { preconditionFailure("no pixel buffer") }
             CVPixelBufferLockBaseAddress(buffer, [])
             if let base = CVPixelBufferGetBaseAddress(buffer) {
-                let level = UInt8(truncatingIfNeeded: frame * 7)
-                memset(base, Int32(level), CVPixelBufferGetBytesPerRow(buffer) * CVPixelBufferGetHeight(buffer))
+                let bytesPerRow = CVPixelBufferGetBytesPerRow(buffer)
+                let total = bytesPerRow * CVPixelBufferGetHeight(buffer)
+                if blue {
+                    let pixels = base.assumingMemoryBound(to: UInt8.self)
+                    for offset in stride(from: 0, to: total, by: 4) {
+                        pixels[offset] = 255
+                        pixels[offset + 1] = 0
+                        pixels[offset + 2] = 0
+                        pixels[offset + 3] = 255
+                    }
+                } else {
+                    memset(base, Int32(UInt8(truncatingIfNeeded: frame * 7)), total)
+                }
             }
             CVPixelBufferUnlockBaseAddress(buffer, [])
             let time = CMTime(value: CMTimeValue(frame), timescale: fps)
@@ -82,9 +93,11 @@ enum VideoFrameExportCheck {
         defer { try? FileManager.default.removeItem(at: dir) }
 
         let videoURL = dir.appendingPathComponent("source.mp4")
+        let cameraURL = dir.appendingPathComponent("source.camera.mp4")
         let audioURL = dir.appendingPathComponent("source.m4a")
         let outputURL = dir.appendingPathComponent("out.mp4")
         try makeVideo(at: videoURL)
+        try makeVideo(at: cameraURL, width: 640, height: 480, blue: true)
         try makeAudio(at: audioURL)
 
         let videoAsset = AVURLAsset(url: videoURL)
@@ -100,7 +113,13 @@ enum VideoFrameExportCheck {
         let compAudio = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)!
         try compAudio.insertTimeRange(range, of: audioTrack, at: .zero)
 
+        let cameraAsset = AVURLAsset(url: cameraURL)
+        let cameraTrack = try await cameraAsset.loadTracks(withMediaType: .video)[0]
+        let compCamera = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)!
+        try compCamera.insertTimeRange(range, of: cameraTrack, at: .zero)
+
         let canvasSize = CGSize(width: CGFloat(sourceWidth) + pad * 2, height: CGFloat(sourceHeight) + pad * 2)
+        let cameraRect = CGRect(x: pad + 120, y: pad + 100, width: 200, height: 200)
         let videoComposition = AVMutableVideoComposition()
         videoComposition.renderSize = canvasSize
         videoComposition.frameDuration = CMTime(value: 1, timescale: fps)
@@ -119,7 +138,8 @@ enum VideoFrameExportCheck {
             cornerRadius: 24,
             backgroundStyle: .gradient(GradientPreset.presets[0]),
             shadowStrength: 0.6,
-            outputURL: outputURL
+            outputURL: outputURL,
+            camera: VideoFrameExporter.Configuration.Camera(trackID: compCamera.trackID, rect: cameraRect)
         )
 
         let result = try await VideoFrameExporter().export(configuration) { _ in }
@@ -142,7 +162,36 @@ enum VideoFrameExportCheck {
         let bytes = (try FileManager.default.attributesOfItem(atPath: result.path)[.size] as? Int) ?? 0
         precondition(bytes > 50_000, "exported file suspiciously small: \(bytes) bytes")
 
+        let generator = AVAssetImageGenerator(asset: exported)
+        generator.appliesPreferredTrackTransform = true
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        let frame = try await generator.image(at: CMTime(seconds: 2, preferredTimescale: 600)).image
+        // The sampling context is y-up like the bubble rect, so both read in the same coordinate space.
+        let inside = try sample(frame, at: CGPoint(x: cameraRect.midX, y: cameraRect.midY), canvasSize: canvasSize)
+        let outside = try sample(frame, at: CGPoint(x: cameraRect.midX, y: cameraRect.midY + cameraRect.height), canvasSize: canvasSize)
+        precondition(inside.blue > 180 && inside.red < 80, "the face cam must be composited into its circle, sampled \(inside)")
+        precondition(!(outside.blue > 180 && outside.red < 80), "the face cam must stay inside its circle, sampled \(outside)")
+
         print("VideoFrameExportCheck: exported \(Int(size.width))x\(Int(size.height)) \(String(format: "%.1f", exportedDuration))s with audio (\(bytes / 1024) KB)")
+    }
+
+    static func sample(_ image: CGImage, at point: CGPoint, canvasSize: CGSize) throws -> (red: Int, green: Int, blue: Int) {
+        var pixel = [UInt8](repeating: 0, count: 4)
+        let scaleX = CGFloat(image.width) / canvasSize.width
+        let scaleY = CGFloat(image.height) / canvasSize.height
+        guard let context = CGContext(
+            data: &pixel,
+            width: 1,
+            height: 1,
+            bitsPerComponent: 8,
+            bytesPerRow: 4,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { preconditionFailure("no sampling context") }
+        context.translateBy(x: -point.x * scaleX, y: -point.y * scaleY)
+        context.draw(image, in: CGRect(x: 0, y: 0, width: CGFloat(image.width), height: CGFloat(image.height)))
+        return (Int(pixel[0]), Int(pixel[1]), Int(pixel[2]))
     }
 
     static func main() async throws {

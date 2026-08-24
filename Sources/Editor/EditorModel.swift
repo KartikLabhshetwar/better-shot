@@ -61,6 +61,26 @@ final class EditorModel {
     var canUndo: Bool { history.canUndo || !configPast.isEmpty }
     var canRedo: Bool { history.canRedo || !configFuture.isEmpty }
 
+    var hasEdits: Bool { !items.isEmpty || hasCrop || canUndo }
+
+    /// Escape backs out of whatever is in flight before it reaches the window, the way it does everywhere else on the Mac.
+    @discardableResult
+    func cancelCurrentOperation() -> Bool {
+        if isCropping {
+            isCropping = false
+            return true
+        }
+        if editingTextItemID != nil {
+            commitTextEditing()
+            return true
+        }
+        if !selectedItemIDs.isEmpty || isTextPlacementArmed || selectionRect != nil {
+            clearSelection()
+            return true
+        }
+        return false
+    }
+
     var itemIDs: [AnnotationItem.ID] { items.map(\.id) }
     var selectionCount: Int { selectedItemIDs.count }
 

@@ -12,7 +12,7 @@ struct RecordingPickerControls: View {
     @State private var captureMicrophone = AppPreferences.recordingCaptureMicrophone
     @State private var microphones = MicrophoneCatalog.available()
     @State private var selectedMicrophoneID = MicrophoneCatalog.preferred(savedID: AppPreferences.recordingMicrophoneDeviceID)?.uniqueID
-    @State private var captureSystemAudio = AppPreferences.recordingCaptureAudio
+    @AppStorage(AppPreferences.recordingCaptureAudioKey) private var captureSystemAudio = false
     @State private var startDelaySeconds = AppPreferences.recordingStartDelaySeconds
     @State private var camera = CameraBubbleController.shared
 
@@ -142,7 +142,6 @@ struct RecordingPickerControls: View {
                 accessibilityLabel: captureSystemAudio ? "System audio on" : "System audio off"
             ) {
                 captureSystemAudio.toggle()
-                AppPreferences.recordingCaptureAudio = captureSystemAudio
             }
 
             delayMenu

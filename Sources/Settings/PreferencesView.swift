@@ -718,7 +718,7 @@ struct CaptureSettingsTab: View {
 struct RecordingSettingsTab: View {
     @AppStorage("bs_recordingFPS") private var recordingFPS: Int = 30
     @AppStorage("bs_recordingShowCursor") private var showCursor: Bool = true
-    @AppStorage("bs_recordingCaptureAudio") private var captureAudio: Bool = false
+    @AppStorage(AppPreferences.recordingCaptureAudioKey) private var captureAudio: Bool = false
     @AppStorage("bs_recordingOpenEditor") private var openEditor: Bool = true
     @State private var isConfirmingReset = false
 

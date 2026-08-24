@@ -15,7 +15,7 @@ enum AppPreferences {
     private static let selfTimerKey = "bs_selfTimerDelay"
     private static let recordingFPSKey = "bs_recordingFPS"
     private static let recordingShowCursorKey = "bs_recordingShowCursor"
-    private static let recordingCaptureAudioKey = "bs_recordingCaptureAudio"
+    static let recordingCaptureAudioKey = "bs_recordingCaptureAudio"
     private static let recordingOpenEditorKey = "bs_recordingOpenEditor"
     private static let openEditorAfterCaptureKey = "bs_openEditorAfterCapture"
     private static let historyRetentionKey = "bs_historyRetentionLimit"

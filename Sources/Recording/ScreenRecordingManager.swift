@@ -139,11 +139,15 @@ final class ScreenRecordingManager {
     private var elapsedBeforePause: Duration = .zero
     private let pointerCapture = PointerCaptureRecorder()
     private(set) var activeRegionRect: CGRect?
+    private(set) var isRestarting = false
     private var lastSource: RecordingSource?
 
     private init() {}
 
     var isRecording: Bool { state == .recording || state == .paused }
+
+    /// Spans the gap a restart opens between tearing the old session down and the new one reaching `.preparing`, so the floating bar does not fall back to its picker.
+    var isSessionActive: Bool { state != .idle || isRestarting }
 
     // MARK: - Start
 
@@ -152,6 +156,11 @@ final class ScreenRecordingManager {
     }
 
     func restartRecording() async throws -> Bool {
+        guard !isRestarting else { return false }
+        isRestarting = true
+        defer { isRestarting = false }
+        await cancelRecording()
+
         switch lastSource {
         case .fullScreen, .none:
             return try await startFullScreenRecording()
@@ -178,7 +187,7 @@ final class ScreenRecordingManager {
                 return false
             }
 
-            let filter = Self.displayFilter(display: display, content: content, cameraWindowID: CameraBubbleController.shared.windowID)
+            let filter = Self.displayFilter(display: display, content: content)
             let scale = max(1, CGFloat(filter.pointPixelScale))
             let (width, height) = Self.pixelSize(
                 points: CGSize(width: CGFloat(display.width), height: CGFloat(display.height)),
@@ -222,7 +231,7 @@ final class ScreenRecordingManager {
                 return false
             }
 
-            let filter = Self.displayFilter(display: display, content: content, cameraWindowID: CameraBubbleController.shared.windowID)
+            let filter = Self.displayFilter(display: display, content: content)
             let sourceRect = Self.sourceRect(
                 forGlobalQuartzRect: selection.pointsRect,
                 displayID: display.displayID,
@@ -300,7 +309,7 @@ final class ScreenRecordingManager {
                 return false
             }
 
-            let filter = Self.displayFilter(display: display, content: content, cameraWindowID: CameraBubbleController.shared.windowID)
+            let filter = Self.displayFilter(display: display, content: content)
             let scale = max(1, CGFloat(filter.pointPixelScale))
             let (width, height) = Self.pixelSize(
                 points: CGSize(width: CGFloat(display.width), height: CGFloat(display.height)),
@@ -327,13 +336,11 @@ final class ScreenRecordingManager {
         content.displays.first { $0.displayID == displayID } ?? content.displays.first
     }
 
-    private static func displayFilter(display: SCDisplay, content: SCShareableContent, cameraWindowID: CGWindowID?) -> SCContentFilter {
+    /// Excludes every BetterShot window, the camera bubble included: the bubble records to its own file so the editor can move it afterwards.
+    private static func displayFilter(display: SCDisplay, content: SCShareableContent) -> SCContentFilter {
         let ownBundleID = Bundle.main.bundleIdentifier ?? ""
         let excludedApps = content.applications.filter { $0.bundleIdentifier == ownBundleID }
-        let cameraWindows = cameraWindowID.flatMap { id in
-            content.windows.first { $0.windowID == id }
-        }.map { [$0] } ?? []
-        return SCContentFilter(display: display, excludingApplications: excludedApps, exceptingWindows: cameraWindows)
+        return SCContentFilter(display: display, excludingApplications: excludedApps, exceptingWindows: [])
     }
 
     private static func pixelSize(points: CGSize, scale: CGFloat) -> (Int, Int) {
@@ -509,10 +516,15 @@ final class ScreenRecordingManager {
         }
 
         recordingSession.isCapturing = true
+        CameraBubbleController.shared.beginRecording(to: Self.cameraSidecarURL(for: url))
         state = .recording
         resetElapsed()
         startTimer()
         return true
+    }
+
+    static func cameraSidecarURL(for url: URL) -> URL {
+        url.deletingPathExtension().appendingPathExtension("camera.mov")
     }
 
     // MARK: - Stop
@@ -529,6 +541,7 @@ final class ScreenRecordingManager {
         session?.finishInputs()
         let wroteFootage = await session?.finishWriting() ?? false
         session = nil
+        let cameraURL = await CameraBubbleController.shared.finishRecording()
         let capturedPointerData = pointerCapture.stop()
         activeRegionRect = nil
 
@@ -540,9 +553,13 @@ final class ScreenRecordingManager {
 
         guard wroteFootage, let url else {
             if let url { try? FileManager.default.removeItem(at: url) }
+            if let cameraURL { try? FileManager.default.removeItem(at: cameraURL) }
             return nil
         }
         writePointerSidecar(capturedPointerData, alongside: url)
+        if let cameraURL, cameraURL != Self.cameraSidecarURL(for: url) {
+            try? FileManager.default.removeItem(at: cameraURL)
+        }
         return url
     }
 
@@ -557,6 +574,7 @@ final class ScreenRecordingManager {
     func pauseRecording() {
         guard state == .recording else { return }
         session?.pause()
+        CameraBubbleController.shared.pauseRecording()
         pointerCapture.pause()
         state = .paused
         stopTimer()
@@ -565,6 +583,7 @@ final class ScreenRecordingManager {
     func resumeRecording() {
         guard state == .paused else { return }
         session?.resume()
+        CameraBubbleController.shared.resumeRecording()
         pointerCapture.resume()
         state = .recording
         startTimer()
@@ -587,6 +606,7 @@ final class ScreenRecordingManager {
 
         session?.cancelWriting()
         session = nil
+        await CameraBubbleController.shared.discardRecording()
         _ = pointerCapture.stop()
         activeRegionRect = nil
 

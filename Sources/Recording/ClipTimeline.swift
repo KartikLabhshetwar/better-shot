@@ -144,11 +144,25 @@ nonisolated struct ClipTimeline: Equatable, Sendable {
 }
 
 nonisolated enum ClipCompositionBuilder {
-    static func makeComposition(videoTrack: AVAssetTrack, audioTracks: [AVAssetTrack], clips: [Clip]) throws -> AVMutableComposition {
+    struct Built {
+        let composition: AVMutableComposition
+        let cameraTrackID: CMPersistentTrackID?
+    }
+
+    static func makeComposition(
+        videoTrack: AVAssetTrack,
+        audioTracks: [AVAssetTrack],
+        camera: CameraSource?,
+        clips: [Clip]
+    ) throws -> Built {
         let composition = AVMutableComposition()
 
         guard let compVideoTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
-            return composition
+            return Built(composition: composition, cameraTrackID: nil)
+        }
+        // Added before any `scaleTimeRange`, so a clip's speed change stretches the face cam by exactly as much as the screen.
+        let compCameraTrack = camera.flatMap { _ in
+            composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
         }
         let compAudioTracks = audioTracks.compactMap { source -> (AVAssetTrack, AVMutableCompositionTrack)? in
             guard let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { return nil }
@@ -165,6 +179,9 @@ nonisolated enum ClipCompositionBuilder {
             for (source, compAudioTrack) in compAudioTracks {
                 try? compAudioTrack.insertTimeRange(range, of: source, at: insertionTime)
             }
+            if let camera, let compCameraTrack {
+                insertCamera(camera, into: compCameraTrack, sourceRange: range, at: insertionTime)
+            }
 
             if abs(clip.speed - 1) > 0.000_001 {
                 let insertedRange = CMTimeRange(start: insertionTime, duration: range.duration)
@@ -175,6 +192,33 @@ nonisolated enum ClipCompositionBuilder {
                 insertionTime = insertionTime + range.duration
             }
         }
-        return composition
+        return Built(composition: composition, cameraTrackID: compCameraTrack?.trackID)
     }
+
+    /// The face cam file can end before the screen recording does, so whatever it cannot cover becomes empty timeline rather than a length mismatch.
+    static func insertCamera(
+        _ camera: CameraSource,
+        into compCameraTrack: AVMutableCompositionTrack,
+        sourceRange: CMTimeRange,
+        at insertionTime: CMTime
+    ) {
+        let remaining = CMTimeMaximum(CMTimeSubtract(camera.duration, sourceRange.start), .zero)
+        let usable = CMTimeMinimum(sourceRange.duration, remaining)
+        if usable > .zero {
+            try? compCameraTrack.insertTimeRange(
+                CMTimeRange(start: sourceRange.start, duration: usable),
+                of: camera.track,
+                at: insertionTime
+            )
+        }
+        let padding = CMTimeSubtract(sourceRange.duration, usable)
+        if padding > .zero {
+            compCameraTrack.insertEmptyTimeRange(CMTimeRange(start: CMTimeAdd(insertionTime, usable), duration: padding))
+        }
+    }
+}
+
+nonisolated struct CameraSource {
+    let track: AVAssetTrack
+    let duration: CMTime
 }

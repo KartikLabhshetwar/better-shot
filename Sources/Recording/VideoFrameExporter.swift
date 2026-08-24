@@ -14,6 +14,14 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
         let backgroundStyle: BackgroundStyle
         let shadowStrength: CGFloat
         let outputURL: URL
+        var camera: Camera?
+
+        /// The face cam rides in the same composition as a second video track, so the compositor can draw it as a circle wherever the editor put it.
+        struct Camera: Sendable {
+            let trackID: CMPersistentTrackID
+            /// Canvas coordinates with y pointing up, matching the CoreGraphics and CoreImage passes.
+            let rect: CGRect
+        }
     }
 
     private final class CancelFlag: @unchecked Sendable {
@@ -42,7 +50,10 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> URL {
         let composition = configuration.composition
-        let videoTracks = composition.tracks(withMediaType: .video)
+        let cameraTrack = configuration.camera.flatMap { camera in
+            composition.tracks(withMediaType: .video).first { $0.trackID == camera.trackID }
+        }
+        let videoTracks = composition.tracks(withMediaType: .video).filter { $0.trackID != cameraTrack?.trackID }
         guard !videoTracks.isEmpty else { throw VideoExportError.noVideoTrack }
 
         let reader = try AVAssetReader(asset: composition)
@@ -53,6 +64,16 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
         videoOutput.videoComposition = configuration.videoComposition
         videoOutput.alwaysCopiesSampleData = false
         reader.add(videoOutput)
+
+        var cameraOutput: AVAssetReaderTrackOutput?
+        if let cameraTrack {
+            let output = AVAssetReaderTrackOutput(
+                track: cameraTrack,
+                outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+            )
+            reader.add(output)
+            cameraOutput = output
+        }
 
         var audioOutput: AVAssetReaderAudioMixOutput?
         let audioTracks = composition.tracks(withMediaType: .audio)
@@ -120,6 +141,7 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
             cornerRadius: configuration.cornerRadius,
             backgroundStyle: configuration.backgroundStyle,
             shadowStrength: configuration.shadowStrength,
+            cameraRect: configuration.camera?.rect
         )
 
         let frameCount = max(1, Int((composition.duration.seconds * 30).rounded()))
@@ -129,6 +151,7 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
                 videoOutput: videoOutput,
                 videoInput: videoInput,
                 adaptor: adaptor,
+                cameraOutput: cameraOutput,
                 audioOutput: audioOutput,
                 audioInput: audioInput,
                 compositor: compositor,
@@ -158,6 +181,7 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
         videoOutput: AVAssetReaderVideoCompositionOutput,
         videoInput: AVAssetWriterInput,
         adaptor: AVAssetWriterInputPixelBufferAdaptor,
+        cameraOutput: AVAssetReaderTrackOutput?,
         audioOutput: AVAssetReaderAudioMixOutput?,
         audioInput: AVAssetWriterInput?,
         compositor: FrameCompositor,
@@ -168,6 +192,9 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
         var videoDone = false
         var audioDone = audioOutput == nil || audioInput == nil
         var frameIndex = 0
+        var cameraExhausted = cameraOutput == nil
+        var cameraLookahead: (buffer: CVPixelBuffer, time: CMTime)?
+        var cameraFrame: CVPixelBuffer?
 
         while !videoDone || !audioDone {
             if cancelFlag.isCancelled { throw VideoExportError.exportCancelled }
@@ -185,8 +212,22 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
                         guard let destinationBuffer else {
                             throw VideoExportError.exportFailed(nil)
                         }
-                        compositor.render(videoFrame: sourceBuffer, into: destinationBuffer)
                         let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+                        // The face cam decodes at its own rate, so hold the newest frame that is not ahead of the screen frame being written.
+                        while !cameraExhausted {
+                            if let ahead = cameraLookahead {
+                                guard ahead.time <= presentationTime else { break }
+                                cameraFrame = ahead.buffer
+                                cameraLookahead = nil
+                            }
+                            guard let cameraSample = cameraOutput?.copyNextSampleBuffer() else {
+                                cameraExhausted = true
+                                break
+                            }
+                            guard let buffer = CMSampleBufferGetImageBuffer(cameraSample) else { continue }
+                            cameraLookahead = (buffer, CMSampleBufferGetPresentationTimeStamp(cameraSample))
+                        }
+                        compositor.render(videoFrame: sourceBuffer, cameraFrame: cameraFrame, into: destinationBuffer)
                         if !adaptor.append(destinationBuffer, withPresentationTime: presentationTime) {
                             throw VideoExportError.exportFailed(nil)
                         }
@@ -230,8 +271,11 @@ private final class FrameCompositor: @unchecked Sendable {
     private let colorSpace = CGColorSpaceCreateDeviceRGB()
     private let backdrop: CIImage
     private let cardMask: CIImage
+    private let cameraRect: CGRect?
+    private let cameraMask: CIImage?
+    private let cameraRing: CIImage?
 
-    init(canvasSize: CGSize, cardRect: CGRect, cornerRadius: CGFloat, backgroundStyle: BackgroundStyle, shadowStrength: CGFloat) {
+    init(canvasSize: CGSize, cardRect: CGRect, cornerRadius: CGFloat, backgroundStyle: BackgroundStyle, shadowStrength: CGFloat, cameraRect: CGRect?) {
         self.canvasSize = canvasSize
         let canvasRect = CGRect(origin: .zero, size: canvasSize)
         if let backdropImage = Self.renderBackdrop(canvasSize: canvasSize, cardRect: cardRect, cornerRadius: cornerRadius, backgroundStyle: backgroundStyle, shadowStrength: shadowStrength) {
@@ -244,16 +288,80 @@ private final class FrameCompositor: @unchecked Sendable {
         } else {
             cardMask = CIImage(color: .white).cropped(to: canvasRect)
         }
+        self.cameraRect = cameraRect
+        cameraMask = cameraRect
+            .flatMap { Self.renderCircleMask(canvasSize: canvasSize, circle: $0) }
+            .map { CIImage(cgImage: $0) }
+        cameraRing = cameraRect
+            .flatMap { Self.renderCircleRing(canvasSize: canvasSize, circle: $0) }
+            .map { CIImage(cgImage: $0) }
     }
 
-    func render(videoFrame: CVPixelBuffer, into destination: CVPixelBuffer) {
-        let videoImage = CIImage(cvPixelBuffer: videoFrame)
+    func render(videoFrame: CVPixelBuffer, cameraFrame: CVPixelBuffer?, into destination: CVPixelBuffer) {
+        let canvasRect = CGRect(origin: .zero, size: canvasSize)
         let filter = CIFilter.blendWithMask()
-        filter.inputImage = videoImage
+        filter.inputImage = CIImage(cvPixelBuffer: videoFrame)
         filter.backgroundImage = backdrop
         filter.maskImage = cardMask
-        let output = (filter.outputImage ?? backdrop).cropped(to: CGRect(origin: .zero, size: canvasSize))
-        ciContext.render(output, to: destination, bounds: CGRect(origin: .zero, size: canvasSize), colorSpace: colorSpace)
+        var output = (filter.outputImage ?? backdrop).cropped(to: canvasRect)
+
+        if let cameraFrame, let cameraRect, let cameraMask {
+            let bubble = CIFilter.blendWithMask()
+            bubble.inputImage = Self.aspectFilled(CIImage(cvPixelBuffer: cameraFrame), into: cameraRect)
+            bubble.backgroundImage = output
+            bubble.maskImage = cameraMask
+            output = (bubble.outputImage ?? output).cropped(to: canvasRect)
+            if let cameraRing {
+                output = cameraRing.composited(over: output).cropped(to: canvasRect)
+            }
+        }
+
+        ciContext.render(output, to: destination, bounds: canvasRect, colorSpace: colorSpace)
+    }
+
+    private static func aspectFilled(_ image: CIImage, into rect: CGRect) -> CIImage {
+        let extent = image.extent
+        guard extent.width > 0, extent.height > 0 else { return image }
+        let scale = max(rect.width / extent.width, rect.height / extent.height)
+        let scaled = image.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        return scaled.transformed(by: CGAffineTransform(
+            translationX: rect.midX - scaled.extent.midX,
+            y: rect.midY - scaled.extent.midY
+        ))
+    }
+
+    private static func renderCircleMask(canvasSize: CGSize, circle: CGRect) -> CGImage? {
+        guard let context = CGContext(
+            data: nil,
+            width: Int(canvasSize.width),
+            height: Int(canvasSize.height),
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceGray(),
+            bitmapInfo: CGImageAlphaInfo.none.rawValue
+        ) else { return nil }
+        context.setFillColor(gray: 0, alpha: 1)
+        context.fill(CGRect(origin: .zero, size: canvasSize))
+        context.setFillColor(gray: 1, alpha: 1)
+        context.fillEllipse(in: circle)
+        return context.makeImage()
+    }
+
+    private static func renderCircleRing(canvasSize: CGSize, circle: CGRect) -> CGImage? {
+        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: nil,
+            width: Int(canvasSize.width),
+            height: Int(canvasSize.height),
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        ) else { return nil }
+        context.setStrokeColor(CGColor(gray: 1, alpha: 0.9))
+        context.setLineWidth(max(2, min(circle.width, circle.height) * 0.022))
+        context.strokeEllipse(in: circle)
+        return context.makeImage()
     }
 
     private static func flipped(_ rect: CGRect, canvasHeight: CGFloat) -> CGRect {

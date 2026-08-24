@@ -9,6 +9,7 @@ struct EditorWindowView: View {
     @State private var shareUploader = R2Uploader.shared
     @State private var shareItemID: UUID?
     @State private var isConfirmingDelete = false
+    @State private var isConfirmingDiscard = false
     @State private var hostWindow: NSWindow?
     @Environment(\.dismiss) private var dismiss
 
@@ -26,12 +27,19 @@ struct EditorWindowView: View {
         .padding(EditorPanelMetrics.gap)
         .background(EditorCanvasBackdrop())
         .hostWindow($hostWindow)
+        .editorCloseGuard(window: hostWindow, hasEdits: model.hasEdits) { isConfirmingDiscard = true }
         .editorToast($model.toastMessage)
         .confirmationDialog("Delete this capture?", isPresented: $isConfirmingDelete) {
             Button("Delete Capture", role: .destructive) { deleteCapture() }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("The file is removed from disk. This cannot be undone.")
+        }
+        .confirmationDialog("Discard your edits?", isPresented: $isConfirmingDiscard) {
+            Button("Discard Edits", role: .destructive) { hostWindow?.close() }
+            Button("Keep Editing", role: .cancel) {}
+        } message: {
+            Text("The capture stays on disk, but these annotations and styling are not saved.")
         }
         .background {
             AnnotationKeyCommandHandler(
@@ -42,8 +50,9 @@ struct EditorWindowView: View {
                 onSelectTool: { tool in model.selectTool(tool) }
             )
         }
+        .onEscapeKey { escapePressed() }
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .navigation) {
                 Button {
                     model.undo()
                 } label: {
@@ -51,7 +60,7 @@ struct EditorWindowView: View {
                 }
                 .disabled(!model.canUndo)
                 .keyboardShortcut("z", modifiers: .command)
-                .help("Undo")
+                .help("Undo (\u{2318}Z)")
 
                 Button {
                     model.redo()
@@ -60,22 +69,23 @@ struct EditorWindowView: View {
                 }
                 .disabled(!model.canRedo)
                 .keyboardShortcut("z", modifiers: [.command, .shift])
-                .help("Redo")
+                .help("Redo (\u{21E7}\u{2318}Z)")
+            }
 
-                Spacer()
-
-                Button("Cancel") {
-                    hostWindow?.close()
-                }
-                .keyboardShortcut(.escape, modifiers: [])
-
-                Button {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button(role: .destructive) {
                     isConfirmingDelete = true
                 } label: {
                     Label("Delete", systemImage: "trash")
-                        .foregroundStyle(.red)
                 }
                 .help("Delete this capture from disk")
+
+                Button {
+                    attemptClose()
+                } label: {
+                    Label("Close", systemImage: "xmark")
+                }
+                .help("Close without exporting (esc)")
 
                 Button {
                     Task { await copyToClipboard() }
@@ -83,24 +93,22 @@ struct EditorWindowView: View {
                     Label("Copy", systemImage: "doc.on.doc")
                 }
                 .keyboardShortcut("c", modifiers: [.command, .shift])
+                .help("Copy the edited image (\u{21E7}\u{2318}C)")
 
                 if shareCredentials.isConfigured && shareCredentials.enabled {
                     Button {
                         Task { await shareImage() }
                     } label: {
                         if let shareItemID, shareUploader.uploadingItems.contains(shareItemID) {
-                            HStack(spacing: 6) {
-                                ProgressView(value: shareUploader.uploadProgress[shareItemID] ?? 0)
-                                    .progressViewStyle(.circular)
-                                    .controlSize(.small)
-                                Text("\(Int((shareUploader.uploadProgress[shareItemID] ?? 0) * 100))%")
-                                    .font(.caption)
-                            }
+                            ProgressView(value: shareUploader.uploadProgress[shareItemID] ?? 0)
+                                .progressViewStyle(.circular)
+                                .controlSize(.small)
                         } else {
                             Label("Share", systemImage: "link")
                         }
                     }
                     .disabled(shareItemID != nil)
+                    .help("Upload and copy a share link")
                 }
 
                 Button {
@@ -110,6 +118,7 @@ struct EditorWindowView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut("s", modifiers: .command)
+                .help("Export to \(AppPreferences.exportFormat.fileExtension.uppercased()) (\u{2318}S)")
             }
         }
         .onAppear {
@@ -117,6 +126,21 @@ struct EditorWindowView: View {
         }
         .onChange(of: urlHolder.url) { _, newURL in
             model.loadImage(from: newURL)
+        }
+    }
+
+    /// Escape peels back the current operation first, so it only reaches the window once there is nothing left to cancel.
+    private func escapePressed() -> Bool {
+        if model.cancelCurrentOperation() { return true }
+        attemptClose()
+        return true
+    }
+
+    private func attemptClose() {
+        if model.hasEdits {
+            isConfirmingDiscard = true
+        } else {
+            hostWindow?.close()
         }
     }
 

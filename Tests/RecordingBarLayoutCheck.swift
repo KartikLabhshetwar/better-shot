@@ -20,6 +20,14 @@ private struct BarRoot: View {
     }
 }
 
+@main
+enum RecordingBarLayoutCheck {
+    @MainActor
+    static func main() {
+        run()
+    }
+}
+
 @MainActor
 func run() {
     _ = NSApplication.shared
@@ -52,21 +60,28 @@ func run() {
 
     let screenFrame = NSRect(x: 0, y: 0, width: 1512, height: 948)
     let bottomInset: CGFloat = 64
-    let origin = NSPoint(x: screenFrame.midX - size.width / 2, y: screenFrame.minY + bottomInset)
-    let frame = NSRect(origin: origin, size: size)
+    let frame = RecordingBarFrame.centered(size: size, in: screenFrame, bottomInset: bottomInset)
 
     check(abs(frame.midX - screenFrame.midX) < 0.5, "bar should be horizontally centered, midX \(frame.midX) vs \(screenFrame.midX)")
     check(frame.minY == screenFrame.minY + bottomInset, "bar should clear the bottom edge by \(bottomInset)")
     check(frame.minX > screenFrame.minX + 100, "a centered bar must not sit against the left edge, minX \(frame.minX)")
 
-    let offScreen = NSRect(x: -900, y: 20, width: size.width, height: size.height)
-    check(!screenFrame.contains(offScreen), "a saved origin mostly off screen must be rejected")
+    let wider = RecordingBarFrame.resized(frame, to: NSSize(width: size.width + 120, height: size.height), in: screenFrame)
+    check(abs(wider.midX - frame.midX) < 0.5, "a mode swap must grow about the bar's own centre, midX \(wider.midX) vs \(frame.midX)")
+    check(wider.minY == frame.minY, "a resize must not move the bar vertically")
+    check(wider.width == size.width + 120, "a resize must adopt the new width")
 
-    let partly = NSRect(x: screenFrame.maxX - 10, y: 20, width: size.width, height: size.height)
-    check(screenFrame.intersects(partly), "sanity: this frame does intersect")
-    check(!screenFrame.contains(partly), "containment must reject a bar hanging off the right edge that intersects")
+    let atRightEdge = NSRect(x: screenFrame.maxX - size.width, y: 20, width: size.width, height: size.height)
+    let grownAtEdge = RecordingBarFrame.resized(atRightEdge, to: NSSize(width: size.width + 200, height: size.height), in: screenFrame)
+    check(grownAtEdge.maxX <= screenFrame.maxX + 0.5, "a bar widening at the right edge must be pulled back on screen, maxX \(grownAtEdge.maxX)")
+    check(grownAtEdge.minX >= screenFrame.minX - 0.5, "clamping must not push the bar off the left edge, minX \(grownAtEdge.minX)")
+
+    let offScreen = NSRect(x: -900, y: 20, width: size.width, height: size.height)
+    let rescued = RecordingBarFrame.clamped(offScreen, in: screenFrame)
+    check(screenFrame.contains(rescued), "a saved origin off screen must be clamped back into the visible frame, got \(rescued)")
+
+    let tooWide = RecordingBarFrame.clamped(NSRect(x: -50, y: 20, width: screenFrame.width + 400, height: size.height), in: screenFrame)
+    check(tooWide.minX == screenFrame.minX, "a bar wider than the screen must pin to the left edge, minX \(tooWide.minX)")
 
     print("RecordingBarLayoutCheck: all assertions passed")
 }
-
-MainActor.assumeIsolated { run() }

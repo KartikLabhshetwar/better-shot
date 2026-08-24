@@ -77,7 +77,6 @@ struct RecordingSessionControls: View {
                 accessibilityLabel: "Restart recording"
             ) {
                 Task {
-                    await recorder.cancelRecording()
                     let started = try? await recorder.restartRecording()
                     if started != true {
                         RecordingBarPresenter.shared.hide()
@@ -104,7 +103,7 @@ struct RecordingSessionControls: View {
         .padding(.trailing, 8)
     }
 
-    /// Fixed rather than intrinsic: the bar's panel is sized to its fitted content, so a growing label would resize the window every time the digit count changes.
+    /// Fixed rather than intrinsic, so the controls beside it do not shift every time a digit changes width.
     private var timeWidth: CGFloat {
         recorder.elapsedSeconds >= 3600 ? 66 : 44
     }

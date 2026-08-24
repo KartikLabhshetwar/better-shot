@@ -2,7 +2,7 @@ import AVFoundation
 import AppKit
 import SwiftUI
 
-/// Floating circular camera preview that sits on top of whatever you record. It is a real on-screen window rather than a composited overlay, so ScreenCaptureKit picks it up by excepting it from BetterShot's own excluded application.
+/// Floating circular camera preview that sits on top of whatever you record. Its footage is written to its own file rather than burned into the screen capture, so the editor can move and resize the bubble afterwards.
 @Observable
 @MainActor
 final class CameraBubbleController {
@@ -29,11 +29,8 @@ final class CameraBubbleController {
 
     @ObservationIgnored private var session: CameraSessionBox?
     @ObservationIgnored private var panel: NSPanel?
-
-    var windowID: CGWindowID? {
-        guard let panel, panel.isVisible else { return nil }
-        return CGWindowID(panel.windowNumber)
-    }
+    @ObservationIgnored private var movieOutput: AVCaptureMovieFileOutput?
+    @ObservationIgnored private var recordingDelegate: CameraRecordingDelegate?
 
     private init() {}
 
@@ -87,8 +84,51 @@ final class CameraBubbleController {
         isEnabled = false
         panel?.orderOut(nil)
         panel = nil
+        movieOutput = nil
+        recordingDelegate = nil
         session?.stop()
         session = nil
+    }
+
+    // MARK: - Sidecar recording
+
+    func beginRecording(to url: URL) {
+        guard let movieOutput, !movieOutput.isRecording else { return }
+        try? FileManager.default.removeItem(at: url)
+        if let connection = movieOutput.connection(with: .video) {
+            connection.automaticallyAdjustsVideoMirroring = false
+            connection.isVideoMirrored = true
+        }
+        let delegate = CameraRecordingDelegate()
+        recordingDelegate = delegate
+        movieOutput.startRecording(to: url, recordingDelegate: delegate)
+    }
+
+    func finishRecording() async -> URL? {
+        guard let movieOutput, movieOutput.isRecording, let delegate = recordingDelegate else {
+            recordingDelegate = nil
+            return nil
+        }
+        recordingDelegate = nil
+        movieOutput.stopRecording()
+        guard let url = await delegate.waitForFinish(),
+              FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return url
+    }
+
+    func discardRecording() async {
+        guard let url = await finishRecording() else { return }
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    func pauseRecording() {
+        guard let movieOutput, movieOutput.isRecording, !movieOutput.isRecordingPaused else { return }
+        movieOutput.pauseRecording()
+    }
+
+    func resumeRecording() {
+        guard let movieOutput, movieOutput.isRecordingPaused else { return }
+        movieOutput.resumeRecording()
     }
 
     func resize(to size: Size) {
@@ -127,6 +167,12 @@ final class CameraBubbleController {
             return
         }
         session.addInput(input)
+
+        let output = AVCaptureMovieFileOutput()
+        if session.canAddOutput(output) {
+            session.addOutput(output)
+            movieOutput = output
+        }
 
         let box = CameraSessionBox(session: session)
         self.session = box
@@ -185,6 +231,44 @@ private final class CameraSessionBox: @unchecked Sendable {
 
     func stop() {
         queue.async { self.session.stopRunning() }
+    }
+}
+
+/// Bridges `AVCaptureMovieFileOutput`'s arbitrary-queue completion to an await, keeping the finished result if it lands before anyone asks.
+private final class CameraRecordingDelegate: NSObject, AVCaptureFileOutputRecordingDelegate, @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<URL?, Never>?
+    private var finishedURL: URL?
+    private var didFinish = false
+
+    func waitForFinish() async -> URL? {
+        await withCheckedContinuation { (continuation: CheckedContinuation<URL?, Never>) in
+            lock.lock()
+            if didFinish {
+                let url = finishedURL
+                lock.unlock()
+                continuation.resume(returning: url)
+                return
+            }
+            self.continuation = continuation
+            lock.unlock()
+        }
+    }
+
+    func fileOutput(
+        _ output: AVCaptureFileOutput,
+        didFinishRecordingTo outputFileURL: URL,
+        from connections: [AVCaptureConnection],
+        error: Error?
+    ) {
+        lock.lock()
+        didFinish = true
+        finishedURL = error == nil ? outputFileURL : nil
+        let url = finishedURL
+        let waiting = continuation
+        continuation = nil
+        lock.unlock()
+        waiting?.resume(returning: url)
     }
 }
 
