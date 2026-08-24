@@ -1,5 +1,6 @@
 import AppKit
 import AVFoundation
+import Combine
 import ScreenCaptureKit
 import SwiftUI
 
@@ -9,52 +10,81 @@ struct RecordingPickerControls: View {
 
     @State private var sources = RecordingSourceCatalog.shared
     @State private var captureMicrophone = AppPreferences.recordingCaptureMicrophone
+    @State private var microphones = MicrophoneCatalog.available()
     @State private var selectedMicrophoneID = MicrophoneCatalog.preferred(savedID: AppPreferences.recordingMicrophoneDeviceID)?.uniqueID
     @State private var captureSystemAudio = AppPreferences.recordingCaptureAudio
     @State private var startDelaySeconds = AppPreferences.recordingStartDelaySeconds
     @State private var camera = CameraBubbleController.shared
 
-    private func toggleMicrophone() {
-        guard !captureMicrophone else {
-            captureMicrophone = false
-            AppPreferences.recordingCaptureMicrophone = false
-            return
-        }
+    /// Refreshed on device connect/disconnect so a mic plugged in while the bar is open shows up. The saved preference is left alone, so unplugging and replugging a device restores it.
+    private func refreshMicrophones() {
+        microphones = MicrophoneCatalog.available()
+        selectedMicrophoneID = MicrophoneCatalog.resolveID(
+            availableIDs: microphones.map(\.uniqueID),
+            savedID: AppPreferences.recordingMicrophoneDeviceID,
+            systemDefaultID: AVCaptureDevice.default(for: .audio)?.uniqueID
+        )
+    }
+
+    private func disableMicrophone() {
+        captureMicrophone = false
+        AppPreferences.recordingCaptureMicrophone = false
+    }
+
+    /// `deviceID` nil keeps whatever is already resolved, for the case where the menu is used only to ask for access.
+    private func enableMicrophone(deviceID: String?) {
         AVCaptureDevice.requestAccess(for: .audio) { granted in
             Task { @MainActor in
-                captureMicrophone = granted
-                AppPreferences.recordingCaptureMicrophone = granted
-                if granted, selectedMicrophoneID == nil {
-                    selectedMicrophoneID = MicrophoneCatalog.preferred(savedID: AppPreferences.recordingMicrophoneDeviceID)?.uniqueID
-                }
-                if !granted {
+                guard granted else {
+                    disableMicrophone()
                     ToastWindow.shared.show(
                         title: "Microphone Blocked",
                         message: "Allow BetterShot in System Settings > Privacy & Security > Microphone.",
                         systemIcon: "mic.slash"
                     )
+                    return
                 }
+                if let deviceID {
+                    AppPreferences.recordingMicrophoneDeviceID = deviceID
+                }
+                refreshMicrophones()
+                captureMicrophone = true
+                AppPreferences.recordingCaptureMicrophone = true
             }
         }
     }
 
     @ViewBuilder
-    private var microphonePicker: some View {
-        let devices = MicrophoneCatalog.available()
-        if devices.isEmpty {
-            Text("No microphones available")
-        } else {
-            ForEach(devices, id: \.uniqueID) { device in
+    private var microphoneMenu: some View {
+        Button {
+            disableMicrophone()
+        } label: {
+            if captureMicrophone {
+                Text("Off")
+            } else {
+                Label("Off", systemImage: "checkmark")
+            }
+        }
+
+        Divider()
+
+        if !microphones.isEmpty {
+            ForEach(microphones, id: \.uniqueID) { device in
                 Button {
-                    AppPreferences.recordingMicrophoneDeviceID = device.uniqueID
-                    selectedMicrophoneID = device.uniqueID
+                    enableMicrophone(deviceID: device.uniqueID)
                 } label: {
-                    if device.uniqueID == selectedMicrophoneID {
+                    if captureMicrophone, device.uniqueID == selectedMicrophoneID {
                         Label(device.localizedName, systemImage: "checkmark")
                     } else {
                         Text(device.localizedName)
                     }
                 }
+            }
+        } else if AVCaptureDevice.authorizationStatus(for: .audio) == .authorized {
+            Text("No microphones available")
+        } else {
+            Button("Allow Microphone Access…") {
+                enableMicrophone(deviceID: nil)
             }
         }
     }
@@ -71,18 +101,19 @@ struct RecordingPickerControls: View {
             RecordingBarDivider()
 
             if ScreenCaptureStream.supportsMicrophoneCapture {
-                RecordingBarIconButton(
-                    id: "microphone",
-                    title: captureMicrophone ? "Microphone on" : "Microphone off",
-                    systemImage: captureMicrophone ? "mic.fill" : "mic.slash",
-                    tint: captureMicrophone ? RecordingBarMetrics.activeTint : RecordingBarMetrics.inactiveTint,
-                    accessibilityLabel: captureMicrophone ? "Microphone on" : "Microphone off"
-                ) {
-                    toggleMicrophone()
+                Menu {
+                    microphoneMenu
+                } label: {
+                    RecordingBarIconLabel(
+                        id: "microphone",
+                        title: captureMicrophone ? "Microphone on" : "Microphone off",
+                        systemImage: captureMicrophone ? "mic.fill" : "mic.slash",
+                        tint: captureMicrophone ? RecordingBarMetrics.activeTint : RecordingBarMetrics.inactiveTint,
+                        accessibilityLabel: captureMicrophone ? "Microphone on, choose an input device" : "Microphone off, choose an input device"
+                    )
                 }
-                .contextMenu {
-                    microphonePicker
-                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
             }
 
             if camera.hasCamera {
@@ -122,6 +153,16 @@ struct RecordingPickerControls: View {
             }
         }
         .padding(.horizontal, RecordingBarMetrics.horizontalPadding)
+        .onReceive(deviceChanges) { _ in
+            refreshMicrophones()
+        }
+    }
+
+    private var deviceChanges: AnyPublisher<Notification, Never> {
+        let center = NotificationCenter.default
+        return center.publisher(for: AVCaptureDevice.wasConnectedNotification)
+            .merge(with: center.publisher(for: AVCaptureDevice.wasDisconnectedNotification))
+            .eraseToAnyPublisher()
     }
 
     @ViewBuilder
