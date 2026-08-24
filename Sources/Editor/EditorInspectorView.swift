@@ -1,103 +1,109 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+private enum ImageSidebarTab: Hashable {
+    case annotate, image, background
+
+    static let tabs: [InspectorTab<ImageSidebarTab>] = [
+        InspectorTab(.annotate, systemImage: "pencil.tip", title: "Annotate"),
+        InspectorTab(.image, systemImage: "crop", title: "Image"),
+        InspectorTab(.background, systemImage: "photo.on.rectangle.angled", title: "Background")
+    ]
+}
+
 struct EditorInspectorView: View {
     @Bindable var model: EditorModel
 
+    @State private var tab: ImageSidebarTab = .annotate
+
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 0) {
-                InspectorSection("Tools") {
-                    AnnotationInspectorToolGrid(selectedTool: model.selectedTool) { tool in
-                        model.selectTool(tool)
+        VStack(spacing: 0) {
+            InspectorTabBar(tabs: ImageSidebarTab.tabs, selection: $tab)
+
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    switch tab {
+                    case .annotate:
+                        annotateTab
+                    case .image:
+                        ImageCropSection(model: model)
+                        InspectorDivider()
+                        EffectsSection(config: configBinding, onEditingChanged: model.recordConfigEdit)
+                    case .background:
+                        LayoutSection(config: configBinding, onEditingChanged: model.recordConfigEdit)
+                        InspectorDivider()
+                        BackgroundPickerSection(config: configBinding, onEditingChanged: model.recordConfigEdit)
                     }
-                }
 
-                if !model.items.isEmpty {
-                    InspectorPill("Clear All", systemImage: "trash", role: .destructive, fillsWidth: true) {
-                        model.clearAnnotations()
+                    Spacer(minLength: 24)
+                }
+            }
+            .scrollContentBackground(.hidden)
+        }
+        .background(InspectorMaterial())
+    }
+
+    @ViewBuilder
+    private var annotateTab: some View {
+        InspectorSection("Tools") {
+            AnnotationInspectorToolGrid(selectedTool: model.selectedTool) { tool in
+                model.selectTool(tool)
+            }
+        }
+
+        if !model.items.isEmpty {
+            InspectorPill("Clear All", systemImage: "trash", role: .destructive, fillsWidth: true) {
+                model.clearAnnotations()
+            }
+            .padding(.horizontal, InspectorMetrics.gutter)
+            .padding(.bottom, InspectorMetrics.gutter)
+        }
+
+        if model.inspectedTool != nil {
+            InspectorDivider()
+
+            InspectorSection("Style") {
+                VStack(alignment: .leading, spacing: 10) {
+                    if model.selectionCount > 1 {
+                        InspectorCaption("\(model.selectionCount) annotations selected")
                     }
-                    .padding(.horizontal, InspectorMetrics.gutter)
-                    .padding(.bottom, InspectorMetrics.gutter)
-                }
 
-                if model.inspectedTool != nil {
-                    InspectorDivider()
+                    InspectorRow("Color") {
+                        AnnotationColorMenu(selectedSwatch: model.selectedSwatch) { swatch in
+                            model.setSwatch(swatch)
+                        }
+                    }
 
-                    InspectorSection("Style") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            if model.selectionCount > 1 {
-                                InspectorCaption("\(model.selectionCount) annotations selected")
-                            }
-
-                            InspectorRow("Color") {
-                                AnnotationColorMenu(selectedSwatch: model.selectedSwatch) { swatch in
-                                    model.setSwatch(swatch)
-                                }
-                            }
-
-                            if model.isStrokeStyleAvailable {
-                                InspectorRow("Stroke") {
-                                    AnnotationStrokeMenu(strokeWidth: model.strokeWidth) { strokeWidth in
-                                        model.setStrokeWidth(strokeWidth)
-                                    }
-                                }
-                            }
-
-                            if model.isRedactionStyleAvailable {
-                                InspectorSlider(
-                                    "Density",
-                                    value: Binding(
-                                        get: { model.redactionDensity },
-                                        set: { model.setRedactionDensity($0) }
-                                    ),
-                                    range: 0.15...1,
-                                    format: .percent()
-                                )
+                    if model.isStrokeStyleAvailable {
+                        InspectorRow("Stroke") {
+                            AnnotationStrokeMenu(strokeWidth: model.strokeWidth) { strokeWidth in
+                                model.setStrokeWidth(strokeWidth)
                             }
                         }
                     }
-                }
 
-                if model.isTextStyleAvailable {
-                    InspectorDivider()
-
-                    InspectorSection("Text") {
-                        AnnotationTextStyleControls(model: model)
+                    if model.isRedactionStyleAvailable {
+                        InspectorSlider(
+                            "Density",
+                            value: Binding(
+                                get: { model.redactionDensity },
+                                set: { model.setRedactionDensity($0) }
+                            ),
+                            range: 0.15...1,
+                            format: .percent()
+                        )
                     }
                 }
-
-                InspectorDivider()
-
-                ImageCropSection(model: model)
-
-                InspectorDivider()
-
-                EffectsSection(config: configBinding, onEditingChanged: model.recordConfigEdit)
-
-                InspectorDivider()
-
-                ColorGradeSection(
-                    correction: Binding(
-                        get: { model.config.colorCorrection },
-                        set: { model.config.colorCorrection = $0 }
-                    ),
-                    onEditingChanged: model.recordConfigEdit
-                )
-
-                InspectorDivider()
-
-                LayoutSection(config: configBinding, onEditingChanged: model.recordConfigEdit)
-
-                InspectorDivider()
-
-                BackgroundPickerSection(config: configBinding, onEditingChanged: model.recordConfigEdit)
-
-                Spacer(minLength: 24)
             }
         }
-        .scrollContentBackground(.hidden)
-        .background(InspectorMaterial().ignoresSafeArea())
+
+        if model.isTextStyleAvailable {
+            InspectorDivider()
+
+            InspectorSection("Text") {
+                AnnotationTextStyleControls(model: model)
+            }
+        }
     }
 
     private var configBinding: Binding<BeautifierConfig> {

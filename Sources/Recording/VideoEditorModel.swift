@@ -1,7 +1,6 @@
 import AVFoundation
 import AppKit
 import SwiftUI
-import CoreImage
 
 
 private struct ClipEditSnapshot {
@@ -23,14 +22,7 @@ final class VideoEditorModel {
     var isExporting = false
     var toastMessage: String?
     var thumbnails: [NSImage] = []
-    var config = BeautifierConfig() {
-        didSet {
-            guard oldValue.colorCorrection != config.colorCorrection else { return }
-            previewGrade.correction = config.colorCorrection
-            refreshPreviewFrame()
-        }
-    }
-    private let previewGrade = LivePreviewGrade()
+    var config = BeautifierConfig()
 
     var videoWidth: Int = 0
     var videoHeight: Int = 0
@@ -62,7 +54,7 @@ final class VideoEditorModel {
         hasTrim || hasCrop || isClipMode
             || (zoomEnabled && !zoomCues.isEmpty)
             || config.padding > 0 || config.cornerRadius > 0 || config.shadowStrength > 0
-            || config.style != .none || config.aspectRatio != .auto || !config.colorCorrection.isIdentity
+            || config.style != .none || config.aspectRatio != .auto
     }
     var hasPointerCapture: Bool {
         guard let pointerCapture else { return false }
@@ -71,7 +63,6 @@ final class VideoEditorModel {
 
     @ObservationIgnored private var timeObserver: Any?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
-    @ObservationIgnored private var gradeTask: Task<Void, Never>?
     @ObservationIgnored private var thumbnailTask: Task<Void, Never>?
     @ObservationIgnored private var pendingSeek: (time: Double, precise: Bool)?
     @ObservationIgnored private var isSeekInFlight = false
@@ -107,8 +98,6 @@ final class VideoEditorModel {
         let item = AVPlayerItem(asset: asset)
         player = AVPlayer(playerItem: item)
         player?.actionAtItemEnd = .pause
-        previewGrade.correction = config.colorCorrection
-        attachPreviewGrade(to: item, url: url)
 
         loadTask = Task { @MainActor [weak self] in
             let loaded = try? await asset.load(.duration)
@@ -136,23 +125,7 @@ final class VideoEditorModel {
         }
     }
 
-    private func attachPreviewGrade(to item: AVPlayerItem, url: URL) {
-        gradeTask?.cancel()
-        let grade = previewGrade
-        gradeTask = Task { @MainActor [weak self] in
-            let composition = try? await AVMutableVideoComposition.videoComposition(with: AVURLAsset(url: url)) { request in
-                request.finish(with: ColorGrade.apply(grade.correction, to: request.sourceImage), context: nil)
-            }
-            guard let self, !Task.isCancelled, let composition, self.player?.currentItem === item else { return }
-            item.videoComposition = composition
-            self.gradeTask = nil
-        }
-    }
 
-    private func refreshPreviewFrame() {
-        guard let player, player.timeControlStatus != .playing else { return }
-        enqueueSeek(player.currentTime().seconds, precise: true)
-    }
 
     func viewportFrame(at time: Double) -> ViewportFrame {
         zoomEnabled ? viewportTimeline.frame(at: time) : .identity
@@ -429,7 +402,7 @@ final class VideoEditorModel {
         }
 
         let hasEffects = exportConfig.padding > 0 || exportConfig.cornerRadius > 0 || exportConfig.shadowStrength > 0
-            || exportConfig.style != .none || exportConfig.aspectRatio != .auto || !exportConfig.colorCorrection.isIdentity
+            || exportConfig.style != .none || exportConfig.aspectRatio != .auto
         let hasZoom = zoomEnabled && !zoomCues.isEmpty
 
         if isClipMode || hasEffects || hasCrop || hasZoom {
@@ -609,7 +582,6 @@ final class VideoEditorModel {
             cornerRadius: cornerRadius,
             backgroundStyle: config.style,
             shadowStrength: config.shadowStrength,
-            colorCorrection: config.colorCorrection,
             outputURL: outputURL
         )
 
@@ -618,7 +590,6 @@ final class VideoEditorModel {
 
     func cleanup() {
         loadTask?.cancel()
-        gradeTask?.cancel()
         thumbnailTask?.cancel()
         pendingSeek = nil
         player?.pause()
@@ -687,13 +658,3 @@ final class VideoEditorModel {
     }
 }
 
-/// Thread-safe handoff of the live grade to the preview's Core Image compositor.
-private final class LivePreviewGrade: @unchecked Sendable {
-    private let lock = NSLock()
-    private var value = ColorCorrection.identity
-
-    var correction: ColorCorrection {
-        get { lock.withLock { value } }
-        set { lock.withLock { value = newValue } }
-    }
-}

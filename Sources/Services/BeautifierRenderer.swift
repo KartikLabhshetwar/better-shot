@@ -3,8 +3,7 @@ import AppKit
 
 enum BeautifierRenderer {
 
-    static func render(image sourceImage: CGImage, config: BeautifierConfig, annotations: [AnnotationItem] = []) -> CGImage? {
-        let image = ColorGrade.apply(config.colorCorrection, to: sourceImage)
+    static func render(image: CGImage, config: BeautifierConfig, annotations: [AnnotationItem] = []) -> CGImage? {
         let imgW = CGFloat(image.width)
         let imgH = CGFloat(image.height)
         let shortEdge = min(imgW, imgH)

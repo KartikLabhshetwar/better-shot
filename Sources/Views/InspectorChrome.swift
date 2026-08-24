@@ -399,3 +399,137 @@ struct EditorCanvasBackdrop: View {
         .ignoresSafeArea()
     }
 }
+
+// MARK: - Editor Panels
+
+enum EditorPanelMetrics {
+    static let radius: CGFloat = 12
+    static let gap: CGFloat = 8
+    static let sidebarWidth: CGFloat = 320
+    static let gripHeight: CGFloat = 14
+    static let defaultTimelineHeight: CGFloat = 160
+    static let minTimelineHeight: CGFloat = 120
+    static let maxTimelineHeight: CGFloat = 360
+    static let minPlayerHeight: CGFloat = 300
+}
+
+private struct EditorPanelChrome: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background(InspectorMaterial())
+            .clipShape(RoundedRectangle(cornerRadius: EditorPanelMetrics.radius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: EditorPanelMetrics.radius, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.09), lineWidth: 0.5)
+            )
+    }
+}
+
+extension View {
+    func editorPanel() -> some View { modifier(EditorPanelChrome()) }
+}
+
+// MARK: - Sidebar Tab Bar
+
+struct InspectorTab<ID: Hashable & Sendable>: Identifiable, Sendable {
+    let id: ID
+    let systemImage: String
+    let title: String
+
+    init(_ id: ID, systemImage: String, title: String) {
+        self.id = id
+        self.systemImage = systemImage
+        self.title = title
+    }
+}
+
+/// Icon tab strip pinned above the inspector, with the selection puck sliding between tabs.
+struct InspectorTabBar<ID: Hashable & Sendable>: View {
+    let tabs: [InspectorTab<ID>]
+    @Binding var selection: ID
+
+    @Namespace private var puck
+    @State private var hovered: ID?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(tabs) { tab in
+                Button {
+                    selection = tab.id
+                } label: {
+                    Image(systemName: tab.systemImage)
+                        .font(.system(size: 14, weight: .medium))
+                        .frame(width: 34, height: 30)
+                        .background {
+                            if selection == tab.id {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(Color.primary.opacity(0.10))
+                                    .matchedGeometryEffect(id: "puck", in: puck)
+                            } else if hovered == tab.id {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(Color.primary.opacity(0.05))
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.inspectorPress(scale: 0.94))
+                .foregroundStyle(selection == tab.id ? Color.primary : .secondary)
+                .onHover { hovered = $0 ? tab.id : nil }
+                .accessibilityLabel(tab.title)
+                .accessibilityAddTraits(selection == tab.id ? [.isButton, .isSelected] : .isButton)
+                .help(tab.title)
+            }
+        }
+        .padding(.horizontal, 6)
+        .frame(height: 44)
+        .background(InspectorBarMaterial())
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.primary.opacity(0.09))
+                .frame(height: 0.5)
+        }
+        .animation(reduceMotion ? nil : InspectorMotion.press, value: selection)
+    }
+}
+
+// MARK: - Timeline Resize Grip
+
+/// Drag handle between the player and the timeline; matches Cap's row-resize grip.
+struct TimelineResizeGrip: View {
+    @Binding var height: CGFloat
+
+    @State private var startHeight: CGFloat?
+    @State private var isHovering = false
+
+    var body: some View {
+        VStack(spacing: 2) {
+            ForEach(0..<3, id: \.self) { _ in
+                Capsule()
+                    .fill(Color.primary.opacity(isHovering || startHeight != nil ? 0.32 : 0.16))
+                    .frame(width: 72, height: 1.5)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: EditorPanelMetrics.gripHeight)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            isHovering = hovering
+            if hovering { NSCursor.resizeUpDown.push() } else { NSCursor.pop() }
+        }
+        .gesture(
+            DragGesture(minimumDistance: 1)
+                .onChanged { value in
+                    let base = startHeight ?? height
+                    if startHeight == nil { startHeight = base }
+                    height = min(
+                        EditorPanelMetrics.maxTimelineHeight,
+                        max(EditorPanelMetrics.minTimelineHeight, base - value.translation.height)
+                    )
+                }
+                .onEnded { _ in startHeight = nil }
+        )
+        .accessibilityLabel("Resize timeline")
+    }
+}

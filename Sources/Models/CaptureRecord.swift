@@ -50,7 +50,6 @@ struct BeautifierConfig: Codable, Equatable {
     var shadowStrength: CGFloat = 0.36
     var alignment: ImageAlignment = .center
     var aspectRatio: CanvasAspectRatio = .auto
-    var colorCorrection: ColorCorrection = .identity
 
     static let `default` = BeautifierConfig()
 
@@ -64,6 +63,5 @@ struct BeautifierConfig: Codable, Equatable {
         shadowStrength = try container.decodeIfPresent(CGFloat.self, forKey: .shadowStrength) ?? 0.36
         alignment = try container.decodeIfPresent(ImageAlignment.self, forKey: .alignment) ?? .center
         aspectRatio = try container.decodeIfPresent(CanvasAspectRatio.self, forKey: .aspectRatio) ?? .auto
-        colorCorrection = try container.decodeIfPresent(ColorCorrection.self, forKey: .colorCorrection) ?? .identity
     }
 }

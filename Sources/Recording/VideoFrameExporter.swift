@@ -13,7 +13,6 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
         let cornerRadius: CGFloat
         let backgroundStyle: BackgroundStyle
         let shadowStrength: CGFloat
-        let colorCorrection: ColorCorrection
         let outputURL: URL
     }
 
@@ -121,7 +120,6 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
             cornerRadius: configuration.cornerRadius,
             backgroundStyle: configuration.backgroundStyle,
             shadowStrength: configuration.shadowStrength,
-            colorCorrection: configuration.colorCorrection
         )
 
         let frameCount = max(1, Int((composition.duration.seconds * 30).rounded()))
@@ -232,11 +230,9 @@ private final class FrameCompositor: @unchecked Sendable {
     private let colorSpace = CGColorSpaceCreateDeviceRGB()
     private let backdrop: CIImage
     private let cardMask: CIImage
-    private let colorCorrection: ColorCorrection
 
-    init(canvasSize: CGSize, cardRect: CGRect, cornerRadius: CGFloat, backgroundStyle: BackgroundStyle, shadowStrength: CGFloat, colorCorrection: ColorCorrection) {
+    init(canvasSize: CGSize, cardRect: CGRect, cornerRadius: CGFloat, backgroundStyle: BackgroundStyle, shadowStrength: CGFloat) {
         self.canvasSize = canvasSize
-        self.colorCorrection = colorCorrection
         let canvasRect = CGRect(origin: .zero, size: canvasSize)
         if let backdropImage = Self.renderBackdrop(canvasSize: canvasSize, cardRect: cardRect, cornerRadius: cornerRadius, backgroundStyle: backgroundStyle, shadowStrength: shadowStrength) {
             backdrop = CIImage(cgImage: backdropImage)
@@ -251,7 +247,7 @@ private final class FrameCompositor: @unchecked Sendable {
     }
 
     func render(videoFrame: CVPixelBuffer, into destination: CVPixelBuffer) {
-        let videoImage = ColorGrade.apply(colorCorrection, to: CIImage(cvPixelBuffer: videoFrame))
+        let videoImage = CIImage(cvPixelBuffer: videoFrame)
         let filter = CIFilter.blendWithMask()
         filter.inputImage = videoImage
         filter.backgroundImage = backdrop

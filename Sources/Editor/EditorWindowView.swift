@@ -12,14 +12,18 @@ struct EditorWindowView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        HSplitView {
-            EditorInspectorView(model: model)
-                .frame(minWidth: 260, idealWidth: 280, maxWidth: 380)
-
+        HStack(spacing: EditorPanelMetrics.gap) {
             EditorCanvasView(model: model)
                 .frame(minWidth: 500, minHeight: 400)
                 .background(EditorCanvasBackdrop())
+                .editorPanel()
+
+            EditorInspectorView(model: model)
+                .frame(width: EditorPanelMetrics.sidebarWidth)
+                .editorPanel()
         }
+        .padding(EditorPanelMetrics.gap)
+        .background(EditorCanvasBackdrop())
         .editorToast($model.toastMessage)
         .confirmationDialog("Delete this capture?", isPresented: $isConfirmingDelete) {
             Button("Delete Capture", role: .destructive) { deleteCapture() }

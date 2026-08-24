@@ -18,6 +18,16 @@ struct AVPlayerRepresentable: NSViewRepresentable {
     }
 }
 
+private enum VideoSidebarTab: Hashable {
+    case clip, zoom, style
+
+    static let tabs: [InspectorTab<VideoSidebarTab>] = [
+        InspectorTab(.clip, systemImage: "scissors", title: "Clip"),
+        InspectorTab(.zoom, systemImage: "plus.magnifyingglass", title: "Zoom"),
+        InspectorTab(.style, systemImage: "photo.on.rectangle.angled", title: "Style")
+    ]
+}
+
 struct VideoEditorView: View {
     @State var model = VideoEditorModel()
     let url: URL
@@ -27,33 +37,44 @@ struct VideoEditorView: View {
     @State private var shareItemID: UUID?
     @State private var isConfirmingDelete = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var sidebarTab: VideoSidebarTab = .clip
+    @AppStorage("editor.video.timelineHeight") private var storedTimelineHeight = EditorPanelMetrics.defaultTimelineHeight
+
+    private var timelineHeight: Binding<CGFloat> {
+        Binding(get: { CGFloat(storedTimelineHeight) }, set: { storedTimelineHeight = Double($0) })
+    }
 
     var body: some View {
-        HSplitView {
-            videoInspector
-                .frame(minWidth: 250, idealWidth: 270, maxWidth: 380)
+        VStack(spacing: EditorPanelMetrics.gap) {
+            HStack(spacing: EditorPanelMetrics.gap) {
+                VStack(spacing: 0) {
+                    VideoPreviewCanvas(model: model)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            VStack(spacing: 0) {
-                VideoPreviewCanvas(model: model)
-                    .frame(minWidth: 460, minHeight: 280)
-
-                VStack(spacing: 8) {
                     VideoTransportBar(model: model)
-                    timelineSection
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(InspectorBarMaterial())
+
+                    TimelineResizeGrip(height: timelineHeight)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background {
-                    InspectorBarMaterial()
-                        .overlay(alignment: .top) {
-                            Rectangle()
-                                .fill(Color.primary.opacity(0.09))
-                                .frame(height: 0.5)
-                        }
-                        .ignoresSafeArea()
-                }
+                .frame(minWidth: 460, minHeight: EditorPanelMetrics.minPlayerHeight)
+                .editorPanel()
+
+                videoInspector
+                    .frame(width: EditorPanelMetrics.sidebarWidth)
+                    .editorPanel()
             }
+
+            timelineSection
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .top)
+                .frame(height: storedTimelineHeight)
+                .editorPanel()
         }
+        .padding(EditorPanelMetrics.gap)
+        .background(EditorCanvasBackdrop())
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
@@ -132,7 +153,7 @@ struct VideoEditorView: View {
         } message: {
             Text("The file is removed from disk. This cannot be undone.")
         }
-        .frame(minWidth: 780, minHeight: 520)
+        .frame(minWidth: 900, minHeight: 640)
         .onAppear { model.loadVideo(from: url) }
         .onDisappear { model.cleanup() }
     }
@@ -140,39 +161,32 @@ struct VideoEditorView: View {
     // MARK: - Inspector Sidebar
 
     private var videoInspector: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 0) {
-                VideoTrimSection(model: model)
+        VStack(spacing: 0) {
+            InspectorTabBar(tabs: VideoSidebarTab.tabs, selection: $sidebarTab)
 
-                InspectorDivider()
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
+                    switch sidebarTab {
+                    case .clip:
+                        VideoTrimSection(model: model)
+                        InspectorDivider()
+                        VideoCropSection(model: model)
+                    case .zoom:
+                        VideoZoomSection(model: model)
+                    case .style:
+                        EffectsSection(config: $model.config)
+                        InspectorDivider()
+                        LayoutSection(config: $model.config, showsAlignment: false)
+                        InspectorDivider()
+                        BackgroundPickerSection(config: $model.config)
+                    }
 
-                VideoZoomSection(model: model)
-
-                InspectorDivider()
-
-                VideoCropSection(model: model)
-
-                InspectorDivider()
-
-                EffectsSection(config: $model.config)
-
-                InspectorDivider()
-
-                ColorGradeSection(correction: $model.config.colorCorrection)
-
-                InspectorDivider()
-
-                LayoutSection(config: $model.config, showsAlignment: false)
-
-                InspectorDivider()
-
-                BackgroundPickerSection(config: $model.config)
-
-                Spacer(minLength: 24)
+                    Spacer(minLength: 24)
+                }
             }
+            .scrollContentBackground(.hidden)
         }
-        .scrollContentBackground(.hidden)
-        .background(InspectorMaterial().ignoresSafeArea())
+        .background(InspectorMaterial())
     }
 
     // MARK: - Timeline

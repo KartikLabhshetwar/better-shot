@@ -119,7 +119,6 @@ enum VideoFrameExportCheck {
             cornerRadius: 24,
             backgroundStyle: .gradient(GradientPreset.presets[0]),
             shadowStrength: 0.6,
-            colorCorrection: ColorPreset.cinematic.values,
             outputURL: outputURL
         )
 
