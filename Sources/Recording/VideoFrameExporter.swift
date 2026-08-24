@@ -50,6 +50,7 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
         var scenes: [SceneWindow] = []
         var pose: Camera3D = .neutral
         var resolveMasks: (@Sendable (TimeInterval) -> [ResolvedMask])?
+        var resolveTexts: (@Sendable (TimeInterval) -> [ResolvedText])?
 
         /// The face cam rides in the same composition as a second video track, so the compositor can draw it as a circle wherever the editor put it.
         struct Camera: Sendable {
@@ -186,7 +187,8 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
             dimWindows: configuration.dimWindows,
             scenes: configuration.scenes,
             pose: configuration.pose,
-            resolveMasks: configuration.resolveMasks
+            resolveMasks: configuration.resolveMasks,
+            resolveTexts: configuration.resolveTexts
         )
 
         let frameCount = max(1, Int((composition.duration.seconds * 30).rounded()))
@@ -336,6 +338,7 @@ private final class FrameCompositor: @unchecked Sendable {
     private let layouts: [SceneMode: SceneLayout]
     private let sceneMasks: [SceneMode: SceneMasks]
     private let resolveMasks: (@Sendable (TimeInterval) -> [ResolvedMask])?
+    private let resolveTexts: (@Sendable (TimeInterval) -> [ResolvedText])?
 
     private struct SceneMasks {
         var screen: CIImage?
@@ -356,11 +359,13 @@ private final class FrameCompositor: @unchecked Sendable {
         dimWindows: [TransitionDim] = [],
         scenes: [SceneWindow] = [],
         pose: Camera3D = .neutral,
-        resolveMasks: (@Sendable (TimeInterval) -> [ResolvedMask])? = nil
+        resolveMasks: (@Sendable (TimeInterval) -> [ResolvedMask])? = nil,
+        resolveTexts: (@Sendable (TimeInterval) -> [ResolvedText])? = nil
     ) {
         self.canvasSize = canvasSize
         self.cardRect = cardRect
         self.resolveMasks = resolveMasks
+        self.resolveTexts = resolveTexts
         self.screenGrade = screenGrade
         self.cameraGrade = cameraGrade
         self.dimWindows = dimWindows
@@ -457,6 +462,10 @@ private final class FrameCompositor: @unchecked Sendable {
         }
 
         var output = posed(content).composited(over: backdrop).cropped(to: canvasRect)
+
+        if let resolveTexts {
+            output = ResolvedText.composited(resolveTexts(frameTime), over: output, canvasSize: canvasSize)
+        }
 
         let brightness = TransitionDim.brightness(of: dimWindows, at: frameTime)
         if brightness < 1 {

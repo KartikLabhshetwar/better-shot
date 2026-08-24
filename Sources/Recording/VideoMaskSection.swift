@@ -80,7 +80,7 @@ private struct MaskRow: View {
 
             Spacer(minLength: 4)
 
-            Text(VideoMaskSection.range(mask))
+            Text(VideoMaskSection.range(mask.start, mask.end))
                 .font(.system(size: 10, weight: .medium, design: .monospaced))
                 .foregroundStyle(.tertiary)
 
@@ -170,7 +170,7 @@ private struct MaskEditor: View {
 
                 Spacer(minLength: 4)
 
-                Text(VideoMaskSection.range(mask))
+                Text(VideoMaskSection.range(mask.start, mask.end))
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundStyle(.tertiary)
                     .contentTransition(.numericText())
@@ -204,8 +204,8 @@ private struct MaskEditor: View {
 }
 
 extension VideoMaskSection {
-    static func range(_ mask: VideoMask) -> String {
-        "\(stamp(mask.start))-\(stamp(mask.end))"
+    static func range(_ start: TimeInterval, _ end: TimeInterval) -> String {
+        "\(stamp(start))-\(stamp(end))"
     }
 
     private static func stamp(_ seconds: TimeInterval) -> String {

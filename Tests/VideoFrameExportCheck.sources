@@ -7,3 +7,4 @@ Sources/Recording/ColorGrade.swift
 Sources/Recording/ClipTimeline.swift
 Sources/Recording/Camera3D.swift
 Sources/Recording/VideoMask.swift
+Sources/Recording/TextOverlay.swift

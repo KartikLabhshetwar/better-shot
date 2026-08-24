@@ -66,6 +66,8 @@ final class VideoEditorModel {
         }
     }
     var selectedMaskID: UUID?
+    var texts: [TextOverlay] = []
+    var selectedTextID: UUID?
 
     var zoomCues: [ZoomCue] = []
     var selectedZoomCueID: UUID?
@@ -111,7 +113,7 @@ final class VideoEditorModel {
             || zoomEnabled || showsClickHighlights
             || config.padding > 0 || config.cornerRadius > 0 || config.shadowStrength > 0
             || config.style != .none || config.aspectRatio != .auto
-            || !screenGrade.isNeutral || !cameraGrade.isNeutral || !pose.isNeutral || !masks.isEmpty
+            || !screenGrade.isNeutral || !cameraGrade.isNeutral || !pose.isNeutral || !masks.isEmpty || !texts.isEmpty
     }
     /// Escape backs out of whatever is in flight before it reaches the window, the way it does everywhere else on the Mac.
     @discardableResult
@@ -124,8 +126,9 @@ final class VideoEditorModel {
             timelineSplitMode = false
             return true
         }
-        if selectedMaskID != nil {
+        if selectedMaskID != nil || selectedTextID != nil {
             selectedMaskID = nil
+            selectedTextID = nil
             return true
         }
         if selectedZoomCueID != nil {
@@ -350,6 +353,34 @@ final class VideoEditorModel {
     func deleteMask(_ id: UUID) {
         masks.removeAll { $0.id == id }
         if selectedMaskID == id { selectedMaskID = nil }
+    }
+
+    var selectedText: TextOverlay? {
+        selectedTextID.flatMap { id in texts.first { $0.id == id } }
+    }
+
+    func addText() {
+        let start = min(currentTime, max(0, duration - TextOverlay.minimumDuration))
+        let overlay = TextOverlay(
+            start: start,
+            end: min(start + TextOverlay.defaultDuration, max(start + TextOverlay.minimumDuration, duration))
+        )
+        texts.append(overlay)
+        selectedTextID = overlay.id
+    }
+
+    func updateText(_ overlay: TextOverlay) {
+        guard let index = texts.firstIndex(where: { $0.id == overlay.id }) else { return }
+        var clamped = overlay
+        clamped.center = CGPoint(x: min(max(overlay.center.x, 0), 1), y: min(max(overlay.center.y, 0), 1))
+        clamped.start = min(max(0, overlay.start), max(0, duration - TextOverlay.minimumDuration))
+        clamped.end = min(max(clamped.start + TextOverlay.minimumDuration, overlay.end), max(duration, clamped.start + TextOverlay.minimumDuration))
+        texts[index] = clamped
+    }
+
+    func deleteText(_ id: UUID) {
+        texts.removeAll { $0.id == id }
+        if selectedTextID == id { selectedTextID = nil }
     }
 
     func setCameraCenter(_ center: CGPoint, in card: CGRect) {
@@ -774,7 +805,7 @@ final class VideoEditorModel {
             || exportConfig.style != .none || exportConfig.aspectRatio != .auto
         let hasZoom = zoomEnabled
 
-        if isClipMode || hasEffects || hasCrop || hasZoom || isCameraVisible || showsClickHighlights || !masks.isEmpty {
+        if isClipMode || hasEffects || hasCrop || hasZoom || isCameraVisible || showsClickHighlights || !masks.isEmpty || !texts.isEmpty {
             return try await exportWithEffects(asset: asset, outputURL: outputURL, config: exportConfig)
         }
 
@@ -1073,6 +1104,12 @@ final class VideoEditorModel {
             }
         }
 
+        let exportTexts = texts
+        let canvasSize = CGSize(width: canvasW, height: canvasH)
+        let resolveTexts: @Sendable (TimeInterval) -> [ResolvedText] = { editorTime in
+            TextOverlay.resolved(exportTexts, atSourceTime: mapToSourceTime(editorTime), canvasSize: canvasSize)
+        }
+
         let cardRect = CGRect(x: offsetX, y: offsetY, width: vidW, height: vidH)
         let exportConfig = VideoFrameExporter.Configuration(
             composition: composition,
@@ -1094,7 +1131,8 @@ final class VideoEditorModel {
             dimWindows: dimWindows,
             scenes: scenes,
             pose: pose,
-            resolveMasks: exportMasks.isEmpty ? nil : resolveMasks
+            resolveMasks: exportMasks.isEmpty ? nil : resolveMasks,
+            resolveTexts: exportTexts.isEmpty ? nil : resolveTexts
         )
 
         return try await VideoFrameExporter().export(exportConfig) { [weak self] fraction in

@@ -46,7 +46,7 @@ struct VideoEditorView: View {
         VStack(spacing: EditorPanelMetrics.gap) {
             HStack(spacing: EditorPanelMetrics.gap) {
                 VStack(spacing: 0) {
-                    VideoPreviewCanvas(model: model, isEditingMasks: inspectorTab == .overlay)
+                    VideoPreviewCanvas(model: model, isEditingOverlays: inspectorTab == .overlay)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                     VideoTransportBar(model: model)
@@ -203,6 +203,8 @@ struct VideoEditorView: View {
             InspectorDivider()
             VideoCursorSection(model: model)
         case .overlay:
+            VideoTextSection(model: model)
+            InspectorDivider()
             VideoMaskSection(model: model)
         case .camera:
             if model.hasCamera {
@@ -373,7 +375,7 @@ struct VideoEditorView: View {
 /// The preview reads the playhead to place the zoom viewport, so it lives in its own view: reading it in `VideoEditorView.body` re-evaluated the inspector and toolbar thirty times a second.
 private struct VideoPreviewCanvas: View {
     @Bindable var model: VideoEditorModel
-    let isEditingMasks: Bool
+    let isEditingOverlays: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -427,7 +429,7 @@ private struct VideoPreviewCanvas: View {
                                     .allowsHitTesting(false)
                                 }
 
-                                if isEditingMasks && !model.isCropping {
+                                if isEditingOverlays && !model.isCropping {
                                     MaskEditingLayer(model: model)
                                 }
                             }
@@ -460,6 +462,14 @@ private struct VideoPreviewCanvas: View {
                     .modifier(CardPose(pose: model.isCropping ? .neutral : model.pose, card: card))
                     .animation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 1), value: model.sceneAtPlayhead)
                     .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 1), value: model.isCropping)
+
+                    if !model.texts.isEmpty && !model.isCropping {
+                        TextOverlayLayer(
+                            model: model,
+                            canvasSize: CGSize(width: canvasW, height: canvasH),
+                            isEditing: isEditingOverlays
+                        )
+                    }
 
                     if model.isCropping {
                         CropBox(rect: $model.cropRect, frameSize: CGSize(width: videoW, height: videoH))

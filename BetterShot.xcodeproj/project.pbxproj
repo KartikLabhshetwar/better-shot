@@ -29,6 +29,7 @@
 		1CF87FFD59B2CF267AF92376 /* MicrophoneCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B88A8ED1633D6E01CE4EE0FA /* MicrophoneCatalog.swift */; };
 		1F0739DA40E1862702A03326 /* InspectorValueFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52E6D8AFD167052CD093BDBB /* InspectorValueFormat.swift */; };
 		224A19E23130B834F212C3D3 /* RecordingBarPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01335DD6AA3E94EA2C92C22E /* RecordingBarPresenter.swift */; };
+		2BBDA4B9D7B668E10F4E0B54 /* VideoTextSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A5F909E7BAF90C7475BDC8 /* VideoTextSection.swift */; };
 		2D2CFBFFDA6767FA9FB2C2E9 /* BeautifierRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D58300A37E3A994CE15987C5 /* BeautifierRenderer.swift */; };
 		328ADEC511F4BFC1C5DBE414 /* EscapeKey.swift in Sources */ = {isa = PBXBuildFile; fileRef = 178C37EB6125E1A3345A3BFB /* EscapeKey.swift */; };
 		35166CF539A9A0D4C42CF4EE /* PointerCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24D46DA7E74F2EB4C230512D /* PointerCapture.swift */; };
@@ -48,6 +49,7 @@
 		615EE1453C9A7BDFD9248E09 /* ScreenCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4495302A23BB2192D91C5ED3 /* ScreenCapture.swift */; };
 		6682480DF2FDA028736D23D2 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9822447B9DE8F15B9CC94381 /* PreferencesView.swift */; };
 		67FFFB48B47C8A28384B87DC /* VideoColorSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B7210A496D5FEFB23702874 /* VideoColorSection.swift */; };
+		687598C3AAAA7B4594DF9CE4 /* TextOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41398C9084CB762F19EBCC70 /* TextOverlay.swift */; };
 		7492DCC25BAEBAFD914AAC6C /* EditorCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D72A7FD249FD623240D8735 /* EditorCanvasView.swift */; };
 		7A3EBC41CA7A6F9DE045888B /* AnnotationRedactionImageProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 147306FB804DB8E1D8FC83DA /* AnnotationRedactionImageProcessor.swift */; };
 		7C4AD16D6095D80279D2C66E /* RecordingBarChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8908BA741C21BE7AAFF8F028 /* RecordingBarChrome.swift */; };
@@ -116,6 +118,7 @@
 		34E0B1E09D31B739AF031BC5 /* HostWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostWindow.swift; sourceTree = "<group>"; };
 		3E1907B91A013BCA494AB08A /* ColorPickerOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorPickerOverlay.swift; sourceTree = "<group>"; };
 		4056BF81776068841C838844 /* ActiveDisplayResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveDisplayResolver.swift; sourceTree = "<group>"; };
+		41398C9084CB762F19EBCC70 /* TextOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextOverlay.swift; sourceTree = "<group>"; };
 		4495302A23BB2192D91C5ED3 /* ScreenCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCapture.swift; sourceTree = "<group>"; };
 		451695CAAFEDDEA2ECE3CEF7 /* ShareManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareManifest.swift; sourceTree = "<group>"; };
 		4B626577BDFABF32D144DC8B /* CaptureOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureOrchestrator.swift; sourceTree = "<group>"; };
@@ -153,6 +156,7 @@
 		94D707990F014D8BE452023A /* BundledBackgrounds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundledBackgrounds.swift; sourceTree = "<group>"; };
 		9822447B9DE8F15B9CC94381 /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
 		9D72A7FD249FD623240D8735 /* EditorCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorCanvasView.swift; sourceTree = "<group>"; };
+		A0A5F909E7BAF90C7475BDC8 /* VideoTextSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoTextSection.swift; sourceTree = "<group>"; };
 		A4065CB57977B06461B6B42A /* Camera3D.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Camera3D.swift; sourceTree = "<group>"; };
 		A9FD147E96AE29FF1E11357F /* Backgrounds */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Backgrounds; path = Resources/Backgrounds; sourceTree = SOURCE_ROOT; };
 		AE1AF97C84324A8DA1B6948D /* PreviewOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewOverlay.swift; sourceTree = "<group>"; };
@@ -358,6 +362,7 @@
 				77D11FADA33C25A258D5A97A /* RecordingStagingDirectory.swift */,
 				C72B137FE8A09ED62E3E58DF /* RecordingStatusBar.swift */,
 				947DF939565AA34A0BC56B3F /* ScreenRecordingManager.swift */,
+				41398C9084CB762F19EBCC70 /* TextOverlay.swift */,
 				087237D165BDF4246FC3A356 /* TimelineFilmstrip.swift */,
 				CCF297FE8B79DB3BC5B6B470 /* TimelineTransform.swift */,
 				85A36EDCABE99B72392EB93C /* TrimSelection.swift */,
@@ -369,6 +374,7 @@
 				095CB855F57CF7731EACD376 /* VideoInspectorTabs.swift */,
 				16E1AC78A2EF608ADE1326F8 /* VideoMask.swift */,
 				69C174F1C28F814A4A2FB864 /* VideoMaskSection.swift */,
+				A0A5F909E7BAF90C7475BDC8 /* VideoTextSection.swift */,
 				29B6B3D52CB7D59DAE025C2D /* ViewportTimeline.swift */,
 				FD99B20FCC14CE7B29F78502 /* ZoomCue.swift */,
 			);
@@ -536,6 +542,7 @@
 				073D955347C6F1FBC8B7367E /* ShareService.swift in Sources */,
 				B9B5CCB2FE5EDEA8A879E245 /* SharingSettingsTab.swift in Sources */,
 				8782829F9AD2E1BE2B796AC7 /* ShortcutService.swift in Sources */,
+				687598C3AAAA7B4594DF9CE4 /* TextOverlay.swift in Sources */,
 				AC73400A5306BD53C5FB8D6E /* TimelineFilmstrip.swift in Sources */,
 				0CB60CEFB5D9FE7979CB5179 /* TimelineTransform.swift in Sources */,
 				52B62D47D9FDBE73F0FEDB1A /* ToastWindow.swift in Sources */,
@@ -549,6 +556,7 @@
 				0829025143E7A865F64AA834 /* VideoInspectorTabs.swift in Sources */,
 				1AF7851FB729B82C6DCC1A4C /* VideoMask.swift in Sources */,
 				B47137742DCBF868686D2B1E /* VideoMaskSection.swift in Sources */,
+				2BBDA4B9D7B668E10F4E0B54 /* VideoTextSection.swift in Sources */,
 				EC29168521E36776F7087CF4 /* ViewportTimeline.swift in Sources */,
 				08EE0F43183D219119172084 /* ZoomCue.swift in Sources */,
 			);

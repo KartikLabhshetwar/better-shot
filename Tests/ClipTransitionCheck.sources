@@ -7,3 +7,4 @@ Sources/Models/BackgroundStyle.swift
 Sources/Models/BundledBackgrounds.swift
 Sources/Recording/Camera3D.swift
 Sources/Recording/VideoMask.swift
+Sources/Recording/TextOverlay.swift

@@ -13,6 +13,7 @@ transitions, scene changes, a tilted 3D card, color) now live in four tabs.
 
 ### Added
 
+- **Text segments**: Drop a line of text on the canvas for a stretch of the recording. It sits on the background rather than inside the video, so it holds still while the recording zooms under it. Size, weight, alignment, color, width and shadow, plus an entrance and an exit picked from fade, slide, pop or a typewriter reveal. Drag it where you want it on the preview, and one resolve drives both what you see and what the exporter draws
 - **Masks**: An Overlay tab holds boxes that either hide part of the frame or spotlight it. Hide blurs or pixelates what is inside the box, and it is destroyed in the export rather than covered, so a password on screen never ships. Spotlight dims everything outside the box and fades in and out so it does not blink. Drag the box on the video, set its start and end from the playhead, and the same math paints the live preview and the exported file
 - **Tabbed video inspector**: The right sidebar is now five tabs instead of one long scroll: Clip (scissors), Motion (arrow), Camera (person), Overlay (masks), and Style (paintbrush). Each tab holds only the controls that act on what you selected, so the sidebar stops being a wall of disclosure triangles
 - **Per-clip audio mode**: Speeding a clip up no longer forces one behavior on its audio. Each clip picks Mute, Keep Pitch, or Match Speed, so a 4x skim can stay silent while a 0.5x hold keeps a natural voice
