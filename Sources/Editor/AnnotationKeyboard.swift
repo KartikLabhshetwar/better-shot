@@ -117,25 +117,11 @@ final class AnnotationKeyCommandHandlerView: NSView {
 
     private static func toolShortcut(for event: NSEvent) -> AnnotationTool? {
         guard event.modifierFlags.intersection([.command, .option, .control]).isEmpty,
-              let character = event.charactersIgnoringModifiers?.lowercased(),
-              character.count == 1 else {
+              let characters = event.charactersIgnoringModifiers?.lowercased(),
+              characters.count == 1,
+              let character = characters.first else {
             return nil
         }
-
-        switch character {
-        case "v": return .select
-        case "r": return .rectangle
-        case "f": return .filledRectangle
-        case "o": return .ellipse
-        case "l": return .line
-        case "a": return .arrow
-        case "d": return .freehand
-        case "n": return .numberedCircle
-        case "b": return .blur
-        case "g": return .spotlight
-        case "t": return .text
-        case "h": return .select
-        default: return nil
-        }
+        return AnnotationTool.tool(forShortcut: character)
     }
 }

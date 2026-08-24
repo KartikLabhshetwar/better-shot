@@ -404,6 +404,7 @@ final class CapTimelineControl: NSView {
         if model.timelineSplitMode, case .segmentBody = hit {
             guard let candidate = splitCandidate(at: point) else { return }
             model.split(at: candidate.time)
+            model.timelineSplitMode = false
             splitPreview = nil
             syncFromModel()
             return

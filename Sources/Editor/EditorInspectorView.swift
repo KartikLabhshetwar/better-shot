@@ -131,6 +131,13 @@ private struct AnnotationInspectorToolGrid: View {
                 .font(.system(size: 14, weight: .medium))
                 .frame(maxWidth: .infinity)
                 .frame(height: 32)
+                .overlay(alignment: .bottomTrailing) {
+                    Text(String(tool.shortcut).uppercased())
+                        .font(.system(size: 7, weight: .bold, design: .rounded))
+                        .foregroundStyle(.tertiary)
+                        .padding(.trailing, 3)
+                        .padding(.bottom, 2)
+                }
                 .background(
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
                         .fill(isSelected ? Color.accentColor.opacity(0.16) : (hoveredTool == tool ? Color.primary.opacity(0.07) : .clear))
@@ -142,7 +149,7 @@ private struct AnnotationInspectorToolGrid: View {
         .onHover { hoveredTool = $0 ? tool : nil }
         .accessibilityLabel(tool.title)
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
-        .help(tool.title)
+        .help("\(tool.title) (\(String(tool.shortcut).uppercased()))")
     }
 }
 

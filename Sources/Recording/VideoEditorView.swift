@@ -235,17 +235,23 @@ struct VideoEditorView: View {
 
     private var clipToolbar: some View {
         HStack(spacing: 6) {
-            InspectorPill("Split", systemImage: "scissors", isActive: model.timelineSplitMode) {
+            InspectorPill("Split", systemImage: "scissors") {
+                model.splitAtPlayhead()
+            }
+            .keyboardShortcut("s", modifiers: [])
+            .help("Cut at the playhead (S)")
+
+            InspectorPill("Cut Anywhere", systemImage: "scissors.badge.ellipsis", isActive: model.timelineSplitMode) {
                 model.timelineSplitMode.toggle()
             }
-            .help("Click a clip on the timeline to cut it")
+            .help("Click a clip on the timeline to cut it there")
 
-            if model.selectedClipID != nil {
-                InspectorPill("Delete", systemImage: "trash", role: .destructive) {
-                    model.deleteSelectedClip()
-                }
-                .disabled(!model.canDeleteSelectedClip)
+            InspectorPill("Delete", systemImage: "trash", role: .destructive) {
+                model.deleteSelectedClip()
             }
+            .keyboardShortcut(.delete, modifiers: [])
+            .disabled(!model.canDeleteSelectedClip)
+            .help("Remove the selected clip (\u{232B})")
 
             Spacer()
 
@@ -253,8 +259,10 @@ struct VideoEditorView: View {
                 Text("\(model.clips.count) clips")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.tertiary)
+                    .contentTransition(.numericText())
             }
         }
+        .animation(reduceMotion ? nil : InspectorMotion.reveal, value: model.clips.count)
     }
 
     // MARK: - Actions

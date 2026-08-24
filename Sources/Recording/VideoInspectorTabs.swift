@@ -25,6 +25,15 @@ enum VideoInspectorTab: String, CaseIterable, Identifiable {
         case .style: "paintbrush"
         }
     }
+
+    var shortcut: Character {
+        switch self {
+        case .clip: "1"
+        case .motion: "2"
+        case .camera: "3"
+        case .style: "4"
+        }
+    }
 }
 
 /// Cap groups the sidebar behind icon tabs so one scroll does not hold every control at once.
@@ -62,9 +71,10 @@ struct InspectorTabBar: View {
                     }
                 }
                 .buttonStyle(.inspectorPress(scale: 0.96))
+                .keyboardShortcut(KeyEquivalent(tab.shortcut), modifiers: .command)
                 .disabled(!enabled)
                 .opacity(enabled ? 1 : 0.35)
-                .help(enabled ? tab.title : "\(tab.title) is unavailable for this recording")
+                .help(enabled ? "\(tab.title) (\u{2318}\(tab.shortcut))" : "\(tab.title) is unavailable for this recording")
                 .accessibilityLabel(tab.title)
                 .accessibilityAddTraits(selection == tab ? .isSelected : [])
             }

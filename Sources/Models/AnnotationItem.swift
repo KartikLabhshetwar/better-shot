@@ -658,6 +658,27 @@ enum AnnotationTool: String, CaseIterable, Identifiable, Codable {
         }
     }
 
+    var shortcut: Character {
+        switch self {
+        case .select: "v"
+        case .rectangle: "r"
+        case .filledRectangle: "f"
+        case .ellipse: "o"
+        case .line: "l"
+        case .arrow: "a"
+        case .freehand: "d"
+        case .numberedCircle: "n"
+        case .pixelate: "p"
+        case .blur: "b"
+        case .spotlight: "g"
+        case .text: "t"
+        }
+    }
+
+    static func tool(forShortcut character: Character) -> AnnotationTool? {
+        toolbarCases.first { $0.shortcut == character }
+    }
+
     var isFilledShape: Bool {
         self == .filledRectangle
     }
