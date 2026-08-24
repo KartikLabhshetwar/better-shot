@@ -49,6 +49,7 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
         var dimWindows: [TransitionDim] = []
         var scenes: [SceneWindow] = []
         var pose: Camera3D = .neutral
+        var resolveMasks: (@Sendable (TimeInterval) -> [ResolvedMask])?
 
         /// The face cam rides in the same composition as a second video track, so the compositor can draw it as a circle wherever the editor put it.
         struct Camera: Sendable {
@@ -184,7 +185,8 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
             cameraGrade: configuration.cameraGrade,
             dimWindows: configuration.dimWindows,
             scenes: configuration.scenes,
-            pose: configuration.pose
+            pose: configuration.pose,
+            resolveMasks: configuration.resolveMasks
         )
 
         let frameCount = max(1, Int((composition.duration.seconds * 30).rounded()))
@@ -333,6 +335,7 @@ private final class FrameCompositor: @unchecked Sendable {
     private let posedCorners: [CGPoint]?
     private let layouts: [SceneMode: SceneLayout]
     private let sceneMasks: [SceneMode: SceneMasks]
+    private let resolveMasks: (@Sendable (TimeInterval) -> [ResolvedMask])?
 
     private struct SceneMasks {
         var screen: CIImage?
@@ -352,10 +355,12 @@ private final class FrameCompositor: @unchecked Sendable {
         cameraGrade: ColorGrade = .neutral,
         dimWindows: [TransitionDim] = [],
         scenes: [SceneWindow] = [],
-        pose: Camera3D = .neutral
+        pose: Camera3D = .neutral,
+        resolveMasks: (@Sendable (TimeInterval) -> [ResolvedMask])? = nil
     ) {
         self.canvasSize = canvasSize
         self.cardRect = cardRect
+        self.resolveMasks = resolveMasks
         self.screenGrade = screenGrade
         self.cameraGrade = cameraGrade
         self.dimWindows = dimWindows
@@ -412,8 +417,9 @@ private final class FrameCompositor: @unchecked Sendable {
             let source = CIImage(cvPixelBuffer: videoFrame)
             let fit = Self.aspectFillTransform(from: cardRect, into: screenRect)
             let placed = screenRect == cardRect ? source : source.cropped(to: cardRect).transformed(by: fit)
+            let graded = screenGrade.applied(to: placed, extent: screenRect, frameTime: frameTime)
             let filter = CIFilter.blendWithMask()
-            filter.inputImage = screenGrade.applied(to: placed, extent: screenRect, frameTime: frameTime)
+            filter.inputImage = ResolvedMask.applied(resolveMasks?(frameTime) ?? [], to: graded, extent: screenRect)
             filter.backgroundImage = content
             filter.maskImage = screenMask
             content = (filter.outputImage ?? content).cropped(to: canvasRect)

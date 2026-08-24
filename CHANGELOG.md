@@ -13,7 +13,8 @@ transitions, scene changes, a tilted 3D card, color) now live in four tabs.
 
 ### Added
 
-- **Tabbed video inspector**: The right sidebar is now four tabs instead of one long scroll: Clip (scissors), Motion (arrow), Camera (person), and Style (paintbrush). Each tab holds only the controls that act on what you selected, so the sidebar stops being a wall of disclosure triangles
+- **Masks**: An Overlay tab holds boxes that either hide part of the frame or spotlight it. Hide blurs or pixelates what is inside the box, and it is destroyed in the export rather than covered, so a password on screen never ships. Spotlight dims everything outside the box and fades in and out so it does not blink. Drag the box on the video, set its start and end from the playhead, and the same math paints the live preview and the exported file
+- **Tabbed video inspector**: The right sidebar is now five tabs instead of one long scroll: Clip (scissors), Motion (arrow), Camera (person), Overlay (masks), and Style (paintbrush). Each tab holds only the controls that act on what you selected, so the sidebar stops being a wall of disclosure triangles
 - **Per-clip audio mode**: Speeding a clip up no longer forces one behavior on its audio. Each clip picks Mute, Keep Pitch, or Match Speed, so a 4x skim can stay silent while a 0.5x hold keeps a natural voice
 - **Transitions**: Adjacent clips can cross into each other with Crossfade or Fade Through Black, with an adjustable length. The transition is baked into the export rather than faked in the preview
 - **Scene modes and split screen**: Every clip carries its own scene: Both (screen with the floating face cam), Screen only, Camera only, or Split, which drops the bubble and gives the screen and the camera a pane each. Change scenes mid-recording and the export cuts between them
@@ -24,7 +25,7 @@ transitions, scene changes, a tilted 3D card, color) now live in four tabs.
 - **Countdown overlay**: The start delay now draws a full-screen countdown so you know exactly when capture begins
 - **Escape closes editors**: Escape dismisses the image and video editors, and an unsaved editor asks before it closes rather than discarding your work
 - **Cut at the playhead**: The video editor's Split button now cuts where the playhead sits, on click or with `S`. Cut Anywhere is a separate toggle for slicing a clip at the point you click, and it turns itself off once the cut lands, so you never get stuck in a cutting mode. `Delete` removes the selected clip
-- **Inspector tab shortcuts**: Command 1 through Command 4 jump between Clip, Motion, Camera, and Style
+- **Inspector tab shortcuts**: Command 1 through Command 5 jump between Clip, Motion, Camera, Overlay, and Style
 - **Annotation keys are visible**: The image editor's tools always had single-key shortcuts, but nothing said so. Each tool now carries its key in the corner of its button and in its tooltip, read from the same table the keyboard uses, so the two cannot drift apart
 
 ### Changed

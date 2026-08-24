@@ -23,6 +23,7 @@
 		1850191A8CA9613E6AFF3B6E /* RecordingBarFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAA2826AFAC3FE6B63D302E5 /* RecordingBarFrame.swift */; };
 		1881BC67C7A74FEC212DA8EC /* EditorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7307DAB0AA0DDC8AB161E476 /* EditorModel.swift */; };
 		190449BC0719D36DD018A4D8 /* RecordingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3F4A34905E009410BCE4384 /* RecordingSession.swift */; };
+		1AF7851FB729B82C6DCC1A4C /* VideoMask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16E1AC78A2EF608ADE1326F8 /* VideoMask.swift */; };
 		1C291E3F80FE43A2FEA8F663 /* RecordingAreaHighlight.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6198417D4285E0B0F93CD9C /* RecordingAreaHighlight.swift */; };
 		1CBDB240923B9F176D454CEA /* Backgrounds in Resources */ = {isa = PBXBuildFile; fileRef = A9FD147E96AE29FF1E11357F /* Backgrounds */; };
 		1CF87FFD59B2CF267AF92376 /* MicrophoneCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = B88A8ED1633D6E01CE4EE0FA /* MicrophoneCatalog.swift */; };
@@ -63,6 +64,7 @@
 		A75C4FCCE3EE54A0AB010297 /* InspectorSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF9F61AFB543497004AF4EB3 /* InspectorSlider.swift */; };
 		AC73400A5306BD53C5FB8D6E /* TimelineFilmstrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 087237D165BDF4246FC3A356 /* TimelineFilmstrip.swift */; };
 		B20B0C52AEF6529B4DEE0B46 /* AnnotationItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6DFE09CC845C78A0C3D2685 /* AnnotationItem.swift */; };
+		B47137742DCBF868686D2B1E /* VideoMaskSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69C174F1C28F814A4A2FB864 /* VideoMaskSection.swift */; };
 		B89AAE0FC436D51766C43D3C /* InspectorChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B3B484A34F96CA7461389C /* InspectorChrome.swift */; };
 		B9B5CCB2FE5EDEA8A879E245 /* SharingSettingsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D62F387131F8D7E1EF8BD54 /* SharingSettingsTab.swift */; };
 		BA2E35F115F67D7CA6DEE5A9 /* BetterShotApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F74F2F48E0775A96906E180F /* BetterShotApp.swift */; };
@@ -102,6 +104,7 @@
 		10E86CE1D0EB9F9A7F5A8B85 /* CropBox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropBox.swift; sourceTree = "<group>"; };
 		11DEB19CCE7ED49CF1136508 /* HistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStore.swift; sourceTree = "<group>"; };
 		147306FB804DB8E1D8FC83DA /* AnnotationRedactionImageProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationRedactionImageProcessor.swift; sourceTree = "<group>"; };
+		16E1AC78A2EF608ADE1326F8 /* VideoMask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoMask.swift; sourceTree = "<group>"; };
 		17544CDA089E3F65F7BCE622 /* AnnotationDrawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationDrawing.swift; sourceTree = "<group>"; };
 		178C37EB6125E1A3345A3BFB /* EscapeKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EscapeKey.swift; sourceTree = "<group>"; };
 		1A8FF0E5AD713FC1D7E99DE7 /* BetterShotDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BetterShotDelegate.swift; sourceTree = "<group>"; };
@@ -124,6 +127,7 @@
 		5BADFC6B5CCEDC123DF696D8 /* AppUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdater.swift; sourceTree = "<group>"; };
 		679F127F74BFC991CCDCA27B /* R2CredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = R2CredentialStore.swift; sourceTree = "<group>"; };
 		688AC417DC21DAAB08B94675 /* RecordingSourceCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSourceCatalog.swift; sourceTree = "<group>"; };
+		69C174F1C28F814A4A2FB864 /* VideoMaskSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoMaskSection.swift; sourceTree = "<group>"; };
 		6B7210A496D5FEFB23702874 /* VideoColorSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoColorSection.swift; sourceTree = "<group>"; };
 		7307DAB0AA0DDC8AB161E476 /* EditorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorModel.swift; sourceTree = "<group>"; };
 		731AB94C144EE3BF763C4518 /* RecordingAudioPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingAudioPlan.swift; sourceTree = "<group>"; };
@@ -363,6 +367,8 @@
 				AED95760D56AC3DD0DAB3150 /* VideoExportError.swift */,
 				51F4CF838E8E6B0F1CF28918 /* VideoFrameExporter.swift */,
 				095CB855F57CF7731EACD376 /* VideoInspectorTabs.swift */,
+				16E1AC78A2EF608ADE1326F8 /* VideoMask.swift */,
+				69C174F1C28F814A4A2FB864 /* VideoMaskSection.swift */,
 				29B6B3D52CB7D59DAE025C2D /* ViewportTimeline.swift */,
 				FD99B20FCC14CE7B29F78502 /* ZoomCue.swift */,
 			);
@@ -541,6 +547,8 @@
 				F624776F3B0A0526D8C35911 /* VideoExportError.swift in Sources */,
 				923CCF853D24DB686D9CB758 /* VideoFrameExporter.swift in Sources */,
 				0829025143E7A865F64AA834 /* VideoInspectorTabs.swift in Sources */,
+				1AF7851FB729B82C6DCC1A4C /* VideoMask.swift in Sources */,
+				B47137742DCBF868686D2B1E /* VideoMaskSection.swift in Sources */,
 				EC29168521E36776F7087CF4 /* ViewportTimeline.swift in Sources */,
 				08EE0F43183D219119172084 /* ZoomCue.swift in Sources */,
 			);

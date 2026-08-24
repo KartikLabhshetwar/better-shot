@@ -46,7 +46,7 @@ struct VideoEditorView: View {
         VStack(spacing: EditorPanelMetrics.gap) {
             HStack(spacing: EditorPanelMetrics.gap) {
                 VStack(spacing: 0) {
-                    VideoPreviewCanvas(model: model)
+                    VideoPreviewCanvas(model: model, isEditingMasks: inspectorTab == .overlay)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                     VideoTransportBar(model: model)
@@ -202,6 +202,8 @@ struct VideoEditorView: View {
             VideoZoomSection(model: model)
             InspectorDivider()
             VideoCursorSection(model: model)
+        case .overlay:
+            VideoMaskSection(model: model)
         case .camera:
             if model.hasCamera {
                 VideoCameraSection(model: model)
@@ -371,6 +373,7 @@ struct VideoEditorView: View {
 /// The preview reads the playhead to place the zoom viewport, so it lives in its own view: reading it in `VideoEditorView.body` re-evaluated the inspector and toolbar thirty times a second.
 private struct VideoPreviewCanvas: View {
     @Bindable var model: VideoEditorModel
+    let isEditingMasks: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -422,6 +425,10 @@ private struct VideoPreviewCanvas: View {
                                         radius: min(videoW, videoH) * VideoEditorModel.clickHighlightRadiusFraction * model.clickHighlightScale
                                     )
                                     .allowsHitTesting(false)
+                                }
+
+                                if isEditingMasks && !model.isCropping {
+                                    MaskEditingLayer(model: model)
                                 }
                             }
                             .frame(width: videoW / visible.width, height: videoH / visible.height)

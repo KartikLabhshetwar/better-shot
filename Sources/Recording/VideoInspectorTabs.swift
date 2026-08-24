@@ -4,6 +4,7 @@ enum VideoInspectorTab: String, CaseIterable, Identifiable {
     case clip
     case motion
     case camera
+    case overlay
     case style
 
     var id: String { rawValue }
@@ -13,6 +14,7 @@ enum VideoInspectorTab: String, CaseIterable, Identifiable {
         case .clip: "Clip"
         case .motion: "Motion"
         case .camera: "Camera"
+        case .overlay: "Overlay"
         case .style: "Style"
         }
     }
@@ -22,6 +24,7 @@ enum VideoInspectorTab: String, CaseIterable, Identifiable {
         case .clip: "scissors"
         case .motion: "cursorarrow.motionlines"
         case .camera: "person.crop.circle"
+        case .overlay: "square.on.square.dashed"
         case .style: "paintbrush"
         }
     }
@@ -31,7 +34,8 @@ enum VideoInspectorTab: String, CaseIterable, Identifiable {
         case .clip: "1"
         case .motion: "2"
         case .camera: "3"
-        case .style: "4"
+        case .overlay: "4"
+        case .style: "5"
         }
     }
 }

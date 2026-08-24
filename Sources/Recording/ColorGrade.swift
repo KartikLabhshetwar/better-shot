@@ -195,20 +195,3 @@ nonisolated struct ColorGrade: Equatable, Sendable {
         return blend.outputImage?.cropped(to: image.extent) ?? image
     }
 }
-
-/// The preview player grades on a background queue while the sliders move on the main actor, so the current grade lives behind a lock.
-nonisolated final class ColorGradeBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var screen = ColorGrade.neutral
-    private var camera = ColorGrade.neutral
-
-    var screenGrade: ColorGrade {
-        get { lock.withLock { screen } }
-        set { lock.withLock { screen = newValue } }
-    }
-
-    var cameraGrade: ColorGrade {
-        get { lock.withLock { camera } }
-        set { lock.withLock { camera = newValue } }
-    }
-}

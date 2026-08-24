@@ -6,3 +6,4 @@ Sources/Recording/ColorGrade.swift
 Sources/Models/BackgroundStyle.swift
 Sources/Models/BundledBackgrounds.swift
 Sources/Recording/Camera3D.swift
+Sources/Recording/VideoMask.swift

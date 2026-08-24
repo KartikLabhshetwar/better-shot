@@ -1,5 +1,6 @@
 import AVFoundation
 import AppKit
+import CoreImage
 import SwiftUI
 
 
@@ -37,18 +38,18 @@ final class VideoEditorModel {
     var screenGrade = ColorGrade.neutral {
         didSet {
             guard screenGrade != oldValue else { return }
-            gradeBox.screenGrade = screenGrade
-            syncGradePreview()
+            filterBox.screenGrade = screenGrade
+            syncPreviewFilters()
         }
     }
     var cameraGrade = ColorGrade.neutral {
         didSet {
             guard cameraGrade != oldValue else { return }
-            gradeBox.cameraGrade = cameraGrade
-            syncGradePreview()
+            filterBox.cameraGrade = cameraGrade
+            syncPreviewFilters()
         }
     }
-    @ObservationIgnored private let gradeBox = ColorGradeBox()
+    @ObservationIgnored private let filterBox = PreviewFilterBox()
 
     var pose = Camera3D.neutral
 
@@ -56,6 +57,15 @@ final class VideoEditorModel {
     var isCropping = false
     var cropRect = CropGeometry.identity
     private var cropRectBeforeEditing = CropGeometry.identity
+
+    var masks: [VideoMask] = [] {
+        didSet {
+            guard masks != oldValue else { return }
+            filterBox.screenMasks = masks
+            syncPreviewFilters()
+        }
+    }
+    var selectedMaskID: UUID?
 
     var zoomCues: [ZoomCue] = []
     var selectedZoomCueID: UUID?
@@ -101,7 +111,7 @@ final class VideoEditorModel {
             || zoomEnabled || showsClickHighlights
             || config.padding > 0 || config.cornerRadius > 0 || config.shadowStrength > 0
             || config.style != .none || config.aspectRatio != .auto
-            || !screenGrade.isNeutral || !cameraGrade.isNeutral || !pose.isNeutral
+            || !screenGrade.isNeutral || !cameraGrade.isNeutral || !pose.isNeutral || !masks.isEmpty
     }
     /// Escape backs out of whatever is in flight before it reaches the window, the way it does everywhere else on the Mac.
     @discardableResult
@@ -112,6 +122,10 @@ final class VideoEditorModel {
         }
         if timelineSplitMode {
             timelineSplitMode = false
+            return true
+        }
+        if selectedMaskID != nil {
+            selectedMaskID = nil
             return true
         }
         if selectedZoomCueID != nil {
@@ -305,7 +319,37 @@ final class VideoEditorModel {
         player.isMuted = true
         player.actionAtItemEnd = .pause
         cameraPlayer = player
-        syncGradePreview()
+        syncPreviewFilters()
+    }
+
+    var selectedMask: VideoMask? {
+        selectedMaskID.flatMap { id in masks.first { $0.id == id } }
+    }
+
+    /// Masks live in source time, the same clock the preview player runs on, so the playhead lands one straight into place.
+    func addMask(kind: VideoMask.Kind) {
+        let start = min(currentTime, max(0, duration - VideoMask.minimumDuration))
+        var mask = VideoMask(
+            start: start,
+            end: min(start + VideoMask.defaultDuration, max(start + VideoMask.minimumDuration, duration))
+        )
+        mask.kind = kind
+        masks.append(mask)
+        selectedMaskID = mask.id
+    }
+
+    func updateMask(_ mask: VideoMask) {
+        guard let index = masks.firstIndex(where: { $0.id == mask.id }) else { return }
+        var clamped = mask
+        clamped.rect = VideoMask.clampedRect(mask.rect)
+        clamped.start = min(max(0, mask.start), max(0, duration - VideoMask.minimumDuration))
+        clamped.end = min(max(clamped.start + VideoMask.minimumDuration, mask.end), max(duration, clamped.start + VideoMask.minimumDuration))
+        masks[index] = clamped
+    }
+
+    func deleteMask(_ id: UUID) {
+        masks.removeAll { $0.id == id }
+        if selectedMaskID == id { selectedMaskID = nil }
     }
 
     func setCameraCenter(_ center: CGPoint, in card: CGRect) {
@@ -324,31 +368,48 @@ final class VideoEditorModel {
         }
     }
 
-    /// The grade filter reads a locked box, so a slider drag only swaps values: the composition is built once, when the grade first stops being neutral.
-    private func syncGradePreview() {
-        attachGrade(to: player?.currentItem, isNeutral: screenGrade.isNeutral) { [gradeBox] in gradeBox.screenGrade }
-        attachGrade(to: cameraPlayer?.currentItem, isNeutral: cameraGrade.isNeutral) { [gradeBox] in gradeBox.cameraGrade }
+    /// The preview filters read a locked box, so a slider drag only swaps values: the composition is built once, when the frame first stops being untouched.
+    private func syncPreviewFilters() {
+        attachFilters(to: player?.currentItem, isIdle: screenGrade.isNeutral && masks.isEmpty) { [filterBox] source, time in
+            let graded = filterBox.screenGrade.applied(to: source, extent: source.extent, frameTime: time)
+            let masks = VideoMask.resolved(
+                filterBox.screenMasks,
+                atSourceTime: time,
+                pixelScale: source.extent.height / VideoMask.referenceHeight,
+                project: { Self.frameRect($0, in: source.extent) }
+            )
+            return ResolvedMask.applied(masks, to: graded, extent: source.extent)
+        }
+        attachFilters(to: cameraPlayer?.currentItem, isIdle: cameraGrade.isNeutral) { [filterBox] source, time in
+            filterBox.cameraGrade.applied(to: source, extent: source.extent, frameTime: time)
+        }
         guard !isPlaying else { return }
         enqueueSeek(currentTime, precise: true)
     }
 
-    private func attachGrade(
+    /// Masks are stored top-down like the screen, but Core Image paints y-up, so the rect flips on its way into the frame.
+    nonisolated static func frameRect(_ normalized: CGRect, in extent: CGRect) -> CGRect {
+        CGRect(
+            x: extent.minX + normalized.minX * extent.width,
+            y: extent.minY + (1 - normalized.maxY) * extent.height,
+            width: normalized.width * extent.width,
+            height: normalized.height * extent.height
+        )
+    }
+
+    private func attachFilters(
         to item: AVPlayerItem?,
-        isNeutral: Bool,
-        grade: @escaping @Sendable () -> ColorGrade
+        isIdle: Bool,
+        filter: @escaping @Sendable (CIImage, TimeInterval) -> CIImage
     ) {
         guard let item else { return }
-        guard !isNeutral else {
+        guard !isIdle else {
             item.videoComposition = nil
             return
         }
         guard item.videoComposition == nil else { return }
         item.videoComposition = AVMutableVideoComposition(asset: item.asset) { request in
-            let source = request.sourceImage
-            request.finish(
-                with: grade().applied(to: source, extent: source.extent, frameTime: request.compositionTime.seconds),
-                context: nil
-            )
+            request.finish(with: filter(request.sourceImage, request.compositionTime.seconds), context: nil)
         }
     }
 
@@ -713,7 +774,7 @@ final class VideoEditorModel {
             || exportConfig.style != .none || exportConfig.aspectRatio != .auto
         let hasZoom = zoomEnabled
 
-        if isClipMode || hasEffects || hasCrop || hasZoom || isCameraVisible || showsClickHighlights {
+        if isClipMode || hasEffects || hasCrop || hasZoom || isCameraVisible || showsClickHighlights || !masks.isEmpty {
             return try await exportWithEffects(asset: asset, outputURL: outputURL, config: exportConfig)
         }
 
@@ -770,7 +831,7 @@ final class VideoEditorModel {
         let cameraSource = await loadCameraSource()
 
         let composition: AVMutableComposition
-        let mapToSourceTime: (TimeInterval) -> TimeInterval
+        let mapToSourceTime: @Sendable (TimeInterval) -> TimeInterval
         let mapToEditorTime: (TimeInterval) -> TimeInterval?
         var cameraTrackID: CMPersistentTrackID?
         var audioMix: AVAudioMix?
@@ -858,12 +919,13 @@ final class VideoEditorModel {
         )
 
         let timeline = viewportTimeline
+        let cropFrame = cropRect
 
-        func frameTransform(atSourceTime sourceTime: TimeInterval) -> CGAffineTransform {
+        @Sendable func frameTransform(atSourceTime sourceTime: TimeInterval) -> CGAffineTransform {
             let viewport = useZoom ? timeline.frame(at: sourceTime) : .identity
             let anchorDisplay = CGPoint(
-                x: (cropRect.origin.x + viewport.anchor.x * cropRect.width) * fullW,
-                y: (cropRect.origin.y + viewport.anchor.y * cropRect.height) * fullH
+                x: (cropFrame.origin.x + viewport.anchor.x * cropFrame.width) * fullW,
+                y: (cropFrame.origin.y + viewport.anchor.y * cropFrame.height) * fullH
             )
             let magnification = max(1, viewport.magnification)
             let zoomTransform = CGAffineTransform(translationX: -anchorDisplay.x, y: -anchorDisplay.y)
@@ -874,7 +936,7 @@ final class VideoEditorModel {
                 .concatenating(cropShift)
         }
 
-        func frameTransform(atEditorTime editorTime: TimeInterval) -> CGAffineTransform {
+        @Sendable func frameTransform(atEditorTime editorTime: TimeInterval) -> CGAffineTransform {
             frameTransform(atSourceTime: mapToSourceTime(editorTime))
         }
 
@@ -993,6 +1055,24 @@ final class VideoEditorModel {
             )
             : []
 
+        let exportMasks = masks
+        let sourceSize = CGSize(width: fullW, height: fullH)
+        let resolveMasks: @Sendable (TimeInterval) -> [ResolvedMask] = { editorTime in
+            VideoMask.resolved(
+                exportMasks,
+                atSourceTime: mapToSourceTime(editorTime),
+                pixelScale: canvasH / VideoMask.referenceHeight
+            ) { normalized in
+                let placed = CGRect(
+                    x: normalized.minX * sourceSize.width,
+                    y: normalized.minY * sourceSize.height,
+                    width: normalized.width * sourceSize.width,
+                    height: normalized.height * sourceSize.height
+                ).applying(frameTransform(atEditorTime: editorTime))
+                return CGRect(x: placed.minX, y: canvasH - placed.maxY, width: placed.width, height: placed.height)
+            }
+        }
+
         let cardRect = CGRect(x: offsetX, y: offsetY, width: vidW, height: vidH)
         let exportConfig = VideoFrameExporter.Configuration(
             composition: composition,
@@ -1013,7 +1093,8 @@ final class VideoEditorModel {
             cameraGrade: cameraGrade,
             dimWindows: dimWindows,
             scenes: scenes,
-            pose: pose
+            pose: pose,
+            resolveMasks: exportMasks.isEmpty ? nil : resolveMasks
         )
 
         return try await VideoFrameExporter().export(exportConfig) { [weak self] fraction in
@@ -1107,3 +1188,25 @@ final class VideoEditorModel {
     }
 }
 
+/// The preview player filters on a background queue while the sliders move on the main actor, so what it draws lives behind a lock.
+nonisolated final class PreviewFilterBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var screen = ColorGrade.neutral
+    private var camera = ColorGrade.neutral
+    private var masks: [VideoMask] = []
+
+    var screenGrade: ColorGrade {
+        get { lock.withLock { screen } }
+        set { lock.withLock { screen = newValue } }
+    }
+
+    var cameraGrade: ColorGrade {
+        get { lock.withLock { camera } }
+        set { lock.withLock { camera = newValue } }
+    }
+
+    var screenMasks: [VideoMask] {
+        get { lock.withLock { masks } }
+        set { lock.withLock { masks = newValue } }
+    }
+}
