@@ -12,6 +12,12 @@
       "sourceType": "github",
       "skillPath": "SKILL.md",
       "computedHash": "a5c61fb7c674373537cdfcb132640439b5f26008cd26b10b550c2cc9cd3acd59"
+    },
+    "landing-page-design": {
+      "source": "skills-101/superpowers",
+      "sourceType": "github",
+      "skillPath": "guides/design/landing-page-design/SKILL.md",
+      "computedHash": "435af3919183e91ded83197f9238740593cac886f45067dc729d8a7095fbfb5a"
     }
   }
 }
