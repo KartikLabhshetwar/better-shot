@@ -28,6 +28,10 @@ final class RecordingSession: @unchecked Sendable {
 
     var duration: TimeInterval { lock.withLock { _latestAdjustedTime.seconds } }
 
+    static func averageBitRate(width: Int, height: Int) -> Int {
+        min(40_000_000, max(4_000_000, width * height * 4))
+    }
+
     init(outputURL: URL, width: Int, height: Int, fps: Int, includeAudio: Bool, includeMicrophone: Bool = false) throws {
         self.outputURL = outputURL
         try? FileManager.default.removeItem(at: outputURL)
@@ -35,7 +39,7 @@ final class RecordingSession: @unchecked Sendable {
         writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
         writer.movieFragmentInterval = CMTime(seconds: 2, preferredTimescale: 600)
 
-        let bitRate = max(20_000_000, width * height * 4)
+        let bitRate = Self.averageBitRate(width: width, height: height)
         let videoSettings: [String: Any] = [
             AVVideoCodecKey: AVVideoCodecType.hevc,
             AVVideoWidthKey: width,
