@@ -550,7 +550,7 @@ private final class FrameCompositor: @unchecked Sendable {
     }
 
     private static func renderClickRing(radius: CGFloat) -> CGImage? {
-        let side = Int((radius * 2).rounded(.up)) + 4
+        let side = Int((radius * 2).rounded(.up)) + Int((radius * ClickHighlight.strokeFraction * ClickHighlight.haloWidthScale).rounded(.up)) + 4
         guard side > 4, let context = CGContext(
             data: nil,
             width: side,
@@ -562,16 +562,19 @@ private final class FrameCompositor: @unchecked Sendable {
         ) else { return nil }
 
         let center = CGPoint(x: CGFloat(side) / 2, y: CGFloat(side) / 2)
-        let lineWidth = max(2, radius * 0.16)
+        let lineWidth = max(2, radius * ClickHighlight.strokeFraction)
         let circle = CGRect(
             x: center.x - radius + lineWidth / 2,
             y: center.y - radius + lineWidth / 2,
             width: (radius - lineWidth / 2) * 2,
             height: (radius - lineWidth / 2) * 2
         )
-        context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 0.18))
+        context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: ClickHighlight.fillOpacity))
         context.fillEllipse(in: circle)
-        context.setStrokeColor(CGColor(red: 1, green: 1, blue: 1, alpha: 0.9))
+        context.setStrokeColor(CGColor(red: 0, green: 0, blue: 0, alpha: ClickHighlight.haloOpacity))
+        context.setLineWidth(lineWidth * ClickHighlight.haloWidthScale)
+        context.strokeEllipse(in: circle)
+        context.setStrokeColor(CGColor(red: 1, green: 1, blue: 1, alpha: ClickHighlight.strokeOpacity))
         context.setLineWidth(lineWidth)
         context.strokeEllipse(in: circle)
         return context.makeImage()

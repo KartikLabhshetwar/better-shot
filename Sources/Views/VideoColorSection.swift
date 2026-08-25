@@ -16,7 +16,10 @@ private func gradedSwatch(_ source: NSImage, grade: ColorGrade) -> NSImage? {
         width: side,
         height: side
     ))
-    let centered = square.transformed(by: CGAffineTransform(translationX: -square.extent.minX, y: -square.extent.minY))
+    let scale = min(1, swatchSide * 4 / max(side, 1))
+    let centered = square
+        .transformed(by: CGAffineTransform(translationX: -square.extent.minX, y: -square.extent.minY))
+        .transformed(by: CGAffineTransform(scaleX: scale, y: scale))
     let graded = grade.applied(to: centered, extent: centered.extent, frameTime: 0)
     guard let output = swatchContext.createCGImage(graded, from: centered.extent) else { return nil }
     return NSImage(cgImage: output, size: CGSize(width: swatchSide, height: swatchSide))
@@ -55,6 +58,98 @@ private struct ColorGradeSwatch: View {
     }
 }
 
+/// One grade, one strip of swatches cut from the frame it will be applied to, shared by the video editor and the image editor.
+struct ColorGradePicker: View {
+    @Binding var grade: ColorGrade
+    let thumbnail: NSImage?
+    var onEditingChanged: ((Bool) -> Void)?
+
+    @State private var swatches: [String: NSImage] = [:]
+    @State private var swatchSource: NSImage?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            presetStrip
+
+            InspectorSlider(
+                "Intensity",
+                value: knob(\.intensity),
+                range: 0...1,
+                format: .percent(),
+                onEditingChanged: onEditingChanged
+            )
+            .disabled(grade == .neutral)
+
+            DisclosureGroup("Adjust") {
+                VStack(alignment: .leading, spacing: 10) {
+                    InspectorSlider("Exposure", value: knob(\.exposure), range: -1...1, format: .percent(signed: true), onEditingChanged: onEditingChanged)
+                    InspectorSlider("Contrast", value: knob(\.contrast), range: -1...1, format: .percent(signed: true), onEditingChanged: onEditingChanged)
+                    InspectorSlider("Saturation", value: knob(\.saturation), range: -1...1, format: .percent(signed: true), onEditingChanged: onEditingChanged)
+                    InspectorSlider("Warmth", value: knob(\.temperature), range: -1...1, format: .percent(signed: true), onEditingChanged: onEditingChanged)
+                    InspectorSlider("Tint", value: knob(\.tint), range: -1...1, format: .percent(signed: true), onEditingChanged: onEditingChanged)
+                    InspectorSlider("Fade", value: knob(\.fade), range: 0...1, format: .percent(), onEditingChanged: onEditingChanged)
+                    InspectorSlider("Split Tone", value: knob(\.splitTone), range: -1...1, format: .percent(signed: true), onEditingChanged: onEditingChanged)
+                    InspectorSlider("Vignette", value: knob(\.vignette), range: 0...1, format: .percent(), onEditingChanged: onEditingChanged)
+                    InspectorSlider("Grain", value: knob(\.grain), range: 0...1, format: .percent(), onEditingChanged: onEditingChanged)
+                }
+                .padding(.top, 8)
+            }
+            .font(.system(size: 11, weight: .medium))
+            .tint(.secondary)
+
+            if grade != .neutral {
+                InspectorPill("Reset Color", systemImage: "arrow.counterclockwise", fillsWidth: true) {
+                    apply(.neutral)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .animation(reduceMotion ? nil : InspectorMotion.reveal, value: grade == .neutral)
+        .onChange(of: thumbnail) { rebuildSwatches() }
+        .onAppear { rebuildSwatches() }
+    }
+
+    private var presetStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(ColorGrade.presets) { preset in
+                    ColorGradeSwatch(
+                        preset: preset,
+                        thumbnail: swatches[preset.id],
+                        isSelected: grade.matchingPresetID == preset.id,
+                        action: { apply(preset.grade) }
+                    )
+                }
+            }
+            .padding(.vertical, 3)
+            .padding(.horizontal, 2)
+        }
+        .frame(height: swatchSide + 24)
+    }
+
+    private func apply(_ next: ColorGrade) {
+        onEditingChanged?(true)
+        grade = next
+        onEditingChanged?(false)
+    }
+
+    private func knob(_ path: WritableKeyPath<ColorGrade, CGFloat>) -> Binding<CGFloat> {
+        Binding(
+            get: { grade[keyPath: path] },
+            set: { grade[keyPath: path] = $0 }
+        )
+    }
+
+    private func rebuildSwatches() {
+        guard let thumbnail, thumbnail !== swatchSource else { return }
+        swatchSource = thumbnail
+        swatches = ColorGrade.presets.reduce(into: [:]) { result, preset in
+            result[preset.id] = gradedSwatch(thumbnail, grade: preset.grade)
+        }
+    }
+}
+
 private enum GradeTarget: String, CaseIterable {
     case screen = "Screen"
     case camera = "Camera"
@@ -64,12 +159,7 @@ struct VideoColorSection: View {
     @Bindable var model: VideoEditorModel
 
     @State private var target: GradeTarget = .screen
-    @State private var swatches: [String: NSImage] = [:]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private var grade: ColorGrade {
-        target == .camera ? model.cameraGrade : model.screenGrade
-    }
 
     private var gradeBinding: Binding<ColorGrade> {
         target == .camera ? $model.cameraGrade : $model.screenGrade
@@ -91,75 +181,28 @@ struct VideoColorSection: View {
                     .labelsHidden()
                 }
 
-                presetStrip
-
-                InspectorSlider(
-                    "Intensity",
-                    value: knob(\.intensity),
-                    range: 0...1,
-                    format: .percent()
-                )
-                .disabled(grade == .neutral)
-
-                DisclosureGroup("Adjust") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        InspectorSlider("Exposure", value: knob(\.exposure), range: -1...1, format: .percent(signed: true))
-                        InspectorSlider("Contrast", value: knob(\.contrast), range: -1...1, format: .percent(signed: true))
-                        InspectorSlider("Saturation", value: knob(\.saturation), range: -1...1, format: .percent(signed: true))
-                        InspectorSlider("Warmth", value: knob(\.temperature), range: -1...1, format: .percent(signed: true))
-                        InspectorSlider("Tint", value: knob(\.tint), range: -1...1, format: .percent(signed: true))
-                        InspectorSlider("Fade", value: knob(\.fade), range: 0...1, format: .percent())
-                        InspectorSlider("Split Tone", value: knob(\.splitTone), range: -1...1, format: .percent(signed: true))
-                        InspectorSlider("Vignette", value: knob(\.vignette), range: 0...1, format: .percent())
-                        InspectorSlider("Grain", value: knob(\.grain), range: 0...1, format: .percent())
-                    }
-                    .padding(.top, 8)
-                }
-                .font(.system(size: 11, weight: .medium))
-                .tint(.secondary)
-
-                if grade != .neutral {
-                    InspectorPill("Reset Color", systemImage: "arrow.counterclockwise", fillsWidth: true) {
-                        gradeBinding.wrappedValue = .neutral
-                    }
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                }
+                ColorGradePicker(grade: gradeBinding, thumbnail: sourceThumbnail)
+                    .id(target)
             }
-            .animation(reduceMotion ? nil : InspectorMotion.reveal, value: grade == .neutral)
             .animation(reduceMotion ? nil : InspectorMotion.reveal, value: target)
         }
-        .task(id: model.thumbnails.count) { rebuildSwatches() }
     }
+}
 
-    private var presetStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(ColorGrade.presets) { preset in
-                    ColorGradeSwatch(
-                        preset: preset,
-                        thumbnail: swatches[preset.id],
-                        isSelected: grade.matchingPresetID == preset.id,
-                        action: { model.applyGradePreset(preset, toCamera: target == .camera) }
-                    )
-                }
-            }
-            .padding(.vertical, 3)
-            .padding(.horizontal, 2)
+/// The image editor grades the still with the same presets the recorder uses, so a set of screenshots and a clip can match.
+struct ImageColorSection: View {
+    @Binding var config: BeautifierConfig
+    let source: CGImage?
+    var onEditingChanged: ((Bool) -> Void)?
+
+    @State private var thumbnail: NSImage?
+
+    var body: some View {
+        InspectorSection("Color", collapsedByDefault: true) {
+            ColorGradePicker(grade: $config.grade, thumbnail: thumbnail, onEditingChanged: onEditingChanged)
         }
-        .frame(height: swatchSide + 24)
-    }
-
-    private func knob(_ path: WritableKeyPath<ColorGrade, CGFloat>) -> Binding<CGFloat> {
-        Binding(
-            get: { grade[keyPath: path] },
-            set: { gradeBinding.wrappedValue[keyPath: path] = $0 }
-        )
-    }
-
-    private func rebuildSwatches() {
-        guard let sourceThumbnail else { return }
-        swatches = ColorGrade.presets.reduce(into: [:]) { result, preset in
-            result[preset.id] = gradedSwatch(sourceThumbnail, grade: preset.grade)
+        .task(id: source.map(ObjectIdentifier.init)) {
+            thumbnail = source.map { NSImage(cgImage: $0, size: NSSize(width: $0.width, height: $0.height)) }
         }
     }
 }

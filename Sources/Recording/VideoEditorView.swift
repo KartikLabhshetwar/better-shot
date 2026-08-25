@@ -239,22 +239,17 @@ struct VideoEditorView: View {
             clipToolbar
 
             CapTimelineView(model: model, playhead: model.currentTime)
-                .frame(height: CapTimelineView.height(zoomEnabled: model.zoomEnabled))
+                .frame(height: CapTimelineView.height(model: model))
         }
     }
 
     private var clipToolbar: some View {
         HStack(spacing: 6) {
-            InspectorPill("Split", systemImage: "scissors") {
-                model.splitAtPlayhead()
-            }
-            .keyboardShortcut("s", modifiers: [])
-            .help("Cut at the playhead (S)")
-
-            InspectorPill("Cut Anywhere", systemImage: "scissors.badge.ellipsis", isActive: model.timelineSplitMode) {
+            InspectorPill("Split", systemImage: "scissors", isActive: model.timelineSplitMode) {
                 model.timelineSplitMode.toggle()
             }
-            .help("Click a clip on the timeline to cut it there")
+            .keyboardShortcut("s", modifiers: [])
+            .help("Click a clip on the timeline to cut it there (S)")
 
             InspectorPill("Delete", systemImage: "trash", role: .destructive) {
                 model.deleteSelectedClip()
@@ -847,9 +842,11 @@ private struct ClickHighlightLayer: View {
         GeometryReader { geo in
             ForEach(Array(presses.enumerated()), id: \.offset) { _, press in
                 if let phase = press.phase(at: time) {
+                    let lineWidth = max(2, radius * ClickHighlight.strokeFraction)
                     Circle()
-                        .fill(Color.white.opacity(0.18))
-                        .overlay(Circle().strokeBorder(Color.white.opacity(0.9), lineWidth: max(2, radius * 0.16)))
+                        .fill(Color.white.opacity(ClickHighlight.fillOpacity))
+                        .overlay(Circle().strokeBorder(Color.black.opacity(ClickHighlight.haloOpacity), lineWidth: lineWidth * ClickHighlight.haloWidthScale))
+                        .overlay(Circle().strokeBorder(Color.white.opacity(ClickHighlight.strokeOpacity), lineWidth: lineWidth))
                         .frame(width: radius * 2, height: radius * 2)
                         .scaleEffect(phase.scale)
                         .opacity(phase.opacity)

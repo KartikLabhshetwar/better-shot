@@ -33,6 +33,15 @@ enum CaptionCheck {
         })
         precondition(slow.count > 1, "a line that lingers too long is split even when it is short")
 
+        let dragged = CaptionCue(start: -2, end: 1, text: "early").clamped(to: 10)
+        precondition(dragged.start == 0 && dragged.end == 1, "a cue dragged off the left edge lands at zero and keeps its tail")
+
+        let overshot = CaptionCue(start: 9.9, end: 12, text: "late").clamped(to: 10)
+        precondition(overshot.start <= 10 - CaptionCue.minimumDuration && overshot.end <= 10, "a cue dragged past the end stays inside the recording")
+
+        let squashed = CaptionCue(start: 3, end: 3.05, text: "tiny").clamped(to: 10)
+        precondition(squashed.end - squashed.start >= CaptionCue.minimumDuration, "a cue never collapses below the minimum duration")
+
         var style = CaptionStyle()
         style.fadeDuration = 0.2
         let cues = [CaptionCue(start: 1, end: 3, text: "ship it"), CaptionCue(start: 4, end: 5, text: "again")]

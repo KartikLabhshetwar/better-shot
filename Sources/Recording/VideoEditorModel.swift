@@ -75,6 +75,7 @@ final class VideoEditorModel {
     var hasKeystrokes: Bool { keystrokeStyle.isEnabled && !keystrokeSegments.isEmpty }
 
     var captions: [CaptionCue] = []
+    var selectedCaptionID: UUID?
     var captionStyle = CaptionStyle()
     var isTranscribing = false
     var transcriptionError: String?
@@ -137,9 +138,10 @@ final class VideoEditorModel {
             timelineSplitMode = false
             return true
         }
-        if selectedMaskID != nil || selectedTextID != nil {
+        if selectedMaskID != nil || selectedTextID != nil || selectedCaptionID != nil {
             selectedMaskID = nil
             selectedTextID = nil
+            selectedCaptionID = nil
             return true
         }
         if selectedZoomCueID != nil {
@@ -467,7 +469,7 @@ final class VideoEditorModel {
 
     func updateCaption(_ cue: CaptionCue) {
         guard let index = captions.firstIndex(where: { $0.id == cue.id }) else { return }
-        captions[index] = cue
+        captions[index] = cue.clamped(to: duration)
     }
 
     func setCameraCenter(_ center: CGPoint, in card: CGRect) {
@@ -486,9 +488,10 @@ final class VideoEditorModel {
         }
     }
 
-    /// The preview filters read a locked box, so a slider drag only swaps values: the composition is built once, when the frame first stops being untouched.
+    /// A paused player only repaints when its composition changes, so a still frame gets a fresh one and playback keeps the one it has.
     private func syncPreviewFilters() {
-        attachFilters(to: player?.currentItem, isIdle: screenGrade.isNeutral && masks.isEmpty) { [filterBox] source, time in
+        let repaint = !isPlaying
+        attachFilters(to: player?.currentItem, isIdle: screenGrade.isNeutral && masks.isEmpty, repaint: repaint) { [filterBox] source, time in
             let graded = filterBox.screenGrade.applied(to: source, extent: source.extent, frameTime: time)
             let masks = VideoMask.resolved(
                 filterBox.screenMasks,
@@ -498,7 +501,7 @@ final class VideoEditorModel {
             )
             return ResolvedMask.applied(masks, to: graded, extent: source.extent)
         }
-        attachFilters(to: cameraPlayer?.currentItem, isIdle: cameraGrade.isNeutral) { [filterBox] source, time in
+        attachFilters(to: cameraPlayer?.currentItem, isIdle: cameraGrade.isNeutral, repaint: repaint) { [filterBox] source, time in
             filterBox.cameraGrade.applied(to: source, extent: source.extent, frameTime: time)
         }
         guard !isPlaying else { return }
@@ -518,6 +521,7 @@ final class VideoEditorModel {
     private func attachFilters(
         to item: AVPlayerItem?,
         isIdle: Bool,
+        repaint: Bool,
         filter: @escaping @Sendable (CIImage, TimeInterval) -> CIImage
     ) {
         guard let item else { return }
@@ -525,7 +529,7 @@ final class VideoEditorModel {
             item.videoComposition = nil
             return
         }
-        guard item.videoComposition == nil else { return }
+        guard repaint || item.videoComposition == nil else { return }
         item.videoComposition = AVMutableVideoComposition(asset: item.asset) { request in
             request.finish(with: filter(request.sourceImage, request.compositionTime.seconds), context: nil)
         }
@@ -674,10 +678,6 @@ final class VideoEditorModel {
 
     func selectClip(_ id: UUID?) {
         selectedClipID = id
-    }
-
-    func splitAtPlayhead() {
-        split(at: currentTime)
     }
 
     func split(at time: Double) {

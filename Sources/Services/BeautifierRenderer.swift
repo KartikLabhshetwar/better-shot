@@ -3,7 +3,8 @@ import AppKit
 
 enum BeautifierRenderer {
 
-    static func render(image: CGImage, config: BeautifierConfig, annotations: [AnnotationItem] = []) -> CGImage? {
+    static func render(image source: CGImage, config: BeautifierConfig, annotations: [AnnotationItem] = []) -> CGImage? {
+        let image = config.grade.applied(to: source)
         let imgW = CGFloat(image.width)
         let imgH = CGFloat(image.height)
         let shortEdge = min(imgW, imgH)

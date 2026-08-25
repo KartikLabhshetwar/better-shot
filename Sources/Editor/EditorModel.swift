@@ -9,6 +9,17 @@ final class EditorModel {
     var previewImage: NSImage?
     var imageSize: CGSize = .zero
     var config = BeautifierConfig.default
+    @ObservationIgnored private var gradeCache: (grade: ColorGrade, source: CGImage, output: CGImage)?
+
+    /// The canvas draws the graded frame, so a preset shows on the picture and not only in its swatch.
+    var gradedImage: CGImage? {
+        guard let sourceImage else { return nil }
+        guard !config.grade.isNeutral else { return sourceImage }
+        if let cache = gradeCache, cache.grade == config.grade, cache.source === sourceImage { return cache.output }
+        let output = config.grade.applied(to: sourceImage)
+        gradeCache = (config.grade, sourceImage, output)
+        return output
+    }
     var toastMessage: String?
 
     // Annotation state

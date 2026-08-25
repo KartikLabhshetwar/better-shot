@@ -30,7 +30,7 @@ nonisolated struct CursorStyle: Equatable, Sendable {
         }
     }
 
-    static let heightFraction: CGFloat = 0.03
+    static let heightFraction: CGFloat = 0.045
     static let spriteOversample: CGFloat = 2
 
     var isEnabled = false

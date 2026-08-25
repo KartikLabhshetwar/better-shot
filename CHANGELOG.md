@@ -18,6 +18,8 @@ transitions, scene changes, a tilted 3D card, color) now live in four tabs.
 - **Captions**: The Overlay tab can transcribe the recording's own audio into timed caption lines, on device where your Mac supports it, so nothing is uploaded. Speech is grouped into readable lines that break on a pause, on a full stop, or when a line gets too long, and every line stays editable in the sidebar. Position, size, weight, color, width, a backdrop plate and uppercase, drawn on the canvas so captions stay readable while the recording zooms
 - **Text segments**: Drop a line of text on the canvas for a stretch of the recording. It sits on the background rather than inside the video, so it holds still while the recording zooms under it. Size, weight, alignment, color, width and shadow, plus an entrance and an exit picked from fade, slide, pop or a typewriter reveal. Drag it where you want it on the preview, and one resolve drives both what you see and what the exporter draws
 - **Masks**: An Overlay tab holds boxes that either hide part of the frame or spotlight it. Hide blurs or pixelates what is inside the box, and it is destroyed in the export rather than covered, so a password on screen never ships. Spotlight dims everything outside the box and fades in and out so it does not blink. Drag the box on the video, set its start and end from the playhead, and the same math paints the live preview and the exported file
+- **Text, blur and caption lanes**: Text overlays, masks and caption lines now sit on the timeline under the zoom lane, one lane per kind, exactly like zoom cues. Drag a segment to move it, drag either edge to retime it, click it to select it in the sidebar. A lane only appears once it has something in it, so a plain recording still gets a plain timeline
+- **Color in the image editor**: The screenshot editor gained the same Color section the recorder has, with the nine presets, an intensity slider and the full manual set (exposure, contrast, saturation, warmth, tint, fade, split tone, vignette, grain), so a set of screenshots and a clip can be graded to match
 - **Tabbed video inspector**: The right sidebar is now five tabs instead of one long scroll: Clip (scissors), Motion (arrow), Camera (person), Overlay (masks), and Style (paintbrush). Each tab holds only the controls that act on what you selected, so the sidebar stops being a wall of disclosure triangles
 - **Per-clip audio mode**: Speeding a clip up no longer forces one behavior on its audio. Each clip picks Mute, Keep Pitch, or Match Speed, so a 4x skim can stay silent while a 0.5x hold keeps a natural voice
 - **Transitions**: Adjacent clips can cross into each other with Crossfade or Fade Through Black, with an adjustable length. The transition is baked into the export rather than faked in the preview
@@ -28,7 +30,7 @@ transitions, scene changes, a tilted 3D card, color) now live in four tabs.
 - **Export progress**: Exporting shows a live progress overlay instead of a frozen window, with the spring timing and reduced-motion fallback the rest of the app uses
 - **Countdown overlay**: The start delay now draws a full-screen countdown so you know exactly when capture begins
 - **Escape closes editors**: Escape dismisses the image and video editors, and an unsaved editor asks before it closes rather than discarding your work
-- **Cut at the playhead**: The video editor's Split button now cuts where the playhead sits, on click or with `S`. Cut Anywhere is a separate toggle for slicing a clip at the point you click, and it turns itself off once the cut lands, so you never get stuck in a cutting mode. `Delete` removes the selected clip
+- **Split anywhere**: One Split button, on click or with `S`. Turn it on and click a clip where you want the cut; it turns itself off once the cut lands, so you never get stuck in a cutting mode. `Delete` removes the selected clip
 - **Inspector tab shortcuts**: Command 1 through Command 5 jump between Clip, Motion, Camera, Overlay, and Style
 - **Annotation keys are visible**: The image editor's tools always had single-key shortcuts, but nothing said so. Each tool now carries its key in the corner of its button and in its tooltip, read from the same table the keyboard uses, so the two cannot drift apart
 
@@ -40,6 +42,9 @@ transitions, scene changes, a tilted 3D card, color) now live in four tabs.
 
 ### Fixed
 
+- **The pointer size slider does something**: The drawn cursor was rendered at about three quarters the size of a real macOS pointer and the slider stopped at 2x, so moving it looked like nothing happened. The pointer now starts life-size and the slider runs to 3x
+- **Click highlights are visible**: The ring was drawn in plain white for 0.42s, which is invisible on a light window. It now carries a dark halo under the white stroke and lingers 0.55s, in the preview and the export alike
+- **Color presets apply while paused**: Picking a grade with the player stopped repainted nothing, because the preview kept the first filter chain it built and the follow-up seek landed on the frame it was already showing. A paused player now gets a fresh chain per change, so every preset shows on the canvas rather than only in its swatch
 - **Zoom no longer needs a switch**: The zoom inspector acts on cues directly rather than gating them behind a toggle
 
 ## [4.0.0] - 2026-08-23

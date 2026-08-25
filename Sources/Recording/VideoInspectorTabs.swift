@@ -185,7 +185,7 @@ struct VideoCursorSection: View {
             if model.hasClicks {
                 VStack(alignment: .leading, spacing: 8) {
                     InspectorRow("Size") {
-                        Slider(value: $model.clickHighlightScale, in: 0.5...2)
+                        Slider(value: $model.clickHighlightScale, in: 0.5...3)
                             .controlSize(.small)
                             .disabled(!model.clickHighlightsEnabled)
                     }
@@ -223,7 +223,7 @@ struct VideoPointerSection: View {
                     .disabled(!model.cursorStyle.isEnabled)
 
                     InspectorRow("Size") {
-                        Slider(value: $model.cursorStyle.size, in: 0.5...2)
+                        Slider(value: $model.cursorStyle.size, in: 0.5...3)
                             .controlSize(.small)
                             .disabled(!model.cursorStyle.isEnabled)
                     }

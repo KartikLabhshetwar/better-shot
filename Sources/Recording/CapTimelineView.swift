@@ -1,13 +1,42 @@
 import AppKit
 import SwiftUI
 
+/// One lane per kind of edit, in the order Cap stacks them, and a lane only exists once it has something in it.
+enum TimelineRow: Equatable {
+    case clips
+    case zoom
+    case text
+    case mask
+    case caption
+
+    @MainActor static func rows(for model: VideoEditorModel?) -> [TimelineRow] {
+        guard let model else { return [.clips] }
+        var rows: [TimelineRow] = [.clips]
+        if model.zoomEnabled { rows.append(.zoom) }
+        if !model.texts.isEmpty { rows.append(.text) }
+        if !model.masks.isEmpty { rows.append(.mask) }
+        if !model.captions.isEmpty { rows.append(.caption) }
+        return rows
+    }
+
+    var minimumDuration: TimeInterval {
+        switch self {
+        case .clips: 0
+        case .zoom: ZoomCue.minimumDuration
+        case .text: TextOverlay.minimumDuration
+        case .mask: VideoMask.minimumDuration
+        case .caption: 0.2
+        }
+    }
+}
+
 /// `playhead` exists so the enclosing view's read of it is what schedules `updateNSView` while playback advances.
 struct CapTimelineView: NSViewRepresentable {
     let model: VideoEditorModel
     let playhead: Double
 
-    static func height(zoomEnabled: Bool) -> CGFloat {
-        CapTimelineControl.height(rowCount: zoomEnabled ? 2 : 1)
+    static func height(model: VideoEditorModel) -> CGFloat {
+        CapTimelineControl.height(rows: TimelineRow.rows(for: model))
     }
 
     func makeNSView(context: Context) -> CapTimelineControl {
@@ -29,6 +58,7 @@ final class CapTimelineControl: NSView {
         static let headerHeight: CGFloat = 32
         static let playheadTop: CGFloat = 24
         static let trackHeight: CGFloat = 52
+        static let laneHeight: CGFloat = 34
         static let trackGap: CGFloat = 8
         static let minimapTop: CGFloat = 2
         static let minimapHeight: CGFloat = 12
@@ -44,11 +74,6 @@ final class CapTimelineControl: NSView {
         static let bottomInset: CGFloat = 8
     }
 
-    private enum Row: Equatable {
-        case clips
-        case zoom
-    }
-
     private enum Target: Equatable {
         case minimapChip
         case minimapLeftEdge
@@ -58,12 +83,21 @@ final class CapTimelineControl: NSView {
         case segmentStart(UUID)
         case segmentEnd(UUID)
         case segmentBody(UUID)
-        case cueStart(UUID)
-        case cueEnd(UUID)
-        case cueBody(UUID)
+        case itemStart(TimelineRow, UUID)
+        case itemEnd(TimelineRow, UUID)
+        case itemBody(TimelineRow, UUID)
         case clipTrack
-        case zoomTrack
+        case laneTrack(TimelineRow)
         case gutter
+    }
+
+    /// Every lane draws and drags the same way, so each one only has to say what it holds.
+    private struct LaneItem: Equatable {
+        let id: UUID
+        let start: TimeInterval
+        let end: TimeInterval
+        let title: String
+        let detail: String
     }
 
     private struct Segment: Equatable {
@@ -88,9 +122,9 @@ final class CapTimelineControl: NSView {
 
     private struct RenderState: Equatable {
         var clips: [Clip] = []
-        var cues: [ZoomCue] = []
+        var lanes: [[LaneItem]] = []
+        var laneSelections: [UUID?] = []
         var selectedClipID: UUID?
-        var selectedCueID: UUID?
         var trim = TrimSelection(start: .nan, end: .nan)
         var playhead = Double.nan
         var duration = Double.nan
@@ -101,7 +135,7 @@ final class CapTimelineControl: NSView {
         var splitPreview: TimeInterval?
         var splitSnapped = false
         var hoveredID: UUID?
-        var zoomEnabled = false
+        var rows: [TimelineRow] = []
         var size = CGSize.zero
     }
 
@@ -134,9 +168,13 @@ final class CapTimelineControl: NSView {
     private var rendered = RenderState()
     private let filmstrip = TimelineFilmstrip()
 
-    static func height(rowCount: Int) -> CGFloat {
-        let rows = CGFloat(max(1, rowCount))
-        return Metrics.headerHeight + rows * Metrics.trackHeight + (rows - 1) * Metrics.trackGap + Metrics.bottomInset
+    static func height(rows: [TimelineRow]) -> CGFloat {
+        let stacked = rows.reduce(0) { $0 + rowHeight($1) }
+        return Metrics.headerHeight + stacked + CGFloat(max(0, rows.count - 1)) * Metrics.trackGap + Metrics.bottomInset
+    }
+
+    private static func rowHeight(_ row: TimelineRow) -> CGFloat {
+        row == .clips ? Metrics.trackHeight : Metrics.laneHeight
     }
 
     override var isFlipped: Bool { true }
@@ -146,7 +184,7 @@ final class CapTimelineControl: NSView {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override var intrinsicContentSize: NSSize {
-        NSSize(width: NSView.noIntrinsicMetric, height: Self.height(rowCount: rows.count))
+        NSSize(width: NSView.noIntrinsicMetric, height: Self.height(rows: rows))
     }
 
     @available(*, unavailable)
@@ -158,9 +196,7 @@ final class CapTimelineControl: NSView {
 
     // MARK: - Geometry
 
-    private var rows: [Row] {
-        (model?.zoomEnabled ?? false) ? [.clips, .zoom] : [.clips]
-    }
+    private var rows: [TimelineRow] { TimelineRow.rows(for: model) }
 
     private var contentX: CGFloat { Metrics.padding }
 
@@ -172,15 +208,12 @@ final class CapTimelineControl: NSView {
     private var sourceDuration: TimeInterval { model?.duration ?? 0 }
 
     private func rowRect(_ index: Int) -> CGRect {
-        CGRect(
-            x: contentX,
-            y: Metrics.headerHeight + CGFloat(index) * (Metrics.trackHeight + Metrics.trackGap),
-            width: trackWidth,
-            height: Metrics.trackHeight
-        )
+        let stack = rows
+        let top = stack.prefix(index).reduce(Metrics.headerHeight) { $0 + Self.rowHeight($1) + Metrics.trackGap }
+        return CGRect(x: contentX, y: top, width: trackWidth, height: Self.rowHeight(stack[index]))
     }
 
-    private func rowRect(for row: Row) -> CGRect? {
+    private func rowRect(for row: TimelineRow) -> CGRect? {
         guard let index = rows.firstIndex(of: row) else { return nil }
         return rowRect(index)
     }
@@ -228,7 +261,88 @@ final class CapTimelineControl: NSView {
 
     private func segment(_ id: UUID) -> Segment? { segments.first { $0.id == id } }
 
-    private func cue(_ id: UUID) -> ZoomCue? { model?.zoomCues.first { $0.id == id } }
+    private func laneItems(_ row: TimelineRow) -> [LaneItem] {
+        guard let model else { return [] }
+        switch row {
+        case .clips:
+            return []
+        case .zoom:
+            return model.zoomCues.map {
+                LaneItem(id: $0.id, start: $0.start, end: $0.end, title: "Zoom", detail: String(format: "%.1fx", $0.zoom))
+            }
+        case .text:
+            return model.texts.map {
+                LaneItem(id: $0.id, start: $0.start, end: $0.end, title: "Text", detail: Self.snippet($0.content, span: $0.end - $0.start))
+            }
+        case .mask:
+            return model.masks.map {
+                LaneItem(
+                    id: $0.id,
+                    start: $0.start,
+                    end: $0.end,
+                    title: $0.kind == .spotlight ? VideoMask.Kind.spotlight.title : $0.effect.title,
+                    detail: Self.durationLabel($0.end - $0.start)
+                )
+            }
+        case .caption:
+            return model.captions.map {
+                LaneItem(id: $0.id, start: $0.start, end: $0.end, title: "Caption", detail: Self.snippet($0.text, span: $0.end - $0.start))
+            }
+        }
+    }
+
+    private static func snippet(_ text: String, span: TimeInterval) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "\n", with: " ")
+        guard !trimmed.isEmpty else { return durationLabel(span) }
+        return trimmed.count <= 24 ? trimmed : trimmed.prefix(23) + "\u{2026}"
+    }
+
+    private func laneSelection(_ row: TimelineRow) -> UUID? {
+        guard let model else { return nil }
+        switch row {
+        case .clips: return model.selectedClipID
+        case .zoom: return model.selectedZoomCueID
+        case .text: return model.selectedTextID
+        case .mask: return model.selectedMaskID
+        case .caption: return model.selectedCaptionID
+        }
+    }
+
+    private func selectLaneItem(_ row: TimelineRow, _ id: UUID?) {
+        guard let model else { return }
+        switch row {
+        case .clips: model.selectClip(id)
+        case .zoom: model.selectedZoomCueID = id
+        case .text: model.selectedTextID = id
+        case .mask: model.selectedMaskID = id
+        case .caption: model.selectedCaptionID = id
+        }
+    }
+
+    private func updateLaneItem(_ row: TimelineRow, id: UUID, start: TimeInterval, end: TimeInterval) {
+        guard let model else { return }
+        switch row {
+        case .clips:
+            break
+        case .zoom:
+            model.updateZoomCue(id: id, start: start, end: end)
+        case .text:
+            guard var overlay = model.texts.first(where: { $0.id == id }) else { return }
+            overlay.start = start
+            overlay.end = end
+            model.updateText(overlay)
+        case .mask:
+            guard var mask = model.masks.first(where: { $0.id == id }) else { return }
+            mask.start = start
+            mask.end = end
+            model.updateMask(mask)
+        case .caption:
+            guard var cue = model.captions.first(where: { $0.id == id }) else { return }
+            cue.start = start
+            cue.end = end
+            model.updateCaption(cue)
+        }
+    }
 
     private var snapCandidates: [TimeInterval] {
         guard let model else { return [] }
@@ -251,11 +365,12 @@ final class CapTimelineControl: NSView {
             transform = transform.positioned(at: transform.position, duration: duration)
         }
 
+        let stack = rows
         let next = RenderState(
             clips: model.clips,
-            cues: model.zoomCues,
+            lanes: stack.map(laneItems),
+            laneSelections: stack.map(laneSelection),
             selectedClipID: model.selectedClipID,
-            selectedCueID: model.selectedZoomCueID,
             trim: model.trimSelection,
             playhead: model.currentTime,
             duration: duration,
@@ -266,11 +381,11 @@ final class CapTimelineControl: NSView {
             splitPreview: splitPreview?.time,
             splitSnapped: splitPreview?.snapped ?? false,
             hoveredID: hoveredID,
-            zoomEnabled: model.zoomEnabled,
+            rows: stack,
             size: bounds.size
         )
         guard next != rendered else { return }
-        if next.zoomEnabled != rendered.zoomEnabled { invalidateIntrinsicContentSize() }
+        if next.rows != rendered.rows { invalidateIntrinsicContentSize() }
         rendered = next
         needsDisplay = true
     }
@@ -314,18 +429,19 @@ final class CapTimelineControl: NSView {
             return .clipTrack
         }
 
-        if let rect = rowRect(for: .zoom), rect.insetBy(dx: 0, dy: -Metrics.trackGap / 2).contains(point) {
-            let cues = model?.zoomCues ?? []
-            for candidate in cues {
+        for row in rows.dropFirst() {
+            guard let rect = rowRect(for: row), rect.insetBy(dx: 0, dy: -Metrics.trackGap / 2).contains(point) else { continue }
+            let items = laneItems(row)
+            for candidate in items {
                 let toStart = abs(point.x - x(for: candidate.start))
                 let toEnd = abs(point.x - x(for: candidate.end))
                 guard toStart <= slop || toEnd <= slop else { continue }
-                return toStart <= toEnd ? .cueStart(candidate.id) : .cueEnd(candidate.id)
+                return toStart <= toEnd ? .itemStart(row, candidate.id) : .itemEnd(row, candidate.id)
             }
-            for candidate in cues where point.x > x(for: candidate.start) && point.x < x(for: candidate.end) {
-                return .cueBody(candidate.id)
+            for candidate in items where point.x > x(for: candidate.start) && point.x < x(for: candidate.end) {
+                return .itemBody(row, candidate.id)
             }
-            return .zoomTrack
+            return .laneTrack(row)
         }
 
         return .gutter
@@ -347,19 +463,20 @@ final class CapTimelineControl: NSView {
         let hit = target(at: point)
 
         switch hit {
-        case .segmentStart, .segmentEnd, .cueStart, .cueEnd, .minimapLeftEdge, .minimapRightEdge:
+        case .segmentStart, .segmentEnd, .itemStart, .itemEnd, .minimapLeftEdge, .minimapRightEdge:
             NSCursor.resizeLeftRight.set()
         case .segmentBody where model.timelineSplitMode:
             Self.splitCursor.set()
-        case .segmentBody, .cueBody, .minimapChip:
+        case .segmentBody, .itemBody, .minimapChip:
             NSCursor.pointingHand.set()
         default:
             NSCursor.arrow.set()
         }
 
         switch hit {
-        case .segmentStart(let id), .segmentEnd(let id), .segmentBody(let id),
-             .cueStart(let id), .cueEnd(let id), .cueBody(let id):
+        case .segmentStart(let id), .segmentEnd(let id), .segmentBody(let id):
+            hoveredID = id
+        case .itemStart(_, let id), .itemEnd(_, let id), .itemBody(_, let id):
             hoveredID = id
         default:
             hoveredID = nil
@@ -431,10 +548,15 @@ final class CapTimelineControl: NSView {
         case .minimapChip, .minimapLeftEdge, .minimapRightEdge:
             drag = windowDrag
 
-        case .ruler, .clipTrack, .zoomTrack:
+        case .ruler, .clipTrack:
             model.pauseForScrub()
             if hit == .clipTrack { model.selectClip(nil) }
-            if hit == .zoomTrack { model.selectedZoomCueID = nil }
+            model.seekTo(pressTime)
+            drag = DragState(target: .ruler)
+
+        case .laneTrack(let row):
+            model.pauseForScrub()
+            selectLaneItem(row, nil)
             model.seekTo(pressTime)
             drag = DragState(target: .ruler)
 
@@ -457,10 +579,10 @@ final class CapTimelineControl: NSView {
             model.seekTo(pressTime)
             drag = DragState(target: .ruler)
 
-        case .cueStart(let id), .cueEnd(let id), .cueBody(let id):
-            guard let hitCue = cue(id) else { return }
-            model.selectedZoomCueID = id
-            drag = DragState(target: hit, grabTime: pressTime, originStart: hitCue.start, originEnd: hitCue.end)
+        case .itemStart(let row, let id), .itemEnd(let row, let id), .itemBody(let row, let id):
+            guard let item = laneItems(row).first(where: { $0.id == id }) else { return }
+            selectLaneItem(row, id)
+            drag = DragState(target: hit, grabTime: pressTime, originStart: item.start, originEnd: item.end)
         }
 
         syncFromModel()
@@ -491,20 +613,20 @@ final class CapTimelineControl: NSView {
         case .segmentEnd(let id):
             applySegmentTrim(id: id, movingStart: false, to: drag.originEnd + sourceDelta(to: point, drag: drag), opposite: drag.originStart)
 
-        case .cueStart(let id):
+        case .itemStart(let row, let id):
             let delta = pointerTime - drag.grabTime
-            let start = max(0, min(drag.originStart + delta, drag.originEnd - ZoomCue.minimumDuration))
-            model.updateZoomCue(id: id, start: start, end: drag.originEnd)
+            let start = max(0, min(drag.originStart + delta, drag.originEnd - row.minimumDuration))
+            updateLaneItem(row, id: id, start: start, end: drag.originEnd)
 
-        case .cueEnd(let id):
+        case .itemEnd(let row, let id):
             let delta = pointerTime - drag.grabTime
-            let end = min(sourceDuration, max(drag.originEnd + delta, drag.originStart + ZoomCue.minimumDuration))
-            model.updateZoomCue(id: id, start: drag.originStart, end: end)
+            let end = min(sourceDuration, max(drag.originEnd + delta, drag.originStart + row.minimumDuration))
+            updateLaneItem(row, id: id, start: drag.originStart, end: end)
 
-        case .cueBody(let id):
+        case .itemBody(let row, let id):
             let delta = pointerTime - drag.grabTime
             let moved = TrimSelection(start: drag.originStart, end: drag.originEnd).shifted(by: delta, duration: sourceDuration)
-            model.updateZoomCue(id: id, start: moved.start, end: moved.end)
+            updateLaneItem(row, id: id, start: moved.start, end: moved.end)
 
         default:
             break
@@ -601,9 +723,10 @@ final class CapTimelineControl: NSView {
             ctx.clip()
             ctx.setFillColor(Palette.trackWell.cgColor)
             ctx.fill(rect)
-            switch row {
-            case .clips: drawClipTrack(ctx: ctx, rect: rect, model: model)
-            case .zoom: drawZoomTrack(ctx: ctx, rect: rect, model: model)
+            if row == .clips {
+                drawClipTrack(ctx: ctx, rect: rect, model: model)
+            } else {
+                drawLane(ctx: ctx, rect: rect, row: row)
             }
             ctx.restoreGState()
         }
@@ -616,6 +739,18 @@ final class CapTimelineControl: NSView {
         static let trackWell = NSColor.white.withAlphaComponent(0.05)
         static let clip = NSColor(srgbRed: 0.29, green: 0.45, blue: 0.98, alpha: 1)
         static let cue = NSColor(srgbRed: 0.62, green: 0.42, blue: 0.96, alpha: 1)
+        static let text = NSColor(srgbRed: 0.96, green: 0.62, blue: 0.24, alpha: 1)
+        static let mask = NSColor(srgbRed: 0.18, green: 0.72, blue: 0.66, alpha: 1)
+        static let caption = NSColor(srgbRed: 0.92, green: 0.36, blue: 0.55, alpha: 1)
+
+        static func lane(_ row: TimelineRow) -> NSColor {
+            switch row {
+            case .clips, .zoom: cue
+            case .text: text
+            case .mask: mask
+            case .caption: caption
+            }
+        }
         static let playhead = NSColor(srgbRed: 226 / 255, green: 64 / 255, blue: 64 / 255, alpha: 1)
         static let snap = NSColor(srgbRed: 0.29, green: 0.56, blue: 0.99, alpha: 1)
     }
@@ -695,23 +830,24 @@ final class CapTimelineControl: NSView {
         }
     }
 
-    private func drawZoomTrack(ctx: CGContext, rect: CGRect, model: VideoEditorModel) {
-        for cue in model.zoomCues where transform.isVisible(start: editorTime(cue.start), end: editorTime(cue.end)) {
+    private func drawLane(ctx: CGContext, rect: CGRect, row: TimelineRow) {
+        let selected = laneSelection(row)
+        for item in laneItems(row) where transform.isVisible(start: editorTime(item.start), end: editorTime(item.end)) {
             let box = CGRect(
-                x: x(for: cue.start),
+                x: x(for: item.start),
                 y: rect.minY,
-                width: max(2, x(for: cue.end) - x(for: cue.start)),
+                width: max(2, x(for: item.end) - x(for: item.start)),
                 height: rect.height
             )
             drawSegment(
                 ctx: ctx,
                 box: box,
-                color: Palette.cue,
+                color: Palette.lane(row),
                 filled: true,
-                isSelected: cue.id == model.selectedZoomCueID,
-                isHovered: hoveredID == cue.id,
-                title: "Zoom",
-                detail: String(format: "%.1fx", cue.zoom)
+                isSelected: item.id == selected,
+                isHovered: hoveredID == item.id,
+                title: item.title,
+                detail: item.detail
             )
         }
     }
@@ -821,6 +957,12 @@ final class CapTimelineControl: NSView {
             .font: NSFont.systemFont(ofSize: 11, weight: .semibold),
             .foregroundColor: NSColor.white.withAlphaComponent(0.95)
         ]
+        guard box.height >= Metrics.trackHeight else {
+            let label = "\(title)  \(detail)" as NSString
+            let size = label.size(withAttributes: titleAttributes)
+            label.draw(at: CGPoint(x: box.minX + 10, y: box.midY - size.height / 2), withAttributes: titleAttributes)
+            return
+        }
         (title as NSString).draw(at: CGPoint(x: box.minX + 10, y: box.minY + 8), withAttributes: titleAttributes)
         (detail as NSString).draw(at: CGPoint(x: box.minX + 10, y: box.maxY - 22), withAttributes: detailAttributes)
     }

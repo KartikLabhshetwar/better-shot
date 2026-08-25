@@ -3,8 +3,14 @@ import Foundation
 
 /// A ring that pops out of each recorded click, so a viewer can see where the pointer acted.
 nonisolated struct ClickHighlight: Equatable, Sendable {
-    static let duration: TimeInterval = 0.42
+    static let duration: TimeInterval = 0.55
     static let minimumScale: CGFloat = 0.35
+    /// White alone vanishes on a light window, so the ring carries a dark halo under it and reads on any background.
+    static let strokeFraction: CGFloat = 0.16
+    static let strokeOpacity: CGFloat = 0.95
+    static let haloOpacity: CGFloat = 0.4
+    static let haloWidthScale: CGFloat = 2.2
+    static let fillOpacity: CGFloat = 0.16
 
     var time: TimeInterval
     var point: CGPoint

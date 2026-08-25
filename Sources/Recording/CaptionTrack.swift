@@ -8,9 +8,18 @@ nonisolated struct CaptionCue: Identifiable, Equatable, Sendable {
     var end: TimeInterval
     var text: String
 
+    static let minimumDuration: TimeInterval = 0.2
     static let maximumWords = 8
     static let maximumDuration: TimeInterval = 3.2
     static let breakingGap: TimeInterval = 0.55
+
+    /// A timeline drag can push a cue past either edge, so it comes back inside the recording with its floor intact.
+    func clamped(to duration: TimeInterval) -> CaptionCue {
+        var cue = self
+        cue.start = min(max(0, start), max(0, duration - Self.minimumDuration))
+        cue.end = min(max(cue.start + Self.minimumDuration, end), max(duration, cue.start + Self.minimumDuration))
+        return cue
+    }
 
     /// Speech hands back one word at a time, so cues break on a pause, on a full stop, or when a line grows too long to read.
     static func grouped(_ words: [SpokenWord]) -> [CaptionCue] {

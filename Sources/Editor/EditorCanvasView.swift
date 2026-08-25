@@ -68,7 +68,7 @@ struct EditorCanvasView: View {
 
                     // Shadow + Screenshot layer
                     CanvasScreenshotView(
-                        image: sourceImage,
+                        image: model.gradedImage ?? sourceImage,
                         frame: sourceImageFrame,
                         cornerRadii: viewRadii,
                         shadowStrength: model.config.shadowStrength,

@@ -13,6 +13,8 @@ struct EditorInspectorView: View {
                 InspectorDivider()
                 EffectsSection(config: configBinding, onEditingChanged: model.recordConfigEdit)
                 InspectorDivider()
+                ImageColorSection(config: configBinding, source: model.sourceImage, onEditingChanged: model.recordConfigEdit)
+                InspectorDivider()
                 LayoutSection(config: configBinding, onEditingChanged: model.recordConfigEdit)
                 InspectorDivider()
                 BackgroundPickerSection(config: configBinding, onEditingChanged: model.recordConfigEdit)

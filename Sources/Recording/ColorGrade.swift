@@ -3,7 +3,7 @@ import CoreImage.CIFilterBuiltins
 import Foundation
 
 /// Cap's cinematic grade, ported to Core Image: bipolar knobs around zero, plus `intensity` scaling every one of them except grain.
-nonisolated struct ColorGrade: Equatable, Sendable {
+nonisolated struct ColorGrade: Codable, Equatable, Sendable {
     var intensity: CGFloat = 1
     var exposure: CGFloat = 0
     var contrast: CGFloat = 0
@@ -125,6 +125,16 @@ nonisolated struct ColorGrade: Equatable, Sendable {
 
         return output
     }
+
+    /// A still is graded once into a new bitmap, because a screenshot has no player to hang a composition off.
+    func applied(to image: CGImage) -> CGImage {
+        guard !isNeutral else { return image }
+        let source = CIImage(cgImage: image)
+        let output = applied(to: source, extent: source.extent, frameTime: 0)
+        return Self.context.createCGImage(output, from: source.extent) ?? image
+    }
+
+    private static let context = CIContext(options: [.useSoftwareRenderer: false])
 
     /// Teal into the shadows, orange into the highlights, split by the frame's own luminance. Negative reverses the two.
     private static func splitToned(_ image: CIImage, amount: CGFloat) -> CIImage {
