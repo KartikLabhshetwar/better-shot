@@ -145,7 +145,7 @@ struct EditorWindowView: View {
     }
 
     private func shareImage() async {
-        guard let rendered = model.renderFinal() else { return }
+        guard let rendered = await model.renderFinal() else { return }
 
         let itemID = UUID()
         shareItemID = itemID
@@ -183,7 +183,7 @@ struct EditorWindowView: View {
     }
 
     private func exportImage() async {
-        guard let rendered = model.renderFinal() else { return }
+        guard let rendered = await model.renderFinal() else { return }
 
         let dir = AppPreferences.saveDirectory
         let stamp = Int(Date().timeIntervalSince1970 * 1000)
@@ -240,7 +240,7 @@ struct EditorWindowView: View {
     }
 
     private func copyToClipboard() async {
-        guard let rendered = model.renderFinal() else { return }
+        guard let rendered = await model.renderFinal() else { return }
 
         let nsImage = NSImage(cgImage: rendered, size: NSSize(width: rendered.width, height: rendered.height))
         let pb = NSPasteboard.general

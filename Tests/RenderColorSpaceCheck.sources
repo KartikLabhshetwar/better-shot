@@ -1,0 +1,8 @@
+Sources/Services/BeautifierRenderer.swift
+Sources/Models/CaptureRecord.swift
+Sources/Models/BackgroundStyle.swift
+Sources/Recording/ColorGrade.swift
+Sources/Models/AnnotationItem.swift
+Sources/Models/BundledBackgrounds.swift
+Sources/Editor/AnnotationDrawing.swift
+Sources/Editor/AnnotationRedactionImageProcessor.swift

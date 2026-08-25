@@ -13,8 +13,31 @@ enum RedactionImageProcessor {
     }()
     private static let ciContext = CIContext(options: [.cacheIntermediates: false])
 
+    /// Identifies a cached preview by its source, tool, density, scale and pixel crop, so a new source never reuses an old bitmap.
+    static func previewCacheKey(
+        prefix: String,
+        sourceToken: UUID,
+        tool: AnnotationTool,
+        density: CGFloat,
+        scale: CGFloat,
+        cropRect: CGRect
+    ) -> NSString {
+        [
+            prefix,
+            sourceToken.uuidString,
+            tool.rawValue,
+            "\(Int((density * 100).rounded()))",
+            "\(Int((scale * 1000).rounded()))",
+            "\(Int(cropRect.minX))",
+            "\(Int(cropRect.minY))",
+            "\(Int(cropRect.width))",
+            "\(Int(cropRect.height))"
+        ].joined(separator: "-") as NSString
+    }
+
     static func previewImage(
         source: NSImage,
+        sourceToken: UUID,
         tool: AnnotationTool,
         density: CGFloat,
         normalizedBounds: CGRect,
@@ -28,17 +51,7 @@ enum RedactionImageProcessor {
         }
         let previewScale = redactionScale(sourceImage: sourceImage, originalImageSize: originalImageSize)
 
-        let quantizedDensity = Int((density * 100).rounded())
-        let cacheKey = [
-            "\(ObjectIdentifier(source).hashValue)",
-            tool.rawValue,
-            "\(quantizedDensity)",
-            "\(Int((previewScale * 1000).rounded()))",
-            "\(Int(cropRect.minX))",
-            "\(Int(cropRect.minY))",
-            "\(Int(cropRect.width))",
-            "\(Int(cropRect.height))"
-        ].joined(separator: "-") as NSString
+        let cacheKey = previewCacheKey(prefix: "ns", sourceToken: sourceToken, tool: tool, density: density, scale: previewScale, cropRect: cropRect)
         if allowsCaching, let cachedImage = cache.object(forKey: cacheKey) {
             return cachedImage
         }
@@ -66,6 +79,7 @@ enum RedactionImageProcessor {
 
     static func previewImageFromCGImage(
         source: CGImage,
+        sourceToken: UUID,
         tool: AnnotationTool,
         density: CGFloat,
         normalizedBounds: CGRect,
@@ -75,17 +89,7 @@ enum RedactionImageProcessor {
         guard tool.isRedactionTool else { return nil }
         guard let cropRect = pixelRect(for: normalizedBounds, in: source) else { return nil }
 
-        let quantizedDensity = Int((density * 100).rounded())
-        let cacheKey = [
-            "cg-\(source.width)x\(source.height)",
-            tool.rawValue,
-            "\(quantizedDensity)",
-            "\(Int((viewScale * 1000).rounded()))",
-            "\(Int(cropRect.minX))",
-            "\(Int(cropRect.minY))",
-            "\(Int(cropRect.width))",
-            "\(Int(cropRect.height))"
-        ].joined(separator: "-") as NSString
+        let cacheKey = previewCacheKey(prefix: "cg", sourceToken: sourceToken, tool: tool, density: density, scale: viewScale, cropRect: cropRect)
         if allowsCaching, let cachedImage = cache.object(forKey: cacheKey) {
             return cachedImage
         }

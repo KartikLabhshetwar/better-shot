@@ -109,15 +109,16 @@ final class CaptureOrchestrator {
     }
 
     private func galleryApplyAndSave(_ url: URL, recordID: UUID? = nil) async {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return }
-
         let config = AppPreferences.defaultBeautifierConfig
-        let rendered = BeautifierRenderer.render(image: cgImage, config: config)
 
-        guard let rendered else { return }
+        let (didRender, savedURL) = await Task.detached { () -> (Bool, URL?) in
+            guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+                  let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil),
+                  let rendered = BeautifierRenderer.render(image: cgImage, config: config) else { return (false, nil) }
+            return (true, Self.saveImage(rendered))
+        }.value
 
-        let savedURL = saveImage(rendered)
+        guard didRender else { return }
 
         if let savedURL, let recordID {
             HistoryStore.shared.setBeautifiedPath(savedURL.path, for: recordID)
@@ -150,7 +151,7 @@ final class CaptureOrchestrator {
         }
     }
 
-    private func saveImage(_ cgImage: CGImage) -> URL? {
+    private nonisolated static func saveImage(_ cgImage: CGImage) -> URL? {
         let dir = AppPreferences.saveDirectory
         let stamp = Int(Date().timeIntervalSince1970 * 1000)
         let ext = AppPreferences.exportFormat.fileExtension

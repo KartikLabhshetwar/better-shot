@@ -5,6 +5,7 @@ import SwiftUI
 @Observable
 final class EditorModel {
     var sourceImage: CGImage?
+    private(set) var sourceToken = UUID()
     var sourceURL: URL?
     var previewImage: NSImage?
     var imageSize: CGSize = .zero
@@ -109,6 +110,7 @@ final class EditorModel {
 
     private func replaceSource(with image: CGImage) {
         sourceImage = image
+        sourceToken = UUID()
         imageSize = CGSize(width: image.width, height: image.height)
         previewImage = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
         RedactionImageProcessor.removeAllCachedPreviewImages()
@@ -608,9 +610,13 @@ final class EditorModel {
 
     // MARK: - Render
 
-    func renderFinal() -> CGImage? {
+    func renderFinal() async -> CGImage? {
         guard let image = sourceImage else { return nil }
-        return BeautifierRenderer.render(image: image, config: config, annotations: items)
+        let config = config
+        let items = items
+        return await Task.detached {
+            BeautifierRenderer.render(image: image, config: config, annotations: items)
+        }.value
     }
 
     private func cropImage(_ image: CGImage, to fraction: CGRect) -> CGImage {

@@ -43,23 +43,6 @@ final class EditorWindowController {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    func close(window: NSWindow? = nil) {
-        if let window {
-            windows.removeAll { $0 === window }
-            window.close()
-        } else {
-            let windowToClose = NSApp.keyWindow ?? windows.last
-            if let windowToClose {
-                windows.removeAll { $0 === windowToClose }
-                windowToClose.close()
-            }
-        }
-
-        if windows.isEmpty {
-            ActivationPolicy.dropIfNoWindowsLeft()
-        }
-    }
-
     func windowDidClose(_ window: NSWindow) {
         windows.removeAll { $0 === window }
         if windows.isEmpty {

@@ -5,6 +5,7 @@ struct AnnotationItemView: View {
     let item: AnnotationItem
     let image: NSImage
     let sourceImage: CGImage?
+    let sourceToken: UUID
     let originalImageSize: CGSize
     let imageFrame: CGRect
     var canvasFrame: CGRect?
@@ -26,6 +27,7 @@ struct AnnotationItemView: View {
                 RedactionPreview(
                     image: image,
                     sourceImage: sourceImage,
+                    sourceToken: sourceToken,
                     item: item,
                     originalImageSize: originalImageSize,
                     imageFrame: imageFrame,
@@ -313,6 +315,21 @@ private struct AnnotationTextItemView: View {
     }
 }
 
+extension NSTextView {
+    /// Pushes new text in unless an input method is mid-composition, where overwriting would swallow a dead-key accent.
+    /// Returns false when the composition was left alone.
+    @discardableResult
+    func syncPreservingComposition(to newText: String) -> Bool {
+        guard !hasMarkedText() else { return false }
+        guard string != newText else { return true }
+
+        let ranges = selectedRanges
+        string = newText
+        selectedRanges = ranges
+        return true
+    }
+}
+
 private struct AnnotationTextBoxView: NSViewRepresentable {
     @Binding var text: String
 
@@ -387,13 +404,9 @@ private struct AnnotationTextBoxView: NSViewRepresentable {
         textView.isSelectable = isEditing
         updateTextViewFrame(textView, in: scrollView)
 
-        if textView.string != text {
-            let selectedRanges = textView.selectedRanges
-            textView.string = text
-            textView.selectedRanges = selectedRanges
+        if textView.syncPreservingComposition(to: text) {
+            applyStyle(to: textView)
         }
-
-        applyStyle(to: textView)
 
         if isEditing && textView.window?.firstResponder !== textView {
             DispatchQueue.main.async {
@@ -551,6 +564,7 @@ extension NSCursor {
 private struct RedactionPreview: View {
     let image: NSImage
     let sourceImage: CGImage?
+    let sourceToken: UUID
     let item: AnnotationItem
     let originalImageSize: CGSize
     let imageFrame: CGRect
@@ -571,6 +585,7 @@ private struct RedactionPreview: View {
         if let sourceImage {
             return RedactionImageProcessor.previewImageFromCGImage(
                 source: sourceImage,
+                sourceToken: sourceToken,
                 tool: item.tool,
                 density: item.redactionDensity,
                 normalizedBounds: item.bounds,
@@ -580,6 +595,7 @@ private struct RedactionPreview: View {
         }
         return RedactionImageProcessor.previewImage(
             source: image,
+            sourceToken: sourceToken,
             tool: item.tool,
             density: item.redactionDensity,
             normalizedBounds: item.bounds,

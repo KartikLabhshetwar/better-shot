@@ -1,0 +1,3 @@
+Sources/Editor/AnnotationItemView.swift
+Sources/Models/AnnotationItem.swift
+Sources/Editor/AnnotationRedactionImageProcessor.swift

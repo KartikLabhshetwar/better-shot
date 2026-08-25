@@ -3,6 +3,8 @@ import AppKit
 
 enum BeautifierRenderer {
 
+    static let sRGB = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+
     static func render(image source: CGImage, config: BeautifierConfig, annotations: [AnnotationItem] = []) -> CGImage? {
         let image = config.grade.applied(to: source)
         let imgW = CGFloat(image.width)
@@ -37,7 +39,7 @@ enum BeautifierRenderer {
             bottomLeft: baseRadius * m.bl
         )
 
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let canvasColorSpace = source.colorSpace.flatMap { $0.model == .rgb ? $0 : nil } ?? sRGB
 
         guard let ctx = CGContext(
             data: nil,
@@ -45,13 +47,13 @@ enum BeautifierRenderer {
             height: Int(canvasH),
             bitsPerComponent: 8,
             bytesPerRow: 0,
-            space: colorSpace,
+            space: canvasColorSpace,
             bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
         ) else { return nil }
 
         let canvasRect = CGRect(x: 0, y: 0, width: canvasW, height: canvasH)
 
-        drawBackground(in: ctx, rect: canvasRect, style: config.style, colorSpace: colorSpace)
+        drawBackground(in: ctx, rect: canvasRect, style: config.style, colorSpace: sRGB)
 
         let imageRect = CGRect(x: imgX, y: imgY, width: imgW, height: imgH)
         if config.shadowStrength > 0 {
