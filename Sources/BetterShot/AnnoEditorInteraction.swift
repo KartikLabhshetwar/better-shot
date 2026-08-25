@@ -241,7 +241,9 @@ extension AnnoEditor {
                 setBoxSize(id, width: fallback, height: fallback)
             }
             selectedIds = [id]
-            tool = .select
+            // Redaction is repetitive by nature: one screenshot usually has several fields to
+            // hide, so blur and pixelate stay armed instead of dropping back to select.
+            if !tool.isRedactionTool { tool = .select }
 
         case let .creatingArrow(id):
             if let shape = document.shape(id), let props = shape.arrowProps,
