@@ -1,0 +1,4 @@
+Sources/Models/AppPreferences.swift
+Sources/Models/CaptureRecord.swift
+Sources/Models/BackgroundStyle.swift
+Sources/Recording/ColorGrade.swift

@@ -14,6 +14,16 @@ final class PinnedScreenshotController {
         !panels.isEmpty
     }
 
+    /// Grows or shrinks a panel from its top-left corner, so scroll-zooming does not walk the window down the screen.
+    nonisolated static func anchoredFrame(_ frame: CGRect, resizedTo newSize: CGSize) -> CGRect {
+        CGRect(
+            x: frame.minX,
+            y: frame.maxY - newSize.height,
+            width: newSize.width,
+            height: newSize.height
+        )
+    }
+
     /// Creates a new borderless, always-on-top floating panel showing the image at `url`.
     func pin(url: URL, on preferredScreen: NSScreen? = nil) {
         guard let image = NSImage(contentsOf: url) else { return }
@@ -53,6 +63,10 @@ final class PinnedScreenshotController {
                 guard let self, let panel else { return }
                 panel.orderOut(nil)
                 self.panels.removeAll { $0 === panel }
+            },
+            onResize: { [weak panel] newSize in
+                guard let panel else { return }
+                panel.setFrame(Self.anchoredFrame(panel.frame, resizedTo: newSize), display: true, animate: false)
             }
         )
         panel.contentView = NSHostingView(rootView: contentView)
@@ -82,6 +96,7 @@ struct PinnedScreenshotView: View {
     let image: NSImage
     let originalDisplaySize: CGSize
     let onClose: () -> Void
+    let onResize: (CGSize) -> Void
 
     @State private var scaleFactor: CGFloat = 1.0
     @State private var isHovered: Bool = false
@@ -126,8 +141,8 @@ struct PinnedScreenshotView: View {
         .onScrollWheel { delta in
             let newScale = (scaleFactor + delta * 0.05).clamped(to: minScale...maxScale)
             scaleFactor = newScale
-            resizeWindow(to: CGSize(width: originalDisplaySize.width * newScale,
-                                    height: originalDisplaySize.height * newScale))
+            onResize(CGSize(width: originalDisplaySize.width * newScale,
+                            height: originalDisplaySize.height * newScale))
         }
         // Right-click context menu
         .contextMenu {
@@ -142,30 +157,6 @@ struct PinnedScreenshotView: View {
         }
     }
 
-    private func resizeWindow(to newSize: CGSize) {
-        guard let window = NSApp.windows.first(where: {
-            ($0.contentView as? NSHostingView<PinnedScreenshotView>) != nil
-        }) ?? findHostingWindow() else { return }
-
-        var frame = window.frame
-        // Keep the top-left corner anchored.
-        frame.origin.y += frame.size.height - newSize.height
-        frame.size = newSize
-        window.setFrame(frame, display: true, animate: false)
-    }
-
-    private func findHostingWindow() -> NSWindow? {
-        // Walk all app windows to find the one hosting this view.
-        for window in NSApp.windows {
-            if let hv = window.contentView as? NSHostingView<PinnedScreenshotView> {
-                // Check it's ours by comparing image size as a proxy.
-                if hv.rootView.image.size == image.size {
-                    return window
-                }
-            }
-        }
-        return nil
-    }
 }
 
 // MARK: - Scroll-wheel modifier

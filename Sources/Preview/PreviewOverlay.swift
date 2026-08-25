@@ -106,6 +106,7 @@ final class PreviewOverlay {
 
     private func scheduleDismiss() {
         dismissTask?.cancel()
+        guard AppPreferences.overlayDismisses(after: AppPreferences.overlayDismissDelay) else { return }
         dismissTask = Task {
             try? await Task.sleep(for: .seconds(AppPreferences.overlayDismissDelay))
             guard !Task.isCancelled else { return }

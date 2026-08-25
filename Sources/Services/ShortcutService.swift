@@ -94,6 +94,9 @@ final class ShortcutService {
         if let source = runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
         }
+        if let tap = eventTap {
+            CFMachPortInvalidate(tap)
+        }
         eventTap = nil
         runLoopSource = nil
     }
@@ -154,8 +157,9 @@ final class ShortcutService {
         for (action, shortcut) in cachedShortcuts {
             guard shortcut.enabled else { continue }
             if keyCode == shortcut.keyCode && carbonMods == shortcut.modifiers {
-                let mouseScreen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) }
+                let pointerLocation = event.location
                 Task { @MainActor in
+                    let mouseScreen = ActiveDisplayResolver.screen(containingQuartzPoint: pointerLocation)
                     if action == .recording {
                         guard !ScreenRecordingManager.shared.isRecording else { return }
                         RecordingBarPresenter.shared.togglePicker(on: mouseScreen)

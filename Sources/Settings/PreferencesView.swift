@@ -671,8 +671,8 @@ struct CaptureSettingsTab: View {
 
                 LabeledContent("Hide it after") {
                     HStack(spacing: 12) {
-                        Slider(value: $overlayDismissDelay, in: 2...15, step: 1)
-                        Text("\(Int(overlayDismissDelay))s")
+                        Slider(value: $overlayDismissDelay, in: AppPreferences.overlayDismissRange, step: 1)
+                        Text(AppPreferences.overlayDismisses(after: overlayDismissDelay) ? "\(Int(overlayDismissDelay))s" : "Never")
                             .font(.system(.callout, design: .monospaced))
                             .foregroundStyle(.secondary)
                             .frame(width: 44, alignment: .trailing)

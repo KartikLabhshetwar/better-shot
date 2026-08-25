@@ -68,6 +68,12 @@ enum AppPreferences {
         set { UserDefaults.standard.set(newValue.rawValue, forKey: overlayPositionKey) }
     }
 
+    static let overlayDismissNever: Double = 16
+    static let overlayDismissRange: ClosedRange<Double> = 2...overlayDismissNever
+
+    /// The top of the slider means "leave it up", so anything at or above the sentinel never auto-hides.
+    static func overlayDismisses(after delay: Double) -> Bool { delay < overlayDismissNever }
+
     static var overlayDismissDelay: Double {
         get {
             let val = UserDefaults.standard.double(forKey: overlayDismissDelayKey)

@@ -25,6 +25,18 @@ enum ActiveDisplayResolver {
         return screenContainingFrontmostWindow() ?? pointerScreen ?? NSScreen.main ?? NSScreen.screens.first
     }
 
+    /// Flips a Quartz global point (top-left origin) into AppKit screen space (bottom-left origin on the primary display).
+    nonisolated static func appKitPoint(fromQuartz point: CGPoint, primaryHeight: CGFloat) -> CGPoint {
+        CGPoint(x: point.x, y: primaryHeight - point.y)
+    }
+
+    /// Resolves the screen under a Quartz global point, as delivered by CGEvent.
+    static func screen(containingQuartzPoint point: CGPoint) -> NSScreen? {
+        let primaryHeight = CGDisplayBounds(CGMainDisplayID()).height
+        return screen(containing: appKitPoint(fromQuartz: point, primaryHeight: primaryHeight))
+            ?? activeScreen()
+    }
+
     private static func screen(containing point: CGPoint) -> NSScreen? {
         NSScreen.screens.first { NSMouseInRect(point, $0.frame, false) }
     }
