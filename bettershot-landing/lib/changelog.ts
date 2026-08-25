@@ -9,6 +9,7 @@ export interface ChangelogSection {
 export interface ChangelogVersion {
   version: string
   date: string
+  summary: string
   sections: ChangelogSection[]
 }
 
@@ -22,7 +23,6 @@ export function getChangelog(): ChangelogVersion[] {
   let currentSection: ChangelogSection | null = null
 
   for (const line of lines) {
-    // Match version header: ## [0.3.7] - 2026-06-07
     const versionMatch = line.match(/^## \[(.+?)\]\s*-\s*(.+)$/)
     if (versionMatch) {
       if (currentSection && currentVersion) {
@@ -35,12 +35,12 @@ export function getChangelog(): ChangelogVersion[] {
       currentVersion = {
         version: versionMatch[1],
         date: versionMatch[2].trim(),
+        summary: "",
         sections: [],
       }
       continue
     }
 
-    // Match section header: ### Added / ### Fixed / etc.
     const sectionMatch = line.match(/^### (.+)$/)
     if (sectionMatch && currentVersion) {
       if (currentSection) {
@@ -50,19 +50,17 @@ export function getChangelog(): ChangelogVersion[] {
       continue
     }
 
-    // Match list items: - **Label**: description  or  - plain text
     const itemMatch = line.match(/^- (.+)$/)
     if (itemMatch && currentSection) {
-      // Strip bold markdown (**text**) — keep label text + rest of description
-      const text = itemMatch[1]
-        .replace(/\*\*(.+?)\*\*:/g, "$1:") // **Foo**: bar → Foo: bar
-        .replace(/\*\*(.+?)\*\*/g, "$1")    // **Foo** → Foo
-        .trim()
-      currentSection.items.push(text)
+      currentSection.items.push(itemMatch[1].trim())
+      continue
+    }
+
+    if (currentVersion && !currentSection && line.trim()) {
+      currentVersion.summary = `${currentVersion.summary} ${line.trim()}`.trim()
     }
   }
 
-  // Flush the last section and version
   if (currentSection && currentVersion) {
     currentVersion.sections.push(currentSection)
   }

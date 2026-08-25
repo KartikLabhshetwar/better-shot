@@ -37,8 +37,8 @@ Most contributions won't need this.
 
 On first launch, grant both:
 
-1. **Screen Recording** — System Settings > Privacy & Security > Screen Recording
-2. **Accessibility** — System Settings > Privacy & Security > Accessibility
+1. **Screen Recording**: System Settings > Privacy & Security > Screen Recording
+2. **Accessibility**: System Settings > Privacy & Security > Accessibility
 
 ## Project structure
 
@@ -50,10 +50,11 @@ Sources/
   Models/                Data types: annotations, backgrounds, preferences, config
   Preview/               Floating preview overlay and pinned screenshots
   History/               Capture history (JSON in Application Support)
-  Recording/             Screen/window recording, video editor, trim timeline, effects export
+  Recording/             Screen/window recording, video editor, clip timeline, effects export
   Services/              Beautifier renderer, keyboard shortcuts, app updater
   Settings/              Preferences window (sidebar navigation) and settings window controller
-  Views/                 Menu bar popover, toast notifications
+  Sharing/               Cloudflare R2 credentials, SigV4 signing, uploads
+  Views/                 Menu bar popover, toast notifications, shared inspector controls
 Resources/
   Assets.xcassets/       App icon, menu bar icon
   Backgrounds/           Bundled wallpaper and gradient images
@@ -77,6 +78,9 @@ Resources/
 | `ScreenRecordingManager.swift` | Screen and window recording via ScreenCaptureKit |
 | `VideoEditorModel.swift` | Video editor state: trim, effects config, export with AVMutableVideoComposition |
 | `VideoEditorView.swift` | Video editor UI: inspector sidebar, preview, timeline, transport controls |
+| `EditTimelineView.swift` | AppKit-drawn timeline: clip track, zoom lane, overlay lanes, ruler, minimap |
+| `TimelineTransform.swift` | The windowed `{position, zoom}` transform every timeline lane shares |
+| `VideoInspectorTabs.swift` | The five inspector tabs: Clip, Motion, Camera, Overlay, Style |
 | `RecordingStatusBar.swift` | Floating recording status bar with timer, pause, stop, discard |
 | `PreferencesView.swift` | Settings window with sidebar navigation (General, Capture, Recording, History, Videos, About) |
 | `SettingsWindowController.swift` | Creates and manages the settings NSWindow (mirrors EditorWindowController) |
@@ -108,14 +112,29 @@ User presses ⌘⇧2 (or clicks Record / Record Window)
   → ScreenRecordingManager.startRecording() (full screen)
      or .startWindowRecording() (hover-and-click window picker)
   → RecordingStatusBarController.show() (floating status bar, excluded from capture)
-  → User clicks stop → HistoryStore.importCapture(kind: .recording, deleteSource: true)
-  → VideoEditorModel.autoExportWithDefaults() (applies default beautifier config)
-  → HistoryStore.setBeautifiedPath() (links processed video to record)
-  → PreviewOverlay.show() (floating card with processed video)
+  → User clicks stop → HistoryStore.referenceCapture(kind: .recording)
+  → PreviewOverlay.show() (floating card with raw video)
   → User clicks preview → VideoEditorWindowController.open()
   → User edits effects → VideoEditorModel.exportWithEffects()
      (AVMutableVideoComposition + Core Animation layers)
 ```
+
+### Storage
+
+Every capture is on disk once. Screenshots keep their untouched original in
+`~/Library/Application Support/BetterShot/` (`CaptureRecord.filename`) and the
+beautified export in the user's save folder (`CaptureRecord.beautifiedPath`);
+`CaptureOrchestrator.resolveRawSource` maps an export back to that original so
+the editor reloads unflattened pixels. Recordings are written straight into the
+save folder and only referenced by history (`CaptureRecord.sourcePath`), never
+copied. Re-exporting updates `beautifiedPath` in place instead of creating a
+second record.
+
+History keeps the most recent 100 captures by default, configurable in Settings
+> General > History (up to 500, or unlimited). Trimming deletes only the
+originals BetterShot owns in Application Support, never files in the save
+folder. `BetterShot/bases/` is a legacy directory from when every screenshot
+kept a duplicate raw copy; it is read for old captures and pruned at launch.
 
 ### Editor flow
 
@@ -133,7 +152,7 @@ Annotations use **normalized coordinates** (0.0 to 1.0) so they're resolution-in
 
 ### Settings
 
-The settings window is managed by `SettingsWindowController`, which creates an `NSWindow` hosting `PreferencesView` in an `NSHostingView`. This mirrors the `EditorWindowController` pattern. The view uses a sidebar list (General, Capture, Recording, History, Videos, About) and a content panel. Preferences are stored via `@AppStorage` and the centralized `AppPreferences` enum. Screenshots and recordings have separate history tabs — History shows only screenshots, Videos shows only recordings.
+The settings window is managed by `SettingsWindowController`, which creates an `NSWindow` hosting `PreferencesView` in an `NSHostingView`. This mirrors the `EditorWindowController` pattern. The view uses a sidebar list (General, Capture, Recording, History, Videos, About) and a content panel. Preferences are stored via `@AppStorage` and the centralized `AppPreferences` enum. Screenshots and recordings have separate history tabs. History shows only screenshots, Videos shows only recordings.
 
 ### Menu bar
 
@@ -145,8 +164,8 @@ The menu bar popover is managed by `MenuBarPopoverController`, which creates a c
 
 1. Add the case to `AnnotationTool` in `Models/AnnotationItem.swift`
 2. Set its `systemImage` and `title`
-3. Add live rendering in `Editor/AnnotationItemView.swift` (uses `viewRect`/`viewPoint` — Y-down)
-4. Add export rendering in `Editor/AnnotationDrawing.swift` (uses `renderedRect`/`renderedPoint` with `flipped: true` — same Y-down math as the canvas)
+3. Add live rendering in `Editor/AnnotationItemView.swift` (uses `viewRect`/`viewPoint`, Y-down)
+4. Add export rendering in `Editor/AnnotationDrawing.swift` (uses `renderedRect`/`renderedPoint` with `flipped: true`, the same Y-down math as the canvas)
 5. Handle creation in `EditorModel.beginDraftItem`
 6. Handle updates in `EditorModel.updateDraftItem`
 7. Add keyboard shortcut in `Editor/AnnotationKeyboard.swift`
@@ -166,20 +185,33 @@ The menu bar popover is managed by `MenuBarPopoverController`, which creates a c
 
 ## Code style
 
-- **Swift 6 strict concurrency** — all code must compile without concurrency warnings
+- **Swift 6 strict concurrency**: all code must compile without concurrency warnings
 - **`@Observable`** for model classes, `@Bindable` in views
 - **No comments** unless explaining something non-obvious (a hidden constraint, a workaround)
-- **No abstractions for their own sake** — three similar lines is better than a premature helper
-- **System colors** — use `NSColor.controlBackgroundColor`, `.separatorColor`, etc. for native look
-- **Main actor** — all UI types are `@MainActor`
+- **No abstractions for their own sake**: three similar lines is better than a premature helper
+- **System colors**: use `NSColor.controlBackgroundColor`, `.separatorColor`, etc. for native look
+- **Main actor**: all UI types are `@MainActor`
 
 ## Submitting a pull request
 
 1. Create a branch: `git checkout -b feat/what-it-does` or `fix/what-it-fixes`
-2. Keep changes focused — one feature or fix per PR
+2. Keep changes focused, one feature or fix per PR
 3. Make sure it builds: `make build`
 4. Test manually in the app: `make run`
 5. Write a clear PR title and description
+
+### Make targets
+
+| Command | What it does |
+|---|---|
+| `make build` | Debug build |
+| `make release` | Release build (unsigned) |
+| `make run` | Build and launch |
+| `make dmg` | Create a DMG for local testing |
+| `make clean` | Remove build artifacts |
+| `make lint` | Check for compiler warnings |
+| `make test-build` | Full clean plus release build |
+| `make version` | Print the current version |
 
 ### Commit messages
 

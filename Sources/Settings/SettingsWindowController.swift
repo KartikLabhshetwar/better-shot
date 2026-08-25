@@ -7,6 +7,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     private var window: NSWindow?
 
+    var hasOpenWindow: Bool { window != nil }
+
     private override init() { super.init() }
 
     func open(on screen: NSScreen? = nil) {
@@ -17,15 +19,12 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             return
         }
 
-        let hostingView = NSHostingView(rootView: PreferencesView())
+        let controller = NSHostingController(rootView: PreferencesView())
 
-        let win = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 680, height: 560),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        win.contentView = hostingView
+        let win = NSWindow(contentViewController: controller)
+        win.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        win.setContentSize(NSSize(width: 820, height: 660))
+        win.titlebarAppearsTransparent = true
         win.title = "Settings"
         win.isReleasedWhenClosed = false
         win.delegate = self
@@ -36,19 +35,17 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         window = win
 
         win.orderFrontRegardless()
-        NSApp.setActivationPolicy(.regular)
+        AppActivationPolicy.enter()
         win.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func close() {
+        window?.performClose(nil)
     }
 
     func windowWillClose(_ notification: Notification) {
         window = nil
-        DispatchQueue.main.async {
-            if !EditorWindowController.shared.hasOpenWindows
-                && !VideoEditorWindowController.shared.hasOpenWindow {
-                NSApp.setActivationPolicy(.accessory)
-            }
-        }
+        AppActivationPolicy.leave()
     }
 
     private func centerOnCurrentScreen(_ window: NSWindow, preferring preferred: NSScreen? = nil) {

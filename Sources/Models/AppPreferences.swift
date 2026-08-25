@@ -13,10 +13,15 @@ enum AppPreferences {
     private static let exportFormatKey = "bs_exportFormat"
     private static let exportQualityKey = "bs_exportQuality"
     private static let selfTimerKey = "bs_selfTimerDelay"
-    private static let recordingFPSKey = "bs_recordingFPS"
-    private static let recordingShowCursorKey = "bs_recordingShowCursor"
-    private static let recordingCaptureAudioKey = "bs_recordingCaptureAudio"
-    private static let recordingOpenEditorKey = "bs_recordingOpenEditor"
+    static let recordingCaptureKeystrokesKey = "bs_recordingCaptureKeystrokes"
+    private static let openEditorAfterCaptureKey = "bs_openEditorAfterCapture"
+    private static let historyRetentionKey = "bs_historyRetentionLimit"
+    private static let recordingCaptureMicrophoneKey = "bs_recordingCaptureMicrophone"
+    private static let recordingStartDelaySecondsKey = "bs_recordingStartDelaySeconds"
+    private static let recordingShowCameraKey = "bs_recordingShowCamera"
+    private static let recordingCameraSizeKey = "bs_recordingCameraSize"
+    private static let recordingCameraDeviceIDKey = "bs_recordingCameraDeviceID"
+    private static let recordingMicrophoneDeviceIDKey = "bs_recordingMicrophoneDeviceID"
 
     // MARK: - Appearance
     static var appearance: AppAppearance {
@@ -59,6 +64,12 @@ enum AppPreferences {
         set { UserDefaults.standard.set(newValue.rawValue, forKey: overlayPositionKey) }
     }
 
+    static let overlayDismissNever: Double = 16
+    static let overlayDismissRange: ClosedRange<Double> = 2...overlayDismissNever
+
+    /// The top of the slider means "leave it up", so anything at or above the sentinel never auto-hides.
+    static func overlayDismisses(after delay: Double) -> Bool { delay < overlayDismissNever }
+
     static var overlayDismissDelay: Double {
         get {
             let val = UserDefaults.standard.double(forKey: overlayDismissDelayKey)
@@ -95,27 +106,52 @@ enum AppPreferences {
     }
 
     // MARK: - Recording
-    static var recordingFPS: Int {
-        get {
-            let val = UserDefaults.standard.integer(forKey: recordingFPSKey)
-            return val > 0 ? val : 30
-        }
-        set { UserDefaults.standard.set(newValue, forKey: recordingFPSKey) }
+    static var recordingCaptureKeystrokes: Bool {
+        get { UserDefaults.standard.object(forKey: recordingCaptureKeystrokesKey) as? Bool ?? false }
+        set { UserDefaults.standard.set(newValue, forKey: recordingCaptureKeystrokesKey) }
     }
 
-    static var recordingShowCursor: Bool {
-        get { UserDefaults.standard.object(forKey: recordingShowCursorKey) as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: recordingShowCursorKey) }
+    static var recordingCaptureMicrophone: Bool {
+        get { UserDefaults.standard.object(forKey: recordingCaptureMicrophoneKey) as? Bool ?? false }
+        set { UserDefaults.standard.set(newValue, forKey: recordingCaptureMicrophoneKey) }
     }
 
-    static var recordingCaptureAudio: Bool {
-        get { UserDefaults.standard.object(forKey: recordingCaptureAudioKey) as? Bool ?? false }
-        set { UserDefaults.standard.set(newValue, forKey: recordingCaptureAudioKey) }
+    static var recordingStartDelaySeconds: Int {
+        get { UserDefaults.standard.integer(forKey: recordingStartDelaySecondsKey) }
+        set { UserDefaults.standard.set(newValue, forKey: recordingStartDelaySecondsKey) }
     }
 
-    static var recordingOpenEditor: Bool {
-        get { UserDefaults.standard.object(forKey: recordingOpenEditorKey) as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: recordingOpenEditorKey) }
+    static var recordingShowCamera: Bool {
+        get { UserDefaults.standard.object(forKey: recordingShowCameraKey) as? Bool ?? false }
+        set { UserDefaults.standard.set(newValue, forKey: recordingShowCameraKey) }
+    }
+
+    static var recordingCameraSize: Int {
+        get { UserDefaults.standard.object(forKey: recordingCameraSizeKey) as? Int ?? 200 }
+        set { UserDefaults.standard.set(newValue, forKey: recordingCameraSizeKey) }
+    }
+
+    static var recordingCameraDeviceID: String? {
+        get { UserDefaults.standard.string(forKey: recordingCameraDeviceIDKey) }
+        set { UserDefaults.standard.set(newValue, forKey: recordingCameraDeviceIDKey) }
+    }
+
+    static var recordingMicrophoneDeviceID: String? {
+        get { UserDefaults.standard.string(forKey: recordingMicrophoneDeviceIDKey) }
+        set { UserDefaults.standard.set(newValue, forKey: recordingMicrophoneDeviceIDKey) }
+    }
+
+    // MARK: - Screenshot
+    static var openEditorAfterCapture: Bool {
+        get { UserDefaults.standard.object(forKey: openEditorAfterCaptureKey) as? Bool ?? false }
+        set { UserDefaults.standard.set(newValue, forKey: openEditorAfterCaptureKey) }
+    }
+
+    // MARK: - History
+    /// How many captures history keeps. 0 means unlimited.
+    static var historyRetentionLimit: Int {
+        get { UserDefaults.standard.object(forKey: historyRetentionKey) as? Int ?? 100 }
+        set { UserDefaults.standard.set(newValue, forKey: historyRetentionKey) }
     }
 
     // MARK: - Default Beautifier Config
@@ -180,6 +216,20 @@ enum ExportFormat: String, CaseIterable {
         case .png: return "png"
         case .jpeg: return "jpg"
         }
+    }
+}
+
+enum HistoryRetention: Int, CaseIterable, Identifiable {
+    case fifty = 50
+    case hundred = 100
+    case twoFifty = 250
+    case fiveHundred = 500
+    case unlimited = 0
+
+    var id: Int { rawValue }
+
+    var label: String {
+        self == .unlimited ? "Unlimited" : "\(rawValue) captures"
     }
 }
 

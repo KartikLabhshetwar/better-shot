@@ -1,0 +1,7 @@
+Sources/Models/BackgroundStyle.swift
+Sources/Models/CaptureRecord.swift
+Sources/Models/BundledBackgrounds.swift
+Sources/Services/ColorGrade.swift
+Sources/BetterShot/AnnotationBackground.swift
+Sources/BetterShot/AnnotationShadowStyle.swift
+Sources/BetterShot/AnnotationSwatch.swift

@@ -22,8 +22,16 @@
     <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
     <key>LSUIElement</key>
     <true/>
+    <key>NSInputMonitoringUsageDescription</key>
+    <string>BetterShot records the shortcut keys you press during a recording, only when you turn on key capture, so the editor can show them on screen.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>BetterShot shows your camera in a floating bubble when you turn on the face cam, so your face appears in the recording.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>BetterShot records your microphone when you turn on the mic in the recording bar, so you can narrate what you capture.</string>
     <key>NSScreenCaptureUsageDescription</key>
     <string>BetterShot needs screen recording access to capture screenshots and record your screen.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>BetterShot transcribes the audio in your recording so it can add captions, on your Mac where it can.</string>
     <key>NSRequiresAquaSystemAppearance</key>
     <true/>
 </dict>

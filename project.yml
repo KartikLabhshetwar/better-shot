@@ -2,20 +2,30 @@ name: BetterShot
 options:
   bundleIdPrefix: com.bettershot
   deploymentTarget:
-    macOS: "14.0"
+    macOS: "26.0"
   xcodeVersion: "16.0"
   generateEmptyDirectories: true
 
 settings:
   base:
-    SWIFT_VERSION: "6.0"
-    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    SWIFT_VERSION: "5.0"
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_APPROACHABLE_CONCURRENCY: true
+    SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: true
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
     ENABLE_USER_SCRIPT_SANDBOXING: false
+
+packages:
+  DockProgress:
+    url: https://github.com/sindresorhus/DockProgress
+    from: 5.0.0
 
 targets:
   BetterShot:
     type: application
     platform: macOS
+    dependencies:
+      - package: DockProgress
     sources:
       - Sources
       - path: Resources/Assets.xcassets
@@ -29,11 +39,17 @@ targets:
         PRODUCT_NAME: BetterShot
         INFOPLIST_FILE: Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: Resources/BetterShot.entitlements
-        MARKETING_VERSION: "0.3.7"
-        CURRENT_PROJECT_VERSION: "10"
+        MARKETING_VERSION: "0.4.0"
+        CURRENT_PROJECT_VERSION: "12"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_HARDENED_RUNTIME: true
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Developer ID Application"
+        DEVELOPMENT_TEAM: 8JL39GK2DC
         COMBINE_HIDPI_IMAGES: true
         LD_RUNPATH_SEARCH_PATHS: "@executable_path/../Frameworks"
     entitlements:
       path: Resources/BetterShot.entitlements
+      properties:
+        com.apple.security.device.audio-input: true
+        com.apple.security.device.camera: true

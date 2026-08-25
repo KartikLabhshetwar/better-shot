@@ -39,6 +39,7 @@ final class PreviewOverlay {
         dismissTask = nil
 
         panel?.orderOut(nil)
+        panel = nil
         isVisible = false
         currentURL = nil
     }
@@ -47,14 +48,8 @@ final class PreviewOverlay {
 
     func openAnnotateEditor() {
         guard let url = currentURL else { return }
-        let screen = targetScreen
         dismiss()
-        let ext = url.pathExtension.lowercased()
-        if ext == "mov" || ext == "mp4" {
-            VideoEditorWindowController.shared.open(url: url, on: screen)
-        } else {
-            EditorWindowController.shared.open(url: url, on: screen)
-        }
+        PreviewPanelPresenter.shared.openEditor(for: url)
     }
 
     private func createPanel() {
@@ -105,6 +100,7 @@ final class PreviewOverlay {
 
     private func scheduleDismiss() {
         dismissTask?.cancel()
+        guard AppPreferences.overlayDismisses(after: AppPreferences.overlayDismissDelay) else { return }
         dismissTask = Task {
             try? await Task.sleep(for: .seconds(AppPreferences.overlayDismissDelay))
             guard !Task.isCancelled else { return }
@@ -165,8 +161,10 @@ struct PreviewCardView: View {
                     overlay.openAnnotateEditor()
                 }
                 .onDrag {
-                    if let url = overlay.currentURL {
-                        return NSItemProvider(object: url as NSURL)
+                    if let url = overlay.currentURL,
+                       let provider = NSItemProvider(contentsOf: url) {
+                        provider.suggestedName = url.lastPathComponent
+                        return provider
                     }
                     return NSItemProvider(object: image)
                 }

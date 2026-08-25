@@ -35,3 +35,6 @@ scripts/
 
 # Claude Code
 CLAUDE.md
+
+.claude/worktrees/
+.build-release/

@@ -1,197 +1,257 @@
-import Image from "next/image"
 import Link from "next/link"
-import { ArrowUpRight } from "lucide-react"
+import { ArrowUpRightIcon, GithubLogoIcon } from "@phosphor-icons/react/dist/ssr"
 import { DownloadDropdown } from "@/components/download-dropdown"
 import { getLatestRelease } from "@/lib/downloads"
-import { StarCount } from "@/components/star-count"
-import { EditorPreview } from "@/components/editor-demo"
+import { SiteNav } from "@/components/site-nav"
+import { SiteFooter } from "@/components/site-footer"
+import { Reveal } from "@/components/reveal"
+import { SectionLabel } from "@/components/section"
+import { CopyCommand } from "@/components/copy-command"
+import { Comparison } from "@/components/home/comparison"
+import { FaqSection, faqs } from "@/components/home/faq"
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqs.map((faq) => ({
+    "@type": "Question",
+    name: faq.q,
+    acceptedAnswer: { "@type": "Answer", text: faq.a },
+  })),
+}
+
+const stats = [
+  { value: "$0", label: "Forever. No tiers, no trial" },
+  { value: "0 KB", label: "Uploaded by default" },
+  { value: "30 Hz", label: "Pointer sampled while recording" },
+  { value: "BSD 3", label: "Clause licensed, auditable" },
+]
+
+const features = [
+  {
+    n: "01",
+    title: "Capture",
+    tags: ["Region", "Window", "Fullscreen", "OCR", "Color picker", "Pin on top"],
+    body: "Region, window, or fullscreen from one shortcut. A floating preview appears after every shot, so you can edit it, copy it, pin it above your work, or drag the file straight into Figma, Slack, or Finder.",
+  },
+  {
+    n: "02",
+    title: "Record",
+    tags: ["Cursor auto-zoom", "Face cam", "Microphone", "24/30/60 fps", "Pause and resume"],
+    body: "Pick a display, a window, or an area. The pointer is sampled at 30 Hz and clicks become smooth zoom moves, so a 4K screen stays readable in a small player. Recordings are written as fragmented MP4 and survive a crash mid-take.",
+  },
+  {
+    n: "03",
+    title: "Edit",
+    tags: ["Multi-clip timeline", "0.25x to 4x", "Transitions", "3D tilt", "Color grading"],
+    body: "Split at the playhead, drag an edge to trim, speed a slow stretch up to 4x, cross into the next clip. Then tilt the card, grade the color, set it on a background, and export MP4.",
+  },
+  {
+    n: "04",
+    title: "Overlay",
+    tags: ["Captions", "Keystrokes", "Blur and pixelate", "Spotlight", "Canvas text"],
+    body: "Captions, keystrokes, masks, and text are timeline lanes you drag and retime next to your zoom cues. Transcription runs on device. A hide mask destroys its pixels in the export, so the password on screen never ships.",
+  },
+  {
+    n: "05",
+    title: "Annotate",
+    tags: ["Arrows", "Shapes", "Numbered badges", "Crop", "Rule of thirds"],
+    body: "Arrows, shapes, text, and numbered badges, each with its key printed in the corner of its button. Backgrounds, padding, shadow, and corner radius make the result presentable without a second app.",
+  },
+  {
+    n: "06",
+    title: "Share",
+    tags: ["Your own R2 bucket", "Keychain keys", "Direct SigV4", "Edits baked in"],
+    body: "Connect a Cloudflare R2 bucket and Share uploads the edited recording straight from the app, then copies the link. No proxy, no vendor in the middle, no viewer limit.",
+  },
+]
+
+const shortcuts = [
+  { label: "Capture region", keys: "⌘ ⇧ 4" },
+  { label: "Capture screen", keys: "⌘ ⇧ 3" },
+  { label: "Capture window", keys: "⌘ ⇧ 5" },
+  { label: "Record screen", keys: "⌘ ⇧ 2" },
+  { label: "OCR text scan", keys: "⌘ ⇧ O" },
+  { label: "Color picker", keys: "⌘ ⇧ C" },
+]
+
+const chip =
+  "inline-flex items-center bg-[#f8f4f4] px-2.5 py-[3px] text-[11px] tracking-[0.02em] text-[#444141]"
+const chipOutline =
+  "inline-flex items-center border border-brand-700 px-2.5 py-[3px] text-[11px] tracking-[0.02em] text-brand-700"
+const shell = "mx-auto max-w-[1240px] px-6"
+const featureRow =
+  "grid gap-6 py-10 sm:py-[42px] lg:grid-cols-[88px_minmax(0,360px)_minmax(0,1fr)] lg:gap-x-[clamp(24px,4vw,72px)]"
 
 export default async function Home() {
   const release = await getLatestRelease()
+
   return (
-    <div className="min-h-screen w-full bg-[#fafaf9] text-[#111] selection:bg-[#e78a53]/20">
-      {/* Nav */}
-      <nav className="fixed top-0 inset-x-0 z-50 h-14 backdrop-blur-xl bg-[#fafaf9]/80">
-        <div className="max-w-[960px] mx-auto h-full px-6 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2.5">
-            <Image src="/logo.png" alt="" width={22} height={22} className="rounded-[5px]" />
-            <span className="text-[13px] font-medium tracking-[-0.01em] text-[#111]/50">
-              Better Shot
-            </span>
-          </a>
-          <div className="flex items-center gap-5">
-            <a
-              href="https://github.com/KartikLabhshetwar/better-shot"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[12px] text-[#111]/25 hover:text-[#111]/50 transition-colors"
-            >
-              <StarCount />
-            </a>
-            <DownloadDropdown release={release} source="navbar" size="sm" showLabel={false} />
-          </div>
-        </div>
-      </nav>
+    <div className="min-h-screen w-full bg-canvas text-ink">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
+      <SiteNav />
 
-      {/* Hero */}
-      <main className="pt-14">
-        <section className="flex flex-col items-center px-6 pt-28 pb-20">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[#111]/[0.06] bg-[#111]/[0.02] mb-8">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            <span className="text-[11px] font-medium text-[#111]/35 tracking-wide uppercase">
-              Free &amp; open source
-            </span>
-          </div>
+      <main id="main">
+        <Reveal as="section" className={`${shell} pb-14 pt-16 sm:pt-20`}>
+          <Link
+            href="/changelog"
+            className="micro group inline-flex flex-wrap items-baseline gap-x-3 gap-y-1 border border-rule px-3 py-[7px] text-[13px] uppercase text-brand-700 outline-none transition-colors duration-150 hover:border-ink"
+          >
+            <span className="font-semibold">v{release.version}</span>
+            <span className="text-ink/70">Auto-zoom, face cam, share links you own</span>
+            <ArrowUpRightIcon size={11} weight="bold" aria-hidden className="text-ink/55" />
+          </Link>
 
-          <h1 className="text-center text-[clamp(36px,6.5vw,64px)] leading-[1.05] font-semibold tracking-[-0.035em] text-[#111] max-w-[680px] text-balance">
-            Screenshots that look like you tried
+          <h1 className="display mt-8 -ml-[0.058em] text-[clamp(42px,6.4vw,88px)]">
+            <span className="block">One app for the whole screen.</span>
+            <span className="block text-brand">No subscription. No uploads.</span>
           </h1>
 
-          <p className="text-center text-[15px] leading-[1.7] text-[#111]/40 mt-5 max-w-[400px] text-pretty">
-            Capture, record, annotate, beautify. A local-first screenshot &amp; recording tool for macOS — no account, no cloud, no tracking.
+          <p className="mt-7 max-w-[60ch] text-[18px] leading-[30px] text-ink/80">
+            Better Shot takes the screenshot, records the walkthrough with cursor-tracked zoom,
+            captions it on device, and edits it down to the file you send. Native macOS, free, and
+            open source. Nothing leaves your Mac unless you say so.
           </p>
 
-          <div className="flex items-center gap-3 mt-10">
+          <div className="mt-7 flex flex-wrap items-center gap-3">
             <DownloadDropdown release={release} source="hero" />
             <a
               href="https://github.com/KartikLabhshetwar/better-shot"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-4 h-10 text-[13px] font-medium text-[#111]/30 hover:text-[#111]/55 border border-[#111]/[0.08] hover:border-[#111]/[0.15] rounded-lg transition-all"
+              className="inline-flex items-center gap-2 border-2 border-rule px-6 py-3.5 text-[15px] font-semibold text-ink outline-none transition-colors duration-150 hover:border-ink"
             >
-              Source
-              <ArrowUpRight className="h-3.5 w-3.5" />
+              <GithubLogoIcon size={16} weight="bold" />
+              View source
             </a>
           </div>
 
-          <div className="flex items-center gap-6 mt-8 text-[11px] text-[#111]/20">
-            <span>macOS 14+</span>
-            <span className="h-3 w-px bg-[#111]/8" />
-            <span>Apple Silicon &amp; Intel</span>
-            <span className="h-3 w-px bg-[#111]/8" />
-            <span>Homebrew</span>
+          <ul className="micro mt-7 flex flex-wrap gap-x-7 gap-y-2 text-[13px] uppercase text-ink/70">
+            <li>Free forever</li>
+            <li>No account</li>
+            <li>macOS 14 and later</li>
+            <li>Apple Silicon and Intel</li>
+          </ul>
+        </Reveal>
+
+        <section className={`${shell} border-t-2 border-rule py-14`} aria-label="Better Shot in numbers">
+          <Reveal className="grid grid-cols-2 gap-x-6 gap-y-8 md:grid-cols-4">
+            {stats.map((stat) => (
+              <div key={stat.value}>
+                <p className="-ml-[0.045em] text-[clamp(34px,3.6vw,50px)] font-extrabold leading-[1.05] text-brand">
+                  {stat.value}
+                </p>
+                <p className="micro mt-3.5 text-[13px] uppercase leading-[18px] text-ink/70">
+                  {stat.label}
+                </p>
+              </div>
+            ))}
+          </Reveal>
+        </section>
+
+        <section id="features" className={`${shell} scroll-mt-20 border-t-2 border-rule pb-7 pt-14`}>
+          <Reveal>
+            <SectionLabel className="mb-3.5">Everything in the box</SectionLabel>
+            <h2 className="display -ml-[0.04em] max-w-[24ch] text-[clamp(30px,3.4vw,44px)]">
+              One app instead of four subscriptions.
+            </h2>
+          </Reveal>
+
+          <div className="mt-10 sm:mt-14">
+            {features.map((feature, index) => (
+              <Reveal
+                key={feature.n}
+                className={index === 0 ? featureRow : `${featureRow} border-t-2 border-rule`}
+              >
+                <p className="text-[15px] font-extrabold leading-6 tabular-nums">{feature.n}</p>
+                <div>
+                  <h3 className="text-[24px] leading-7 tracking-[-0.01em]">{feature.title}</h3>
+                  <ul className="mt-4 flex flex-wrap gap-1.5">
+                    {feature.tags.map((tag) => (
+                      <li key={tag} className={chip}>
+                        {tag}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <p className="max-w-[52ch] text-[16px] leading-[28px] text-ink/80">{feature.body}</p>
+              </Reveal>
+            ))}
           </div>
         </section>
 
-        {/* Screenshot preview */}
-        <section className="max-w-[880px] mx-auto px-6 pb-24">
-          <div className="rounded-xl border border-[#111]/[0.06] bg-[#111]/[0.02] p-2 overflow-hidden">
-            <EditorPreview />
-          </div>
-        </section>
-
-        {/* What it does — concise vertical blocks */}
-        <section className="max-w-[600px] mx-auto px-6 pb-28">
-          <div className="border-t border-[#111]/[0.06]" />
-
-          <div className="space-y-16 pt-16">
-            <FeatureBlock
-              title="Capture everything"
-              description="Region, fullscreen, or window screenshots. Screen recording with pause and resume. OCR text extraction and color picker. All from the menu bar or a keyboard shortcut."
-            />
-            <FeatureBlock
-              title="Make it look good"
-              description="Add padding, corner radius, and shadows. Pick from solid colors, gradients, or macOS wallpapers as backgrounds. Crop with draggable handles. Works on both screenshots and recordings."
-            />
-            <FeatureBlock
-              title="Annotate with purpose"
-              description="Arrows, shapes, text, numbered badges, blur, and spotlight. Each tool has a single-key shortcut. Text supports font selection, bold, italic, and alignment."
-            />
-            <FeatureBlock
-              title="Stay in flow"
-              description="Floating preview after every capture. Click to edit, drag into any app. Pin screenshots as always-on-top windows. Auto-apply your default effects on every capture."
-            />
-          </div>
-        </section>
-
-        {/* Shortcuts */}
-        <section className="max-w-[480px] mx-auto px-6 pb-28">
-          <h2 className="text-[13px] font-medium text-[#111]/20 tracking-wide uppercase text-center mb-8">
-            Keyboard shortcuts
+        <Reveal as="section" className={`${shell} border-t-2 border-rule py-14`}>
+          <SectionLabel className="mb-3.5">On device</SectionLabel>
+          <h2 className="display-sm text-[32px] leading-[38px]">
+            The parts that used to need After Effects
           </h2>
-          <div className="space-y-0 divide-y divide-[#111]/[0.06] border-y border-[#111]/[0.06] rounded-lg overflow-hidden bg-[#111]/[0.015]">
-            <Shortcut label="Capture region" keys={["⌘", "⇧", "4"]} />
-            <Shortcut label="Capture screen" keys={["⌘", "⇧", "3"]} />
-            <Shortcut label="Capture window" keys={["⌘", "⇧", "5"]} />
-            <Shortcut label="Record screen" keys={["⌘", "⇧", "2"]} />
-            <Shortcut label="OCR text scan" keys={["⌘", "⇧", "O"]} />
-            <Shortcut label="Color picker" keys={["⌘", "⇧", "C"]} />
-          </div>
-        </section>
+          <p className="mt-6 max-w-[60ch] text-[16px] leading-[28px] text-ink/80">
+            The editor transcribes the recording&rsquo;s own audio, collapses typing into words, and
+            draws its own pointer from the path you actually moved, so a shaky hand glides. The
+            preview draws exactly what the exporter writes.
+          </p>
+          <ul className="mt-6 flex flex-wrap gap-1.5">
+            {["Captions", "Keystroke overlay", "Cursor smoothing", "Scenes and split screen"].map(
+              (tag) => (
+                <li key={tag} className={chipOutline}>
+                  {tag}
+                </li>
+              ),
+            )}
+          </ul>
+        </Reveal>
 
-        {/* CTA */}
-        <section className="border-t border-[#111]/[0.06] py-20">
-          <div className="text-center px-6">
-            <p className="text-[15px] text-[#111]/30 mb-6 text-pretty">
-              No account. No subscription. Just a better screenshot tool.
+        <Comparison />
+
+        <Reveal as="section" className={`${shell} border-t-2 border-rule py-14`}>
+          <SectionLabel className="mb-3.5">Shortcuts</SectionLabel>
+          <h2 className="display-sm mb-8 text-[32px] leading-[38px]">Six keys, all remappable</h2>
+          <ul className="grid gap-0.5 bg-rule sm:grid-cols-2 lg:grid-cols-3">
+            {shortcuts.map((shortcut) => (
+              <li
+                key={shortcut.label}
+                className="flex items-baseline justify-between gap-4 bg-canvas px-[18px] py-5"
+              >
+                <span className="text-[15px] leading-6">{shortcut.label}</span>
+                <kbd className="whitespace-nowrap font-sans text-[14px] font-semibold tracking-[0.06em] text-brand-700">
+                  {shortcut.keys}
+                </kbd>
+              </li>
+            ))}
+          </ul>
+        </Reveal>
+
+        <FaqSection />
+
+        <Reveal as="section" className="bg-brand text-canvas">
+          <div className={`${shell} py-20 sm:py-[84px]`}>
+            <h2 className="display -ml-[0.058em] text-[clamp(34px,4.4vw,60px)]">
+              Stop paying to share your screen.
+            </h2>
+            <p className="mt-6 max-w-[46ch] text-[18px] leading-[30px]">
+              Free, open source, and installed in about thirty seconds. No account, no card, no trial
+              countdown.
             </p>
-            <div className="flex flex-col items-center gap-4">
-              <DownloadDropdown release={release} source="cta" />
-              <p className="text-[12px] text-[#111]/20 font-mono">
-                brew install --cask bettershot
-              </p>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Link
+                href="/download"
+                className="inline-flex items-center border border-canvas px-5 py-3 text-[15px] font-semibold text-canvas outline-none transition-colors duration-150 hover:bg-canvas hover:text-brand"
+              >
+                Download for macOS
+              </Link>
+              <CopyCommand
+                command="brew install --cask bettershot"
+                className="border border-canvas/55 bg-transparent px-4 py-3 text-[15px] text-canvas hover:border-canvas hover:text-canvas"
+              />
             </div>
           </div>
-        </section>
+        </Reveal>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-[#111]/[0.04]">
-        <div className="max-w-[960px] mx-auto px-6 py-6 flex items-center justify-between">
-          <p className="text-[11px] text-[#111]/15">
-            &copy; {new Date().getFullYear()} Better Shot
-          </p>
-          <nav className="flex items-center gap-5">
-            <Link
-              href="/changelog"
-              className="text-[11px] text-[#111]/15 hover:text-[#111]/40 transition-colors"
-            >
-              Changelog
-            </Link>
-            <a
-              href="https://x.com/code_kartik"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[11px] text-[#111]/15 hover:text-[#111]/40 transition-colors"
-            >
-              Twitter
-            </a>
-            <Link
-              href="/privacy"
-              className="text-[11px] text-[#111]/15 hover:text-[#111]/40 transition-colors"
-            >
-              Privacy
-            </Link>
-          </nav>
-        </div>
-      </footer>
-    </div>
-  )
-}
-
-function FeatureBlock({ title, description }: { title: string; description: string }) {
-  return (
-    <div>
-      <h3 className="text-[15px] font-semibold text-[#111]/70 tracking-[-0.01em] mb-2">{title}</h3>
-      <p className="text-[14px] leading-[1.7] text-[#111]/35">{description}</p>
-    </div>
-  )
-}
-
-function Shortcut({ label, keys }: { label: string; keys: string[] }) {
-  return (
-    <div className="flex items-center justify-between px-4 py-3">
-      <span className="text-[13px] text-[#111]/40">{label}</span>
-      <div className="flex items-center gap-1">
-        {keys.map((k, i) => (
-          <kbd
-            key={i}
-            className="inline-flex items-center justify-center h-6 min-w-[24px] px-1.5 text-[11px] font-medium text-[#111]/50 bg-white border border-[#111]/[0.08] rounded shadow-[0_1px_0_rgba(0,0,0,0.04)]"
-          >
-            {k}
-          </kbd>
-        ))}
-      </div>
+      <SiteFooter />
     </div>
   )
 }

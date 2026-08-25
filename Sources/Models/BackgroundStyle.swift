@@ -173,6 +173,20 @@ enum ImageAlignment: String, Codable, CaseIterable {
     case leading, center, trailing
     case bottomLeading, bottom, bottomTrailing
 
+    var title: String {
+        switch self {
+        case .topLeading: return "Top Left"
+        case .top: return "Top"
+        case .topTrailing: return "Top Right"
+        case .leading: return "Left"
+        case .center: return "Center"
+        case .trailing: return "Right"
+        case .bottomLeading: return "Bottom Left"
+        case .bottom: return "Bottom"
+        case .bottomTrailing: return "Bottom Right"
+        }
+    }
+
     var xFactor: CGFloat {
         switch self {
         case .topLeading, .leading, .bottomLeading: return 0

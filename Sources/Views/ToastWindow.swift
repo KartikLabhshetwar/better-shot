@@ -28,7 +28,7 @@ final class ToastWindow {
         )
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
+        panel.hasShadow = false
         panel.level = .floating
         panel.contentView = hostingView
         panel.isMovableByWindowBackground = false
@@ -40,16 +40,18 @@ final class ToastWindow {
         let panelSize = panel.frame.size
         let x = screenFrame.midX - panelSize.width / 2
         let y = screenFrame.maxY - panelSize.height - 12
-        panel.setFrameOrigin(NSPoint(x: x, y: y))
+        let slide: CGFloat = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 10
+        panel.setFrameOrigin(NSPoint(x: x, y: y + slide))
 
         panel.alphaValue = 0
         panel.orderFrontRegardless()
         self.panel = panel
 
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.25
+            ctx.duration = 0.28
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().alphaValue = 1
+            panel.animator().setFrameOrigin(NSPoint(x: x, y: y))
         }
 
         dismissTask = Task {
@@ -109,22 +111,18 @@ private struct ToastContentView: View {
                     .frame(width: 32, height: 32)
             }
 
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
                 Text(message)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5)
-        )
-        .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
+        .padding(.vertical, 11)
+        .glassSurface(cornerRadius: 14, depth: .raised)
+        .accessibilityElement(children: .combine)
     }
 }

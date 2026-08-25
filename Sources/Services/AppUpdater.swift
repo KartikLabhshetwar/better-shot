@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import Security
 
 @MainActor
 @Observable
@@ -19,8 +20,11 @@ final class AppUpdater {
 
     private(set) var state: State = .idle
 
-    private let owner = "KartikLabhshetwar"
-    private let repo = "better-shot"
+    nonisolated private static let owner = "KartikLabhshetwar"
+    nonisolated private static let repo = "better-shot"
+
+    private var owner: String { Self.owner }
+    private var repo: String { Self.repo }
 
     private var currentVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
@@ -57,7 +61,8 @@ final class AppUpdater {
                     ?? assets.first { ($0["name"] as? String)?.hasSuffix(".dmg") == true }
 
                 if let assetURLString = dmgAsset?["browser_download_url"] as? String,
-                   let assetURL = URL(string: assetURLString) {
+                   let assetURL = URL(string: assetURLString),
+                   Self.isTrustedAssetURL(assetURL) {
                     state = .available(version: latestVersion, url: assetURL)
                     ToastWindow.shared.show(
                         title: "Update Available",
@@ -115,10 +120,11 @@ final class AppUpdater {
                     ?? assets.first { ($0["name"] as? String)?.hasSuffix(".dmg") == true }
 
                 if let assetURLString = dmgAsset?["browser_download_url"] as? String,
-                   let assetURL = URL(string: assetURLString) {
+                   let assetURL = URL(string: assetURLString),
+                   Self.isTrustedAssetURL(assetURL) {
                     state = .available(version: latestVersion, url: assetURL)
                 } else {
-                    state = .failed("No .dmg asset found in latest release")
+                    state = .failed("No trusted .dmg asset found in latest release")
                 }
             } else {
                 state = .upToDate
@@ -137,7 +143,14 @@ final class AppUpdater {
             }
         }
 
+        // A delegate-based URLSession keeps a strong reference to its delegate until it is
+        // invalidated, so the session and the delegate outlive every download otherwise.
         let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+        defer {
+            session.finishTasksAndInvalidate()
+            self.downloadTask = nil
+        }
+
         let downloadTask = session.downloadTask(with: url)
         self.downloadTask = downloadTask
 
@@ -188,6 +201,11 @@ final class AppUpdater {
                 return
             }
 
+            if let signatureError = Self.signatureRejection(for: appBundle) {
+                state = .failed(signatureError)
+                return
+            }
+
             guard let currentAppURL = Bundle.main.bundleURL as URL? else {
                 state = .failed("Cannot determine current app location")
                 return
@@ -214,6 +232,37 @@ final class AppUpdater {
         } catch {
             state = .failed("Install failed: \(error.localizedDescription)")
         }
+    }
+
+    /// Only accepts release assets served from this repo's own GitHub releases path.
+    nonisolated static func isTrustedAssetURL(_ url: URL) -> Bool {
+        url.scheme == "https"
+            && url.host == "github.com"
+            && url.path.hasPrefix("/\(owner)/\(repo)/releases/download/")
+    }
+
+    nonisolated private static let developerIDRequirement = "anchor apple generic and certificate leaf[subject.OU] = \"8JL39GK2DC\""
+
+    /// Returns a failure message when the downloaded bundle is not signed by BetterShot's Developer ID.
+    nonisolated static func signatureRejection(for bundle: URL) -> String? {
+        var staticCode: SecStaticCode?
+        guard SecStaticCodeCreateWithPath(bundle as CFURL, [], &staticCode) == errSecSuccess,
+              let code = staticCode else {
+            return "Update rejected: the downloaded app has no readable code signature."
+        }
+
+        var requirement: SecRequirement?
+        guard SecRequirementCreateWithString(developerIDRequirement as CFString, [], &requirement) == errSecSuccess,
+              let requirement else {
+            return "Update rejected: could not build the signature requirement."
+        }
+
+        let status = SecStaticCodeCheckValidity(code, SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSCheckNestedCode), requirement)
+        guard status == errSecSuccess else {
+            return "Update rejected: the downloaded app is not signed by BetterShot (OSStatus \(status))."
+        }
+
+        return nil
     }
 
     func cancelDownload() {
@@ -268,7 +317,7 @@ final class AppUpdater {
     private func relaunchApp(at appURL: URL) {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/sh")
-        task.arguments = ["-c", "sleep 1 && open \"\(appURL.path)\""]
+        task.arguments = ["-c", "sleep 1 && open \"$0\"", appURL.path]
         try? task.run()
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -299,10 +348,10 @@ final class AppUpdater {
 }
 
 private final class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
-    let onProgress: (Double) -> Void
-    var completion: ((Result<URL, Error>) -> Void)?
+    let onProgress: @Sendable (Double) -> Void
+    var completion: (@Sendable (Result<URL, Error>) -> Void)?
 
-    init(onProgress: @escaping (Double) -> Void) {
+    init(onProgress: @escaping @Sendable (Double) -> Void) {
         self.onProgress = onProgress
     }
 

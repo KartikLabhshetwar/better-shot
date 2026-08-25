@@ -18,15 +18,23 @@ DERIVED_DIR  = .build
 APP_DEBUG    = $(DERIVED_DIR)/Build/Products/$(CONFIG_DEBUG)/$(SCHEME).app
 APP_RELEASE  = $(DERIVED_DIR)/Build/Products/$(CONFIG_REL)/$(SCHEME).app
 VERSION     := $(shell python3 -c "import json; print(json.load(open('version.json'))['version'])")
+BUILD_NUM   := $(shell python3 -c "import json; print(json.load(open('version.json'))['build'])")
 DMG_NAME     = BetterShot-$(VERSION).dmg
 DMG_DIR      = release
 
-.PHONY: build release run dmg clean lint test-build version ship help
+.PHONY: generate build release run dmg clean lint test-build version ship help
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-build: ## Debug build
+generate: ## Sync version from version.json and regenerate the Xcode project
+	@sed -i '' \
+		-e 's/MARKETING_VERSION: ".*"/MARKETING_VERSION: "$(VERSION)"/' \
+		-e 's/CURRENT_PROJECT_VERSION: ".*"/CURRENT_PROJECT_VERSION: "$(BUILD_NUM)"/' \
+		project.yml
+	@xcodegen generate
+
+build: generate ## Debug build
 	@echo "==> Building $(SCHEME) (Debug)..."
 	@xcodebuild -project $(PROJECT) \
 		-scheme $(SCHEME) \
@@ -35,7 +43,7 @@ build: ## Debug build
 		build 2>&1 | tail -3
 	@echo "==> $(APP_DEBUG)"
 
-release: ## Release build (unsigned)
+release: generate ## Release build (unsigned)
 	@echo "==> Building $(SCHEME) (Release)..."
 	@xcodebuild -project $(PROJECT) \
 		-scheme $(SCHEME) \
@@ -48,6 +56,8 @@ release: ## Release build (unsigned)
 
 run: build ## Build and launch (debug)
 	@echo "==> Launching BetterShot..."
+	@pkill -x BetterShot 2>/dev/null || true
+	@sleep 1
 	@open "$(APP_DEBUG)"
 
 dmg: release ## Create unsigned DMG for local testing
@@ -80,7 +90,7 @@ lint: ## Check for compiler warnings
 test-build: clean release ## Full clean + release build
 	@echo "==> Test build passed."
 
-ship: ## Signed release: build, sign, notarize, DMG (both architectures)
+ship: generate ## Signed release: build, sign, notarize, DMG (both architectures)
 	@bash scripts/release.sh
 
 version: ## Print current version

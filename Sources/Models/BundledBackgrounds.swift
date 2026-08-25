@@ -20,18 +20,6 @@ enum BundledBackgrounds {
         }
     }
 
-    final class ImageCache: @unchecked Sendable {
-        static let shared = ImageCache()
-        private var cache: [String: NSImage] = [:]
-
-        func image(for asset: ImageAsset) -> NSImage? {
-            if let cached = cache[asset.id] { return cached }
-            guard let url = asset.url, let img = NSImage(contentsOf: url) else { return nil }
-            cache[asset.id] = img
-            return img
-        }
-    }
-
     static let macAssets: [ImageAsset] = [
         ImageAsset(id: "mac-3", filename: "mac-asset-3.jpg"),
         ImageAsset(id: "mac-5", filename: "mac-asset-5.jpg"),
@@ -44,5 +32,25 @@ enum BundledBackgrounds {
 
     static func asset(byID id: String) -> ImageAsset? {
         macAssets.first { $0.id == id }
+    }
+}
+
+/// Decodes a background image once instead of once per view body evaluation. `NSCache` evicts under memory pressure, which matters because a desktop wallpaper costs tens of megabytes decoded.
+final class ImageCache: @unchecked Sendable {
+    static let shared = ImageCache()
+    private let cache = NSCache<NSString, NSImage>()
+
+    func image(for asset: BundledBackgrounds.ImageAsset) -> NSImage? {
+        if let cached = cache.object(forKey: asset.id as NSString) { return cached }
+        guard let url = asset.url, let image = NSImage(contentsOf: url) else { return nil }
+        cache.setObject(image, forKey: asset.id as NSString)
+        return image
+    }
+
+    func image(atPath path: String) -> NSImage? {
+        if let cached = cache.object(forKey: path as NSString) { return cached }
+        guard let image = NSImage(contentsOfFile: path) else { return nil }
+        cache.setObject(image, forKey: path as NSString)
+        return image
     }
 }

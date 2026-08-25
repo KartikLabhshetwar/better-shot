@@ -1,8 +1,6 @@
 "use client"
 
-import * as React from "react"
-import { ChevronDown, Download, Terminal } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { AppleLogoIcon, CaretDownIcon, DownloadSimpleIcon, TerminalWindowIcon } from "@phosphor-icons/react/dist/ssr"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,6 +9,13 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { trackDownload } from "@/lib/analytics"
 import type { ReleaseInfo } from "@/lib/downloads"
+import { cn } from "@/lib/utils"
+
+const sizeClass = {
+  sm: "px-3.5 py-2 text-[14px] gap-2",
+  default: "px-4 py-2.5 text-[15px] gap-2",
+  lg: "px-6 py-3.5 text-[15px] gap-2.5",
+} as const
 
 interface DownloadDropdownProps {
   release: ReleaseInfo
@@ -18,7 +23,7 @@ interface DownloadDropdownProps {
   variant?: "default" | "outline"
   size?: "default" | "sm" | "lg"
   className?: string
-  showLabel?: boolean
+  label?: string
 }
 
 export function DownloadDropdown({
@@ -27,54 +32,64 @@ export function DownloadDropdown({
   variant = "default",
   size = "lg",
   className,
-  showLabel = true,
+  label,
 }: DownloadDropdownProps) {
-  const handleDownload = (arch: "appleSilicon" | "intel") => {
+  const open = (url: string) => {
     trackDownload(source)
-    window.open(release[arch], "_blank")
-  }
-
-  const handleHomebrew = () => {
-    trackDownload(source)
-    window.open("https://formulae.brew.sh/cask/bettershot", "_blank")
+    window.open(url, "_blank", "noopener,noreferrer")
   }
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button size={size} variant={variant === "outline" ? "outline" : "default"} className={className}>
-          {showLabel ? (
-            <>
-              <Download className="mr-2 h-4 w-4" />
-              Download
-            </>
-          ) : (
-            <Download className="h-4 w-4" />
-          )}
-          <ChevronDown className="ml-1.5 h-3 w-3 opacity-50" />
-        </Button>
+      <DropdownMenuTrigger
+        className={cn(
+          "inline-flex items-center justify-center font-semibold tracking-tight outline-none",
+          "transition-colors duration-150",
+          sizeClass[size],
+          variant === "outline"
+            ? "border-2 border-rule text-ink hover:border-ink"
+            : "bg-brand text-canvas hover:bg-brand-600 active:bg-brand-700",
+          className,
+        )}
+      >
+        <DownloadSimpleIcon size={16} weight="bold" />
+        {label ?? "Download for macOS"}
+        <CaretDownIcon size={12} weight="bold" className="opacity-50" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56 border-none shadow-lg bg-white rounded-lg p-1">
-        <DropdownMenuItem onClick={() => handleDownload("appleSilicon")} className="cursor-pointer rounded-md">
-          <Download className="mr-2 h-4 w-4" />
-          <div className="flex flex-col">
-            <span className="font-medium">Apple Silicon</span>
-            <span className="text-xs text-muted-foreground">M1, M2, M3, M4</span>
-          </div>
+      <DropdownMenuContent
+        align="end"
+        sideOffset={8}
+        className="w-64 border-2 border-ink bg-surface p-0"
+      >
+        <DropdownMenuItem
+          onClick={() => open(release.appleSilicon)}
+          className="cursor-pointer gap-3 border-b border-rule px-3 py-2.5 last:border-b-0"
+        >
+          <AppleLogoIcon size={16} weight="fill" />
+          <span className="flex flex-col">
+            <span className="text-sm font-semibold text-ink">Apple Silicon</span>
+            <span className="text-xs text-ink/60">M1, M2, M3, M4</span>
+          </span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleDownload("intel")} className="cursor-pointer rounded-md">
-          <Download className="mr-2 h-4 w-4" />
-          <div className="flex flex-col">
-            <span className="font-medium">Intel</span>
-            <span className="text-xs text-muted-foreground">x86_64</span>
-          </div>
+        <DropdownMenuItem
+          onClick={() => open(release.intel)}
+          className="cursor-pointer gap-3 border-b border-rule px-3 py-2.5 last:border-b-0"
+        >
+          <DownloadSimpleIcon size={16} weight="bold" />
+          <span className="flex flex-col">
+            <span className="text-sm font-semibold text-ink">Intel</span>
+            <span className="text-xs text-ink/60">x86_64</span>
+          </span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleHomebrew} className="cursor-pointer rounded-md">
-          <Terminal className="mr-2 h-4 w-4" />
-          <div className="flex flex-col">
-            <span className="font-medium">Homebrew</span>
-            <span className="text-xs text-muted-foreground">brew install --cask bettershot</span>
-          </div>
+        <DropdownMenuItem
+          onClick={() => open("https://formulae.brew.sh/cask/bettershot")}
+          className="cursor-pointer gap-3 border-b border-rule px-3 py-2.5 last:border-b-0"
+        >
+          <TerminalWindowIcon size={16} weight="bold" />
+          <span className="flex flex-col">
+            <span className="text-sm font-semibold text-ink">Homebrew</span>
+            <span className="font-mono text-xs text-ink/60">brew install --cask bettershot</span>
+          </span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
