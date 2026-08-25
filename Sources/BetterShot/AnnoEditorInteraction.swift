@@ -241,9 +241,6 @@ extension AnnoEditor {
                 setBoxSize(id, width: fallback, height: fallback)
             }
             selectedIds = [id]
-            // Redaction is repetitive by nature: one screenshot usually has several fields to
-            // hide, so blur and pixelate stay armed instead of dropping back to select.
-            if !tool.isRedactionTool { tool = .select }
 
         case let .creatingArrow(id):
             if let shape = document.shape(id), let props = shape.arrowProps,
@@ -252,7 +249,6 @@ extension AnnoEditor {
                 document.delete([id])
             } else {
                 selectedIds = [id]
-                tool = .select
             }
 
         case let .brushing(origin):
@@ -677,10 +673,6 @@ extension AnnoEditor {
             selectedIds.remove(id)
         }
         onEditingTextChanged?(nil)
-        // Fall back to select once the text is committed, the same as finishing a geo or an arrow.
-        // Safe against the `tool` observer calling back into here: `editingTextId` is already nil,
-        // so the guard at the top returns immediately.
-        if tool == .text { tool = .select }
         notifyChanged()
     }
 
