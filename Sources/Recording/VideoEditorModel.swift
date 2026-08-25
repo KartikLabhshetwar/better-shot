@@ -880,8 +880,9 @@ final class VideoEditorModel {
 
         let dir = directory ?? AppPreferences.saveDirectory
         let stamp = Int(Date().timeIntervalSince1970 * 1000)
-        let outputPath = "\(dir)/bettershot_\(stamp).mp4"
-        let outputURL = URL(fileURLWithPath: outputPath)
+        let name = "bettershot_\(stamp).mp4"
+        let destinationURL = URL(fileURLWithPath: "\(dir)/\(name)")
+        let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent(name)
 
         var exportConfig = config
         if exportConfig.style != .none && exportConfig.padding <= 0 {
@@ -893,7 +894,8 @@ final class VideoEditorModel {
         let hasZoom = zoomEnabled
 
         if isClipMode || hasEffects || hasCrop || hasZoom || isCameraVisible || showsClickHighlights || showsDrawnCursor || !masks.isEmpty || !texts.isEmpty || hasCaptions || hasKeystrokes {
-            return try await exportWithEffects(asset: asset, outputURL: outputURL, config: exportConfig)
+            let rendered = try await exportWithEffects(asset: asset, outputURL: outputURL, config: exportConfig)
+            return try Self.move(rendered, to: destinationURL)
         }
 
         guard let session = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetHighestQuality) else {
@@ -911,11 +913,23 @@ final class VideoEditorModel {
 
         switch session.status {
         case .completed:
-            return outputURL
+            return try Self.move(outputURL, to: destinationURL)
         case .cancelled:
             throw VideoExportError.exportCancelled
         default:
             throw VideoExportError.exportFailed(session.error)
+        }
+    }
+
+    /// The writer needs a folder it can always open, so the render lands in the temporary directory and only the finished file touches the save location.
+    private static func move(_ rendered: URL, to destination: URL) throws -> URL {
+        do {
+            try? FileManager.default.removeItem(at: destination)
+            try FileManager.default.moveItem(at: rendered, to: destination)
+            return destination
+        } catch {
+            try? FileManager.default.removeItem(at: rendered)
+            throw VideoExportError.saveFailed(destination.deletingLastPathComponent(), error)
         }
     }
 

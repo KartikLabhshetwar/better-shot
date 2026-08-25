@@ -33,13 +33,13 @@ nonisolated struct SceneWindow: Equatable, Sendable {
 nonisolated final class VideoFrameExporter: @unchecked Sendable {
     struct Configuration: @unchecked Sendable {
         let composition: AVMutableComposition
-        let videoComposition: AVMutableVideoComposition
+        var videoComposition: AVMutableVideoComposition
         let canvasSize: CGSize
         let cardRect: CGRect
         let cornerRadius: CGFloat
         let backgroundStyle: BackgroundStyle
         let shadowStrength: CGFloat
-        let outputURL: URL
+        var outputURL: URL
         var camera: Camera?
         var clicks: [ClickHighlight] = []
         var clickRadius: CGFloat = 0
@@ -199,6 +199,7 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
 
         do {
             try await pump(
+                reader: reader,
                 videoOutput: videoOutput,
                 videoInput: videoInput,
                 adaptor: adaptor,
@@ -229,6 +230,7 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
     }
 
     private func pump(
+        reader: AVAssetReader,
         videoOutput: AVAssetReaderVideoCompositionOutput,
         videoInput: AVAssetWriterInput,
         adaptor: AVAssetWriterInputPixelBufferAdaptor,
@@ -293,6 +295,8 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
                         }
                     }
                 } else {
+                    // A reader that gave up mid-render also returns nil, so the file would otherwise finish silently truncated.
+                    if reader.status == .failed { throw VideoExportError.exportFailed(reader.error) }
                     videoInput.markAsFinished()
                     videoDone = true
                 }
@@ -305,6 +309,7 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
                         throw VideoExportError.exportFailed(nil)
                     }
                 } else {
+                    if reader.status == .failed { throw VideoExportError.exportFailed(reader.error) }
                     audioInput.markAsFinished()
                     audioDone = true
                 }
@@ -314,6 +319,8 @@ nonisolated final class VideoFrameExporter: @unchecked Sendable {
                 try await Task.sleep(nanoseconds: 2_000_000)
             }
         }
+
+        guard frameIndex > 0 else { throw VideoExportError.exportFailed(reader.error) }
     }
 
     private static func averageBitRate(width: Int, height: Int) -> Int {

@@ -39,6 +39,7 @@ transitions, scene changes, a tilted 3D card, color) now live in four tabs.
 - **Crop is a mode, not a permanent panel**: Entering crop shows the crop box, and leaving it puts the box away in both the image and the video editor. Crop handles stay flat while cropping even when a 3D pose is applied, so they remain grabbable
 - **The face cam bubble is draggable in the editor**: Position it in the preview and the export follows, instead of being locked to where capture left it
 - **Rebuilt clip timeline**: Cuts occupy real space on the timeline, delete works on the selected clip, and the drag math for trimming and scrubbing was rewritten so handles track the pointer 1:1
+- **Export and Cloud Share sit side by side**: The editor toolbar has two buttons. Export renders and saves locally; Cloud Share uploads and copies a link. With a bucket connected, Cloud Share is a split button whose menu re-copies the last link, opens it, or hands it to Mail, Messages or Slack through the system share sheet. Without one, it opens the cloud settings instead of hiding
 
 ### Fixed
 
@@ -46,6 +47,9 @@ transitions, scene changes, a tilted 3D card, color) now live in four tabs.
 - **Click highlights are visible**: The ring was drawn in plain white for 0.42s, which is invisible on a light window. It now carries a dark halo under the white stroke and lingers 0.55s, in the preview and the export alike
 - **Color presets apply while paused**: Picking a grade with the player stopped repainted nothing, because the preview kept the first filter chain it built and the follow-up seek landed on the frame it was already showing. A paused player now gets a fresh chain per change, so every preset shows on the canvas rather than only in its swatch
 - **Zoom no longer needs a switch**: The zoom inspector acts on cues directly rather than gating them behind a toggle
+- **Exports stop failing silently**: The frame pump treated a reader that gave up mid-render exactly like a reader that finished, so a failed read marked the inputs done and the writer closed a truncated or empty file. It now surfaces the reader's own error, and an export that produced no frames fails instead of writing a stub
+- **Export failures say what went wrong**: “The operation could not be completed” is AVFoundation's placeholder, not a diagnosis. The toast now carries the failure reason, the underlying error, and the domain and code behind it
+- **Saving to a protected folder reports itself**: The render lands in the temporary directory and only the finished file moves to your save folder, so a Desktop or Documents permission block reads as “could not be saved to /Users/you/Desktop” instead of an opaque AVFoundation code
 
 ## [4.0.0] - 2026-08-23
 

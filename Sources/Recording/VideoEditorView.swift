@@ -30,6 +30,7 @@ struct VideoEditorView: View {
     @State private var shareCredentials = R2CredentialStore.shared
     @State private var shareUploader = R2Uploader.shared
     @State private var shareItemID: UUID?
+    @State private var lastShareURL: URL?
     @State private var isConfirmingDelete = false
     @State private var isConfirmingDiscard = false
     @State private var hostWindow: NSWindow?
@@ -118,20 +119,33 @@ struct VideoEditorView: View {
                 }
                 .help("Close without exporting (esc)")
 
-                if shareCredentials.isConfigured && shareCredentials.enabled {
-                    Button {
-                        Task { await shareRecording() }
-                    } label: {
-                        if let shareItemID, shareUploader.uploadingItems.contains(shareItemID) {
-                            ProgressView(value: shareUploader.uploadProgress[shareItemID] ?? 0)
-                                .progressViewStyle(.circular)
-                                .controlSize(.small)
-                        } else {
-                            Label("Share", systemImage: "link")
+                if isCloudShareReady {
+                    Menu {
+                        Button("Upload and Copy Link") { Task { await shareRecording() } }
+                        if let lastShareURL {
+                            Divider()
+                            Button("Copy Link Again") { copyToPasteboard(lastShareURL) }
+                            Button("Open Link") { NSWorkspace.shared.open(lastShareURL) }
+                            ShareLink("Send Link\u{2026}", item: lastShareURL)
                         }
+                        Divider()
+                        Button("Cloud Settings\u{2026}") { SettingsWindowController.shared.open(on: hostWindow?.screen) }
+                    } label: {
+                        cloudShareLabel
+                    } primaryAction: {
+                        Task { await shareRecording() }
                     }
+                    .menuStyle(.button)
                     .disabled(shareItemID != nil || model.isExporting)
-                    .help("Upload and copy a share link")
+                    .help("Upload to your bucket and copy a link your colleagues can open")
+                } else {
+                    Button {
+                        SettingsWindowController.shared.open(on: hostWindow?.screen)
+                    } label: {
+                        cloudShareLabel
+                    }
+                    .disabled(model.isExporting)
+                    .help("Connect a storage bucket to share a link")
                 }
 
                 Button {
@@ -292,7 +306,7 @@ struct VideoEditorView: View {
         defer { shareItemID = nil }
 
         guard model.hasEdits else {
-            _ = await ShareService.shared.share(itemID: itemID, fileURL: sourceURL)
+            lastShareURL = await ShareService.shared.share(itemID: itemID, fileURL: sourceURL)
             return
         }
 
@@ -312,7 +326,26 @@ struct VideoEditorView: View {
             )
             return
         }
-        _ = await ShareService.shared.share(itemID: itemID, fileURL: renderedURL)
+        lastShareURL = await ShareService.shared.share(itemID: itemID, fileURL: renderedURL)
+    }
+
+    private var isCloudShareReady: Bool { shareCredentials.isConfigured && shareCredentials.enabled }
+
+    @ViewBuilder
+    private var cloudShareLabel: some View {
+        if let shareItemID, shareUploader.uploadingItems.contains(shareItemID) {
+            ProgressView(value: shareUploader.uploadProgress[shareItemID] ?? 0)
+                .progressViewStyle(.circular)
+                .controlSize(.small)
+        } else {
+            Label("Cloud Share", systemImage: "link")
+        }
+    }
+
+    private func copyToPasteboard(_ url: URL) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+        ToastWindow.shared.show(title: "Link Copied", message: url.absoluteString, systemIcon: "link")
     }
 
     /// Escape peels back the current operation first, so it only reaches the window once there is nothing left to cancel.

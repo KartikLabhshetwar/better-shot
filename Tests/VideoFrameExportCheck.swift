@@ -204,6 +204,33 @@ enum VideoFrameExportCheck {
             "the ring must be gone once its window closes: \(faded) vs \(fadedControl)"
         )
 
+        let stranded = AVMutableVideoComposition()
+        stranded.renderSize = canvasSize
+        stranded.frameDuration = CMTime(value: 1, timescale: fps)
+        let strandedInstruction = AVMutableVideoCompositionInstruction()
+        strandedInstruction.timeRange = CMTimeRange(
+            start: CMTimeAdd(composition.duration, CMTime(seconds: 1, preferredTimescale: 600)),
+            duration: CMTime(seconds: 1, preferredTimescale: 600)
+        )
+        strandedInstruction.layerInstructions = [AVMutableVideoCompositionLayerInstruction(assetTrack: compVideo)]
+        stranded.instructions = [strandedInstruction]
+
+        var strandedConfiguration = configuration
+        strandedConfiguration.videoComposition = stranded
+        strandedConfiguration.outputURL = dir.appendingPathComponent("stranded.mp4")
+        var strandedFailure: Error?
+        do {
+            _ = try await VideoFrameExporter().export(strandedConfiguration) { _ in }
+        } catch {
+            strandedFailure = error
+        }
+        precondition(strandedFailure != nil, "a composition that renders no frames must fail the export, not write a silent stub")
+        precondition(
+            (strandedFailure?.localizedDescription ?? "").contains("The export did not finish"),
+            "the failure must arrive as a VideoExportError, got \(String(describing: strandedFailure))"
+        )
+        print("VideoFrameExportCheck: no-frame composition reported \(strandedFailure?.localizedDescription ?? "")")
+
         print("VideoFrameExportCheck: exported \(Int(size.width))x\(Int(size.height)) \(String(format: "%.1f", exportedDuration))s with audio (\(bytes / 1024) KB)")
     }
 

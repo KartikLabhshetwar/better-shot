@@ -9,6 +9,7 @@ enum VideoExportError: LocalizedError {
     case trimInsertFailed(Error)
     case exportSessionUnavailable
     case exportFailed(Error?)
+    case saveFailed(URL, Error)
     case exportCancelled
 
     var errorDescription: String? {
@@ -29,13 +30,23 @@ enum VideoExportError: LocalizedError {
             return "Could not start the export session."
         case .exportFailed(let error):
             return "The export did not finish.\(Self.detail(error))"
+        case .saveFailed(let folder, let error):
+            return "The video rendered, but it could not be saved to \(folder.path).\(Self.detail(error))"
         case .exportCancelled:
             return "The export was cancelled."
         }
     }
 
+    /// AVFoundation hides the real cause behind "The operation could not be completed", so the reason and the underlying error come along too.
     private static func detail(_ error: Error?) -> String {
         guard let error else { return "" }
-        return " (\(error.localizedDescription))"
+        let ns = error as NSError
+        var parts = [ns.localizedDescription]
+        if let reason = ns.localizedFailureReason, !reason.isEmpty { parts.append(reason) }
+        if let underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError {
+            parts.append("\(underlying.domain) \(underlying.code): \(underlying.localizedDescription)")
+        }
+        parts.append("\(ns.domain) \(ns.code)")
+        return " (\(parts.joined(separator: " \u{2022} ")))"
     }
 }
