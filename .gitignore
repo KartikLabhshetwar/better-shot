@@ -37,3 +37,4 @@ scripts/
 CLAUDE.md
 
 .claude/worktrees/
+.build-release/
