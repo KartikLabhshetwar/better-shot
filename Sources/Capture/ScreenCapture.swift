@@ -34,7 +34,10 @@ final class ScreenCapture {
         defer { isCapturing = false }
 
         let tempPath = makeTempPath()
-        let success = await runScreencapture(["-s", "-x", "-t", "png", tempPath])
+        // -s is "only allow mouse selection mode", so space cannot reach window selection. -i is the
+        // mode that carries the toggle, -J pins the starting mode because -i alone reopens in
+        // whichever one was used last, and -o matches captureWindow's shadowless window shot.
+        let success = await runScreencapture(["-i", "-J", "selection", "-o", "-x", "-t", "png", tempPath])
         guard success, FileManager.default.fileExists(atPath: tempPath) else { return nil }
         return URL(fileURLWithPath: tempPath)
     }
