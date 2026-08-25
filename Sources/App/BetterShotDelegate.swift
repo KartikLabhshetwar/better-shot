@@ -65,7 +65,7 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
         if alert.runModal() == .alertFirstButtonReturn {
             let task = Process()
             task.launchPath = "/bin/sh"
-            task.arguments = ["-c", "sleep 0.5; open \"\(Bundle.main.bundlePath)\""]
+            task.arguments = ["-c", "sleep 0.5; open \"$0\"", Bundle.main.bundlePath]
             try? task.run()
             NSApp.terminate(nil)
         }
