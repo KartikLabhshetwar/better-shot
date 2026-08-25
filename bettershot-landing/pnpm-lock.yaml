@@ -9,7 +9,7 @@ importers:
   .:
     dependencies:
       '@emotion/is-prop-valid':
-        specifier: latest
+        specifier: ^1.4.0
         version: 1.4.0
       '@hookform/resolvers':
         specifier: ^3.10.0
@@ -111,7 +111,7 @@ importers:
         specifier: 1.0.4
         version: 1.0.4(@types/react-dom@19.2.3(@types/react@19.2.8))(@types/react@19.2.8)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       cobe:
-        specifier: latest
+        specifier: ^0.6.5
         version: 0.6.5
       date-fns:
         specifier: 4.1.0
@@ -120,10 +120,10 @@ importers:
         specifier: 8.5.1
         version: 8.5.1(react@19.2.3)
       framer-motion:
-        specifier: latest
+        specifier: ^12.25.0
         version: 12.25.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       geist:
-        specifier: latest
+        specifier: ^1.5.1
         version: 1.5.1(next@15.4.10(react-dom@19.2.3(react@19.2.3))(react@19.2.3))
       input-otp:
         specifier: 1.4.1
@@ -132,13 +132,13 @@ importers:
         specifier: ^0.454.0
         version: 0.454.0(react@19.2.3)
       motion:
-        specifier: latest
+        specifier: ^12.25.0
         version: 12.25.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       next:
         specifier: 15.4.10
         version: 15.4.10(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       next-themes:
-        specifier: latest
+        specifier: ^0.4.6
         version: 0.4.6(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       react:
         specifier: ^19
