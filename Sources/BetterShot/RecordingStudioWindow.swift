@@ -1062,13 +1062,7 @@ private struct StudioBackgroundView: View {
                 endPoint: gradient.endPoint
             )
         case .customWallpaper(let wallpaper):
-            if let image = NSImage(contentsOf: wallpaper.url) {
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } else {
-                Color(white: 0.04)
-            }
+            AnnotationCustomWallpaperPreview(wallpaper: wallpaper, maxPixelSize: 2048)
         }
     }
 }
