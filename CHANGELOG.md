@@ -5,6 +5,34 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-08-26
+
+A quick follow to the rebuild. The Recording Studio learns to crop video the
+way the image editor crops a shot, the clip timeline picks up a minimap,
+split snapping and mid-drag panning, the app wears a new clover, and two
+community fixes bring back Copy and the space key.
+
+### Added
+
+- **Crop video in the Recording Studio**: The video editor now has the same crop the image editor has. Enter crop from the toolbar, drag the box or any handle, and the recording is cropped non-destructively: the full frame stays in the project, so the crop can be adjusted or cleared later, and Cmd Z steps it back. The preview and the export run one shared geometry, auto-zoom anchors are remapped into the cropped frame so zoom and crop now compose instead of zoom overriding the crop, and export sizes round to even pixels so every encoder accepts them
+- **Timeline minimap**: A slim strip under the timeline draws the whole recording with the visible window as a draggable chip and a tick for the playhead, so a zoomed-in timeline never loses its place
+- **The timeline pans itself mid-drag**: Dragging a trim handle or scrubbing past the visible edge scrolls the timeline in that direction, faster the further you overshoot, instead of pinning the drag to the edge
+- **Split snapping**: The split line snaps to the playhead when the pointer comes within a few pixels of it and refuses to cut right on top of an existing clip boundary, so accidental sliver clips are gone; hold Option to cut exactly where the pointer is. `S` splits at the pointer, `C` splits at the pointer or, with nothing hovered, at the playhead, and the right-click Split item disables itself where a cut is not possible
+- **The Copy button is back**: The 0.4.0 toolbar rebuild dropped Copy from the image editor, so an annotated screenshot could only leave through a save panel. It returns beside Export on its old shortcut, and the pasteboard now carries the file, the image and TIFF together, so the paste lands in a terminal as well as in Gmail ([#111](https://github.com/KartikLabhshetwar/better-shot/pull/111), thanks [@zergzorg](https://github.com/zergzorg))
+- **Delete shared uploads from Settings**: The Cloud tabs in Settings grew a Delete From Cloud button that removes the uploaded copies from your R2 bucket after a confirmation, so their share links stop working while the local files stay on your Mac
+
+### Changed
+
+- **A clover on the icon**: The owl lasted one release. The app icon, the menu bar glyph and the website now carry a new clover logo
+- **One card for every transfer**: Rendering, uploading, exporting and a failure with retry all report through the same floating status card, replacing the separate share link panel, so a share and an export look and behave the same
+- **The playhead pins instead of vanishing**: Scrolling a zoomed timeline away from the current frame keeps the playhead at the near edge, dimmed, so you always know which side the frame is on
+- **Timeline edges read as edges**: Content scrolled out of view fades out at the sides instead of hitting a hard clip, and a clip edge under the pointer shows its trim handle before you grab it
+
+### Fixed
+
+- **Annotation tools stay armed**: Drawing a blur, pixelate or any other annotation no longer bounces the editor back to the select tool after one shape, so masking several spots in a row does not mean re-picking the tool each time ([#108](https://github.com/KartikLabhshetwar/better-shot/pull/108), thanks [@zergzorg](https://github.com/zergzorg))
+- **Space switches region capture to window selection**: Region capture invoked the system tool in mouse-only selection mode, so the space key that flips it over to window selection did nothing. It now opens in the interactive mode that carries the space toggle, pinned to start in selection, and a space-switched shot drops the window shadow to match window capture ([#109](https://github.com/KartikLabhshetwar/better-shot/pull/109), thanks [@zergzorg](https://github.com/zergzorg))
+
 ## [0.4.0] - 2026-08-26
 
 The rebuild release. Better Shot's capture pipeline, floating recording bar,
