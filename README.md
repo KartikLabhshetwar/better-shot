@@ -5,18 +5,16 @@
 [![X (Twitter)](https://img.shields.io/badge/X-%231DA1F2.svg?style=flat&logo=X&logoColor=white)](https://x.com/code_kartik)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-%23FFDD00.svg?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/code_kartik)
 
-Screenshots, screen recording, and a video editor in one native macOS app. An
-open-source alternative to CleanShot X and Loom, with no subscription, no
-account, and no telemetry. Captures stay on your Mac unless you share them from
-storage you own.
-
-**[Download BetterShot for macOS](https://www.bettershot.site)**
+**One app for the whole screen.** Screenshots, screen recording, and a video
+editor, native on macOS. An open-source alternative to CleanShot X and Loom:
+no subscription, no account, no telemetry. Nothing leaves your Mac unless you
+share it, and shares go to storage you own.
 
 ## What it does
 
 - **Capture** a region, the full screen, or a single window, plus OCR and an on-screen color picker
 - **Record** any display, window, or region to MP4 with system audio, microphone, and a face cam bubble
-- **Edit** recordings on a multi-clip timeline: cuts, per-clip speed, transitions, cursor-tracked auto-zoom, captions, a keyboard overlay, masks, and a 3D camera
+- **Edit** recordings on a multi-clip timeline: cuts, per-clip speed, transitions, crop, cursor-tracked auto-zoom, a restylable cursor, on-device captions, a keyboard overlay, masks, color grading, and a 3D camera
 - **Annotate** screenshots with arrows, shapes, text, numbered badges, blur, and spotlight
 - **Beautify** with backgrounds, padding, corner radius, and shadow, applied automatically if you want
 - **Share** a link from your own Cloudflare R2 bucket; every upload is compressed first and video always ships as MP4
@@ -39,14 +37,13 @@ screenshot shortcuts.
 |---|---|
 | Region screenshot | `⌘⇧4` |
 | Fullscreen screenshot | `⌘⇧3` |
-| Window screenshot | `⌘⇧5` |
 | Record screen | `⌘⇧2` |
 | OCR text scan | `⌘⇧O` |
 | Color picker (hex) | `⌘⇧C` |
 
-All of these are re-bindable in Settings > Capture. In the editor, every tool
-carries its own single-key shortcut on its button, and `⌘S` saves, `⇧⌘C` copies,
-`⌘Z` undoes.
+Press `Space` during region capture to switch to window selection. All of these
+are re-bindable in Settings > Shortcuts. In the editor, every tool carries its
+own single-key shortcut on its button, and `⌘S` saves, `⇧⌘C` copies, `⌘Z` undoes.
 
 ## Build from source
 
@@ -57,7 +54,7 @@ make run
 ```
 
 Needs macOS 26 and Xcode 26 (Swift 6). Native Swift and SwiftUI throughout: no
-Electron, no web views, no third-party dependencies.
+Electron, no web views, and a single Swift package (DockProgress).
 
 ## Contributing
 
