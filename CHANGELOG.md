@@ -7,13 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.2] - 2026-08-26
 
-The image editor's two buttons finally mean two different things: Save keeps
-the edit inside BetterShot and the app's library shows it, Export is the one
-that writes a file to your Mac, and reopening an edited shot brings its
-annotations back. Three community performance passes move
+The Recording Studio learns to hide things: masks blur or pixelate any region
+of a recording, and a mask lane on the timeline gives each one its own start
+and end. The image editor's two buttons finally mean two different things:
+Save keeps the edit inside BetterShot and the app's library shows it, Export
+is the one that writes a file to your Mac, and reopening an edited shot
+brings its annotations back. Three community performance passes move
 the heavy image and JSON decoding that sat on the main thread into the
 background, so the preview card, the Recording Studio and long recordings all
 stop stuttering.
+
+### Added
+
+- **Mask video in the Recording Studio**: A Mask button in the toolbar drops a blur over the recording, positioned and resized on the canvas the way a crop box is, with a blur or pixelate effect and a strength slider per mask. Several masks can stack, Cmd Z steps every edit back, and the same masks render in the preview, the export and the shared copy, staying with the project across reopens
+- **Masks live on the timeline**: A mask lane under the zoom lane shows every mask as a block. Click an empty spot to add a mask at that moment, drag a block to move it to a different part of the video, drag its edges to trim, so a mask covers exactly the seconds it needs and every scene can carry its own. Masks added from the toolbar keep covering the whole recording
 
 ### Changed
 
