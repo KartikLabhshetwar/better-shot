@@ -17,6 +17,7 @@
 import AppKit
 import AVFoundation
 import CoreGraphics
+import CoreImage
 import CoreText
 import Foundation
 import ImageIO
@@ -62,6 +63,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         /// `reframe`.
         let fitContentAspect: CGFloat?
         let crop: CGRect
+        let masks: [RecordingMaskSegment]
 
         init(
             screenURL: URL,
@@ -82,7 +84,8 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             audioReplacementURL: URL? = nil,
             reframe: ReframeTrack? = nil,
             fitContentAspect: CGFloat? = nil,
-            crop: CGRect = RecordingVideoCrop.unit
+            crop: CGRect = RecordingVideoCrop.unit,
+            masks: [RecordingMaskSegment] = []
         ) {
             self.screenURL = screenURL
             self.cameraURL = cameraURL
@@ -103,6 +106,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             self.reframe = reframe
             self.fitContentAspect = fitContentAspect
             self.crop = crop
+            self.masks = masks
         }
     }
 
@@ -309,7 +313,8 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             outputFrameInterval: 1 / Self.outputFrameRate,
             reframe: configuration.reframe,
             fitContentAspect: configuration.fitContentAspect,
-            crop: configuration.crop
+            crop: configuration.crop,
+            masks: configuration.masks
         )
 
         let screenAudioOutput = audioOutput
@@ -592,6 +597,8 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
     private let karaokeTimeline: KaraokeTimeline?
     private let reframe: ReframeTrack?
     private let crop: CGRect
+    private let masks: [RecordingMaskSegment]
+    private let maskContext: CIContext?
     private var artworkImageCache: [String: CGImage] = [:]
     private let pointerScale: CGFloat
     private let colorSpace: CGColorSpace
@@ -617,7 +624,8 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
         outputFrameInterval: TimeInterval = 1.0 / 60.0,
         reframe: ReframeTrack? = nil,
         fitContentAspect: CGFloat? = nil,
-        crop: CGRect = RecordingVideoCrop.unit
+        crop: CGRect = RecordingVideoCrop.unit,
+        masks: [RecordingMaskSegment] = []
     ) {
         self.canvasSize = canvasSize
         self.layout = RecordingStudioLayout.make(
@@ -637,6 +645,8 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
         self.karaokeTimeline = karaokeTimeline
         self.reframe = reframe
         self.crop = crop
+        self.masks = masks
+        self.maskContext = masks.isEmpty ? nil : CIContext(options: [.cacheIntermediates: false])
         self.outputFrameInterval = outputFrameInterval
         self.pointerScale = style.cursorScale
         self.colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
@@ -714,6 +724,28 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
                 context.setAlpha(1 / CGFloat(sample + 1))
                 context.draw(screenImage, in: flipped(drawRect))
 
+            }
+            if let maskContext, !masks.isEmpty {
+                context.setAlpha(1)
+                let content = contentRect(at: editorTime)
+                let sourceImage = CIImage(cgImage: screenImage)
+                for segment in masks {
+                    guard segment.isActive(at: editorTime),
+                    let region = RecordingMaskRenderer.filteredRegion(
+                        source: sourceImage,
+                        segment: segment
+                    ),
+                    let regionImage = maskContext.createCGImage(region, from: region.extent) else {
+                        continue
+                    }
+                    let drawRect = CGRect(
+                        x: content.minX + segment.rect.minX * content.width,
+                        y: content.minY + segment.rect.minY * content.height,
+                        width: segment.rect.width * content.width,
+                        height: segment.rect.height * content.height
+                    )
+                    context.draw(regionImage, in: flipped(drawRect))
+                }
             }
             context.restoreGState()
         }

@@ -132,6 +132,13 @@ final class RecordingStudioModel {
     private(set) var isCroppingVideo = false
     var cropDraft = RecordingVideoCrop.unit
     var cropAspect: CropAspectRatio = .freeform
+    private(set) var maskSegments: [RecordingMaskSegment] = []
+    private(set) var isEditingMasks = false
+    var selectedMaskID: UUID?
+    private var maskEditSnapshot: [RecordingMaskSegment]?
+    private var maskRangeEditSnapshot: [RecordingMaskSegment]?
+    private let previewMaskState = RecordingMaskPreviewState()
+    private var previewMaskTask: Task<Void, Never>?
     /// The preview's copy of the reframe camera, kept current with every
     /// edit that would change the exported crop.
     private(set) var previewReframe: ReframeTrack?
@@ -429,6 +436,8 @@ final class RecordingStudioModel {
         exportAspectMode = document.exportAspectContentMode
         audioExportFormat = document.audioExportFormatValue
         cropRect = document.cropValue
+        maskSegments = document.masks ?? []
+        updatePreviewMaskComposition()
     }
 
     func teardown() {
@@ -439,6 +448,7 @@ final class RecordingStudioModel {
         shareTask?.cancel()
         transcriptionTask?.cancel()
         projectSaveTask?.cancel()
+        previewMaskTask?.cancel()
         timelineThumbnails.cancel()
         writeDraftNow()
         pause()
@@ -581,12 +591,12 @@ final class RecordingStudioModel {
 
     var canUndo: Bool {
         _ = undoRevision
-        return !isCroppingVideo && editUndoManager.canUndo
+        return !isCroppingVideo && !isEditingMasks && editUndoManager.canUndo
     }
 
     var canRedo: Bool {
         _ = undoRevision
-        return !isCroppingVideo && editUndoManager.canRedo
+        return !isCroppingVideo && !isEditingMasks && editUndoManager.canRedo
     }
 
     var selectedClip: RecordingClipSegment? {
@@ -615,14 +625,14 @@ final class RecordingStudioModel {
     }
 
     func undo() {
-        guard !isCroppingVideo, editUndoManager.canUndo else { return }
+        guard !isCroppingVideo, !isEditingMasks, editUndoManager.canUndo else { return }
         pause()
         editUndoManager.undo()
         undoRevision &+= 1
     }
 
     func redo() {
-        guard !isCroppingVideo, editUndoManager.canRedo else { return }
+        guard !isCroppingVideo, !isEditingMasks, editUndoManager.canRedo else { return }
         pause()
         editUndoManager.redo()
         undoRevision &+= 1
@@ -772,6 +782,7 @@ final class RecordingStudioModel {
         if timeObserver != nil {
             installEndObserver()
         }
+        updatePreviewMaskComposition()
     }
 
     private func registerUndo(
@@ -1110,7 +1121,8 @@ final class RecordingStudioModel {
             replacementAudioFileName: replacementAudio?.url.lastPathComponent,
             replacementAudioDisplayName: replacementAudio?.displayName,
             audioExportFormat: audioExportFormat,
-            crop: RecordingVideoCrop.isUnit(cropRect) ? nil : cropRect
+            crop: RecordingVideoCrop.isUnit(cropRect) ? nil : cropRect,
+            masks: maskSegments.isEmpty ? nil : maskSegments
         )
     }
 
@@ -1620,7 +1632,8 @@ final class RecordingStudioModel {
             audioReplacementURL: replacementAudio?.url,
             reframe: reframe,
             fitContentAspect: fitContentAspect,
-            crop: cropRect
+            crop: cropRect,
+            masks: maskSegments
         )
     }
 
@@ -1676,7 +1689,7 @@ final class RecordingStudioModel {
     }
 
     var effectivePreviewCrop: CGRect {
-        isCroppingVideo ? RecordingVideoCrop.unit : cropRect
+        isCroppingVideo || isEditingMasks ? RecordingVideoCrop.unit : cropRect
     }
 
     var croppedVideoSize: CGSize {
@@ -1688,7 +1701,7 @@ final class RecordingStudioModel {
     }
 
     func beginVideoCrop() {
-        guard isLoaded, !isCroppingVideo else { return }
+        guard isLoaded, !isCroppingVideo, !isEditingMasks else { return }
         pause()
         cropDraft = cropRect
         cropAspect = .freeform
@@ -1771,6 +1784,225 @@ final class RecordingStudioModel {
         scheduleProjectSave()
     }
 
+    // MARK: - Video masks
+
+    var selectedMask: RecordingMaskSegment? {
+        guard let selectedMaskID else { return nil }
+        return maskSegments.first { $0.id == selectedMaskID }
+    }
+
+    private var selectedMaskIndex: Int? {
+        guard let selectedMaskID else { return nil }
+        return maskSegments.firstIndex { $0.id == selectedMaskID }
+    }
+
+    func beginMaskEditing() {
+        guard isLoaded, !isEditingMasks, !isCroppingVideo else { return }
+        pause()
+        maskEditSnapshot = maskSegments
+        isEditingMasks = true
+        if maskSegments.isEmpty {
+            addMask()
+        } else {
+            selectedMaskID = maskSegments.last?.id
+        }
+        rebuildPreviewReframe()
+    }
+
+    func endMaskEditing() {
+        guard isEditingMasks else { return }
+        isEditingMasks = false
+        selectedMaskID = nil
+        if let snapshot = maskEditSnapshot, snapshot != maskSegments {
+            let edited = maskSegments
+            maskSegments = snapshot
+            setMaskSegments(edited, actionName: "Edit Masks")
+        }
+        maskEditSnapshot = nil
+        rebuildPreviewReframe()
+    }
+
+    var showsMaskLane: Bool {
+        isEditingMasks || !maskSegments.isEmpty
+    }
+
+    func addMask() {
+        guard isEditingMasks else { return }
+        let segment = RecordingMaskSegment()
+        maskSegments.append(segment)
+        selectedMaskID = segment.id
+        updatePreviewMaskComposition()
+    }
+
+    func addMask(at time: TimeInterval) {
+        guard isEditingMasks else { return }
+        var segment = RecordingMaskSegment()
+        if duration > RecordingMaskSegment.minimumDuration {
+            let length = min(3, duration)
+            let start = min(max(time - length / 2, 0), duration - length)
+            segment.start = start
+            segment.end = start + length
+        }
+        maskSegments.append(segment)
+        selectedMaskID = segment.id
+        seek(to: min(max(time, 0), max(duration, 0)))
+        updatePreviewMaskComposition()
+    }
+
+    func deleteSelectedMask() {
+        guard isEditingMasks, let selectedMaskID else { return }
+        maskSegments.removeAll { $0.id == selectedMaskID }
+        self.selectedMaskID = maskSegments.last?.id
+        updatePreviewMaskComposition()
+    }
+
+    func removeMask(id: UUID) {
+        if isEditingMasks {
+            maskSegments.removeAll { $0.id == id }
+            if selectedMaskID == id { selectedMaskID = maskSegments.last?.id }
+            updatePreviewMaskComposition()
+        } else {
+            var edited = maskSegments
+            edited.removeAll { $0.id == id }
+            setMaskSegments(edited, actionName: "Remove Mask")
+        }
+    }
+
+    func selectMask(id: UUID) {
+        guard isEditingMasks,
+              let segment = maskSegments.first(where: { $0.id == id }) else { return }
+        selectedMaskID = id
+        if !segment.isActive(at: currentTime) {
+            pause()
+            seek(to: segment.editorRange(duration: duration).lowerBound)
+        }
+    }
+
+    func beginMaskRangeEdit() {
+        guard maskRangeEditSnapshot == nil else { return }
+        pause()
+        maskRangeEditSnapshot = maskSegments
+    }
+
+    func endMaskRangeEdit(actionName: String) {
+        guard let snapshot = maskRangeEditSnapshot else { return }
+        maskRangeEditSnapshot = nil
+        guard !isEditingMasks, snapshot != maskSegments else { return }
+        let edited = maskSegments
+        maskSegments = snapshot
+        setMaskSegments(edited, actionName: actionName)
+    }
+
+    func updateMaskRange(id: UUID, start: Double, end: Double) {
+        guard let index = maskSegments.firstIndex(where: { $0.id == id }) else { return }
+        let clampedStart = min(
+            max(0, start),
+            max(0, duration - RecordingMaskSegment.minimumDuration)
+        )
+        maskSegments[index].start = clampedStart
+        maskSegments[index].end = min(
+            max(clampedStart + RecordingMaskSegment.minimumDuration, end),
+            max(duration, clampedStart + RecordingMaskSegment.minimumDuration)
+        )
+        updatePreviewMaskComposition()
+    }
+
+    func updateSelectedMask(handle: CropHandle, toNormalized point: CGPoint) {
+        guard let index = selectedMaskIndex else { return }
+        maskSegments[index].rect = CropRectEditor.resize(
+            maskSegments[index].rect,
+            handle: handle,
+            to: point,
+            aspect: nil,
+            minWidth: minimumVideoCropWidth,
+            minHeight: minimumVideoCropHeight,
+            fromCenter: isCropCenterResizeModifierPressed
+        )
+        updatePreviewMaskComposition()
+    }
+
+    func moveSelectedMask(from start: CGRect, byNormalized delta: CGSize) {
+        guard let index = selectedMaskIndex else { return }
+        maskSegments[index].rect = CropRectEditor.move(start, by: delta)
+        updatePreviewMaskComposition()
+    }
+
+    func setSelectedMaskEffect(_ effect: RecordingMaskSegment.Effect) {
+        guard let index = selectedMaskIndex, maskSegments[index].effect != effect else { return }
+        maskSegments[index].effect = effect
+        updatePreviewMaskComposition()
+    }
+
+    func setSelectedMaskAmount(_ amount: Double) {
+        guard let index = selectedMaskIndex else { return }
+        maskSegments[index].amount = min(
+            max(amount, RecordingMaskSegment.minimumAmount),
+            RecordingMaskSegment.maximumAmount
+        )
+        updatePreviewMaskComposition()
+    }
+
+    private func setMaskSegments(_ segments: [RecordingMaskSegment], actionName: String) {
+        guard segments != maskSegments else { return }
+        let previous = maskSegments
+        registerUndo(actionName) { target in
+            target.setMaskSegments(previous, actionName: actionName)
+        }
+        maskSegments = segments
+        updatePreviewMaskComposition()
+        scheduleProjectSave()
+    }
+
+    private func updatePreviewMaskComposition() {
+        previewMaskState.update(maskSegments)
+        previewMaskTask?.cancel()
+        previewMaskTask = nil
+        guard let item = screenPlayer.currentItem else { return }
+        if maskSegments.isEmpty {
+            item.videoComposition = nil
+            refreshPausedPreviewFrame()
+            return
+        }
+        if item.videoComposition != nil {
+            refreshPausedPreviewFrame()
+            return
+        }
+        let state = previewMaskState
+        let asset = item.asset
+        previewMaskTask = Task { [weak self, weak item] in
+            let composition = try? await AVMutableVideoComposition.videoComposition(
+                with: asset,
+                applyingCIFiltersWithHandler: { request in
+                    request.finish(
+                        with: RecordingMaskRenderer.masked(
+                            request.sourceImage,
+                            segments: state.current(),
+                            at: request.compositionTime.seconds
+                        ),
+                        context: nil
+                    )
+                }
+            )
+            guard !Task.isCancelled,
+                  let self,
+                  let item,
+                  let composition,
+                  self.screenPlayer.currentItem === item,
+                  !self.maskSegments.isEmpty else { return }
+            item.videoComposition = composition
+            self.refreshPausedPreviewFrame()
+        }
+    }
+
+    private func refreshPausedPreviewFrame() {
+        guard isLoaded, !isPlaying else { return }
+        if let item = screenPlayer.currentItem,
+           let composition = item.videoComposition?.mutableCopy() as? AVMutableVideoComposition {
+            item.videoComposition = composition
+        }
+        movePlayers(to: hoverPreviewTime ?? currentTime)
+    }
+
     // MARK: - Preview canvas
 
     /// What the Studio canvas shows: the target-aspect canvas when a
@@ -1795,7 +2027,7 @@ final class RecordingStudioModel {
     /// zoom viewport otherwise (including Fit mode, where zooms play
     /// inside the fitted card).
     func previewViewportFrame(at time: TimeInterval) -> ViewportFrame {
-        guard !isCroppingVideo else { return .identity }
+        guard !isCroppingVideo, !isEditingMasks else { return .identity }
         return previewReframe?.frame(at: time) ?? viewportFrame(at: time).cropped(to: cropRect)
     }
 

@@ -7,9 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.2] - 2026-08-26
 
-The image editor's save finally means save: the file in your save folder gets
-the effects, reopening an edited shot brings its annotations back, and the
-broken export after a save is fixed. Three community performance passes move
+The image editor's two buttons finally mean two different things: Save keeps
+the edit inside BetterShot and the app's library shows it, Export is the one
+that writes a file to your Mac, and reopening an edited shot brings its
+annotations back. Three community performance passes move
 the heavy image and JSON decoding that sat on the main thread into the
 background, so the preview card, the Recording Studio and long recordings all
 stop stuttering.
@@ -22,7 +23,7 @@ stop stuttering.
 
 ### Fixed
 
-- **Save writes the effects into the saved file**: Annotating, blurring or restyling a screenshot and pressing Save committed the composite only to the app's internal History copy; the file in your save folder kept the plain capture. Save, Done and the close prompt now also rewrite that file with the rendered result, in the format it was saved in, so the screenshot you actually share carries the edits
+- **Save and Export stopped doing the same job**: Save behaved like a second Export, rewriting the file in your save folder. Save now keeps the edit inside BetterShot only, and the Settings library, the preview and the menu bar recents show the edited image instead of the plain capture; Export stays the one action that writes the finished file to your Mac, and the file in your save folder is never touched by a save
 - **Reopening an edited screenshot brings its annotations back**: The editable annotation document lived beside the internal History copy under a fresh name, with nothing linking it to the original capture, so pressing Edit again on the same shot opened the plain image and a second save could wipe the earlier annotations from the saved file. History now remembers which capture an edit came from, and every route into the editor (the preview card, the Library, a drop on the menu bar icon) resolves back to the copy that owns the annotations. Applies to edits made from this version on
 - **Export works after a save**: Saving or sharing an annotated screenshot left the editor pointing at a base image that was never written to disk, so the next Export, Copy or Save failed with "The file couldn't be opened because it isn't in the correct format", whether the edit was an annotation or a background effect. The first save now stores the untouched base and the editable document next to the History copy and repoints the editor at it, so every later export renders, and repeated saves stop stacking duplicate copies in History ([#118](https://github.com/KartikLabhshetwar/better-shot/issues/118), thanks [@erickhun](https://github.com/erickhun))
 - **Copy on a recording copies the video**: The preview card's hover Copy put a still frame on the clipboard for recordings. It now copies the video file itself, so the paste lands in Finder or Slack as a movie ([#115](https://github.com/KartikLabhshetwar/better-shot/pull/115), thanks [@zergzorg](https://github.com/zergzorg))

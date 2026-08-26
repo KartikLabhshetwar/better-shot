@@ -42,6 +42,7 @@ struct CropAdjustmentOverlay: View {
     let coordinateSpaceName: String
     let cropRect: CGRect
     let showsEdgeHandles: Bool
+    var showsChrome: Bool = true
     let onResize: (CropHandle, CGPoint) -> Void
     let onMove: (CGRect, CGSize) -> Void
 
@@ -57,8 +58,10 @@ struct CropAdjustmentOverlay: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            dimmedExterior
-            grid
+            if showsChrome {
+                dimmedExterior
+                grid
+            }
             border
             moveSurface
             handles

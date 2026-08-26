@@ -12,6 +12,7 @@ defer { try? FileManager.default.removeItem(at: root) }
 struct Item {
     let url: URL
     let sourceCapturePath: String?
+    var hasEdits = true
 }
 
 var items: [Item] = []
@@ -80,5 +81,41 @@ assert(freshSource == historyURL, "an image without a document must render as-is
 try! FileManager.default.removeItem(at: historyURL.appendingPathExtension("bettershot"))
 let cleared = annotationEditorURL(for: desktopURL, beautifiedPath: desktopURL.path, rawURL: rawURL)
 assert(cleared == rawURL, "a stale mapping without a sidecar must fall back to the raw source")
+
+func editedHistoryURL(forCapturePaths capturePaths: [String]) -> URL? {
+    guard let item = items.first(where: { item in
+        guard item.hasEdits, let sourceCapturePath = item.sourceCapturePath else { return false }
+        return capturePaths.contains(sourceCapturePath)
+    }), FileManager.default.fileExists(atPath: item.url.path) else {
+        return nil
+    }
+    return item.url
+}
+
+func displayURL(rawURL: URL, beautifiedPath: String?) -> URL {
+    var capturePaths = [rawURL.standardizedFileURL.path]
+    if let beautifiedPath {
+        capturePaths.append(URL(fileURLWithPath: beautifiedPath).standardizedFileURL.path)
+    }
+    if let editedURL = editedHistoryURL(forCapturePaths: capturePaths) {
+        return editedURL
+    }
+    if let beautifiedPath, FileManager.default.fileExists(atPath: beautifiedPath) {
+        return URL(fileURLWithPath: beautifiedPath)
+    }
+    return rawURL
+}
+
+let editedDisplay = displayURL(rawURL: rawURL, beautifiedPath: desktopURL.path)
+assert(editedDisplay == historyURL, "the library must display the edited copy when one exists")
+
+items[0].hasEdits = false
+let clearedDisplay = displayURL(rawURL: rawURL, beautifiedPath: desktopURL.path)
+assert(clearedDisplay == desktopURL, "a cleared edit must fall back to the beautified file")
+
+items[0].hasEdits = true
+try! FileManager.default.removeItem(at: historyURL)
+let missingDisplay = displayURL(rawURL: rawURL, beautifiedPath: desktopURL.path)
+assert(missingDisplay == desktopURL, "a missing history copy must fall back to the beautified file")
 
 print("AnnotationReopenCheck: all assertions passed")

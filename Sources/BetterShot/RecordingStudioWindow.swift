@@ -102,6 +102,8 @@ private struct RecordingStudioContent: View {
             ToolbarItemGroup(placement: .primaryAction) {
                 if model.isCroppingVideo {
                     cropActions
+                } else if model.isEditingMasks {
+                    maskActions
                 } else {
                     Button {
                         withAnimation(.snappy(duration: 0.22)) {
@@ -112,6 +114,16 @@ private struct RecordingStudioContent: View {
                     }
                     .disabled(!model.isLoaded)
                     .help("Crop the video")
+
+                    Button {
+                        withAnimation(.snappy(duration: 0.22)) {
+                            model.beginMaskEditing()
+                        }
+                    } label: {
+                        Label("Mask", systemImage: "eye.slash")
+                    }
+                    .disabled(!model.isLoaded)
+                    .help("Blur or pixelate parts of the video")
 
                     if model.isProject {
                         saveStatus
@@ -143,7 +155,9 @@ private struct RecordingStudioContent: View {
             closeGuard.refreshDocumentEdited()
         }
         .onDeleteCommand {
-            if let selectedCueID = model.selectedCueID {
+            if model.isEditingMasks {
+                model.deleteSelectedMask()
+            } else if let selectedCueID = model.selectedCueID {
                 model.removeZoomCue(id: selectedCueID)
             } else if model.selectedClipID != nil {
                 model.deleteSelectedClip()
@@ -203,6 +217,61 @@ private struct RecordingStudioContent: View {
             set: { newValue in
                 withAnimation(.snappy(duration: 0.18)) { model.setVideoCropAspect(newValue) }
             }
+        )
+    }
+
+    @ViewBuilder
+    private var maskActions: some View {
+        Button {
+            model.addMask()
+        } label: {
+            Label("Add Mask", systemImage: "plus.rectangle")
+        }
+        .help("Add another mask")
+
+        Picker("Effect", selection: maskEffectBinding) {
+            Text("Blur").tag(RecordingMaskSegment.Effect.blur)
+            Text("Pixelate").tag(RecordingMaskSegment.Effect.pixelate)
+        }
+        .pickerStyle(.segmented)
+        .disabled(model.selectedMask == nil)
+
+        Slider(
+            value: maskAmountBinding,
+            in: RecordingMaskSegment.minimumAmount...RecordingMaskSegment.maximumAmount
+        )
+        .frame(width: 110)
+        .disabled(model.selectedMask == nil)
+        .help("Effect strength")
+
+        Button {
+            model.deleteSelectedMask()
+        } label: {
+            Label("Delete", systemImage: "trash")
+        }
+        .disabled(model.selectedMask == nil)
+        .help("Delete the selected mask")
+
+        Button {
+            withAnimation(.snappy(duration: 0.22)) { model.endMaskEditing() }
+        } label: {
+            Text("Done").padding(.horizontal, 8)
+        }
+        .keyboardShortcut(.defaultAction)
+        .buttonStyle(.borderedProminent)
+    }
+
+    private var maskEffectBinding: Binding<RecordingMaskSegment.Effect> {
+        Binding(
+            get: { model.selectedMask?.effect ?? .blur },
+            set: { model.setSelectedMaskEffect($0) }
+        )
+    }
+
+    private var maskAmountBinding: Binding<Double> {
+        Binding(
+            get: { model.selectedMask?.amount ?? RecordingMaskSegment.defaultAmount },
+            set: { model.setSelectedMaskAmount($0) }
         )
     }
 
@@ -478,6 +547,37 @@ private struct StudioCanvas: View {
                             }
                         )
                     }
+
+                    if model.isEditingMasks {
+                        let imageFrame = layout.frameRect(for: .identity)
+                        ForEach(model.maskSegments) { segment in
+                            if segment.id != model.selectedMaskID,
+                               segment.isActive(at: model.displayTime) {
+                                let rect = Self.maskViewRect(segment.rect, in: imageFrame)
+                                Rectangle()
+                                    .strokeBorder(Color.white.opacity(0.6), lineWidth: 1)
+                                    .frame(width: rect.width, height: rect.height)
+                                    .position(x: rect.midX, y: rect.midY)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { model.selectMask(id: segment.id) }
+                            }
+                        }
+                        if let selected = model.selectedMask {
+                            CropAdjustmentOverlay(
+                                imageFrame: imageFrame,
+                                coordinateSpaceName: StudioCanvasCoordinateSpace.name,
+                                cropRect: selected.rect.standardized,
+                                showsEdgeHandles: true,
+                                showsChrome: false,
+                                onResize: { handle, point in
+                                    model.updateSelectedMask(handle: handle, toNormalized: point)
+                                },
+                                onMove: { start, delta in
+                                    model.moveSelectedMask(from: start, byNormalized: delta)
+                                }
+                            )
+                        }
+                    }
                 }
                 .frame(width: canvasSize.width, height: canvasSize.height)
                 .coordinateSpace(.named(StudioCanvasCoordinateSpace.name))
@@ -492,6 +592,15 @@ private struct StudioCanvas: View {
         guard size.width > 0, size.height > 0 else { return bounds }
         let scale = min(bounds.width / size.width, bounds.height / size.height)
         return CGSize(width: size.width * scale, height: size.height * scale)
+    }
+
+    private static func maskViewRect(_ rect: CGRect, in frame: CGRect) -> CGRect {
+        CGRect(
+            x: frame.minX + rect.minX * frame.width,
+            y: frame.minY + rect.minY * frame.height,
+            width: rect.width * frame.width,
+            height: rect.height * frame.height
+        )
     }
 }
 
@@ -1201,7 +1310,7 @@ private struct StudioTimelineEditor: View {
                 clampZoom()
             }
         }
-        .frame(height: StudioTimelineMetrics.lanesHeight)
+        .frame(height: StudioTimelineMetrics.lanesHeight(showsMaskLane: model.showsMaskLane))
         .onChange(of: model.duration) { _, _ in clampZoom() }
         .onChange(of: model.currentTime) { _, time in followPlayhead(to: time) }
     }
@@ -1218,6 +1327,10 @@ private struct StudioTimelineEditor: View {
                     .frame(height: StudioTimelineMetrics.clipLaneHeight)
                 StudioZoomLaneBackground()
                     .frame(height: StudioTimelineMetrics.zoomLaneHeight)
+                if model.showsMaskLane {
+                    StudioZoomLaneBackground()
+                        .frame(height: StudioTimelineMetrics.maskLaneHeight)
+                }
                 Color.clear
                     .frame(height: StudioTimelineMetrics.scrollerGutter)
             }
@@ -1240,6 +1353,18 @@ private struct StudioTimelineEditor: View {
                         height: StudioTimelineMetrics.zoomLaneHeight
                     )
 
+                    if model.showsMaskLane {
+                        StudioMaskLane(
+                            model: model,
+                            scale: scale,
+                            visibleRange: scale.visibleRange(scrollX: scrollX)
+                        )
+                        .frame(
+                            width: scale.contentWidth,
+                            height: StudioTimelineMetrics.maskLaneHeight
+                        )
+                    }
+
                     Color.clear
                         .frame(height: StudioTimelineMetrics.scrollerGutter)
                 }
@@ -1255,7 +1380,7 @@ private struct StudioTimelineEditor: View {
                 }
             }
         }
-        .frame(height: StudioTimelineMetrics.scrollingLanesHeight)
+        .frame(height: StudioTimelineMetrics.scrollingLanesHeight(showsMaskLane: model.showsMaskLane))
         .mask(edgeFadeMask(scale: scale))
     }
 
@@ -1540,10 +1665,18 @@ private enum StudioTimelineMetrics {
     /// Width of the fade masking scrolled-out lane content at each edge.
     static let edgeFadeWidth: CGFloat = 32
 
-    static let scrollingLanesHeight = clipLaneHeight + zoomLaneHeight
-        + scrollerGutter + rowSpacing * 2
-    static let lanesHeight = playheadLaneHeight + rulerHeight
-        + scrollingLanesHeight + minimapHeight + rowSpacing * 3
+    static let maskLaneHeight = zoomLaneHeight
+
+    static func scrollingLanesHeight(showsMaskLane: Bool) -> CGFloat {
+        clipLaneHeight + zoomLaneHeight + scrollerGutter + rowSpacing * 2
+            + (showsMaskLane ? maskLaneHeight + rowSpacing : 0)
+    }
+
+    static func lanesHeight(showsMaskLane: Bool) -> CGFloat {
+        playheadLaneHeight + rulerHeight
+            + scrollingLanesHeight(showsMaskLane: showsMaskLane)
+            + minimapHeight + rowSpacing * 3
+    }
 }
 
 /// Duration-spanning overview strip under the lanes. The chip mirrors the
@@ -2236,6 +2369,193 @@ private struct StudioZoomCueBlock: View {
                     .onEnded { _ in
                         dragBase = nil
                         model.endZoomCueEdit(actionName: "Resize Zoom")
+                    }
+            )
+    }
+}
+
+private struct StudioMaskLane: View {
+    @Bindable var model: RecordingStudioModel
+    let scale: StudioTimelineScale
+    let visibleRange: ClosedRange<TimeInterval>
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { location in
+                    guard scale.pointsPerSecond > 0 else { return }
+                    let time = scale.time(forX: location.x)
+                    model.beginMaskEditing()
+                    model.addMask(at: time)
+                }
+
+            ForEach(visibleSegments) { segment in
+                StudioMaskBlock(model: model, segment: segment, scale: scale)
+            }
+        }
+        .contextMenu {
+            Button("Add Mask at Playhead") {
+                model.beginMaskEditing()
+                model.addMask(at: model.currentTime)
+            }
+        }
+    }
+
+    private var visibleSegments: [RecordingMaskSegment] {
+        model.maskSegments.filter {
+            let range = $0.editorRange(duration: model.duration)
+            return range.upperBound >= visibleRange.lowerBound
+                && range.lowerBound <= visibleRange.upperBound
+        }
+    }
+}
+
+private struct StudioMaskBlock: View {
+    @Bindable var model: RecordingStudioModel
+    let segment: RecordingMaskSegment
+    let scale: StudioTimelineScale
+
+    private struct DragBase {
+        let start: TimeInterval
+        let end: TimeInterval
+    }
+
+    @State private var dragBase: DragBase?
+
+    private var isSelected: Bool {
+        model.selectedMaskID == segment.id
+    }
+
+    private var editorRange: ClosedRange<TimeInterval> {
+        segment.editorRange(duration: model.duration)
+    }
+
+    var body: some View {
+        guard scale.pointsPerSecond > 0 else { return AnyView(EmptyView()) }
+
+        let range = editorRange
+        let width = min(
+            scale.contentWidth,
+            max(24, CGFloat(range.upperBound - range.lowerBound) * scale.pointsPerSecond)
+        )
+        let x = min(
+            max(scale.x(for: range.lowerBound), 0),
+            max(0, scale.contentWidth - width)
+        )
+
+        return AnyView(
+            HStack(spacing: 0) {
+                resizeHandle(edge: .leading)
+                Spacer(minLength: 0)
+                Label(
+                    segment.effect == .blur ? "Blur" : "Pixelate",
+                    systemImage: "eye.slash"
+                )
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                Spacer(minLength: 0)
+                resizeHandle(edge: .trailing)
+            }
+            .frame(width: width, height: StudioZoomLaneMetrics.blockHeight)
+            .background(
+                RoundedRectangle(
+                    cornerRadius: StudioZoomLaneMetrics.blockCornerRadius,
+                    style: .continuous
+                )
+                    .fill(Color.purple.opacity(isSelected ? 0.95 : 0.72))
+            )
+            .overlay {
+                if isSelected {
+                    RoundedRectangle(
+                        cornerRadius: StudioZoomLaneMetrics.selectionRingCornerRadius,
+                        style: .continuous
+                    )
+                        .stroke(Color.white.opacity(0.8), lineWidth: 1.5)
+                        .padding(-StudioZoomLaneMetrics.selectionRingPadding)
+                }
+            }
+            .offset(x: x, y: StudioZoomLaneMetrics.blockInset)
+            .gesture(
+                DragGesture(coordinateSpace: .global)
+                    .onChanged { value in
+                        if dragBase == nil {
+                            dragBase = DragBase(start: range.lowerBound, end: range.upperBound)
+                            model.beginMaskRangeEdit()
+                            model.selectMask(id: segment.id)
+                        }
+                        guard let dragBase else { return }
+                        let delta = Double(value.translation.width) * scale.secondsPerPoint
+                        let length = dragBase.end - dragBase.start
+                        let start = min(
+                            max(0, dragBase.start + delta),
+                            max(0, model.duration - length)
+                        )
+                        model.updateMaskRange(id: segment.id, start: start, end: start + length)
+                    }
+                    .onEnded { _ in
+                        dragBase = nil
+                        model.endMaskRangeEdit(actionName: "Move Mask")
+                    }
+            )
+            .onTapGesture {
+                model.beginMaskEditing()
+                model.selectMask(id: segment.id)
+            }
+            .contextMenu {
+                Button("Remove Mask", role: .destructive) {
+                    model.removeMask(id: segment.id)
+                }
+            }
+        )
+    }
+
+    private func resizeHandle(edge: HorizontalEdge) -> some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.001))
+            .frame(width: 10, height: StudioZoomLaneMetrics.blockHeight)
+            .overlay(alignment: .center) {
+                Capsule()
+                    .fill(Color.white.opacity(isSelected ? 0.9 : 0.45))
+                    .frame(width: 2.5, height: 12)
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(coordinateSpace: .global)
+                    .onChanged { value in
+                        if dragBase == nil {
+                            let range = editorRange
+                            dragBase = DragBase(start: range.lowerBound, end: range.upperBound)
+                            model.beginMaskRangeEdit()
+                            model.selectMask(id: segment.id)
+                        }
+                        guard let dragBase else { return }
+                        let delta = Double(value.translation.width) * scale.secondsPerPoint
+                        switch edge {
+                        case .leading:
+                            model.updateMaskRange(
+                                id: segment.id,
+                                start: min(
+                                    dragBase.start + delta,
+                                    dragBase.end - RecordingMaskSegment.minimumDuration
+                                ),
+                                end: dragBase.end
+                            )
+                        case .trailing:
+                            model.updateMaskRange(
+                                id: segment.id,
+                                start: dragBase.start,
+                                end: max(
+                                    dragBase.start + RecordingMaskSegment.minimumDuration,
+                                    dragBase.end + delta
+                                )
+                            )
+                        }
+                    }
+                    .onEnded { _ in
+                        dragBase = nil
+                        model.endMaskRangeEdit(actionName: "Resize Mask")
                     }
             )
     }

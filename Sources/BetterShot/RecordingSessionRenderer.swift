@@ -150,7 +150,8 @@ enum RecordingSessionRenderer {
             clipTimeline: clipTimeline,
             exportSettings: document?.exportSettings ?? VideoCompressionSettings(),
             reframe: reframe,
-            fitContentAspect: fitContentAspect
+            fitContentAspect: fitContentAspect,
+            masks: document?.masks ?? []
         )
 
         let temporaryURL = try await RecordingStudioExporter().export(configuration) { progress in

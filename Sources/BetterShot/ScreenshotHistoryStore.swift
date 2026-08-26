@@ -495,12 +495,14 @@ final class ScreenshotHistoryStore {
         return rawURL
     }
 
-    func sourceCaptureURL(for historyURL: URL) -> URL? {
-        let standardized = historyURL.standardizedFileURL
-        guard let path = items.first(where: { $0.url.standardizedFileURL == standardized })?.sourceCapturePath else {
+    func editedHistoryURL(forCapturePaths capturePaths: [String]) -> URL? {
+        guard let item = items.first(where: { item in
+            guard item.hasEdits, let sourceCapturePath = item.sourceCapturePath else { return false }
+            return capturePaths.contains(sourceCapturePath)
+        }), FileManager.default.fileExists(atPath: item.url.path) else {
             return nil
         }
-        return URL(fileURLWithPath: path)
+        return item.url
     }
 
     func reload() {

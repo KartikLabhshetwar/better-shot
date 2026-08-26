@@ -158,6 +158,7 @@
 		CFE6DCC81F16975D9C5571D1 /* AnnotationBackgroundInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 061AE6D677E2E3AB437A6738 /* AnnotationBackgroundInspector.swift */; };
 		D1027BECFA02E786BF762444 /* ArrowTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674519179B33EE7750D1D543 /* ArrowTypes.swift */; };
 		D27CCDE7BAF033771F9277B4 /* ArrowShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 458342AE76A103B886AA98AC /* ArrowShared.swift */; };
+		D4228DF9AE3F84716EC8E673 /* RecordingVideoMask.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCA325987B11058BD383F07F /* RecordingVideoMask.swift */; };
 		D7BE3EA091A12262CC4E7894 /* R2CredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 679F127F74BFC991CCDCA27B /* R2CredentialStore.swift */; };
 		D8AE5ACE0841050A49E7B483 /* FailureAlert.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41B1FFF560349A356C312F34 /* FailureAlert.swift */; };
 		D925251B051AC2433DEE6D1E /* ShareManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 451695CAAFEDDEA2ECE3CEF7 /* ShareManifest.swift */; };
@@ -370,6 +371,7 @@
 		FA193D0606AD96AC7616D674 /* AnnotationBackgroundLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationBackgroundLayout.swift; sourceTree = "<group>"; };
 		FBB04739A2E2BF3D541F2161 /* AnnotationBackgroundPreviewViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationBackgroundPreviewViews.swift; sourceTree = "<group>"; };
 		FBB78D69A971DAF784B26C94 /* RecordingProjectsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingProjectsWindowController.swift; sourceTree = "<group>"; };
+		FCA325987B11058BD383F07F /* RecordingVideoMask.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingVideoMask.swift; sourceTree = "<group>"; };
 		FE35FD31C764306466AF2955 /* AnnotationBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationBackground.swift; sourceTree = "<group>"; };
 		FF44DA79DA0F8C173F4D8299 /* RecordingOverlayEffects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingOverlayEffects.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -582,6 +584,7 @@
 				4CCD4CBE6C2F68F14298572D /* RecordingTranscriptEditing.swift */,
 				CEC5745BD6B7DD30BD91DEA0 /* RecordingTranscription.swift */,
 				4AE2BD0DBF602443E0B82C3F /* RecordingVideoCrop.swift */,
+				FCA325987B11058BD383F07F /* RecordingVideoMask.swift */,
 				0DF213690A822844610DB6E0 /* RecordingViewportTimeline.swift */,
 				5D7E69E0EAA9CE007DACC8EE /* RecordingZoomFocusPad.swift */,
 				21453FFFE9FF2E1860B1BB7E /* ScreenRecordingManager.swift */,
@@ -893,6 +896,7 @@
 				ADDDE18D5DA47F866E3C15C2 /* RecordingTranscriptEditing.swift in Sources */,
 				B6A1C17303643E0C512127E3 /* RecordingTranscription.swift in Sources */,
 				BE39F4F3DB46B961EF75AD0F /* RecordingVideoCrop.swift in Sources */,
+				D4228DF9AE3F84716EC8E673 /* RecordingVideoMask.swift in Sources */,
 				77672549FF2EBFBAFD8DC199 /* RecordingViewportTimeline.swift in Sources */,
 				CAEEB8EC9C94B13B9CF30982 /* RecordingZoomFocusPad.swift in Sources */,
 				3933094B835D8EF2F5F1EABB /* RegionSelectionOverlay.swift in Sources */,

@@ -121,14 +121,6 @@ final class HistoryStore {
 
     // MARK: - Access
 
-    func record(forCaptureAt url: URL) -> CaptureRecord? {
-        records.first { matches($0, url) }
-    }
-
-    private func matches(_ record: CaptureRecord, _ url: URL) -> Bool {
-        urlForRecord(record) == url || displayURLForRecord(record) == url
-    }
-
     func urlForRecord(_ record: CaptureRecord) -> URL {
         if let sourcePath = record.sourcePath {
             return URL(fileURLWithPath: sourcePath)
@@ -137,6 +129,13 @@ final class HistoryStore {
     }
 
     func displayURLForRecord(_ record: CaptureRecord) -> URL {
+        var capturePaths = [urlForRecord(record).standardizedFileURL.path]
+        if let beautifiedPath = record.beautifiedPath {
+            capturePaths.append(URL(fileURLWithPath: beautifiedPath).standardizedFileURL.path)
+        }
+        if let editedURL = ScreenshotHistoryStore.shared.editedHistoryURL(forCapturePaths: capturePaths) {
+            return editedURL
+        }
         if let path = record.beautifiedPath {
             let url = URL(fileURLWithPath: path)
             if FileManager.default.fileExists(atPath: url.path) {

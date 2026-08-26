@@ -60,6 +60,7 @@ struct RecordingEditDocument: Codable, Equatable {
     /// Raw RecordingAudioFormat value for the audio-only export.
     var audioExportFormat: String?
     var crop: [Double]?
+    var masks: [RecordingMaskSegment]?
 
     private enum CodingKeys: String, CodingKey {
         case formatVersion
@@ -85,6 +86,7 @@ struct RecordingEditDocument: Codable, Equatable {
         case replacementAudioDisplayName
         case audioExportFormat
         case crop
+        case masks
     }
 
     init(
@@ -106,7 +108,8 @@ struct RecordingEditDocument: Codable, Equatable {
         replacementAudioFileName: String? = nil,
         replacementAudioDisplayName: String? = nil,
         audioExportFormat: RecordingAudioFormat? = nil,
-        crop: CGRect? = nil
+        crop: CGRect? = nil,
+        masks: [RecordingMaskSegment]? = nil
     ) {
         self.style = StoredRecordingStudioStyle(style)
         self.zoomEnabled = zoomEnabled
@@ -137,6 +140,9 @@ struct RecordingEditDocument: Codable, Equatable {
         self.audioExportFormat = audioExportFormat.map(\.rawValue)
         if let crop, !RecordingVideoCrop.isUnit(crop) {
             self.crop = [crop.minX, crop.minY, crop.width, crop.height].map(Double.init)
+        }
+        if let masks, !masks.isEmpty {
+            self.masks = masks
         }
     }
 
@@ -221,6 +227,7 @@ struct RecordingEditDocument: Codable, Equatable {
         )
         audioExportFormat = try container.decodeIfPresent(String.self, forKey: .audioExportFormat)
         crop = try container.decodeIfPresent([Double].self, forKey: .crop)
+        masks = try container.decodeIfPresent([RecordingMaskSegment].self, forKey: .masks)
     }
 
     func encode(to encoder: any Encoder) throws {
@@ -251,6 +258,7 @@ struct RecordingEditDocument: Codable, Equatable {
         )
         try container.encodeIfPresent(audioExportFormat, forKey: .audioExportFormat)
         try container.encodeIfPresent(crop, forKey: .crop)
+        try container.encodeIfPresent(masks, forKey: .masks)
     }
 }
 
