@@ -9,7 +9,7 @@ try! FileManager.default.createDirectory(at: historyDir, withIntermediateDirecto
 try! FileManager.default.createDirectory(at: rawDir, withIntermediateDirectories: true)
 defer { try? FileManager.default.removeItem(at: root) }
 
-@MainActor func isHistoryURL(_ url: URL) -> Bool {
+func isHistoryURL(_ url: URL) -> Bool {
     url.standardizedFileURL.path.hasPrefix(historyDir.standardizedFileURL.path)
 }
 
@@ -27,14 +27,14 @@ func editDocumentURL(for displayURL: URL) -> URL {
 
 var importedCount = 0
 
-@MainActor func importScreenshot(from sourceURL: URL) -> URL {
+func importScreenshot(from sourceURL: URL) -> URL {
     let destinationURL = historyDir.appendingPathComponent("Imported_\(importedCount).png")
     try! FileManager.default.copyItem(at: sourceURL, to: destinationURL)
     importedCount += 1
     return destinationURL
 }
 
-@MainActor func commitAnnotations(displayURL: URL, baseURL: URL, renderedURL: URL) -> URL {
+func commitAnnotations(displayURL: URL, baseURL: URL, renderedURL: URL) -> URL {
     let displayURL = isHistoryURL(displayURL) ? displayURL : importScreenshot(from: renderedURL)
     guard isHistoryURL(displayURL) else { return displayURL }
 

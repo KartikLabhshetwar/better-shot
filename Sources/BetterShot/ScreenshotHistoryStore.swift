@@ -25,6 +25,7 @@ struct ScreenshotHistoryItem: Identifiable, Codable, Equatable {
     /// Absolute path to the non-destructive recording package, when this video
     /// belongs to the new Studio workflow. Older video items remain bare files.
     var recordingSessionPath: String?
+    var sourceCapturePath: String?
 
     var recordingSession: RecordingSession? {
         guard let recordingSessionPath else { return nil }
@@ -60,6 +61,7 @@ struct ScreenshotHistoryItem: Identifiable, Codable, Equatable {
         cloudURL = try container.decodeIfPresent(String.self, forKey: .cloudURL)
         hasEdits = try container.decodeIfPresent(Bool.self, forKey: .hasEdits) ?? false
         recordingSessionPath = try container.decodeIfPresent(String.self, forKey: .recordingSessionPath)
+        sourceCapturePath = try container.decodeIfPresent(String.self, forKey: .sourceCapturePath)
     }
 
     init(
@@ -73,7 +75,8 @@ struct ScreenshotHistoryItem: Identifiable, Codable, Equatable {
         duration: Double? = nil,
         cloudURL: String? = nil,
         hasEdits: Bool = false,
-        recordingSessionPath: String? = nil
+        recordingSessionPath: String? = nil,
+        sourceCapturePath: String? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -86,6 +89,7 @@ struct ScreenshotHistoryItem: Identifiable, Codable, Equatable {
         self.cloudURL = cloudURL
         self.hasEdits = hasEdits
         self.recordingSessionPath = recordingSessionPath
+        self.sourceCapturePath = sourceCapturePath
     }
 }
 
@@ -153,7 +157,7 @@ final class ScreenshotHistoryStore {
     }
 
     @discardableResult
-    func importScreenshot(from sourceURL: URL) -> URL {
+    func importScreenshot(from sourceURL: URL, sourceCapturePath: String? = nil) -> URL {
         do {
             try FileManager.default.createDirectory(at: Self.historyDirectory, withIntermediateDirectories: true)
             let destinationURL = uniqueHistoryURL(for: sourceURL)
@@ -172,7 +176,8 @@ final class ScreenshotHistoryStore {
                 updatedAt: Date(),
                 fileName: destinationURL.lastPathComponent,
                 pixelWidth: Int(imageSize.width),
-                pixelHeight: Int(imageSize.height)
+                pixelHeight: Int(imageSize.height),
+                sourceCapturePath: sourceCapturePath
             )
             items.insert(item, at: 0)
             saveMetadata()
@@ -282,7 +287,9 @@ final class ScreenshotHistoryStore {
         renderedURL: URL,
         document: AnnotationDocument
     ) -> URL {
-        let displayURL = isHistoryURL(displayURL) ? displayURL : importScreenshot(from: renderedURL)
+        let displayURL = isHistoryURL(displayURL)
+            ? displayURL
+            : importScreenshot(from: renderedURL, sourceCapturePath: displayURL.standardizedFileURL.path)
         guard isHistoryURL(displayURL) else { return displayURL }
 
         do {
@@ -473,6 +480,27 @@ final class ScreenshotHistoryStore {
             return item.editorURL
         }
         return mediaURL
+    }
+
+    func annotationEditorURL(for url: URL) -> URL {
+        if hasEditDocument(for: url) { return url }
+        let rawURL = CaptureOrchestrator.resolveRawSource(for: url)
+        let candidatePaths = [rawURL.standardizedFileURL.path, url.standardizedFileURL.path]
+        if let item = items.first(where: { item in
+            guard let sourceCapturePath = item.sourceCapturePath else { return false }
+            return candidatePaths.contains(sourceCapturePath)
+        }), hasEditDocument(for: item.url) {
+            return item.url
+        }
+        return rawURL
+    }
+
+    func sourceCaptureURL(for historyURL: URL) -> URL? {
+        let standardized = historyURL.standardizedFileURL
+        guard let path = items.first(where: { $0.url.standardizedFileURL == standardized })?.sourceCapturePath else {
+            return nil
+        }
+        return URL(fileURLWithPath: path)
     }
 
     func reload() {

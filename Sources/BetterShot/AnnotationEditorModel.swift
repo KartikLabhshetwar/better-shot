@@ -28,6 +28,7 @@ final class AnnotationEditorModel {
     /// re-editing an existing document this is the preserved base image;
     /// otherwise it is the same as `sourceURL`.
     var baseImageURL: URL?
+    var externalSaveURL: URL?
     var previewImage: NSImage?
     /// The preview image's pixels, for the canvas's redaction passes to sample.
     @ObservationIgnored private(set) var previewCGImage: CGImage?
@@ -161,6 +162,9 @@ final class AnnotationEditorModel {
         applyAnnotationPreset()
         resetZoom()
         sourceURL = url
+        let captureURL = ScreenshotHistoryStore.shared.sourceCaptureURL(for: url) ?? url
+        externalSaveURL = (HistoryStore.shared.record(forCaptureAt: captureURL)?.beautifiedPath)
+            .map { URL(fileURLWithPath: $0) }
 
         let document = ScreenshotHistoryStore.shared.loadEditDocument(for: url)
         let candidateBaseURL = ScreenshotHistoryStore.baseImageURL(for: url)

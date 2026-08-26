@@ -564,6 +564,21 @@ struct AnnotationEditorWindow: View {
                 renderedURL: annotatedURL,
                 document: document
             )
+            if let externalURL = model.externalSaveURL,
+               FileManager.default.fileExists(atPath: externalURL.path) {
+                if externalURL.pathExtension.lowercased() == "png" {
+                    try FileManager.default.removeItem(at: externalURL)
+                    try FileManager.default.copyItem(at: annotatedURL, to: externalURL)
+                } else {
+                    try await AnnotationRenderer.renderInBackground(
+                        sourceURL: baseURL,
+                        shapes: shapes,
+                        backgroundSettings: backgroundSettings,
+                        destinationURL: externalURL,
+                        contentType: UTType(filenameExtension: externalURL.pathExtension) ?? .png
+                    )
+                }
+            }
             model.sourceURL = resultURL
             model.baseImageURL = ScreenshotHistoryStore.baseImageURL(for: resultURL)
         } else {

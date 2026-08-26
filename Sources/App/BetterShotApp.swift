@@ -11,6 +11,7 @@ struct BetterShotApp: App {
         Settings {
             PreferencesView()
         }
+        .defaultLaunchBehavior(.suppressed)
 
         WindowGroup("BetterShot Annotate", id: "ANNOTATION_EDITOR", for: URL.self) { value in
             AnnotationEditorWindow(url: value)
@@ -30,7 +31,7 @@ struct BetterShotApp: App {
     /// editors through these closures.
     private func configureEditorPresentation() {
         PreviewPanelPresenter.shared.onAnnotate = { [openWindow] url in
-            openWindow(id: "ANNOTATION_EDITOR", value: CaptureOrchestrator.resolveRawSource(for: url))
+            openWindow(id: "ANNOTATION_EDITOR", value: ScreenshotHistoryStore.shared.annotationEditorURL(for: url))
         }
         PreviewPanelPresenter.shared.onEditVideo = { [openWindow] url in
             openWindow(id: "VIDEO_EDITOR", value: ScreenshotHistoryStore.shared.editorURL(for: url))
