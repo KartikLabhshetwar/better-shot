@@ -169,7 +169,7 @@ final class AnnotationEditorModel {
         let document = ScreenshotHistoryStore.shared.loadEditDocument(for: url)
         let candidateBaseURL = ScreenshotHistoryStore.baseImageURL(for: url)
         let renderSourceURL: URL
-        if let document, !document.shapes.isEmpty,
+        if let document,
            FileManager.default.fileExists(atPath: candidateBaseURL.path) {
             renderSourceURL = candidateBaseURL
             backgroundSettings = document.backgroundSettings

@@ -63,6 +63,20 @@ assert(reopened == historyURL, "reopening an edited capture must open the histor
 let direct = annotationEditorURL(for: historyURL, beautifiedPath: nil, rawURL: rawURL)
 assert(direct == historyURL, "a history URL with a sidecar must open as-is, never remapped to its base")
 
+func loadRenderSource(displayURL: URL, hasDocument: Bool, baseURL: URL) -> URL {
+    if hasDocument, FileManager.default.fileExists(atPath: baseURL.path) {
+        return baseURL
+    }
+    return displayURL
+}
+
+let baseURL = historyDir.appendingPathComponent("BetterShot_1.base.png")
+write("base", to: baseURL)
+let backgroundOnlySource = loadRenderSource(displayURL: historyURL, hasDocument: true, baseURL: baseURL)
+assert(backgroundOnlySource == baseURL, "a background-only document must render from the base, not the baked composite")
+let freshSource = loadRenderSource(displayURL: historyURL, hasDocument: false, baseURL: baseURL)
+assert(freshSource == historyURL, "an image without a document must render as-is")
+
 try! FileManager.default.removeItem(at: historyURL.appendingPathExtension("bettershot"))
 let cleared = annotationEditorURL(for: desktopURL, beautifiedPath: desktopURL.path, rawURL: rawURL)
 assert(cleared == rawURL, "a stale mapping without a sidecar must fall back to the raw source")
