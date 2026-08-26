@@ -202,7 +202,11 @@ struct PreviewCardView: View {
         )
         Task.detached(priority: .userInitiated) {
             let image = HistoryStore.decodeThumbnail(source, maxSize: 260)
-            await MainActor.run { thumbnail = image }
+            // Two captures in quick succession race: the older decode can land last
+            // and paint the previous capture onto the current card.
+            await MainActor.run {
+                if overlay.currentURL == url { thumbnail = image }
+            }
         }
     }
 
