@@ -18,6 +18,8 @@ struct AnnotationEditorWindow: View {
     @State private var isInspectorPresented = true
     @State private var isSaving = false
     @State private var saveFlash = false
+    @State private var isCopying = false
+    @State private var copyFlash = false
     @State private var isUploading = false
     @State private var uploadItemID: UUID?
     @State private var closeGuard = EditorCloseGuard()
@@ -186,6 +188,22 @@ struct AnnotationEditorWindow: View {
             }
         }
 
+        Button(action: copyToClipboard) {
+            if isCopying {
+                ProgressView().controlSize(.small)
+            } else if copyFlash {
+                Label("Copied", systemImage: "checkmark.circle.fill")
+                    .labelStyle(.titleAndIcon)
+                    .foregroundStyle(.green)
+            } else {
+                Label("Copy", systemImage: "doc.on.doc")
+                    .labelStyle(.titleAndIcon)
+            }
+        }
+        .keyboardShortcut("c", modifiers: [.command, .shift])
+        .disabled(model.previewImage == nil || model.imageSize == .zero || isCopying)
+        .help("Copy the finished image to the clipboard (⇧⌘C)")
+
         Button(action: exportImage) {
             Label("Export", systemImage: "arrow.down.circle")
                 .labelStyle(.titleAndIcon)
@@ -329,6 +347,42 @@ struct AnnotationEditorWindow: View {
     private func closeAfterLoadFailure() {
         model.releaseEditorResources()
         dismissWindow()
+    }
+
+    /// The clipboard route out of the editor: renders the current edits and hands
+    /// them straight to the pasteboard, so a screenshot meant for a chat message
+    /// costs no save panel and leaves no file to hunt down afterwards.
+    private func copyToClipboard() {
+        clearInspectorFocus()
+        guard let sourceURL = model.sourceURL, !isCopying else { return }
+        let baseURL = model.baseImageURL ?? sourceURL
+
+        isCopying = true
+        Task {
+            defer { isCopying = false }
+            do {
+                let renderedURL = try await AnnotationRenderer.renderToTemporaryFileInBackground(
+                    sourceURL: baseURL,
+                    shapes: model.shapes,
+                    backgroundSettings: model.backgroundSettings
+                )
+                // The render stays on disk: copyPNGToClipboard offers it as a file
+                // reference too, which is what lets terminals and Slack paste it,
+                // and that flavor is only good for as long as the file is.
+                try ScreenshotFileActions.copyPNGToClipboard(from: renderedURL)
+                flashCopyConfirmation()
+            } catch {
+                model.errorMessage = "Failed to copy annotation: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func flashCopyConfirmation() {
+        withAnimation(.snappy(duration: 0.2)) { copyFlash = true }
+        Task {
+            try? await Task.sleep(for: .milliseconds(1400))
+            withAnimation(.snappy(duration: 0.2)) { copyFlash = false }
+        }
     }
 
     private func exportImage() {
