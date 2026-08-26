@@ -1,5 +1,4 @@
 import AppKit
-import AVFoundation
 import SwiftUI
 
 /// Shows a floating preview card after capture. Uses a borderless NSPanel.
@@ -119,7 +118,12 @@ struct PreviewCardView: View {
     private let cardSize = CGSize(width: 130, height: 98)
 
     private var isVideo: Bool {
-        guard let ext = overlay.currentURL?.pathExtension.lowercased() else { return false }
+        guard let url = overlay.currentURL else { return false }
+        return Self.isVideo(url)
+    }
+
+    private static func isVideo(_ url: URL) -> Bool {
+        let ext = url.pathExtension.lowercased()
         return ext == "mov" || ext == "mp4"
     }
 
@@ -141,7 +145,7 @@ struct PreviewCardView: View {
                     }
 
                     if isHovered {
-                        hoverOverlay(image: image)
+                        hoverOverlay()
                             .transition(.opacity.animation(.easeInOut(duration: 0.15)))
                     }
                 }
@@ -188,26 +192,22 @@ struct PreviewCardView: View {
             return
         }
 
-        let ext = url.pathExtension.lowercased()
-        if ext == "mov" || ext == "mp4" {
-            Task.detached {
-                let asset = AVURLAsset(url: url)
-                let generator = AVAssetImageGenerator(asset: asset)
-                generator.appliesPreferredTrackTransform = true
-                generator.maximumSize = CGSize(width: 260, height: 196)
-                if let result = try? await generator.image(at: .zero) {
-                    let cgImage = result.image
-                    let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-                    await MainActor.run { thumbnail = nsImage }
-                }
-            }
-        } else {
-            thumbnail = NSImage(contentsOf: url)
+        // Both kinds go through the history store's decoder: it samples a bounded
+        // thumbnail rather than the full bitmap, and it is nonisolated, so the
+        // decode runs off the main actor instead of on the tick that just
+        // finished rendering the capture.
+        let source = HistoryStore.ThumbnailSource(
+            url: url,
+            kind: Self.isVideo(url) ? .recording : .screenshot
+        )
+        Task.detached(priority: .userInitiated) {
+            let image = HistoryStore.decodeThumbnail(source, maxSize: 260)
+            await MainActor.run { thumbnail = image }
         }
     }
 
     @ViewBuilder
-    private func hoverOverlay(image: NSImage) -> some View {
+    private func hoverOverlay() -> some View {
         ZStack {
             Color.black.opacity(0.45)
                 .contentShape(Rectangle())
@@ -260,9 +260,14 @@ struct PreviewCardView: View {
             // Center pill actions
             HStack(spacing: 6) {
                 pillButton("Copy") {
-                    let pb = NSPasteboard.general
-                    pb.clearContents()
-                    pb.writeObjects([image])
+                    // Copy the capture itself, not the card's thumbnail.
+                    if let url = overlay.currentURL {
+                        if isVideo {
+                            try? VideoFileActions.copyToClipboard(from: url)
+                        } else {
+                            try? ScreenshotFileActions.copyImageToClipboard(from: url)
+                        }
+                    }
                     overlay.dismiss()
                 }
                 pillButton("Save") {
