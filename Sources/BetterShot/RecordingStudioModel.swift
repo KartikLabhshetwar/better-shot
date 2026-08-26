@@ -250,7 +250,6 @@ final class RecordingStudioModel {
 
         if let session {
             manifest = session.loadCaptureManifest()
-            pointerCapture = session.loadPointerCapture() ?? PointerCaptureFile()
         }
 
         let asset = AVURLAsset(url: screenURL)
@@ -272,18 +271,22 @@ final class RecordingStudioModel {
             return
         }
 
-        if session != nil {
+        if let session {
             let pointScale = max(manifest?.pixelScale ?? 1, 1)
-            let stream = PointerStreamSanitizer.sanitize(
-                pointerCapture,
-                options: PointerSanitizeOptions(
-                    recordingSizeInPoints: CGSize(
-                        width: videoSize.width / CGFloat(pointScale),
-                        height: videoSize.height / CGFloat(pointScale)
-                    )
-                )
+            let recordingSize = CGSize(
+                width: videoSize.width / CGFloat(pointScale),
+                height: videoSize.height / CGFloat(pointScale)
             )
-            pointerCapture = stream.sanitizedCapture
+            // The recorder writes one sample per 60 Hz tick with no thinning, so the
+            // sidecar of a long recording is megabytes of JSON and the thinning pass
+            // walks every sample. Both are pure work over Sendable values, so they
+            // run off the main actor rather than in front of the opening window.
+            pointerCapture = await Task.detached(priority: .userInitiated) {
+                PointerStreamSanitizer.sanitize(
+                    session.loadPointerCapture() ?? PointerCaptureFile(),
+                    options: PointerSanitizeOptions(recordingSizeInPoints: recordingSize)
+                ).sanitizedCapture
+            }.value
             recordedPressTimes = pointerCapture.presses
                 .filter { $0.phase == .down }
                 .map(\.time)
