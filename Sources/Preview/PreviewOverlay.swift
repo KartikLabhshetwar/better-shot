@@ -265,14 +265,27 @@ struct PreviewCardView: View {
             HStack(spacing: 6) {
                 pillButton("Copy") {
                     // Copy the capture itself, not the card's thumbnail.
-                    if let url = overlay.currentURL {
-                        if isVideo {
-                            try? VideoFileActions.copyToClipboard(from: url)
-                        } else {
-                            try? ScreenshotFileActions.copyImageToClipboard(from: url)
-                        }
+                    guard let url = overlay.currentURL else {
+                        overlay.dismiss()
+                        return
                     }
-                    overlay.dismiss()
+                    do {
+                        if Self.isVideo(url) {
+                            try VideoFileActions.copyToClipboard(from: url)
+                        } else {
+                            try ScreenshotFileActions.copyImageToClipboard(from: url)
+                        }
+                        overlay.dismiss()
+                    } catch {
+                        // Reading the file can fail if the capture moved or was deleted
+                        // between the shot and the click. The card stays up so the copy
+                        // can be retried, or the capture dragged out instead.
+                        ToastWindow.shared.show(
+                            title: "Copy Failed",
+                            message: error.localizedDescription,
+                            systemIcon: "exclamationmark.triangle"
+                        )
+                    }
                 }
                 pillButton("Save") {
                     overlay.dismiss()
