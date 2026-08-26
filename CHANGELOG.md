@@ -15,7 +15,7 @@ community fixes bring back Copy and the space key.
 ### Added
 
 - **Crop video in the Recording Studio**: The video editor now has the same crop the image editor has. Enter crop from the toolbar, drag the box or any handle, and the recording is cropped non-destructively: the full frame stays in the project, so the crop can be adjusted or cleared later, and Cmd Z steps it back. The preview and the export run one shared geometry, auto-zoom anchors are remapped into the cropped frame so zoom and crop now compose instead of zoom overriding the crop, and export sizes round to even pixels so every encoder accepts them
-- **Timeline minimap**: A slim strip under the timeline draws the whole recording with the visible window as a draggable chip and a tick for the playhead, so a zoomed-in timeline never loses its place
+- **Timeline minimap**: Once the timeline is zoomed in, a slim strip under it draws the whole recording with the visible window as a draggable chip and a tick for the playhead, so a zoomed-in timeline never loses its place. At fitted zoom it stays out of the way
 - **The timeline pans itself mid-drag**: Dragging a trim handle or scrubbing past the visible edge scrolls the timeline in that direction, faster the further you overshoot, instead of pinning the drag to the edge
 - **Split snapping**: The split line snaps to the playhead when the pointer comes within a few pixels of it and refuses to cut right on top of an existing clip boundary, so accidental sliver clips are gone; hold Option to cut exactly where the pointer is. `S` splits at the pointer, `C` splits at the pointer or, with nothing hovered, at the playhead, and the right-click Split item disables itself where a cut is not possible
 - **The Copy button is back**: The 0.4.0 toolbar rebuild dropped Copy from the image editor, so an annotated screenshot could only leave through a save panel. It returns beside Export on its old shortcut, and the pasteboard now carries the file, the image and TIFF together, so the paste lands in a terminal as well as in Gmail ([#111](https://github.com/KartikLabhshetwar/better-shot/pull/111), thanks [@zergzorg](https://github.com/zergzorg))
@@ -24,6 +24,7 @@ community fixes bring back Copy and the space key.
 ### Changed
 
 - **A clover on the icon**: The owl lasted one release. The app icon, the menu bar glyph and the website now carry a new clover logo
+- **White clip selection**: The selected clip's outline in the timeline is white instead of yellow, so selection reads as chrome rather than a warning
 - **One card for every transfer**: Rendering, uploading, exporting and a failure with retry all report through the same floating status card, replacing the separate share link panel, so a share and an export look and behave the same
 - **The playhead pins instead of vanishing**: Scrolling a zoomed timeline away from the current frame keeps the playhead at the near edge, dimmed, so you always know which side the frame is on
 - **Timeline edges read as edges**: Content scrolled out of view fades out at the sides instead of hitting a hard clip, and a clip edge under the pointer shows its trim handle before you grab it

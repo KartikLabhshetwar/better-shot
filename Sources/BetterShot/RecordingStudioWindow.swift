@@ -1574,11 +1574,13 @@ private struct StudioTimelineMinimap: View {
                 ? CGFloat(min(max(playheadTime / scale.duration, 0), 1)) * width
                 : 0
 
-            ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(Color.primary.opacity(0.05))
+            // At fitted zoom the minimap mirrors the lanes 1:1, so all it
+            // would add is a second playhead tick floating under the real one.
+            if scale.isScrollable {
+                ZStack(alignment: .topLeading) {
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(Color.primary.opacity(0.05))
 
-                if scale.isScrollable {
                     RoundedRectangle(cornerRadius: 5, style: .continuous)
                         .fill(Color.primary.opacity(0.12))
                         .overlay {
@@ -1587,34 +1589,33 @@ private struct StudioTimelineMinimap: View {
                         }
                         .frame(width: chipWidth)
                         .offset(x: chipX)
-                }
 
-                Rectangle()
-                    .fill(Color.accentColor.opacity(0.85))
-                    .frame(width: 1.5)
-                    .offset(x: playheadX - 0.75)
-            }
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        guard scale.isScrollable else { return }
-                        let offset: CGFloat
-                        if let grabOffset {
-                            offset = grabOffset
-                        } else {
-                            let startedInChip = value.startLocation.x >= chipX
-                                && value.startLocation.x <= chipX + chipWidth
-                            offset = startedInChip
-                                ? value.startLocation.x - chipX
-                                : chipWidth / 2
-                            grabOffset = offset
+                    Rectangle()
+                        .fill(Color.accentColor.opacity(0.85))
+                        .frame(width: 1.5)
+                        .offset(x: playheadX - 0.75)
+                }
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            let offset: CGFloat
+                            if let grabOffset {
+                                offset = grabOffset
+                            } else {
+                                let startedInChip = value.startLocation.x >= chipX
+                                    && value.startLocation.x <= chipX + chipWidth
+                                offset = startedInChip
+                                    ? value.startLocation.x - chipX
+                                    : chipWidth / 2
+                                grabOffset = offset
+                            }
+                            let targetChipX = min(max(value.location.x - offset, 0), maxChipX)
+                            onScroll(targetChipX / max(maxChipX, 1) * scrollableWidth)
                         }
-                        let targetChipX = min(max(value.location.x - offset, 0), maxChipX)
-                        onScroll(targetChipX / max(maxChipX, 1) * scrollableWidth)
-                    }
-                    .onEnded { _ in grabOffset = nil }
-            )
+                        .onEnded { _ in grabOffset = nil }
+                )
+            }
         }
         .frame(height: StudioTimelineMetrics.minimapHeight)
     }
@@ -1713,11 +1714,16 @@ private struct StudioTimelinePlayhead: View {
             let isClamped = x != rawX
 
             ZStack(alignment: .topLeading) {
+                // Stop at the bottom of the zoom lane; the trailing row
+                // spacing and scroller gutter are empty space, and a line
+                // ending mid-air there reads as a stray second playhead.
+                let tail = StudioTimelineMetrics.rowSpacing
+                    + StudioTimelineMetrics.scrollerGutter
                 Rectangle()
                     .fill(Color.accentColor)
                     .frame(
                         width: Metrics.lineWidth,
-                        height: max(0, proxy.size.height - Metrics.crownHeight + 2)
+                        height: max(0, proxy.size.height - tail - Metrics.crownHeight + 2)
                     )
                     .offset(x: x - Metrics.lineWidth / 2, y: Metrics.crownHeight - 2)
                     .allowsHitTesting(false)

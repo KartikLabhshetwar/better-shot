@@ -839,7 +839,7 @@ final class RecordingClipTimelineControl: NSView {
     }
 
     private var selectionColor: NSColor {
-        NSColor(srgbRed: 1, green: 212.0 / 255.0, blue: 0, alpha: 1)
+        .white
     }
 
     private func clipRadius(for rect: CGRect) -> CGFloat {
