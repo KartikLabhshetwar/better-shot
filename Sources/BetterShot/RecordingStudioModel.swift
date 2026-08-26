@@ -128,6 +128,10 @@ final class RecordingStudioModel {
             rebuildPreviewReframe()
         }
     }
+    private(set) var cropRect = RecordingVideoCrop.unit
+    private(set) var isCroppingVideo = false
+    var cropDraft = RecordingVideoCrop.unit
+    var cropAspect: CropAspectRatio = .freeform
     /// The preview's copy of the reframe camera, kept current with every
     /// edit that would change the exported crop.
     private(set) var previewReframe: ReframeTrack?
@@ -421,6 +425,7 @@ final class RecordingStudioModel {
         exportAspect = document.exportAspectPreset
         exportAspectMode = document.exportAspectContentMode
         audioExportFormat = document.audioExportFormatValue
+        cropRect = document.cropValue
     }
 
     func teardown() {
@@ -573,12 +578,12 @@ final class RecordingStudioModel {
 
     var canUndo: Bool {
         _ = undoRevision
-        return editUndoManager.canUndo
+        return !isCroppingVideo && editUndoManager.canUndo
     }
 
     var canRedo: Bool {
         _ = undoRevision
-        return editUndoManager.canRedo
+        return !isCroppingVideo && editUndoManager.canRedo
     }
 
     var selectedClip: RecordingClipSegment? {
@@ -607,14 +612,14 @@ final class RecordingStudioModel {
     }
 
     func undo() {
-        guard editUndoManager.canUndo else { return }
+        guard !isCroppingVideo, editUndoManager.canUndo else { return }
         pause()
         editUndoManager.undo()
         undoRevision &+= 1
     }
 
     func redo() {
-        guard editUndoManager.canRedo else { return }
+        guard !isCroppingVideo, editUndoManager.canRedo else { return }
         pause()
         editUndoManager.redo()
         undoRevision &+= 1
@@ -1101,7 +1106,8 @@ final class RecordingStudioModel {
             exportAspectMode: exportAspectMode,
             replacementAudioFileName: replacementAudio?.url.lastPathComponent,
             replacementAudioDisplayName: replacementAudio?.displayName,
-            audioExportFormat: audioExportFormat
+            audioExportFormat: audioExportFormat,
+            crop: RecordingVideoCrop.isUnit(cropRect) ? nil : cropRect
         )
     }
 
@@ -1582,17 +1588,18 @@ final class RecordingStudioModel {
     // MARK: - Export
 
     private func makeExportConfiguration() -> RecordingStudioExporter.Configuration {
-        let reframe = makeReframeTrack()
+        let reframe = makeReframeTrack(crop: cropRect)
+        let exportVideoSize = croppedVideoSize
         let fitContentAspect: CGFloat? =
-            exportAspect != .original && exportAspectMode == .fit && videoSize.height > 0
-                ? videoSize.width / videoSize.height
+            exportAspect != .original && exportAspectMode == .fit && exportVideoSize.height > 0
+                ? exportVideoSize.width / exportVideoSize.height
                 : nil
         return RecordingStudioExporter.Configuration(
             screenURL: screenURL,
             cameraURL: hasCameraVideo && style.camera.isVisible ? session?.cameraURL : nil,
             cameraOffset: cameraOffset,
             style: style,
-            viewportTimeline: zoomEnabled ? viewportTimeline : .identity,
+            viewportTimeline: (zoomEnabled ? viewportTimeline : .identity).cropped(to: cropRect),
             pointerTimeline: pointerIsSynthesized ? pointerTimeline : nil,
             showsPressEffects: showsPressEffects,
             keystrokeTimeline: showsKeystrokes && hasKeystrokes ? keystrokeTimeline : nil,
@@ -1603,30 +1610,36 @@ final class RecordingStudioModel {
                 ? karaokeTimeline
                 : nil,
             canvasSize: exportAspect == .original
-                ? videoSize
-                : exportAspect.canvasSize(for: videoSize),
+                ? exportVideoSize
+                : exportAspect.canvasSize(for: exportVideoSize),
             clipTimeline: clipTimeline,
             exportSettings: exportSettings,
             audioReplacementURL: replacementAudio?.url,
             reframe: reframe,
-            fitContentAspect: fitContentAspect
+            fitContentAspect: fitContentAspect,
+            crop: cropRect
         )
     }
 
     /// The crop-and-follow camera for non-original aspect exports. Focus
     /// comes from the recorded pointer whenever the session captured one,
     /// whether or not the cursor is drawn synthetically.
-    private func makeReframeTrack() -> ReframeTrack? {
+    private func makeReframeTrack(crop: CGRect) -> ReframeTrack? {
         guard exportAspect != .original, exportAspectMode == .fill else { return nil }
         let focusTimeline = reframeFocusPointer()
-        let effectiveViewport = zoomEnabled ? viewportTimeline : .identity
+        let effectiveViewport = (zoomEnabled ? viewportTimeline : .identity).cropped(to: crop)
         return ReframeTrack.build(
             preset: exportAspect,
-            sourceSize: videoSize,
+            sourceSize: RecordingVideoCrop.croppedSize(videoSize, crop: crop),
             viewportTimeline: effectiveViewport,
             duration: duration
         ) { editorTime in
-            focusTimeline?.location(at: editorTime)
+            guard let location = focusTimeline?.location(at: editorTime) else { return nil }
+            let remapped = RecordingVideoCrop.point(location, in: crop)
+            return CGPoint(
+                x: min(max(remapped.x, 0), 1),
+                y: min(max(remapped.y, 0), 1)
+            )
         }
     }
 
@@ -1650,7 +1663,109 @@ final class RecordingStudioModel {
 
     private func rebuildPreviewReframe() {
         guard isLoaded else { return }
-        previewReframe = makeReframeTrack()
+        previewReframe = makeReframeTrack(crop: effectivePreviewCrop)
+    }
+
+    // MARK: - Video crop
+
+    var hasVideoCrop: Bool {
+        !RecordingVideoCrop.isUnit(cropRect)
+    }
+
+    var effectivePreviewCrop: CGRect {
+        isCroppingVideo ? RecordingVideoCrop.unit : cropRect
+    }
+
+    var croppedVideoSize: CGSize {
+        RecordingVideoCrop.croppedSize(videoSize, crop: cropRect)
+    }
+
+    private var previewVideoSize: CGSize {
+        RecordingVideoCrop.croppedSize(videoSize, crop: effectivePreviewCrop)
+    }
+
+    func beginVideoCrop() {
+        guard isLoaded, !isCroppingVideo else { return }
+        pause()
+        cropDraft = cropRect
+        cropAspect = .freeform
+        isCroppingVideo = true
+        rebuildPreviewReframe()
+    }
+
+    func cancelVideoCrop() {
+        guard isCroppingVideo else { return }
+        isCroppingVideo = false
+        rebuildPreviewReframe()
+    }
+
+    func applyVideoCrop() {
+        guard isCroppingVideo else { return }
+        isCroppingVideo = false
+        setVideoCrop(cropDraft, actionName: "Crop Video")
+        rebuildPreviewReframe()
+    }
+
+    func resetVideoCropDraft() {
+        guard isCroppingVideo else { return }
+        cropDraft = RecordingVideoCrop.unit
+        if let ratio = cropAspect.normalizedRatio(imageSize: videoSize) {
+            cropDraft = CropRectEditor.applyAspect(to: cropDraft, aspect: ratio)
+        }
+    }
+
+    func setVideoCropAspect(_ aspect: CropAspectRatio) {
+        guard isCroppingVideo else { return }
+        cropAspect = aspect
+        if let ratio = aspect.normalizedRatio(imageSize: videoSize) {
+            cropDraft = CropRectEditor.applyAspect(to: cropDraft, aspect: ratio)
+        }
+    }
+
+    func updateVideoCropDraft(handle: CropHandle, toNormalized point: CGPoint) {
+        guard isCroppingVideo else { return }
+        let aspect = handle.isCorner ? cropAspect.normalizedRatio(imageSize: videoSize) : nil
+        cropDraft = CropRectEditor.resize(
+            cropDraft,
+            handle: handle,
+            to: point,
+            aspect: aspect,
+            minWidth: minimumVideoCropWidth,
+            minHeight: minimumVideoCropHeight,
+            fromCenter: isCropCenterResizeModifierPressed
+        )
+    }
+
+    func moveVideoCropDraft(from start: CGRect, byNormalized delta: CGSize) {
+        guard isCroppingVideo else { return }
+        cropDraft = CropRectEditor.move(start, by: delta)
+    }
+
+    private var isCropCenterResizeModifierPressed: Bool {
+        let flags = NSEvent.modifierFlags
+        return flags.contains(.option) || (flags.contains(.command) && flags.contains(.shift))
+    }
+
+    private var minimumVideoCropWidth: CGFloat {
+        guard videoSize.width > 0 else { return 0.05 }
+        return min(0.5, max(RecordingVideoCrop.minimumSpan, 24 / videoSize.width))
+    }
+
+    private var minimumVideoCropHeight: CGFloat {
+        guard videoSize.height > 0 else { return 0.05 }
+        return min(0.5, max(RecordingVideoCrop.minimumSpan, 24 / videoSize.height))
+    }
+
+    private func setVideoCrop(_ rect: CGRect, actionName: String) {
+        let next = RecordingVideoCrop.sanitized(rect)
+        guard next != cropRect else { return }
+        let previous = cropRect
+        registerUndo(actionName) { target in
+            target.setVideoCrop(previous, actionName: actionName)
+        }
+        cropRect = next
+        rebuildPreviewReframe()
+        scheduleProjectSave()
     }
 
     // MARK: - Preview canvas
@@ -1658,14 +1773,14 @@ final class RecordingStudioModel {
     /// What the Studio canvas shows: the target-aspect canvas when a
     /// non-original aspect is selected, the source canvas otherwise.
     var previewCanvasSize: CGSize {
-        exportAspect == .original ? videoSize : exportAspect.canvasSize(for: videoSize)
+        exportAspect == .original ? previewVideoSize : exportAspect.canvasSize(for: previewVideoSize)
     }
 
     /// Source aspect for laying out the card on a target-aspect canvas;
     /// nil in the original-aspect layout where card and content agree.
     var previewContentAspect: CGFloat? {
-        guard exportAspect != .original, videoSize.height > 0 else { return nil }
-        return videoSize.width / videoSize.height
+        guard exportAspect != .original, previewVideoSize.height > 0 else { return nil }
+        return previewVideoSize.width / previewVideoSize.height
     }
 
     /// How the content occupies the card on a target-aspect canvas.
@@ -1677,7 +1792,20 @@ final class RecordingStudioModel {
     /// zoom viewport otherwise (including Fit mode, where zooms play
     /// inside the fitted card).
     func previewViewportFrame(at time: TimeInterval) -> ViewportFrame {
-        previewReframe?.frame(at: time) ?? viewportFrame(at: time)
+        guard !isCroppingVideo else { return .identity }
+        return previewReframe?.frame(at: time) ?? viewportFrame(at: time).cropped(to: cropRect)
+    }
+
+    func previewPointerFrame(at time: TimeInterval) -> PointerFrame? {
+        guard var frame = pointerFrame(at: time) else { return nil }
+        let crop = effectivePreviewCrop
+        guard !RecordingVideoCrop.isUnit(crop) else { return frame }
+        frame.location = RecordingVideoCrop.point(frame.location, in: crop)
+        if var press = frame.press {
+            press.location = RecordingVideoCrop.point(press.location, in: crop)
+            frame.press = press
+        }
+        return frame
     }
 
     /// The flattened deliverable when it provably matches the current

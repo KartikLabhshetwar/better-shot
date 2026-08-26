@@ -61,6 +61,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         /// the background fills the rest. Mutually exclusive with
         /// `reframe`.
         let fitContentAspect: CGFloat?
+        let crop: CGRect
 
         init(
             screenURL: URL,
@@ -80,7 +81,8 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             exportSettings: VideoCompressionSettings,
             audioReplacementURL: URL? = nil,
             reframe: ReframeTrack? = nil,
-            fitContentAspect: CGFloat? = nil
+            fitContentAspect: CGFloat? = nil,
+            crop: CGRect = RecordingVideoCrop.unit
         ) {
             self.screenURL = screenURL
             self.cameraURL = cameraURL
@@ -100,6 +102,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             self.audioReplacementURL = audioReplacementURL
             self.reframe = reframe
             self.fitContentAspect = fitContentAspect
+            self.crop = crop
         }
     }
 
@@ -305,7 +308,8 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             includeBubble: cameraFeed != nil,
             outputFrameInterval: 1 / Self.outputFrameRate,
             reframe: configuration.reframe,
-            fitContentAspect: configuration.fitContentAspect
+            fitContentAspect: configuration.fitContentAspect,
+            crop: configuration.crop
         )
 
         let screenAudioOutput = audioOutput
@@ -587,6 +591,7 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
     private let subtitleStyle: SubtitleBarStyle
     private let karaokeTimeline: KaraokeTimeline?
     private let reframe: ReframeTrack?
+    private let crop: CGRect
     private var artworkImageCache: [String: CGImage] = [:]
     private let pointerScale: CGFloat
     private let colorSpace: CGColorSpace
@@ -611,7 +616,8 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
         includeBubble: Bool,
         outputFrameInterval: TimeInterval = 1.0 / 60.0,
         reframe: ReframeTrack? = nil,
-        fitContentAspect: CGFloat? = nil
+        fitContentAspect: CGFloat? = nil,
+        crop: CGRect = RecordingVideoCrop.unit
     ) {
         self.canvasSize = canvasSize
         self.layout = RecordingStudioLayout.make(
@@ -630,6 +636,7 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
         self.subtitleStyle = subtitleStyle
         self.karaokeTimeline = karaokeTimeline
         self.reframe = reframe
+        self.crop = crop
         self.outputFrameInterval = outputFrameInterval
         self.pointerScale = style.cursorScale
         self.colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
@@ -645,6 +652,13 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
     /// when exporting into a different aspect, the zoom viewport otherwise.
     private func viewportFrame(at editorTime: TimeInterval) -> ViewportFrame {
         reframe?.frame(at: editorTime) ?? viewportTimeline.frame(at: editorTime)
+    }
+
+    private func contentRect(at editorTime: TimeInterval) -> CGRect {
+        RecordingVideoCrop.expandedRect(
+            layout.frameRect(for: viewportFrame(at: editorTime)),
+            crop: crop
+        )
     }
 
     func render(
@@ -694,7 +708,7 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
             for sample in 0..<sampleCount {
                 let sampleTime = editorTime - shutter / 2
                     + shutter * (Double(sample) + 0.5) / Double(sampleCount)
-                let drawRect = layout.frameRect(for: viewportFrame(at: sampleTime))
+                let drawRect = contentRect(at: sampleTime)
                 // Drawing sample i at alpha 1/(i+1) keeps the buffer equal to
                 // the running average of all samples so far.
                 context.setAlpha(1 / CGFloat(sample + 1))
@@ -767,8 +781,8 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
     /// still, up to twenty-four when it sweeps, spaced so consecutive samples
     /// land roughly two output pixels apart.
     private func blurSampleCount(at editorTime: TimeInterval, shutter: TimeInterval) -> Int {
-        let a = layout.frameRect(for: viewportFrame(at: editorTime - shutter / 2))
-        let b = layout.frameRect(for: viewportFrame(at: editorTime + shutter / 2))
+        let a = contentRect(at: editorTime - shutter / 2)
+        let b = contentRect(at: editorTime + shutter / 2)
         let displacement = max(
             max(abs(a.minX - b.minX), abs(a.minY - b.minY)),
             max(abs(a.maxX - b.maxX), abs(a.maxY - b.maxY))
@@ -783,7 +797,7 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
             return
         }
 
-        let drawRect = layout.frameRect(for: viewportFrame(at: editorTime))
+        let drawRect = contentRect(at: editorTime)
         let tip = CGPoint(
             x: drawRect.minX + pointer.location.x * drawRect.width,
             y: canvasSize.height - (drawRect.minY + pointer.location.y * drawRect.height)

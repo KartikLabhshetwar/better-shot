@@ -180,6 +180,10 @@ final class RecordingClipTimelineControl: NSView {
         /// Scroll distance that equals one doubling of the timeline scale
         /// under ⌘-scroll.
         static let zoomScrollPointsPerDoubling: CGFloat = 220
+        static let splitSnapRadius: CGFloat = 7
+        static let splitBoundaryEpsilon: TimeInterval = 0.05
+        static let autoPanGain: CGFloat = 0.2
+        static let autoPanMaxStep: CGFloat = 12
     }
 
     private var timeline = RecordingClipTimeline(segments: [])
@@ -199,6 +203,8 @@ final class RecordingClipTimelineControl: NSView {
     private var contextTime: TimeInterval?
     private var contextClipID: UUID?
     private var lastHoverCallbackTimestamp: TimeInterval = 0
+    private var autoPanTimer: Timer?
+    private var lastDragWindowPoint: CGPoint?
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
@@ -260,6 +266,7 @@ final class RecordingClipTimelineControl: NSView {
         drawSelectionChrome()
         drawClips(in: dirtyRect)
         drawSelectionGrooves()
+        drawHoverEdgeHandle()
         drawHoverSkimmer()
     }
 
@@ -315,9 +322,19 @@ final class RecordingClipTimelineControl: NSView {
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard let dragTarget else { return }
+        guard dragTarget != nil else { return }
+        lastDragWindowPoint = event.locationInWindow
         let point = convert(event.locationInWindow, from: nil)
+        applyDrag(at: point)
+        if autoPanOvershoot(forX: point.x) != 0 {
+            startAutoPan()
+        } else {
+            stopAutoPan()
+        }
+    }
 
+    private func applyDrag(at point: CGPoint) {
+        guard let dragTarget else { return }
         switch dragTarget {
         case .scrub:
             let time = editorTime(forX: point.x)
@@ -329,7 +346,57 @@ final class RecordingClipTimelineControl: NSView {
         needsDisplay = true
     }
 
+    /// While a drag sits past the visible edge of the enclosing scroll view,
+    /// the lane pans itself toward the pointer so trims and scrubs can reach
+    /// content that is currently off screen.
+    private func autoPanOvershoot(forX x: CGFloat) -> CGFloat {
+        let visible = visibleRect
+        guard visible.width > 0, visible.width < bounds.width - 0.5 else { return 0 }
+        if x < visible.minX { return x - visible.minX }
+        if x > visible.maxX { return x - visible.maxX }
+        return 0
+    }
+
+    private func startAutoPan() {
+        guard autoPanTimer == nil else { return }
+        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.autoPanTick()
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        autoPanTimer = timer
+    }
+
+    private func stopAutoPan() {
+        autoPanTimer?.invalidate()
+        autoPanTimer = nil
+    }
+
+    private func autoPanTick() {
+        guard dragTarget != nil, let windowPoint = lastDragWindowPoint else {
+            stopAutoPan()
+            return
+        }
+        let overshoot = autoPanOvershoot(forX: convert(windowPoint, from: nil).x)
+        guard overshoot != 0 else { return }
+        let step = min(abs(overshoot) * Metrics.autoPanGain, Metrics.autoPanMaxStep)
+        scrollVisibleRegion(byX: overshoot > 0 ? step : -step)
+        applyDrag(at: convert(windowPoint, from: nil))
+    }
+
+    private func scrollVisibleRegion(byX delta: CGFloat) {
+        guard let scrollView = enclosingScrollView else { return }
+        let clip = scrollView.contentView
+        var origin = clip.bounds.origin
+        origin.x = min(max(origin.x + delta, 0), max(0, bounds.width - clip.bounds.width))
+        clip.scroll(to: origin)
+        scrollView.reflectScrolledClipView(clip)
+    }
+
     override func mouseUp(with event: NSEvent) {
+        stopAutoPan()
+        lastDragWindowPoint = nil
         if case .trim(let clipID, _) = dragTarget,
            let original = dragStartClip,
            let replacement = timeline.segments.first(where: { $0.id == clipID }),
@@ -373,8 +440,18 @@ final class RecordingClipTimelineControl: NSView {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let characters = event.charactersIgnoringModifiers?.lowercased()
 
-        if modifiers.isEmpty, characters == "c", let hoverTime, hoveredClipID != nil {
-            splitRequested?(hoverTime)
+        if modifiers.subtracting(.option).isEmpty, characters == "s",
+           let hoverTime, hoveredClipID != nil {
+            if let time = splitTime(near: hoverTime, allowSnap: !modifiers.contains(.option)) {
+                splitRequested?(time)
+            }
+            return
+        }
+        if modifiers.isEmpty, characters == "c" {
+            let target = hoveredClipID != nil ? hoverTime ?? playheadTime : playheadTime
+            if let time = splitTime(near: target, allowSnap: !NSEvent.modifierFlags.contains(.option)) {
+                splitRequested?(time)
+            }
             return
         }
         if modifiers.isEmpty, event.keyCode == 51 || event.keyCode == 117 {
@@ -396,6 +473,7 @@ final class RecordingClipTimelineControl: NSView {
         selectionDidChange?(location.segmentID)
 
         let menu = NSMenu()
+        menu.autoenablesItems = false
         let split = NSMenuItem(
             title: "Split Clip Here",
             action: #selector(splitFromContextMenu),
@@ -403,6 +481,7 @@ final class RecordingClipTimelineControl: NSView {
         )
         split.target = self
         split.image = NSImage(systemSymbolName: "scissors", accessibilityDescription: nil)
+        split.isEnabled = splitTime(near: time, allowSnap: true) != nil
         menu.addItem(split)
 
         menu.addItem(.separator())
@@ -420,8 +499,9 @@ final class RecordingClipTimelineControl: NSView {
     }
 
     @objc private func splitFromContextMenu() {
-        guard let contextTime else { return }
-        splitRequested?(contextTime)
+        guard let contextTime,
+              let time = splitTime(near: contextTime, allowSnap: true) else { return }
+        splitRequested?(time)
     }
 
     @objc private func deleteFromContextMenu() {
@@ -501,6 +581,25 @@ final class RecordingClipTimelineControl: NSView {
             )
         }
         timeline = startTimeline.replacing(replacement)
+    }
+
+    /// Where a split near `time` would actually land: snapped onto the
+    /// playhead when it sits within a few points, and refused entirely when
+    /// the cut would fall on top of an existing clip boundary.
+    private func splitTime(near time: TimeInterval, allowSnap: Bool) -> TimeInterval? {
+        guard timeline.duration > 0 else { return nil }
+        var candidate = time
+        if allowSnap,
+           abs(xPosition(for: playheadTime) - xPosition(for: time)) <= Metrics.splitSnapRadius {
+            candidate = playheadTime
+        }
+        let boundaries = timeline.segments
+            .compactMap { timeline.editorRange(for: $0.id) }
+            .flatMap { [$0.lowerBound, $0.upperBound] }
+        guard boundaries.allSatisfy({ abs($0 - candidate) > Metrics.splitBoundaryEpsilon }) else {
+            return nil
+        }
+        return candidate
     }
 
     private func edgeHit(at point: CGPoint) -> (clipID: UUID, edge: Edge)? {
@@ -692,9 +791,51 @@ final class RecordingClipTimelineControl: NSView {
 
     private func drawHoverSkimmer() {
         guard let hoverTime, dragTarget == nil else { return }
-        let x = xPosition(for: hoverTime)
-        NSColor.controlAccentColor.withAlphaComponent(0.42).setFill()
+        let allowSnap = !NSEvent.modifierFlags.contains(.option)
+        let snapped = splitTime(near: hoverTime, allowSnap: allowSnap)
+        let time = snapped ?? hoverTime
+        let isSnapped = allowSnap && snapped == playheadTime && hoverTime != playheadTime
+        let x = xPosition(for: time)
+        NSColor.controlAccentColor.withAlphaComponent(isSnapped ? 0.85 : 0.42).setFill()
         CGRect(x: x - 0.5, y: timelineRect.minY, width: 1, height: timelineRect.height).fill()
+    }
+
+    private func drawHoverEdgeHandle() {
+        let target: (clipID: UUID, edge: Edge)?
+        if case .trim(let clipID, let edge) = dragTarget {
+            target = (clipID, edge)
+        } else if dragTarget == nil {
+            target = hoveredEdge
+        } else {
+            target = nil
+        }
+        guard let target, let rect = clipRect(for: target.clipID) else { return }
+        let centerX = target.edge == .leading
+            ? rect.minX + Metrics.selectionHandleInset
+            : rect.maxX - Metrics.selectionHandleInset
+        drawGroove(centerX: centerX, in: rect)
+    }
+
+    private func drawGroove(centerX: CGFloat, in clipRect: CGRect) {
+        NSGraphicsContext.saveGraphicsState()
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.45)
+        shadow.shadowBlurRadius = 2
+        shadow.shadowOffset = .zero
+        shadow.set()
+        NSColor.white.withAlphaComponent(0.92).setFill()
+        let grooveRect = CGRect(
+            x: centerX - Metrics.selectionHandleGrooveWidth / 2,
+            y: clipRect.midY - Metrics.selectionHandleGrooveHeight / 2,
+            width: Metrics.selectionHandleGrooveWidth,
+            height: Metrics.selectionHandleGrooveHeight
+        )
+        NSBezierPath(
+            roundedRect: grooveRect,
+            xRadius: Metrics.selectionHandleGrooveWidth / 2,
+            yRadius: Metrics.selectionHandleGrooveWidth / 2
+        ).fill()
+        NSGraphicsContext.restoreGraphicsState()
     }
 
     private var selectionColor: NSColor {
@@ -738,33 +879,7 @@ final class RecordingClipTimelineControl: NSView {
     private func drawSelectionGrooves() {
         guard let geometry = selectionGeometry() else { return }
         guard geometry.video.width > Metrics.selectionHandleInset * 4 else { return }
-
-        let grooveY = geometry.video.midY - Metrics.selectionHandleGrooveHeight / 2
-        let grooveCenters = [
-            geometry.video.minX + Metrics.selectionHandleInset,
-            geometry.video.maxX - Metrics.selectionHandleInset
-        ]
-
-        NSGraphicsContext.saveGraphicsState()
-        let shadow = NSShadow()
-        shadow.shadowColor = NSColor.black.withAlphaComponent(0.45)
-        shadow.shadowBlurRadius = 2
-        shadow.shadowOffset = .zero
-        shadow.set()
-        NSColor.white.withAlphaComponent(0.92).setFill()
-        for centerX in grooveCenters {
-            let grooveRect = CGRect(
-                x: centerX - Metrics.selectionHandleGrooveWidth / 2,
-                y: grooveY,
-                width: Metrics.selectionHandleGrooveWidth,
-                height: Metrics.selectionHandleGrooveHeight
-            )
-            NSBezierPath(
-                roundedRect: grooveRect,
-                xRadius: Metrics.selectionHandleGrooveWidth / 2,
-                yRadius: Metrics.selectionHandleGrooveWidth / 2
-            ).fill()
-        }
-        NSGraphicsContext.restoreGraphicsState()
+        drawGroove(centerX: geometry.video.minX + Metrics.selectionHandleInset, in: geometry.video)
+        drawGroove(centerX: geometry.video.maxX - Metrics.selectionHandleInset, in: geometry.video)
     }
 }

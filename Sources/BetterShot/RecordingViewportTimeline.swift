@@ -137,6 +137,17 @@ nonisolated struct ViewportFrame: Sendable, Equatable {
     var anchor: CGPoint
 
     static let identity = ViewportFrame(magnification: 1, anchor: CGPoint(x: 0.5, y: 0.5))
+
+    func cropped(to crop: CGRect) -> ViewportFrame {
+        guard !RecordingVideoCrop.isUnit(crop) else { return self }
+        return ViewportFrame(
+            magnification: magnification,
+            anchor: CGPoint(
+                x: RecordingVideoCrop.anchor(anchor.x, origin: crop.minX, span: crop.width, magnification: magnification),
+                y: RecordingVideoCrop.anchor(anchor.y, origin: crop.minY, span: crop.height, magnification: magnification)
+            )
+        )
+    }
 }
 
 // MARK: - Auto-generation from recorded input
@@ -219,6 +230,11 @@ nonisolated struct ViewportTimeline: Sendable {
     private init(frames: [ViewportFrame], duration: TimeInterval) {
         self.frames = frames
         self.duration = duration
+    }
+
+    func cropped(to crop: CGRect) -> ViewportTimeline {
+        guard !RecordingVideoCrop.isUnit(crop) else { return self }
+        return ViewportTimeline(frames: frames.map { $0.cropped(to: crop) }, duration: duration)
     }
 
     /// - Parameter time: Editor (edited-timeline) time, not raw source time.

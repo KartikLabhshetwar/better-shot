@@ -59,6 +59,7 @@ struct RecordingEditDocument: Codable, Equatable {
     var replacementAudioDisplayName: String?
     /// Raw RecordingAudioFormat value for the audio-only export.
     var audioExportFormat: String?
+    var crop: [Double]?
 
     private enum CodingKeys: String, CodingKey {
         case formatVersion
@@ -83,6 +84,7 @@ struct RecordingEditDocument: Codable, Equatable {
         case replacementAudioFileName
         case replacementAudioDisplayName
         case audioExportFormat
+        case crop
     }
 
     init(
@@ -103,7 +105,8 @@ struct RecordingEditDocument: Codable, Equatable {
         exportAspectMode: ExportAspectContentMode? = nil,
         replacementAudioFileName: String? = nil,
         replacementAudioDisplayName: String? = nil,
-        audioExportFormat: RecordingAudioFormat? = nil
+        audioExportFormat: RecordingAudioFormat? = nil,
+        crop: CGRect? = nil
     ) {
         self.style = StoredRecordingStudioStyle(style)
         self.zoomEnabled = zoomEnabled
@@ -132,10 +135,22 @@ struct RecordingEditDocument: Codable, Equatable {
         self.replacementAudioFileName = replacementAudioFileName
         self.replacementAudioDisplayName = replacementAudioDisplayName
         self.audioExportFormat = audioExportFormat.map(\.rawValue)
+        if let crop, !RecordingVideoCrop.isUnit(crop) {
+            self.crop = [crop.minX, crop.minY, crop.width, crop.height].map(Double.init)
+        }
     }
 
     var audioExportFormatValue: RecordingAudioFormat {
         audioExportFormat.flatMap(RecordingAudioFormat.init(rawValue:)) ?? .m4a
+    }
+
+    var cropValue: CGRect {
+        guard let crop, crop.count == 4, crop.allSatisfy(\.isFinite) else {
+            return RecordingVideoCrop.unit
+        }
+        return RecordingVideoCrop.sanitized(
+            CGRect(x: crop[0], y: crop[1], width: crop[2], height: crop[3])
+        )
     }
 
     var subtitleStyle: SubtitleBarStyle {
@@ -205,6 +220,7 @@ struct RecordingEditDocument: Codable, Equatable {
             forKey: .replacementAudioDisplayName
         )
         audioExportFormat = try container.decodeIfPresent(String.self, forKey: .audioExportFormat)
+        crop = try container.decodeIfPresent([Double].self, forKey: .crop)
     }
 
     func encode(to encoder: any Encoder) throws {
@@ -234,6 +250,7 @@ struct RecordingEditDocument: Codable, Equatable {
             forKey: .replacementAudioDisplayName
         )
         try container.encodeIfPresent(audioExportFormat, forKey: .audioExportFormat)
+        try container.encodeIfPresent(crop, forKey: .crop)
     }
 }
 

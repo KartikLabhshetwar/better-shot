@@ -100,22 +100,36 @@ private struct RecordingStudioContent: View {
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
-                if model.isProject {
-                    saveStatus
-                }
+                if model.isCroppingVideo {
+                    cropActions
+                } else {
+                    Button {
+                        withAnimation(.snappy(duration: 0.22)) {
+                            model.beginVideoCrop()
+                        }
+                    } label: {
+                        Label("Crop", systemImage: "crop")
+                    }
+                    .disabled(!model.isLoaded)
+                    .help("Crop the video")
 
-                if model.canShareToCloud {
-                    shareStatus
-                }
+                    if model.isProject {
+                        saveStatus
+                    }
 
-                exportStatus
+                    if model.canShareToCloud {
+                        shareStatus
+                    }
 
-                Button {
-                    isInspectorPresented.toggle()
-                } label: {
-                    Image(systemName: "sidebar.right")
+                    exportStatus
+
+                    Button {
+                        isInspectorPresented.toggle()
+                    } label: {
+                        Image(systemName: "sidebar.right")
+                    }
+                    .help(isInspectorPresented ? "Hide Inspector" : "Show Inspector")
                 }
-                .help(isInspectorPresented ? "Hide Inspector" : "Show Inspector")
             }
         }
         .navigationTitle(windowTitle)
@@ -142,6 +156,54 @@ private struct RecordingStudioContent: View {
             closeGuard.detach()
             AppActivationPolicy.leave(restorePreview: true)
         }
+    }
+
+    @ViewBuilder
+    private var cropActions: some View {
+        Menu {
+            Picker("Aspect Ratio", selection: cropAspectBinding) {
+                ForEach(CropAspectRatio.allCases) { aspect in
+                    Text(aspect.title).tag(aspect)
+                }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        } label: {
+            Label(model.cropAspect.title, systemImage: "aspectratio")
+                .labelStyle(.titleAndIcon)
+        }
+        .help("Aspect ratio")
+
+        Button {
+            withAnimation(.snappy(duration: 0.18)) { model.resetVideoCropDraft() }
+        } label: {
+            Text("Reset").padding(.horizontal, 6)
+        }
+        .help("Reset the selection to the whole video")
+
+        Button {
+            withAnimation(.snappy(duration: 0.22)) { model.cancelVideoCrop() }
+        } label: {
+            Text("Cancel").padding(.horizontal, 6)
+        }
+        .keyboardShortcut(.cancelAction)
+
+        Button {
+            withAnimation(.snappy(duration: 0.22)) { model.applyVideoCrop() }
+        } label: {
+            Text("Crop").padding(.horizontal, 8)
+        }
+        .keyboardShortcut(.defaultAction)
+        .buttonStyle(.borderedProminent)
+    }
+
+    private var cropAspectBinding: Binding<CropAspectRatio> {
+        Binding(
+            get: { model.cropAspect },
+            set: { newValue in
+                withAnimation(.snappy(duration: 0.18)) { model.setVideoCropAspect(newValue) }
+            }
+        )
     }
 
     private var shareSuggestedTitle: String {
@@ -305,6 +367,10 @@ struct StudioProgressRing: View {
 
 // MARK: - Canvas
 
+private enum StudioCanvasCoordinateSpace {
+    static let name = "StudioCanvasSpace"
+}
+
 private struct StudioCanvas: View {
     @Bindable var model: RecordingStudioModel
 
@@ -325,6 +391,8 @@ private struct StudioCanvas: View {
 
             TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !model.isPlaying)) { _ in
                 let state = model.previewViewportFrame(at: model.displayTime)
+                let crop = model.effectivePreviewCrop
+                let cropCenter = RecordingVideoCrop.point(CGPoint(x: 0.5, y: 0.5), in: crop)
 
                 ZStack {
                     // Fixed frame + clip so a scaledToFill wallpaper can never
@@ -339,17 +407,17 @@ private struct StudioCanvas: View {
                     // pans, zooms, and crops exactly like the pixels below.
                     StudioPlayerLayerView(player: model.screenPlayer, gravity: .resize)
                         .frame(
-                            width: layout.contentFillSize.width,
-                            height: layout.contentFillSize.height
+                            width: layout.contentFillSize.width / crop.width,
+                            height: layout.contentFillSize.height / crop.height
                         )
                         .scaleEffect(state.magnification)
                         .offset(
-                            x: (0.5 - state.anchor.x) * state.magnification * layout.contentFillSize.width,
-                            y: (0.5 - state.anchor.y) * state.magnification * layout.contentFillSize.height
+                            x: (cropCenter.x - state.anchor.x) * state.magnification * layout.contentFillSize.width,
+                            y: (cropCenter.y - state.anchor.y) * state.magnification * layout.contentFillSize.height
                         )
                         .frame(width: layout.cardRect.width, height: layout.cardRect.height)
                         .overlay {
-                            if let pointer = model.pointerFrame(at: model.displayTime) {
+                            if let pointer = model.previewPointerFrame(at: model.displayTime) {
                                 StudioCursorOverlay(
                                     pointer: pointer,
                                     artwork: model.artwork(id: pointer.artworkID),
@@ -395,8 +463,24 @@ private struct StudioCanvas: View {
                             canvasSize: canvasSize
                         )
                     }
+
+                    if model.isCroppingVideo {
+                        CropAdjustmentOverlay(
+                            imageFrame: layout.frameRect(for: .identity),
+                            coordinateSpaceName: StudioCanvasCoordinateSpace.name,
+                            cropRect: model.cropDraft.standardized,
+                            showsEdgeHandles: !model.cropAspect.locksAspect,
+                            onResize: { handle, point in
+                                model.updateVideoCropDraft(handle: handle, toNormalized: point)
+                            },
+                            onMove: { start, delta in
+                                model.moveVideoCropDraft(from: start, byNormalized: delta)
+                            }
+                        )
+                    }
                 }
                 .frame(width: canvasSize.width, height: canvasSize.height)
+                .coordinateSpace(.named(StudioCanvasCoordinateSpace.name))
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             .frame(width: canvasSize.width, height: canvasSize.height)
@@ -1087,27 +1171,36 @@ private struct StudioTimelineEditor: View {
             )
 
             VStack(spacing: StudioTimelineMetrics.rowSpacing) {
-                Color.clear
-                    .frame(height: StudioTimelineMetrics.playheadLaneHeight)
+                VStack(spacing: StudioTimelineMetrics.rowSpacing) {
+                    Color.clear
+                        .frame(height: StudioTimelineMetrics.playheadLaneHeight)
 
-                StudioTimelineRuler(
-                    duration: model.duration,
-                    pointsPerSecond: scale.pointsPerSecond,
-                    scrollX: scrollX
-                )
-                .frame(height: StudioTimelineMetrics.rulerHeight)
+                    StudioTimelineRuler(
+                        duration: model.duration,
+                        pointsPerSecond: scale.pointsPerSecond,
+                        scrollX: scrollX
+                    )
+                    .frame(height: StudioTimelineMetrics.rulerHeight)
 
-                scrollingLanes(scale: scale)
-            }
-            .overlay {
-                StudioTimelinePlayhead(
-                    time: model.currentTime,
-                    scale: scale,
-                    scrollX: scrollX
-                ) { time in
-                    model.pause()
-                    model.seek(to: time)
+                    scrollingLanes(scale: scale)
                 }
+                .overlay {
+                    StudioTimelinePlayhead(
+                        time: model.currentTime,
+                        scale: scale,
+                        scrollX: scrollX
+                    ) { time in
+                        model.pause()
+                        model.seek(to: time)
+                    }
+                }
+
+                StudioTimelineMinimap(
+                    scale: scale,
+                    scrollX: scrollX,
+                    playheadTime: model.currentTime,
+                    onScroll: { x in scroll(to: x, in: scale) }
+                )
             }
             .onChange(of: proxy.size.width, initial: true) { _, width in
                 viewportWidth = max(width, 1)
@@ -1169,6 +1262,33 @@ private struct StudioTimelineEditor: View {
             }
         }
         .frame(height: StudioTimelineMetrics.scrollingLanesHeight)
+        .mask(edgeFadeMask(scale: scale))
+    }
+
+    /// Fades scrolled-out lane content at the viewport edges instead of
+    /// cutting it off hard; each side only fades while there is more content
+    /// past it.
+    private func edgeFadeMask(scale: StudioTimelineScale) -> some View {
+        GeometryReader { proxy in
+            let width = max(proxy.size.width, 1)
+            let fade = StudioTimelineMetrics.edgeFadeWidth
+            let span = min(fade / width, 0.25)
+            let leading = min(max(scrollX, 0) / fade, 1)
+            let trailing = min(
+                max(scale.contentWidth - scale.viewportWidth - scrollX, 0) / fade,
+                1
+            )
+            LinearGradient(
+                stops: [
+                    .init(color: .black.opacity(Double(1 - leading)), location: 0),
+                    .init(color: .black, location: span),
+                    .init(color: .black, location: 1 - span),
+                    .init(color: .black.opacity(Double(1 - trailing)), location: 1)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        }
     }
 
     private var clipLane: some View {
@@ -1419,14 +1539,85 @@ private enum StudioTimelineMetrics {
     static let rulerHeight: CGFloat = 16
     static let clipLaneHeight: CGFloat = 52
     static let zoomLaneHeight: CGFloat = 32
+    static let minimapHeight: CGFloat = 12
     /// Room under the lanes for the horizontal scroller, so it never sits on
     /// top of a zoom block.
     static let scrollerGutter: CGFloat = 8
+    /// Width of the fade masking scrolled-out lane content at each edge.
+    static let edgeFadeWidth: CGFloat = 32
 
     static let scrollingLanesHeight = clipLaneHeight + zoomLaneHeight
         + scrollerGutter + rowSpacing * 2
     static let lanesHeight = playheadLaneHeight + rulerHeight
-        + scrollingLanesHeight + rowSpacing * 2
+        + scrollingLanesHeight + minimapHeight + rowSpacing * 3
+}
+
+/// Duration-spanning overview strip under the lanes. The chip mirrors the
+/// scrolled viewport and drags to pan it; grabbing empty track centers the
+/// viewport on the pointer.
+private struct StudioTimelineMinimap: View {
+    let scale: StudioTimelineScale
+    let scrollX: CGFloat
+    let playheadTime: TimeInterval
+    let onScroll: (CGFloat) -> Void
+
+    @State private var grabOffset: CGFloat?
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = max(proxy.size.width, 1)
+            let chipWidth = max(24, width * scale.viewportWidth / max(scale.contentWidth, 1))
+            let maxChipX = max(0, width - chipWidth)
+            let scrollableWidth = max(scale.contentWidth - scale.viewportWidth, 1)
+            let chipX = min(max(scrollX / scrollableWidth, 0), 1) * maxChipX
+            let playheadX = scale.duration > 0
+                ? CGFloat(min(max(playheadTime / scale.duration, 0), 1)) * width
+                : 0
+
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(Color.primary.opacity(0.05))
+
+                if scale.isScrollable {
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(Color.primary.opacity(0.12))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .strokeBorder(Color.primary.opacity(0.18), lineWidth: 0.5)
+                        }
+                        .frame(width: chipWidth)
+                        .offset(x: chipX)
+                }
+
+                Rectangle()
+                    .fill(Color.accentColor.opacity(0.85))
+                    .frame(width: 1.5)
+                    .offset(x: playheadX - 0.75)
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        guard scale.isScrollable else { return }
+                        let offset: CGFloat
+                        if let grabOffset {
+                            offset = grabOffset
+                        } else {
+                            let startedInChip = value.startLocation.x >= chipX
+                                && value.startLocation.x <= chipX + chipWidth
+                            offset = startedInChip
+                                ? value.startLocation.x - chipX
+                                : chipWidth / 2
+                            grabOffset = offset
+                        }
+                        let targetChipX = min(max(value.location.x - offset, 0), maxChipX)
+                        onScroll(targetChipX / max(maxChipX, 1) * scrollableWidth)
+                    }
+                    .onEnded { _ in grabOffset = nil }
+            )
+        }
+        .frame(height: StudioTimelineMetrics.minimapHeight)
+    }
 }
 
 /// Shared horizontal scale for every lane in the Studio timeline. `zoom` is a
@@ -1514,9 +1705,12 @@ private struct StudioTimelinePlayhead: View {
         GeometryReader { proxy in
             let width = max(proxy.size.width, 1)
             // Viewport space: the playhead overlay never scrolls, it just
-            // tracks the scrolled lanes underneath it.
-            let x = scale.x(for: time) - scrollX
-            let isVisible = x >= -Metrics.lineWidth && x <= width + Metrics.lineWidth
+            // tracks the scrolled lanes underneath it. Off-screen positions
+            // clamp to the viewport edge instead of vanishing, so the
+            // playhead always shows which side the current time sits on.
+            let rawX = scale.x(for: time) - scrollX
+            let x = min(max(rawX, 0), width)
+            let isClamped = x != rawX
 
             ZStack(alignment: .topLeading) {
                 Rectangle()
@@ -1527,7 +1721,7 @@ private struct StudioTimelinePlayhead: View {
                     )
                     .offset(x: x - Metrics.lineWidth / 2, y: Metrics.crownHeight - 2)
                     .allowsHitTesting(false)
-                    .opacity(isVisible ? 1 : 0)
+                    .opacity(isClamped ? 0.35 : 1)
 
                 Color.clear
                     .frame(width: Metrics.hitWidth, height: Metrics.hitHeight)
@@ -1539,8 +1733,7 @@ private struct StudioTimelinePlayhead: View {
                             .shadow(color: .black.opacity(0.22), radius: 1, y: 0.5)
                     }
                     .offset(x: x - Metrics.hitWidth / 2, y: 0)
-                    .opacity(isVisible ? 1 : 0)
-                    .allowsHitTesting(isVisible)
+                    .opacity(isClamped ? 0.35 : 1)
                     .gesture(
                         DragGesture(
                             minimumDistance: 0,

@@ -21,16 +21,38 @@ struct AnnotationCropOverlay: View {
     /// The on-screen rect (canvas-local points) the image occupies.
     let imageFrame: CGRect
 
+    var body: some View {
+        CropAdjustmentOverlay(
+            imageFrame: imageFrame,
+            coordinateSpaceName: AnnotationCanvasCoordinateSpace.name,
+            cropRect: model.cropRect.standardized,
+            showsEdgeHandles: !model.cropAspect.locksAspect,
+            onResize: { handle, point in
+                model.updateCrop(handle: handle, toNormalized: point)
+            },
+            onMove: { start, delta in
+                model.cropRect = CropRectEditor.move(start, by: delta)
+            }
+        )
+    }
+}
+
+struct CropAdjustmentOverlay: View {
+    let imageFrame: CGRect
+    let coordinateSpaceName: String
+    let cropRect: CGRect
+    let showsEdgeHandles: Bool
+    let onResize: (CropHandle, CGPoint) -> Void
+    let onMove: (CGRect, CGSize) -> Void
+
     @State private var moveStartCrop: CGRect?
 
     private var cropViewRect: CGRect {
-        viewRect(model.cropRect.standardized)
+        viewRect(cropRect)
     }
 
     private var visibleHandles: [CropHandle] {
-        model.cropAspect.locksAspect
-            ? CropHandle.allCases.filter(\.isCorner)
-            : CropHandle.allCases
+        showsEdgeHandles ? CropHandle.allCases : CropHandle.allCases.filter(\.isCorner)
     }
 
     var body: some View {
@@ -102,24 +124,24 @@ struct AnnotationCropOverlay: View {
     // MARK: Gestures
 
     private var moveGesture: some Gesture {
-        DragGesture(minimumDistance: 0, coordinateSpace: .named(AnnotationCanvasCoordinateSpace.name))
+        DragGesture(minimumDistance: 0, coordinateSpace: .named(coordinateSpaceName))
             .onChanged { value in
-                let start = moveStartCrop ?? model.cropRect.standardized
+                let start = moveStartCrop ?? cropRect
                 if moveStartCrop == nil { moveStartCrop = start }
                 guard imageFrame.width > 0, imageFrame.height > 0 else { return }
                 let delta = CGSize(
                     width: value.translation.width / imageFrame.width,
                     height: value.translation.height / imageFrame.height
                 )
-                model.cropRect = CropRectEditor.move(start, by: delta)
+                onMove(start, delta)
             }
             .onEnded { _ in moveStartCrop = nil }
     }
 
     private func handleGesture(_ handle: CropHandle) -> some Gesture {
-        DragGesture(minimumDistance: 0, coordinateSpace: .named(AnnotationCanvasCoordinateSpace.name))
+        DragGesture(minimumDistance: 0, coordinateSpace: .named(coordinateSpaceName))
             .onChanged { value in
-                model.updateCrop(handle: handle, toNormalized: normalized(value.location))
+                onResize(handle, normalized(value.location))
             }
     }
 
@@ -190,5 +212,3 @@ private struct CropHandleView: View {
         }
     }
 }
-
-
