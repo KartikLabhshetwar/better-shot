@@ -7,12 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.2] - 2026-08-26
 
-A one-fix release: the image editor could no longer export, copy or re-save
-once a shot had been saved or shared.
+The image editor's broken export after a save is fixed, and three community
+performance passes move the heavy image and JSON decoding that sat on the main
+thread into the background, so the preview card, the Recording Studio and long
+recordings all stop stuttering.
+
+### Changed
+
+- **The studio wallpaper decodes once, not sixty times a second**: With a custom wallpaper set, the Recording Studio preview re-read the file from disk and re-decoded it on every frame of playback and every scrub tick, on the main thread, in the same tick that had to draw the video. The wallpaper now renders through the image editor's cached preview component, so the decode happens once, off the main thread, and both editors share the cached copy ([#113](https://github.com/KartikLabhshetwar/better-shot/pull/113), thanks [@zergzorg](https://github.com/zergzorg))
+- **The preview card decodes its thumbnail in the background**: The after-capture card decoded the full screenshot on the main thread, tens of megabytes for a 5K shot, just to draw a card a couple of centimeters wide, right while the capture pipeline was still writing the file. Screenshots now go through the same off-main thumbnail decoder recordings already used ([#115](https://github.com/KartikLabhshetwar/better-shot/pull/115), thanks [@zergzorg](https://github.com/zergzorg))
+- **Long recordings open faster in the studio**: The pointer sidecar, sixty samples a second for the whole recording, so megabytes of JSON on a long take, was read, decoded and thinned on the main thread while the studio window sat unresponsive. All of it now runs in the background before the window fills in ([#117](https://github.com/KartikLabhshetwar/better-shot/pull/117), thanks [@zergzorg](https://github.com/zergzorg))
 
 ### Fixed
 
 - **Export works after a save**: Saving or sharing an annotated screenshot left the editor pointing at a base image that was never written to disk, so the next Export, Copy or Save failed with "The file couldn't be opened because it isn't in the correct format", whether the edit was an annotation or a background effect. The first save now stores the untouched base and the editable document next to the History copy and repoints the editor at it, so every later export renders, and repeated saves stop stacking duplicate copies in History ([#118](https://github.com/KartikLabhshetwar/better-shot/issues/118), thanks [@erickhun](https://github.com/erickhun))
+- **Copy on a recording copies the video**: The preview card's hover Copy put a still frame on the clipboard for recordings. It now copies the video file itself, so the paste lands in Finder or Slack as a movie ([#115](https://github.com/KartikLabhshetwar/better-shot/pull/115), thanks [@zergzorg](https://github.com/zergzorg))
 
 ## [0.4.1] - 2026-08-26
 
