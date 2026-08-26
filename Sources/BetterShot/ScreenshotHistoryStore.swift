@@ -282,9 +282,8 @@ final class ScreenshotHistoryStore {
         renderedURL: URL,
         document: AnnotationDocument
     ) -> URL {
-        guard isHistoryURL(displayURL) else {
-            return importScreenshot(from: renderedURL)
-        }
+        let displayURL = isHistoryURL(displayURL) ? displayURL : importScreenshot(from: renderedURL)
+        guard isHistoryURL(displayURL) else { return displayURL }
 
         do {
             let baseDestination = Self.baseImageURL(for: displayURL)

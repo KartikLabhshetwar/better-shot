@@ -5,6 +5,15 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2026-08-26
+
+A one-fix release: the image editor could no longer export, copy or re-save
+once a shot had been saved or shared.
+
+### Fixed
+
+- **Export works after a save**: Saving or sharing an annotated screenshot left the editor pointing at a base image that was never written to disk, so the next Export, Copy or Save failed with "The file couldn't be opened because it isn't in the correct format", whether the edit was an annotation or a background effect. The first save now stores the untouched base and the editable document next to the History copy and repoints the editor at it, so every later export renders, and repeated saves stop stacking duplicate copies in History ([#118](https://github.com/KartikLabhshetwar/better-shot/issues/118), thanks [@erickhun](https://github.com/erickhun))
+
 ## [0.4.1] - 2026-08-26
 
 A quick follow to the rebuild. The Recording Studio learns to crop video the

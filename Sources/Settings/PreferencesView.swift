@@ -1466,7 +1466,7 @@ struct AboutTab: View {
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
 
-                Text("Capture, annotate and beautify screenshots on macOS.")
+                Text("One app for the whole screen. Capture, record, and edit on macOS.")
                     .foregroundStyle(.tertiary)
                     .padding(.top, 2)
             }

@@ -564,6 +564,7 @@ struct AnnotationEditorWindow: View {
                 renderedURL: annotatedURL,
                 document: document
             )
+            model.sourceURL = resultURL
             model.baseImageURL = ScreenshotHistoryStore.baseImageURL(for: resultURL)
         } else {
             // All annotations were cleared on a previously-edited image:
