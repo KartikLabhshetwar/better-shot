@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Image from "next/image"
-import { ArrowUpRightIcon, CheckIcon, DownloadSimpleIcon, LinkIcon } from "@phosphor-icons/react/dist/ssr"
+import { CheckIcon, DownloadSimpleIcon, LinkIcon } from "@phosphor-icons/react/dist/ssr"
 import type { ResolvedShare } from "@/lib/share"
 import { formatBytes, formatDuration, formatRelativeTime } from "@/lib/share"
 import { cn } from "@/lib/utils"
@@ -19,6 +19,7 @@ export function ShareView({ share }: ShareViewProps) {
   const { manifest, mediaUrl, posterUrl, downloadUrl } = share
   const isVideo = manifest.kind === "video"
   const title = manifest.title?.trim() || (isVideo ? "Untitled recording" : "Untitled screenshot")
+  const author = manifest.authorName?.trim()
   const aspectRatio =
     manifest.width && manifest.height ? manifest.width / manifest.height : isVideo ? 16 / 9 : 4 / 3
 
@@ -32,11 +33,11 @@ export function ShareView({ share }: ShareViewProps) {
   return (
     <div className="flex min-h-dvh flex-col bg-canvas text-ink selection:bg-brand/20">
       <header className="sticky top-0 z-20 border-b border-ink/[0.06] bg-canvas/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-[1080px] items-center gap-3 px-6">
+        <div className="mx-auto flex h-16 w-full max-w-[1080px] items-center justify-between gap-3 px-6">
           <a
             href="/"
             className={cn(
-              "flex shrink-0 items-center gap-2 rounded-md outline-none",
+              "flex shrink-0 items-center gap-2 outline-none",
               fluid,
               "focus-visible:ring-2 focus-visible:ring-brand/60",
             )}
@@ -45,98 +46,99 @@ export function ShareView({ share }: ShareViewProps) {
             <span className="text-sm font-semibold tracking-tight text-ink/75">Better Shot</span>
           </a>
 
-          <span aria-hidden className="mx-1 hidden h-4 w-px bg-ink/10 sm:block" />
+          <div className="flex items-center gap-2">
+            <CopyLinkButton />
 
-          <p className="min-w-0 flex-1 truncate text-sm text-ink/60" title={title}>
-            {title}
-          </p>
-
-          <CopyLinkButton />
-
-          <a
-            href={downloadUrl}
-            className={cn(
-              "hidden items-center gap-2 rounded-lg bg-ink px-3 py-2 text-xs font-semibold text-canvas outline-none sm:inline-flex",
-              fluid,
-              "hover:bg-ink/85 focus-visible:ring-2 focus-visible:ring-brand/60 active:scale-[0.98]",
-            )}
-          >
-            <DownloadSimpleIcon size={14} weight="bold" />
-            Download
-          </a>
+            <a
+              href={downloadUrl}
+              className={cn(
+                "inline-flex items-center gap-2 whitespace-nowrap bg-ink px-3 py-2 text-xs font-semibold text-canvas outline-none",
+                fluid,
+                "hover:bg-ink/85 focus-visible:ring-2 focus-visible:ring-brand/60 active:scale-[0.98]",
+              )}
+            >
+              <DownloadSimpleIcon size={14} weight="bold" />
+              <span className="hidden sm:inline">Download</span>
+            </a>
+          </div>
         </div>
       </header>
 
-      <main id="main" className="mx-auto w-full max-w-[1080px] flex-1 px-6 pb-12 pt-8">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="display-sm text-xl sm:text-2xl">{title}</h1>
-            {meta.length > 0 && (
-              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink/55">
-                {meta.map((entry, index) => (
-                  <span key={entry} className="flex items-center gap-2">
-                    {index > 0 && (
-                      <span aria-hidden className="text-ink/20">
-                        ·
-                      </span>
-                    )}
-                    {entry}
+      <main id="main" className="mx-auto flex w-full max-w-[1080px] flex-1 flex-col px-6 pb-12 pt-8">
+        <div className="my-auto">
+          <div className="mb-5">
+            <h1 className="display-sm break-words text-xl sm:text-2xl">{title}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink/55">
+              {author && (
+                <span className="flex items-center gap-2 text-ink/75">
+                  <span
+                    aria-hidden
+                    className="grid size-6 shrink-0 place-content-center rounded-full bg-brand text-[11px] font-bold uppercase text-canvas"
+                  >
+                    {author.charAt(0)}
                   </span>
-                ))}
-              </p>
+                  <span className="font-semibold">{author}</span>
+                </span>
+              )}
+              {meta.map((entry, index) => (
+                <span key={entry} className="flex items-center gap-2">
+                  {(index > 0 || author) && (
+                    <span aria-hidden className="text-ink/20">
+                      ·
+                    </span>
+                  )}
+                  {entry}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div
+            className="mx-auto w-full max-w-full"
+            style={{
+              width: `max(320px, calc((100dvh - 340px) * ${aspectRatio}))`,
+            }}
+          >
+            {isVideo ? (
+              <VideoPlayer src={mediaUrl} poster={posterUrl} title={title} aspectRatio={aspectRatio} />
+            ) : (
+              <ImageViewer src={mediaUrl} title={title} aspectRatio={aspectRatio} />
             )}
           </div>
 
-          <a
-            href={downloadUrl}
-            className={cn(
-              "inline-flex items-center gap-2 rounded-lg border border-ink/[0.1] px-3 py-2 text-xs font-medium text-ink/60 outline-none sm:hidden",
-              fluid,
-              "hover:border-ink/[0.18] hover:text-ink focus-visible:ring-2 focus-visible:ring-brand/60 active:scale-[0.98]",
-            )}
-          >
-            <DownloadSimpleIcon size={14} weight="bold" />
-            Download
-          </a>
+          {isVideo && (
+            <p className="mt-3 hidden text-center text-xs text-ink/60 sm:block">
+              Space play and pause · Arrow keys seek 5s · J and L seek 10s · M mute · F full screen
+            </p>
+          )}
         </div>
-
-        {isVideo ? (
-          <VideoPlayer src={mediaUrl} poster={posterUrl} title={title} aspectRatio={aspectRatio} />
-        ) : (
-          <ImageViewer src={mediaUrl} title={title} aspectRatio={aspectRatio} />
-        )}
-
-        {isVideo && (
-          <p className="mt-3 hidden text-center text-xs text-ink/60 sm:block">
-            Space play and pause · Arrow keys seek 5s · J and L seek 10s · M mute · F full screen
-          </p>
-        )}
       </main>
 
-      <footer className="pb-12">
-        <a
-          href="https://bettershot.site"
-          target="_blank"
-          rel="noreferrer"
-          className={cn(
-            "group mx-auto flex w-fit items-center gap-2 rounded-full border border-ink/[0.1] bg-white px-3 py-2 text-xs text-ink/55 outline-none",
-            fluid,
-            "hover:border-ink/[0.18] hover:text-ink focus-visible:ring-2 focus-visible:ring-brand/60",
-          )}
-        >
-          <Image src="/logo.png" alt="" width={16} height={16} className="rounded-sm" />
-          {isVideo ? "Recorded" : "Captured"} with{" "}
-          <span className="font-semibold text-ink/85">Better Shot</span>
-          <ArrowUpRightIcon
-            size={12}
-            weight="bold"
+      <footer className="bg-brand text-canvas">
+        <div className="mx-auto flex w-full max-w-[1080px] flex-col items-start justify-between gap-4 px-6 py-8 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-3">
+            <Image src="/logo.png" alt="" width={32} height={32} className="rounded-md" />
+            <div>
+              <p className="text-sm font-semibold">
+                {isVideo ? "Recorded" : "Captured"} with Better Shot
+              </p>
+              <p className="text-xs text-canvas/80">
+                Free, open source screenshots and recordings for macOS. No account, no watermark.
+              </p>
+            </div>
+          </div>
+          <a
+            href="https://bettershot.site/download"
+            target="_blank"
+            rel="noreferrer"
             className={cn(
-              "text-ink/55",
-              fluid,
-              "group-hover:-translate-y-px group-hover:translate-x-px",
+              "inline-flex shrink-0 items-center whitespace-nowrap border border-canvas px-4 py-2.5 text-xs font-semibold outline-none",
+              "transition-colors duration-150 hover:bg-canvas hover:text-brand focus-visible:ring-2 focus-visible:ring-canvas/70",
             )}
-          />
-        </a>
+          >
+            Get Better Shot free
+          </a>
+        </div>
       </footer>
     </div>
   )
@@ -166,7 +168,7 @@ function CopyLinkButton() {
       onClick={copy}
       aria-live="polite"
       className={cn(
-        "inline-flex items-center gap-2 rounded-lg border border-ink/[0.1] px-3 py-2 text-xs font-medium outline-none",
+        "inline-flex items-center gap-2 whitespace-nowrap border border-ink/[0.1] px-3 py-2 text-xs font-medium outline-none",
         fluid,
         "hover:border-ink/[0.18] focus-visible:ring-2 focus-visible:ring-brand/60 active:scale-[0.98]",
         copied ? "text-emerald-600" : "text-ink/60 hover:text-ink",
@@ -184,7 +186,7 @@ function CopyLinkButton() {
           className={cn("col-start-1 row-start-1", fluid, copied ? "scale-50 opacity-0" : "scale-100 opacity-100")}
         />
       </span>
-      <span className="hidden w-12 text-left sm:inline">{copied ? "Copied" : "Copy link"}</span>
+      <span className="hidden w-14 text-left sm:inline">{copied ? "Copied" : "Copy link"}</span>
     </button>
   )
 }
