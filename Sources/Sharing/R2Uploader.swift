@@ -217,6 +217,89 @@ final class R2Uploader {
         throw R2UploadError(message: parseErrorMessage(data: data, statusCode: http.statusCode))
     }
 
+    nonisolated static func slug(fromShareLink link: String) -> String? {
+        guard let components = URL(string: link)?.pathComponents,
+              let index = components.firstIndex(of: "s"),
+              index + 1 < components.count else {
+            return nil
+        }
+        return components[index + 1]
+    }
+
+    /// Removes every object behind a share link: media, poster, and manifest.
+    nonisolated static func deleteShare(slug: String, credentials: R2Credentials) async throws {
+        guard credentials.isConfigured else {
+            throw R2UploadError(message: "R2 sharing is not configured. Add your credentials in Settings > Sharing.")
+        }
+
+        let prefix = ShareBundle.objectPrefix(id: slug)
+        var keys = [prefix + ShareBundle.posterFilename, prefix + ShareBundle.manifestFilename]
+        if let media = try await manifestMediaFilename(prefix: prefix, credentials: credentials) {
+            keys.insert(prefix + media, at: 0)
+        }
+        for key in keys {
+            try await deleteObject(key: key, credentials: credentials)
+        }
+    }
+
+    nonisolated private static func manifestMediaFilename(
+        prefix: String,
+        credentials: R2Credentials
+    ) async throws -> String? {
+        let request = try objectRequest(method: "GET", key: prefix + ShareBundle.manifestFilename, credentials: credentials)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw R2UploadError(message: "No response from R2.")
+        }
+        if http.statusCode == 404 { return nil }
+        guard (200..<300).contains(http.statusCode) else {
+            throw R2UploadError(message: parseErrorMessage(data: data, statusCode: http.statusCode))
+        }
+        return (try? JSONDecoder().decode(ShareManifest.self, from: data))?.media
+    }
+
+    nonisolated private static func deleteObject(key: String, credentials: R2Credentials) async throws {
+        let request = try objectRequest(method: "DELETE", key: key, credentials: credentials)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw R2UploadError(message: "No response from R2.")
+        }
+        guard (200..<300).contains(http.statusCode) || http.statusCode == 404 else {
+            throw R2UploadError(message: parseErrorMessage(data: data, statusCode: http.statusCode))
+        }
+    }
+
+    nonisolated private static func objectRequest(
+        method: String,
+        key: String,
+        credentials: R2Credentials
+    ) throws -> URLRequest {
+        let host = "\(credentials.accountID).r2.cloudflarestorage.com"
+        let canonicalURI = "/" + uriEncodePath(credentials.bucket) + "/" + uriEncodePath(key)
+        guard let url = URL(string: "https://\(host)\(canonicalURI)") else {
+            throw R2UploadError(message: "Invalid R2 endpoint URL.")
+        }
+
+        let contentType = "application/octet-stream"
+        let signature = R2SigV4.sign(
+            method: method,
+            host: host,
+            canonicalURI: canonicalURI,
+            accessKeyID: credentials.accessKeyID,
+            secretAccessKey: credentials.secretAccessKey,
+            contentType: contentType
+        )
+
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        request.setValue(signature.amzDate, forHTTPHeaderField: "x-amz-date")
+        request.setValue(signature.contentSHA256, forHTTPHeaderField: "x-amz-content-sha256")
+        request.setValue(signature.authorizationHeader, forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 60
+        return request
+    }
+
     nonisolated private static func performShareUpload(
         itemID: UUID,
         fileURL: URL,

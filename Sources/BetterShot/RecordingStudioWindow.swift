@@ -58,6 +58,19 @@ private struct RecordingStudioContent: View {
                 StudioCanvas(model: model)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(AnnotationEditorWorkspaceBackground())
+                    .overlay(alignment: .bottom) {
+                        if let transferStatus {
+                            TransferStatusCard(
+                                status: transferStatus,
+                                onCancel: cancelTransfer,
+                                onRetry: retryTransfer,
+                                onDismiss: dismissTransfer
+                            )
+                            .padding(.bottom, 18)
+                            .transition(transferCardTransition)
+                        }
+                    }
+                    .animation(RecordingMotion.showHideSpring, value: transferStatus)
 
                 StudioTimelineEditor(model: model)
             }
@@ -188,113 +201,84 @@ private struct RecordingStudioContent: View {
         .help("Save your edits in BetterShot (⌘S)")
     }
 
-    /// Share pipeline in one toolbar slot: render → upload → link copied.
-    /// The upload leg reads the uploader's live progress so the pill keeps
-    /// moving through both stages.
     @ViewBuilder
     private var shareStatus: some View {
-        switch model.shareState {
-        case .idle:
-            CloudUploadButton(suggestedTitle: shareSuggestedTitle, onUpload: model.shareToCloud) {
-                Label("Share", systemImage: "link")
-                    .labelStyle(.titleAndIcon)
-            }
-            .disabled(!model.isLoaded || model.exportState.isExporting)
-            .help("Upload and copy a share link")
-        case .rendering(let progress):
-            SharePill(stage: "Rendering", progress: progress) {
-                model.cancelShare()
-            }
-        case .uploading:
-            SharePill(
-                stage: "Uploading",
-                progress: model.shareItemID.flatMap {
-                    CloudUploader.shared.uploadProgress[$0]
-                } ?? 0
-            ) {
-                model.cancelShare()
-            }
-        case .finished(let url):
-            HStack(spacing: 6) {
-                Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(url, forType: .string)
-                } label: {
-                    Label("Link Copied", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                }
-                .help("Copy the share link again")
-
-                CloudUploadButton(suggestedTitle: shareSuggestedTitle, onUpload: model.shareToCloud) {
-                    Image(systemName: "link")
-                }
-                .help("Share Again")
-            }
-        case .failed(let message):
-            HStack(spacing: 6) {
-                Label("Share Failed", systemImage: "exclamationmark.triangle.fill")
-                    .labelStyle(.titleAndIcon)
-                    .foregroundStyle(.orange)
-                    .help(message)
-
-                CloudUploadButton(suggestedTitle: shareSuggestedTitle, onUpload: model.shareToCloud) {
-                    Text("Retry")
-                }
-            }
+        CloudUploadButton(suggestedTitle: shareSuggestedTitle, onUpload: model.shareToCloud) {
+            Label("Share", systemImage: "link")
+                .labelStyle(.titleAndIcon)
         }
+        .disabled(!model.isLoaded || model.exportState.isExporting || model.shareState.isBusy)
+        .help("Upload and copy a share link")
     }
 
     @ViewBuilder
     private var exportStatus: some View {
-        switch model.exportState {
-        case .idle:
-            RecordingExportButton(
-                currentSettings: model.exportSettings,
-                onExport: model.export(settings:)
-            ) {
-                Label("Export", systemImage: "arrow.down.circle")
-                    .labelStyle(.titleAndIcon)
-            }
-            .tint(.accentColor)
-            .disabled(!model.isLoaded || model.shareState.isBusy)
-            .help("Save the finished video to your Mac")
-        case .exporting(let progress):
-            ExportProgressPill(progress: progress) {
-                model.cancelExport()
-            }
-        case .finished(let url):
-            HStack(spacing: 6) {
-                Button {
-                    NSWorkspace.shared.activateFileViewerSelecting([url])
-                } label: {
-                    Label("Reveal", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                }
-                .help("Reveal exported recording in Finder")
-
-                RecordingExportButton(
-                    currentSettings: model.exportSettings,
-                    onExport: model.export(settings:)
-                ) {
-                    Image(systemName: "arrow.down.circle")
-                }
-                .help("Export Again")
-            }
-        case .failed(let message):
-            HStack(spacing: 6) {
-                Label("Export Failed", systemImage: "exclamationmark.triangle.fill")
-                    .labelStyle(.titleAndIcon)
-                    .foregroundStyle(.orange)
-                    .help(message)
-
-                RecordingExportButton(
-                    currentSettings: model.exportSettings,
-                    onExport: model.export(settings:)
-                ) {
-                    Text("Retry")
-                }
-            }
+        RecordingExportButton(
+            currentSettings: model.exportSettings,
+            onExport: model.export(settings:)
+        ) {
+            Label("Export", systemImage: "arrow.down.circle")
+                .labelStyle(.titleAndIcon)
         }
+        .tint(.accentColor)
+        .disabled(!model.isLoaded || model.shareState.isBusy || model.exportState.isExporting)
+        .help("Save the finished video to your Mac")
+    }
+
+    private var transferStatus: TransferStatus? {
+        switch model.shareState {
+        case .rendering(let progress):
+            return .working(stage: .rendering, progress: progress)
+        case .uploading:
+            let progress = model.shareItemID.flatMap {
+                CloudUploader.shared.uploadProgress[$0]
+            }
+            return .working(stage: .uploading, progress: (progress ?? 0) > 0 ? progress : nil)
+        case .finished(let link):
+            guard let url = URL(string: link) else { return nil }
+            return .linkReady(url: url)
+        case .failed(let message):
+            return .failed(headline: "Share failed", message: message, canRetry: model.canRetryShare)
+        case .idle:
+            break
+        }
+        switch model.exportState {
+        case .exporting(let progress):
+            return .working(stage: .exporting, progress: progress)
+        case .finished(let url):
+            return .exported(url: url)
+        case .failed(let message):
+            return .failed(headline: "Export failed", message: message, canRetry: true)
+        case .idle:
+            return nil
+        }
+    }
+
+    private var transferCardTransition: AnyTransition {
+        RecordingMotion.reduceMotion
+            ? .opacity
+            : AnyTransition.offset(y: 24).combined(with: .opacity)
+    }
+
+    private func cancelTransfer() {
+        if model.shareState.isBusy {
+            model.cancelShare()
+        } else {
+            model.cancelExport()
+        }
+    }
+
+    private func retryTransfer() {
+        if case .failed = model.shareState {
+            model.retryShare()
+        } else if case .failed = model.exportState {
+            model.export()
+        }
+    }
+
+    private func dismissTransfer() {
+        model.acknowledgeShareResult()
+        model.acknowledgeExportResult()
     }
 }
 
@@ -316,68 +300,6 @@ struct StudioProgressRing: View {
         }
         .frame(width: size, height: size)
         .animation(.easeOut(duration: 0.15), value: progress)
-    }
-}
-
-/// Progress pill for the share pipeline: same ring treatment as the
-/// export pill, with the stage name so render and upload read distinctly.
-struct SharePill: View {
-    let stage: String
-    let progress: Double
-    let onCancel: () -> Void
-
-    var body: some View {
-        HStack(spacing: 6) {
-            StudioProgressRing(progress: progress)
-
-            Text("\(stage) \(Int((progress * 100).rounded()))%")
-                .font(.system(size: 12, weight: .medium).monospacedDigit())
-                .foregroundStyle(.primary.opacity(0.85))
-                .fixedSize()
-                .contentTransition(.numericText())
-
-            Button(action: onCancel) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 8.5, weight: .bold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 16, height: 16)
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .help("Cancel Share")
-        }
-        .padding(.leading, 12)
-    }
-}
-
-/// Single pill that replaces the old "Exporting…" button plus a separate
-/// progress bar with one control: a ring showing percent complete, the
-/// number itself, and a way to actually stop the export.
-private struct ExportProgressPill: View {
-    let progress: Double
-    let onCancel: () -> Void
-
-    var body: some View {
-        HStack(spacing: 6) {
-            StudioProgressRing(progress: progress)
-
-            Text("Exporting \(Int((progress * 100).rounded()))%")
-                .font(.system(size: 12, weight: .medium).monospacedDigit())
-                .foregroundStyle(.primary.opacity(0.85))
-                .fixedSize()
-                .contentTransition(.numericText())
-
-            Button(action: onCancel) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 8.5, weight: .bold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 16, height: 16)
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .help("Cancel Export")
-        }
-        .padding(.leading, 12)
     }
 }
 

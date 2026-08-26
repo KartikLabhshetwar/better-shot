@@ -1033,6 +1033,8 @@ struct CaptureLibraryTab: View {
     @State private var scope: LibraryScope = .local
     @State private var thumbnails: [String: NSImage] = [:]
     @State private var isConfirmingClear = false
+    @State private var isConfirmingCloudClear = false
+    @State private var isClearingCloud = false
 
     private var records: [CaptureRecord] {
         HistoryStore.shared.records.filter { $0.kind == kind }
@@ -1128,10 +1130,34 @@ struct CaptureLibraryTab: View {
                 Text("\(cloudItems.count) shared \(cloudItems.count == 1 ? noun : plural)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
                 Spacer()
+
+                if isClearingCloud {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Button("Delete From Cloud\u{2026}", role: .destructive) {
+                        isConfirmingCloudClear = true
+                    }
+                    .controlSize(.small)
+                    .disabled(!R2CredentialStore.shared.isConfigured)
+                    .help("Delete these uploads from your R2 bucket")
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
+        }
+        .confirmationDialog(
+            "Delete \(cloudItems.count) shared \(cloudItems.count == 1 ? noun : plural) from your cloud storage?",
+            isPresented: $isConfirmingCloudClear
+        ) {
+            Button("Delete", role: .destructive) {
+                clearCloudUploads()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This deletes the uploaded copies from your R2 bucket, so their share links stop working. Local copies stay on this Mac.")
         }
     }
 
@@ -1274,6 +1300,38 @@ struct CaptureLibraryTab: View {
             PreviewOverlay.shared.show(url: HistoryStore.shared.displayURLForRecord(record))
         } else {
             PreviewPanelPresenter.shared.onEditVideo?(HistoryStore.shared.urlForRecord(record))
+        }
+    }
+
+    private func clearCloudUploads() {
+        let credentials = R2CredentialStore.shared.snapshot()
+        let items = cloudItems
+        isClearingCloud = true
+        Task {
+            var failures = 0
+            for item in items {
+                guard let link = item.cloudURL, let slug = R2Uploader.slug(fromShareLink: link) else { continue }
+                do {
+                    try await R2Uploader.deleteShare(slug: slug, credentials: credentials)
+                    ScreenshotHistoryStore.shared.clearCloudURL(for: item.url)
+                } catch {
+                    failures += 1
+                }
+            }
+            isClearingCloud = false
+            if failures > 0 {
+                ToastWindow.shared.show(
+                    title: "Cloud Delete Failed",
+                    message: "\(failures) of \(items.count) uploads could not be deleted.",
+                    systemIcon: "exclamationmark.icloud"
+                )
+            } else {
+                ToastWindow.shared.show(
+                    title: "Cloud \(plural.capitalized) Deleted",
+                    message: "The share links no longer work.",
+                    systemIcon: "icloud.slash"
+                )
+            }
         }
     }
 

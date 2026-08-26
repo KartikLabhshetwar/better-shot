@@ -173,6 +173,7 @@ final class RecordingStudioModel {
     /// Upload identity while sharing, so the UI can read the uploader's
     /// live progress and the history card mirrors the state.
     private(set) var shareItemID: UUID?
+    private var lastShareOptions: CloudUploadOptions?
 
     /// Format the audio-only export writes. Persisted so the round trip
     /// through an external tool keeps whatever that tool accepts.
@@ -1968,6 +1969,7 @@ final class RecordingStudioModel {
             return
         }
         pause()
+        lastShareOptions = options
         // Flush the draft first so the deliverable-invalidation in the
         // debounced autosave can't race the file this render produces.
         projectSaveTask?.cancel()
@@ -2047,13 +2049,6 @@ final class RecordingStudioModel {
                     ScreenshotHistoryStore.shared.setCloudURL(for: uploadURL, cloudURL: result.url)
                 }
                 self.shareState = .finished(result.url)
-                if let shareURL = URL(string: result.url) {
-                    ShareLinkPanel.shared.present(
-                        url: shareURL,
-                        title: options.trimmedTitleOrNil
-                            ?? uploadURL.deletingPathExtension().lastPathComponent
-                    )
-                }
             } catch is CancellationError {
                 self?.shareState = .idle
             } catch RecordingStudioExporter.ExportError.cancelled {
@@ -2072,6 +2067,34 @@ final class RecordingStudioModel {
         }
         if shareState.isBusy {
             shareState = .idle
+        }
+    }
+
+    var canRetryShare: Bool {
+        lastShareOptions != nil
+    }
+
+    func retryShare() {
+        guard case .failed = shareState, let lastShareOptions else { return }
+        shareState = .idle
+        shareToCloud(options: lastShareOptions)
+    }
+
+    func acknowledgeShareResult() {
+        switch shareState {
+        case .finished, .failed:
+            shareState = .idle
+        default:
+            break
+        }
+    }
+
+    func acknowledgeExportResult() {
+        switch exportState {
+        case .finished, .failed:
+            exportState = .idle
+        default:
+            break
         }
     }
 

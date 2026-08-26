@@ -160,7 +160,7 @@
 		D7BE3EA091A12262CC4E7894 /* R2CredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 679F127F74BFC991CCDCA27B /* R2CredentialStore.swift */; };
 		D8AE5ACE0841050A49E7B483 /* FailureAlert.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41B1FFF560349A356C312F34 /* FailureAlert.swift */; };
 		D925251B051AC2433DEE6D1E /* ShareManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 451695CAAFEDDEA2ECE3CEF7 /* ShareManifest.swift */; };
-		DB85516076C2B97001DCECFD /* ShareLinkPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CFE37CFDED1578654D9366 /* ShareLinkPanel.swift */; };
+		DC1BBAE2ABD17F92CB589901 /* TransferStatusCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EDA57621906E0853E3239C7 /* TransferStatusCard.swift */; };
 		DC27DBF1E81ABBFDCB8FB1FE /* RecordingPointerArtworkCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 124A8C7DAD7A2014754CF196 /* RecordingPointerArtworkCapture.swift */; };
 		DE7DD919B4B11F0837F2E146 /* AnnoTextEditorOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 394B206251D59C813EDCB7C8 /* AnnoTextEditorOverlay.swift */; };
 		DF21B0B190903EB60D0694CF /* ShareImageCompressor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 018AB35D9E9F15364DD94E9E /* ShareImageCompressor.swift */; };
@@ -210,6 +210,7 @@
 		179A1F464B2325D933B003EB /* ScreenshotHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotHistoryStore.swift; sourceTree = "<group>"; };
 		1A8FF0E5AD713FC1D7E99DE7 /* BetterShotDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BetterShotDelegate.swift; sourceTree = "<group>"; };
 		1A982D92197DBD85F4E99877 /* Shape.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shape.swift; sourceTree = "<group>"; };
+		1EDA57621906E0853E3239C7 /* TransferStatusCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferStatusCard.swift; sourceTree = "<group>"; };
 		21453FFFE9FF2E1860B1BB7E /* ScreenRecordingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenRecordingManager.swift; sourceTree = "<group>"; };
 		218BCF4C3E6DEC3D0AE86959 /* PathBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathBuilder.swift; sourceTree = "<group>"; };
 		23F4D20DF3F0349735C2F80D /* RecordingProject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingProject.swift; sourceTree = "<group>"; };
@@ -226,7 +227,6 @@
 		2FC217457F424CFCD7667853 /* AnnotationEditorZoom.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationEditorZoom.swift; sourceTree = "<group>"; };
 		3172D4B0B4183CA936794DA1 /* AnnotationInspectorStyleMenus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationInspectorStyleMenus.swift; sourceTree = "<group>"; };
 		3384F12707602584788258C8 /* PreviewBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewBridge.swift; sourceTree = "<group>"; };
-		33CFE37CFDED1578654D9366 /* ShareLinkPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareLinkPanel.swift; sourceTree = "<group>"; };
 		3560130094EAB274FBD6EE6E /* BetterShotPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BetterShotPreferences.swift; sourceTree = "<group>"; };
 		35712AC357C535000CF633D8 /* AnnotationInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationInspector.swift; sourceTree = "<group>"; };
 		37E81E9EEFBAF2A3AADB79A9 /* AnnotationProgressiveBlurPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationProgressiveBlurPreview.swift; sourceTree = "<group>"; };
@@ -410,7 +410,6 @@
 				679F127F74BFC991CCDCA27B /* R2CredentialStore.swift */,
 				861CE2F486701322F7B4FAD3 /* R2Uploader.swift */,
 				018AB35D9E9F15364DD94E9E /* ShareImageCompressor.swift */,
-				33CFE37CFDED1578654D9366 /* ShareLinkPanel.swift */,
 				451695CAAFEDDEA2ECE3CEF7 /* ShareManifest.swift */,
 			);
 			path = Sharing;
@@ -456,6 +455,7 @@
 				EE6013043C27F30509A03C16 /* MenuBarPopoverController.swift */,
 				92E878939547822AC5792A1E /* RecordingMotion.swift */,
 				2B95C7007292236807887D07 /* ToastWindow.swift */,
+				1EDA57621906E0853E3239C7 /* TransferStatusCard.swift */,
 				CFF906CEC52DCC55E1CAB388 /* TransparencyGrid.swift */,
 			);
 			path = Views;
@@ -904,7 +904,6 @@
 				54B7FEFC77CCBC22A4735094 /* ShapeRenderer.swift in Sources */,
 				CB322FB7D761116FFC2AA698 /* Shapes2d.swift in Sources */,
 				DF21B0B190903EB60D0694CF /* ShareImageCompressor.swift in Sources */,
-				DB85516076C2B97001DCECFD /* ShareLinkPanel.swift in Sources */,
 				D925251B051AC2433DEE6D1E /* ShareManifest.swift in Sources */,
 				B9B5CCB2FE5EDEA8A879E245 /* SharingSettingsTab.swift in Sources */,
 				8782829F9AD2E1BE2B796AC7 /* ShortcutService.swift in Sources */,
@@ -922,6 +921,7 @@
 				51ABB074F7C478FC55D4CA87 /* TextMeasure.swift in Sources */,
 				6F97144294F67C07259C83C1 /* Theme.swift in Sources */,
 				52B62D47D9FDBE73F0FEDB1A /* ToastWindow.swift in Sources */,
+				DC1BBAE2ABD17F92CB589901 /* TransferStatusCard.swift in Sources */,
 				B9D28C5450A77E56829E569F /* TransparencyGrid.swift in Sources */,
 				FEAA5D4F3A6152816BB7EA7B /* Vec.swift in Sources */,
 				F765096A0EF37B4DFEEFC879 /* VideoCompressionModels.swift in Sources */,

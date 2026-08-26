@@ -9,6 +9,18 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
+private enum AnnotationUploadPhase: Equatable {
+    case idle
+    case uploading(UUID)
+    case finished(URL)
+    case failed(String)
+
+    var isUploading: Bool {
+        if case .uploading = self { return true }
+        return false
+    }
+}
+
 struct AnnotationEditorWindow: View {
     @Binding var url: URL?
 
@@ -20,10 +32,9 @@ struct AnnotationEditorWindow: View {
     @State private var saveFlash = false
     @State private var isCopying = false
     @State private var copyFlash = false
-    @State private var isUploading = false
-    @State private var uploadItemID: UUID?
+    @State private var uploadPhase: AnnotationUploadPhase = .idle
+    @State private var lastUploadOptions: CloudUploadOptions?
     @State private var closeGuard = EditorCloseGuard()
-    @State private var didCopyLink = false
     @FocusState private var focusedField: AnnotationEditorFocusedField?
     @Environment(\.dismiss) private var dismissWindow
 
@@ -81,11 +92,9 @@ struct AnnotationEditorWindow: View {
             }
             .onChange(of: model.revision) { _, _ in
                 closeGuard.refreshDocumentEdited()
-                if didCopyLink { withAnimation(.snappy(duration: 0.2)) { didCopyLink = false } }
             }
             .onChange(of: model.backgroundSettings) { _, _ in
                 closeGuard.refreshDocumentEdited()
-                if didCopyLink { withAnimation(.snappy(duration: 0.2)) { didCopyLink = false } }
             }
             .onChange(of: model.baseImageURL) { _, _ in
                 // Cropping replaces the base image rather than touching the
@@ -158,34 +167,16 @@ struct AnnotationEditorWindow: View {
         .help("Save your edits in BetterShot (⌘S)")
 
         if CloudUploader.shared.isConfigured {
-            if isUploading {
-                SharePill(
-                    stage: "Uploading",
-                    progress: uploadItemID.flatMap {
-                        CloudUploader.shared.uploadProgress[$0]
-                    } ?? 0
-                ) {
-                    cancelUpload()
-                }
-            } else {
-                CloudUploadButton(
-                    suggestedTitle: model.sourceURL?.deletingPathExtension().lastPathComponent ?? "",
-                    onUpload: uploadAnnotation
-                ) {
-                    if didCopyLink {
-                        Label("Link Copied", systemImage: "checkmark.circle.fill")
-                            .labelStyle(.titleAndIcon)
-                            .foregroundStyle(.green)
-                            .padding(.horizontal, 6)
-                    } else {
-                        Label("Share", systemImage: "link")
-                            .labelStyle(.titleAndIcon)
-                            .padding(.horizontal, 6)
-                    }
-                }
-                .help("Upload and copy a share link")
-                .disabled(model.previewImage == nil || model.imageSize == .zero)
+            CloudUploadButton(
+                suggestedTitle: model.sourceURL?.deletingPathExtension().lastPathComponent ?? "",
+                onUpload: uploadAnnotation
+            ) {
+                Label("Share", systemImage: "link")
+                    .labelStyle(.titleAndIcon)
+                    .padding(.horizontal, 6)
             }
+            .help("Upload and copy a share link")
+            .disabled(model.previewImage == nil || model.imageSize == .zero || uploadPhase.isUploading)
         }
 
         Button(action: copyToClipboard) {
@@ -342,6 +333,49 @@ struct AnnotationEditorWindow: View {
                     .background(.bar)
             }
         }
+        .overlay(alignment: .bottom) {
+            if let transferStatus {
+                TransferStatusCard(
+                    status: transferStatus,
+                    onCancel: cancelUpload,
+                    onRetry: retryUpload,
+                    onDismiss: { uploadPhase = .idle }
+                )
+                .padding(.bottom, 16)
+                .transition(transferCardTransition)
+            }
+        }
+        .animation(RecordingMotion.showHideSpring, value: transferStatus)
+    }
+
+    private var transferStatus: TransferStatus? {
+        switch uploadPhase {
+        case .idle:
+            return nil
+        case .uploading(let itemID):
+            let progress = CloudUploader.shared.uploadProgress[itemID]
+            return .working(stage: .uploading, progress: (progress ?? 0) > 0 ? progress : nil)
+        case .finished(let url):
+            return .linkReady(url: url)
+        case .failed(let message):
+            return .failed(
+                headline: "Upload failed",
+                message: message,
+                canRetry: lastUploadOptions != nil
+            )
+        }
+    }
+
+    private var transferCardTransition: AnyTransition {
+        RecordingMotion.reduceMotion
+            ? .opacity
+            : AnyTransition.offset(y: 24).combined(with: .opacity)
+    }
+
+    private func retryUpload() {
+        guard case .failed = uploadPhase, let lastUploadOptions else { return }
+        uploadPhase = .idle
+        uploadAnnotation(options: lastUploadOptions)
     }
 
     private func closeAfterLoadFailure() {
@@ -435,22 +469,21 @@ struct AnnotationEditorWindow: View {
 
     private func uploadAnnotation(options: CloudUploadOptions) {
         clearInspectorFocus()
-        guard model.sourceURL != nil, !isUploading else { return }
+        guard model.sourceURL != nil, !uploadPhase.isUploading else { return }
 
         let itemID = UUID()
-        isUploading = true
-        uploadItemID = itemID
+        lastUploadOptions = options
+        uploadPhase = .uploading(itemID)
         Task {
-            defer {
-                isUploading = false
-                uploadItemID = nil
-            }
             do {
                 // Persist the current annotations first so the uploaded file
                 // matches what's saved in history, then upload that file. An
                 // untouched screenshot has nothing to commit, so it uploads
                 // as-is. The editor stays open.
-                guard let sourceURL = model.sourceURL else { return }
+                guard let sourceURL = model.sourceURL else {
+                    uploadPhase = .idle
+                    return
+                }
                 let resultURL = try await commitEdits() ?? sourceURL
 
                 _ = ScreenshotPreviewStack.shared.applyAnnotation(
@@ -466,25 +499,25 @@ struct AnnotationEditorWindow: View {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(result.url, forType: .string)
                 ScreenshotHistoryStore.shared.setCloudURL(for: resultURL, cloudURL: result.url)
-                withAnimation(.snappy(duration: 0.2)) { didCopyLink = true }
                 if let shareURL = URL(string: result.url) {
-                    ShareLinkPanel.shared.present(
-                        url: shareURL,
-                        title: options.trimmedTitleOrNil
-                            ?? resultURL.deletingPathExtension().lastPathComponent
-                    )
+                    uploadPhase = .finished(shareURL)
+                } else {
+                    uploadPhase = .idle
                 }
             } catch is CancellationError {
+                uploadPhase = .idle
             } catch let error as URLError where error.code == .cancelled {
+                uploadPhase = .idle
             } catch {
-                model.errorMessage = "Upload failed: \(error.localizedDescription)"
+                uploadPhase = .failed(error.localizedDescription)
             }
         }
     }
 
     private func cancelUpload() {
-        if let uploadItemID {
-            CloudUploader.shared.cancelUpload(for: uploadItemID)
+        if case .uploading(let itemID) = uploadPhase {
+            CloudUploader.shared.cancelUpload(for: itemID)
+            uploadPhase = .idle
         }
     }
 
