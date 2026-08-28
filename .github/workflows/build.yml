@@ -1,0 +1,44 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Release build
+    # macos-26 is the arm64 image and carries Xcode 26, which is what
+    # project.yml targets (arm64-apple-macosx26.0).
+    runs-on: macos-26
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+          sw_vers
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      # `make release` already builds unsigned (CODE_SIGN_IDENTITY=""
+      # CODE_SIGNING_REQUIRED=NO), so it works without the maintainer's
+      # Developer ID. `make build` does not — it inherits DEVELOPMENT_TEAM
+      # from project.yml and fails on any fork.
+      - name: Build
+        run: make release
+
+      - name: Confirm the app was produced
+        run: |
+          app=".build/Build/Products/Release/BetterShot.app"
+          test -d "$app" || { echo "::error::$app was not produced"; exit 1; }
+          echo "Built $app"
