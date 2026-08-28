@@ -80,7 +80,7 @@ final class PreviewOverlay {
         guard let panel, let screen else { return }
 
         let screenFrame = screen.visibleFrame
-        let panelSize = AppPreferences.overlayCardSize.panelSize
+        let panelSize = AppPreferences.overlayCardSize.panelSize(margin: AppPreferences.overlayEdgeMargin)
 
         let x: CGFloat
         let y: CGFloat
@@ -119,7 +119,21 @@ struct PreviewCardView: View {
     // always nils the panel and `show()` always rebuilds it, so a size change
     // in Settings takes effect on the next capture without any extra wiring.
     private var cardSize: CGSize { AppPreferences.overlayCardSize.thumbnailSize }
-    private var panelSize: CGSize { AppPreferences.overlayCardSize.panelSize }
+    private var margin: CGFloat { AppPreferences.overlayEdgeMargin }
+    private var panelSize: CGSize { AppPreferences.overlayCardSize.panelSize(margin: margin) }
+    private var controlScale: CGFloat { AppPreferences.overlayCardSize.controlScale }
+
+    // The card hugs whichever corner the panel is pinned to, so the margin
+    // measures from the same screen edges the user picked. Pinning it to the
+    // trailing edge regardless left the bottom-left card floating a panel's
+    // width in from the screen instead of a margin's width.
+    private var cardAlignment: Alignment {
+        AppPreferences.overlayPosition == .bottomLeft ? .bottomLeading : .bottomTrailing
+    }
+
+    private var marginEdges: Edge.Set {
+        AppPreferences.overlayPosition == .bottomLeft ? [.leading, .bottom] : [.trailing, .bottom]
+    }
 
     private var isVideo: Bool {
         guard let url = overlay.currentURL else { return false }
@@ -143,7 +157,7 @@ struct PreviewCardView: View {
 
                     if isVideo {
                         Image(systemName: "play.circle.fill")
-                            .font(.system(size: 28))
+                            .font(.system(size: 28 * controlScale))
                             .foregroundStyle(.white.opacity(0.9))
                             .shadow(radius: 4)
                     }
@@ -178,9 +192,8 @@ struct PreviewCardView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-        .padding(.trailing, 20)
-        .padding(.bottom, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: cardAlignment)
+        .padding(marginEdges, margin)
         .frame(width: panelSize.width, height: panelSize.height)
         .onChange(of: overlay.currentURL) { _, newURL in
             loadThumbnail(from: newURL)
@@ -264,10 +277,10 @@ struct PreviewCardView: View {
                     }
                 }
             }
-            .padding(6)
+            .padding(6 * controlScale)
 
             // Center pill actions
-            HStack(spacing: 6) {
+            HStack(spacing: 6 * controlScale) {
                 pillButton("Copy") {
                     // Copy the capture itself, not the card's thumbnail.
                     if let url = overlay.currentURL {
@@ -291,7 +304,7 @@ struct PreviewCardView: View {
             Image(systemName: systemName)
                 .symbolRenderingMode(.palette)
                 .foregroundStyle(.white, .white.opacity(0.25))
-                .font(.system(size: 16))
+                .font(.system(size: 16 * controlScale))
         }
         .buttonStyle(.plain)
     }
@@ -299,10 +312,10 @@ struct PreviewCardView: View {
     private func pillButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: 10 * controlScale, weight: .semibold))
                 .foregroundStyle(.primary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
+                .padding(.horizontal, 8 * controlScale)
+                .padding(.vertical, 3 * controlScale)
                 .background(.white.opacity(0.85), in: Capsule())
         }
         .buttonStyle(.plain)

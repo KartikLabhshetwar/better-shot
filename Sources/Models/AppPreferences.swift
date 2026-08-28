@@ -11,6 +11,7 @@ enum AppPreferences {
     private static let overlayPositionKey = "bs_overlayPosition"
     private static let overlayDismissDelayKey = "bs_overlayDismissDelay"
     private static let overlayCardSizeKey = "bs_overlayCardSize"
+    private static let overlayEdgeMarginKey = "bs_overlayEdgeMargin"
     private static let exportFormatKey = "bs_exportFormat"
     private static let exportQualityKey = "bs_exportQuality"
     private static let selfTimerKey = "bs_selfTimerDelay"
@@ -86,6 +87,23 @@ enum AppPreferences {
             return size
         }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: overlayCardSizeKey) }
+    }
+
+    static let overlayEdgeMarginDefault: Double = 20
+    static let overlayEdgeMarginRange: ClosedRange<Double> = 0...48
+
+    /// How far the preview card is held off the screen edges it is pinned to.
+    static var overlayEdgeMargin: Double {
+        get {
+            // Zero is a real choice here (card flush into the corner), so an
+            // unset key has to be told apart from a stored 0 rather than
+            // leaning on `double(forKey:)` returning 0 for both.
+            guard UserDefaults.standard.object(forKey: overlayEdgeMarginKey) != nil else {
+                return overlayEdgeMarginDefault
+            }
+            return UserDefaults.standard.double(forKey: overlayEdgeMarginKey)
+        }
+        set { UserDefaults.standard.set(newValue, forKey: overlayEdgeMarginKey) }
     }
 
     // MARK: - Export
@@ -224,14 +242,33 @@ enum OverlayCardSize: String, CaseIterable, Identifiable {
         }
     }
 
-    /// The floating NSPanel's bounds. Must stay >= thumbnailSize plus the
-    /// card's own trailing/bottom inset (PreviewCardView) or the thumbnail
-    /// clips against the panel edge.
-    var panelSize: CGSize {
+    /// Room the panel needs beyond the thumbnail and its edge inset so the
+    /// card's drop shadow (`radius: 14, y: 6` in PreviewCardView) has
+    /// somewhere to render instead of clipping against the panel bounds.
+    private static let shadowHeadroom: CGFloat = 24
+
+    /// The floating NSPanel's bounds. The card is inset from the panel's
+    /// screen-facing corner by `margin`, so the panel has to hold the
+    /// thumbnail, that inset, and the shadow headroom. The panel is
+    /// transparent and `positionPanel()` pins it flush to the screen edge, so
+    /// these bounds decide only where the shadow may draw, never where the
+    /// card lands on screen.
+    func panelSize(margin: Double) -> CGSize {
+        CGSize(
+            width: thumbnailSize.width + margin + Self.shadowHeadroom,
+            height: thumbnailSize.height + margin + Self.shadowHeadroom
+        )
+    }
+
+    /// The hover controls scale with the card so they do not shrink into
+    /// nothing on a Large one. Deliberately sub-linear: matching the
+    /// thumbnail's own 1.0/1.46/1.92 width ratio makes the Large icons
+    /// cartoonishly big next to the rest of the system UI.
+    var controlScale: CGFloat {
         switch self {
-        case .small: return CGSize(width: 200, height: 170)
-        case .medium: return CGSize(width: 280, height: 220)
-        case .large: return CGSize(width: 360, height: 270)
+        case .small: return 1.0
+        case .medium: return 1.25
+        case .large: return 1.5
         }
     }
 

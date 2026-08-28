@@ -636,6 +636,7 @@ struct CaptureSettingsTab: View {
     @AppStorage("bs_overlayPosition") private var overlayPositionRaw: String = OverlayPosition.bottomRight.rawValue
     @AppStorage("bs_overlayDismissDelay") private var overlayDismissDelay: Double = 5.0
     @AppStorage("bs_overlayCardSize") private var overlayCardSizeRaw: String = OverlayCardSize.small.rawValue
+    @AppStorage("bs_overlayEdgeMargin") private var overlayEdgeMargin: Double = AppPreferences.overlayEdgeMarginDefault
     @AppStorage("bs_openEditorAfterCapture") private var openEditorAfterCapture = false
     @State private var isConfirmingReset = false
 
@@ -688,6 +689,16 @@ struct CaptureSettingsTab: View {
                 }
                 .pickerStyle(.segmented)
 
+                LabeledContent("Keep it off the edge by") {
+                    HStack(spacing: 12) {
+                        Slider(value: $overlayEdgeMargin, in: AppPreferences.overlayEdgeMarginRange, step: 4)
+                        Text("\(Int(overlayEdgeMargin))pt")
+                            .font(.system(.callout, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 44, alignment: .trailing)
+                    }
+                }
+
                 LabeledContent("Hide it after") {
                     HStack(spacing: 12) {
                         Slider(value: $overlayDismissDelay, in: AppPreferences.overlayDismissRange, step: 1)
@@ -726,6 +737,7 @@ struct CaptureSettingsTab: View {
                 overlayPositionRaw = OverlayPosition.bottomRight.rawValue
                 overlayDismissDelay = 5.0
                 overlayCardSizeRaw = OverlayCardSize.small.rawValue
+                overlayEdgeMargin = AppPreferences.overlayEdgeMarginDefault
                 openEditorAfterCapture = false
             }
             Button("Cancel", role: .cancel) {}
