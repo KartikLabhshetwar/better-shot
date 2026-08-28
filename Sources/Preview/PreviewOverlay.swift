@@ -80,7 +80,7 @@ final class PreviewOverlay {
         guard let panel, let screen else { return }
 
         let screenFrame = screen.visibleFrame
-        let panelSize = CGSize(width: 200, height: 170)
+        let panelSize = AppPreferences.overlayCardSize.panelSize
 
         let x: CGFloat
         let y: CGFloat
@@ -115,7 +115,11 @@ struct PreviewCardView: View {
     @State private var isHovered = false
     @State private var thumbnail: NSImage?
 
-    private let cardSize = CGSize(width: 130, height: 98)
+    // Read fresh each time a card is shown rather than cached: `dismiss()`
+    // always nils the panel and `show()` always rebuilds it, so a size change
+    // in Settings takes effect on the next capture without any extra wiring.
+    private var cardSize: CGSize { AppPreferences.overlayCardSize.thumbnailSize }
+    private var panelSize: CGSize { AppPreferences.overlayCardSize.panelSize }
 
     private var isVideo: Bool {
         guard let url = overlay.currentURL else { return false }
@@ -177,7 +181,7 @@ struct PreviewCardView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
         .padding(.trailing, 20)
         .padding(.bottom, 24)
-        .frame(width: 200, height: 170)
+        .frame(width: panelSize.width, height: panelSize.height)
         .onChange(of: overlay.currentURL) { _, newURL in
             loadThumbnail(from: newURL)
         }
@@ -200,8 +204,9 @@ struct PreviewCardView: View {
             url: url,
             kind: Self.isVideo(url) ? .recording : .screenshot
         )
+        let sampleSize = max(cardSize.width, cardSize.height) * 2 // retina headroom at the current card size
         Task.detached(priority: .userInitiated) {
-            let image = HistoryStore.decodeThumbnail(source, maxSize: 260)
+            let image = HistoryStore.decodeThumbnail(source, maxSize: sampleSize)
             // Two captures in quick succession race: the older decode can land last
             // and paint the previous capture onto the current card.
             await MainActor.run {
