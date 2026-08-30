@@ -31,6 +31,15 @@ final class CaptureOrchestrator {
         captureInProgress = false
     }
 
+    func captureLastRegion(on screen: NSScreen? = nil) async {
+        guard !captureInProgress, AppPreferences.lastRegionRect != nil else { return }
+        captureInProgress = true
+        captureScreen = screen
+        await captureAndProcess { try await ScreenCapture.shared.captureLastRegion() }
+        captureScreen = nil
+        captureInProgress = false
+    }
+
     private func executeCapture(_ action: ShortcutService.Action) async {
         switch action {
         case .region:

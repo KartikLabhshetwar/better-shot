@@ -17,6 +17,7 @@ System theme finally follows macOS dark mode.
 
 - **All-in-one bar**: The floating bar that `⌘⇧2` opens now carries the screenshot actions too: region, window, screen, OCR and color picker sit beside the recording sources, so one shortcut reaches everything (#122)
 - **Reuse the last region**: Region capture is drawn by BetterShot itself now and remembers the last rectangle. Next time it appears as a dashed ghost; press `Return`, `A`, or click inside it to capture exactly that area again. `Space` still switches to window selection (#122)
+- **Last region on the bar**: Opening the bar shows the last rectangle as a dashed ghost on screen; press `A` to capture it again without redrawing. The bar now takes keyboard focus while it is up (so `A` and `Esc` work when it is opened from the global shortcut) and hands focus back when it closes or a recording starts
 
 ### Changed
 

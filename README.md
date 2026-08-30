@@ -42,9 +42,10 @@ screenshot shortcuts.
 | Color picker (hex) | `⌘⇧C` |
 
 `⌘⇧2` opens the all-in-one bar: region, window, screen, OCR, color picker and
-recording all live on it. During region capture your last region is shown as a
-dashed ghost; press `Return`, `A`, or click inside it to capture it again, or
-`Space` to switch to window selection. All of these are re-bindable in
+recording all live on it. Your last region appears as a dashed ghost as soon as
+the bar opens; press `A` to capture it again. During region capture the ghost
+stays: `Return`, `A`, or a click inside it captures it, `Space` switches to
+window selection. All of these are re-bindable in
 Settings > Shortcuts. In the editor, every tool carries its
 own single-key shortcut on its button, and `⌘S` saves, `⇧⌘C` copies, `⌘Z` undoes.
 

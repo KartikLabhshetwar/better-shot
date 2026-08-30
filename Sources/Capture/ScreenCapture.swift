@@ -39,13 +39,26 @@ final class ScreenCapture {
         case .window:
             return try await windowShot(includeShadow: false)
         case .region(let selection):
-            try? await Task.sleep(for: .milliseconds(80))
-            let tempPath = makeTempPath()
-            let region = RegionGeometry.screencaptureArgument(selection.pointsRect)
-            let success = await runScreencapture(["-R", region, "-x", "-t", "png", tempPath])
-            guard success, FileManager.default.fileExists(atPath: tempPath) else { return nil }
-            return URL(fileURLWithPath: tempPath)
+            return try await regionShot(selection.pointsRect)
         }
+    }
+
+    /// Captures the remembered rectangle straight away, no selection overlay.
+    func captureLastRegion() async throws -> URL? {
+        guard !isCapturing, let globalRect = AppPreferences.lastRegionRect else { return nil }
+        isCapturing = true
+        defer { isCapturing = false }
+        let pointsRect = RegionGeometry.pointsRect(global: globalRect, primaryHeight: CGDisplayBounds(CGMainDisplayID()).height)
+        return try await regionShot(pointsRect)
+    }
+
+    private func regionShot(_ pointsRect: CGRect) async throws -> URL? {
+        try? await Task.sleep(for: .milliseconds(80))
+        let tempPath = makeTempPath()
+        let region = RegionGeometry.screencaptureArgument(pointsRect)
+        let success = await runScreencapture(["-R", region, "-x", "-t", "png", tempPath])
+        guard success, FileManager.default.fileExists(atPath: tempPath) else { return nil }
+        return URL(fileURLWithPath: tempPath)
     }
 
     // MARK: - Window (CLI screencapture -w)
