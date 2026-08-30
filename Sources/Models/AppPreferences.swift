@@ -16,6 +16,7 @@ enum AppPreferences {
     private static let selfTimerKey = "bs_selfTimerDelay"
     static let recordingCaptureKeystrokesKey = "bs_recordingCaptureKeystrokes"
     private static let openEditorAfterCaptureKey = "bs_openEditorAfterCapture"
+    private static let keepInDeckUntilSavedKey = "bs_keepInDeckUntilSaved"
     private static let historyRetentionKey = "bs_historyRetentionLimit"
     private static let recordingCaptureMicrophoneKey = "bs_recordingCaptureMicrophone"
     private static let recordingStartDelaySecondsKey = "bs_recordingStartDelaySeconds"
@@ -166,6 +167,11 @@ enum AppPreferences {
     static var openEditorAfterCapture: Bool {
         get { UserDefaults.standard.object(forKey: openEditorAfterCaptureKey) as? Bool ?? false }
         set { UserDefaults.standard.set(newValue, forKey: openEditorAfterCaptureKey) }
+    }
+
+    static var keepInDeckUntilSaved: Bool {
+        get { UserDefaults.standard.bool(forKey: keepInDeckUntilSavedKey) }
+        set { UserDefaults.standard.set(newValue, forKey: keepInDeckUntilSavedKey) }
     }
 
     // MARK: - History

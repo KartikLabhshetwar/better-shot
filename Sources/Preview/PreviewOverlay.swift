@@ -51,6 +51,7 @@ final class PreviewOverlay {
 
     func remove(_ url: URL) {
         cancelScheduledDismiss(for: url)
+        DeckStaging.discard(url)
         items.removeAll { $0 == url }
         if items.isEmpty {
             dismiss()
@@ -68,6 +69,41 @@ final class PreviewOverlay {
         items.removeAll()
     }
 
+    func hide() {
+        panel?.orderOut(nil)
+    }
+
+    func clearAll() {
+        items.forEach(DeckStaging.discard)
+        dismiss()
+    }
+
+    func saveAll() {
+        let staged = items.filter(DeckStaging.isStaged)
+        staged.forEach { DeckStaging.promote($0) }
+        clearAll()
+        showSavedToast(count: staged.count)
+    }
+
+    func save(_ url: URL) {
+        if DeckStaging.isStaged(url) {
+            DeckStaging.promote(url)
+            showSavedToast(count: 1)
+        }
+        remove(url)
+    }
+
+    var hasStagedItems: Bool { items.contains(where: DeckStaging.isStaged) }
+
+    private func showSavedToast(count: Int) {
+        guard count > 0 else { return }
+        ToastWindow.shared.show(
+            message: count == 1 ? "Screenshot saved!" : "\(count) screenshots saved!",
+            icon: NSImage(named: "AppIcon") ?? NSApp.applicationIconImage,
+            on: targetScreen
+        )
+    }
+
     func cancelScheduledDismiss(for url: URL) {
         dismissTasks.removeValue(forKey: url)?.cancel()
     }
@@ -75,8 +111,9 @@ final class PreviewOverlay {
     // MARK: - Panel Setup
 
     func openAnnotateEditor(for url: URL) {
+        let savedURL = DeckStaging.promote(url)
         remove(url)
-        PreviewPanelPresenter.shared.openEditor(for: url)
+        PreviewPanelPresenter.shared.openEditor(for: savedURL)
     }
 
     private func createPanel() {
@@ -126,7 +163,8 @@ final class PreviewOverlay {
     }
 
     private func scheduleDismiss(for url: URL) {
-        guard AppPreferences.overlayDismisses(after: AppPreferences.overlayDismissDelay) else { return }
+        guard AppPreferences.overlayDismisses(after: AppPreferences.overlayDismissDelay),
+              !DeckStaging.isStaged(url) else { return }
         dismissTasks[url] = Task {
             try? await Task.sleep(for: .seconds(AppPreferences.overlayDismissDelay))
             guard !Task.isCancelled else { return }
@@ -143,13 +181,12 @@ struct PreviewDeckView: View {
     var body: some View {
         VStack(alignment: .trailing, spacing: 10) {
             if overlay.items.count > 1 {
-                Button("Clear All") { overlay.dismiss() }
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(.black.opacity(0.55), in: Capsule())
-                    .buttonStyle(.plain)
+                HStack(spacing: 6) {
+                    if overlay.hasStagedItems {
+                        deckButton("Save All") { overlay.saveAll() }
+                    }
+                    deckButton("Clear All") { overlay.clearAll() }
+                }
             }
             ForEach(overlay.items, id: \.self) { url in
                 PreviewCardView(overlay: overlay, url: url)
@@ -159,6 +196,16 @@ struct PreviewDeckView: View {
         .padding(.trailing, 20)
         .padding(.bottom, 24)
         .frame(width: overlay.panelSize.width, height: overlay.panelSize.height)
+    }
+
+    private func deckButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.9))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(.black.opacity(0.55), in: Capsule())
+            .buttonStyle(.plain)
     }
 }
 
@@ -220,6 +267,7 @@ struct PreviewCardView: View {
                     overlay.openAnnotateEditor(for: url)
                 }
                 .onDrag {
+                    DeckStaging.promote(url)
                     if let provider = NSItemProvider(contentsOf: url) {
                         provider.suggestedName = url.lastPathComponent
                         return provider
@@ -263,7 +311,7 @@ struct PreviewCardView: View {
                 HStack {
                     // Delete
                     cornerButton("trash.circle.fill") {
-                        if let record = HistoryStore.shared.record(matching: url) {
+                        if let record = HistoryStore.shared.record(matching: DeckStaging.savedURL(for: url) ?? url) {
                             HistoryStore.shared.deleteRecord(record)
                         } else {
                             try? FileManager.default.removeItem(at: url)
@@ -287,7 +335,7 @@ struct PreviewCardView: View {
                     Spacer()
                     // Pin screenshot
                     cornerButton("pin.circle.fill") {
-                        PinnedScreenshotController.shared.pin(url: url)
+                        PinnedScreenshotController.shared.pin(url: DeckStaging.promote(url))
                         overlay.remove(url)
                     }
                 }
@@ -304,6 +352,7 @@ struct PreviewCardView: View {
                         } else {
                             try ScreenshotFileActions.copyImageToClipboard(from: url)
                         }
+                        DeckStaging.promote(url)
                         overlay.remove(url)
                     } catch {
                         // Reading the file can fail if the capture moved or was deleted
@@ -319,7 +368,7 @@ struct PreviewCardView: View {
                     }
                 }
                 pillButton("Save") {
-                    overlay.remove(url)
+                    overlay.save(url)
                 }
             }
         }

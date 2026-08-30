@@ -637,6 +637,7 @@ struct CaptureSettingsTab: View {
     @AppStorage("bs_overlayDismissDelay") private var overlayDismissDelay: Double = 5.0
     @AppStorage("bs_overlayCardSize") private var overlayCardSizeRaw: String = OverlayCardSize.small.rawValue
     @AppStorage("bs_openEditorAfterCapture") private var openEditorAfterCapture = false
+    @AppStorage("bs_keepInDeckUntilSaved") private var keepInDeckUntilSaved = false
     @State private var isConfirmingReset = false
 
     private var selfTimerDelay: Binding<SelfTimerDelay> {
@@ -708,6 +709,11 @@ struct CaptureSettingsTab: View {
                     Text("Open the editor straight away")
                     Text("Off, the screenshot is saved and copied at once, and the thumbnail is there if you want to edit it.")
                 }
+                Toggle(isOn: $keepInDeckUntilSaved) {
+                    Text("Keep screenshots in the deck until saved")
+                    Text("Nothing reaches your save folder or the Library until you save, copy, drag, pin or annotate a card. Cards stay up until you act on them, and clearing the deck deletes what is left.")
+                }
+                .disabled(openEditorAfterCapture)
             } header: {
                 Text("After Capture")
             }
@@ -728,6 +734,7 @@ struct CaptureSettingsTab: View {
                 overlayDismissDelay = 5.0
                 overlayCardSizeRaw = OverlayCardSize.small.rawValue
                 openEditorAfterCapture = false
+                keepInDeckUntilSaved = false
             }
             Button("Cancel", role: .cancel) {}
         }

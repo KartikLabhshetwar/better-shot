@@ -13,6 +13,7 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        DeckStaging.purge()
         AppPreferences.applyAppearance()
         NSApp.setActivationPolicy(.accessory)
 

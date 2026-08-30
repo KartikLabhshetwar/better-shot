@@ -7,7 +7,7 @@ final class ScreenshotPreviewStack {
     static let shared = ScreenshotPreviewStack()
 
     func collapse() {
-        PreviewOverlay.shared.dismiss()
+        PreviewOverlay.shared.hide()
     }
 
     func expand() {}
