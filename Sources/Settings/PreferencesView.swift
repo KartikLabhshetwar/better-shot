@@ -635,6 +635,7 @@ struct CaptureSettingsTab: View {
     @AppStorage("bs_selfTimerDelay") private var selfTimerRaw: Int = 0
     @AppStorage("bs_overlayPosition") private var overlayPositionRaw: String = OverlayPosition.bottomRight.rawValue
     @AppStorage("bs_overlayDismissDelay") private var overlayDismissDelay: Double = 5.0
+    @AppStorage("bs_overlayCardSize") private var overlayCardSizeRaw: String = OverlayCardSize.small.rawValue
     @AppStorage("bs_openEditorAfterCapture") private var openEditorAfterCapture = false
     @State private var isConfirmingReset = false
 
@@ -649,6 +650,13 @@ struct CaptureSettingsTab: View {
         Binding(
             get: { OverlayPosition(rawValue: overlayPositionRaw) ?? .bottomRight },
             set: { overlayPositionRaw = $0.rawValue }
+        )
+    }
+
+    private var overlayCardSize: Binding<OverlayCardSize> {
+        Binding(
+            get: { OverlayCardSize(rawValue: overlayCardSizeRaw) ?? .small },
+            set: { overlayCardSizeRaw = $0.rawValue }
         )
     }
 
@@ -672,6 +680,13 @@ struct CaptureSettingsTab: View {
                     Text("Bottom Right").tag(OverlayPosition.bottomRight)
                     Text("Bottom Left").tag(OverlayPosition.bottomLeft)
                 }
+
+                Picker("Size", selection: overlayCardSize) {
+                    ForEach(OverlayCardSize.allCases) { size in
+                        Text(size.label).tag(size)
+                    }
+                }
+                .pickerStyle(.segmented)
 
                 LabeledContent("Hide it after") {
                     HStack(spacing: 12) {
@@ -711,6 +726,7 @@ struct CaptureSettingsTab: View {
                 selfTimerRaw = 0
                 overlayPositionRaw = OverlayPosition.bottomRight.rawValue
                 overlayDismissDelay = 5.0
+                overlayCardSizeRaw = OverlayCardSize.small.rawValue
                 openEditorAfterCapture = false
             }
             Button("Cancel", role: .cancel) {}

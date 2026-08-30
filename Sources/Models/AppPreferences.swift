@@ -10,6 +10,7 @@ enum AppPreferences {
     private static let playSoundKey = "bs_playSound"
     private static let overlayPositionKey = "bs_overlayPosition"
     private static let overlayDismissDelayKey = "bs_overlayDismissDelay"
+    private static let overlayCardSizeKey = "bs_overlayCardSize"
     private static let exportFormatKey = "bs_exportFormat"
     private static let exportQualityKey = "bs_exportQuality"
     private static let selfTimerKey = "bs_selfTimerDelay"
@@ -87,6 +88,15 @@ enum AppPreferences {
             return val > 0 ? val : 5.0
         }
         set { UserDefaults.standard.set(newValue, forKey: overlayDismissDelayKey) }
+    }
+
+    static var overlayCardSize: OverlayCardSize {
+        get {
+            guard let raw = UserDefaults.standard.string(forKey: overlayCardSizeKey),
+                  let size = OverlayCardSize(rawValue: raw) else { return .small }
+            return size
+        }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: overlayCardSizeKey) }
     }
 
     // MARK: - Export
@@ -210,6 +220,40 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 enum OverlayPosition: String, CaseIterable, Codable {
     case bottomRight = "bottomRight"
     case bottomLeft = "bottomLeft"
+}
+
+enum OverlayCardSize: String, CaseIterable, Identifiable {
+    case small, medium, large
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .small: return "Small"
+        case .medium: return "Medium"
+        case .large: return "Large"
+        }
+    }
+
+    /// The floating NSPanel's bounds. Must stay >= thumbnailSize plus the
+    /// card's own trailing/bottom inset (PreviewCardView) or the thumbnail
+    /// clips against the panel edge.
+    var panelSize: CGSize {
+        switch self {
+        case .small: return CGSize(width: 200, height: 170)
+        case .medium: return CGSize(width: 280, height: 220)
+        case .large: return CGSize(width: 360, height: 270)
+        }
+    }
+
+    /// The visible thumbnail drawn inside the panel.
+    var thumbnailSize: CGSize {
+        switch self {
+        case .small: return CGSize(width: 130, height: 98)
+        case .medium: return CGSize(width: 190, height: 140)
+        case .large: return CGSize(width: 250, height: 180)
+        }
+    }
 }
 
 enum ExportFormat: String, CaseIterable {
