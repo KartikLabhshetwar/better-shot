@@ -295,7 +295,7 @@ struct PreviewCardView: View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(.black.opacity(0.85))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
                 .background(.white.opacity(0.85), in: Capsule())
