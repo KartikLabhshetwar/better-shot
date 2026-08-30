@@ -21,6 +21,7 @@ System theme finally follows macOS dark mode.
 - **Reuse the last region**: Region capture is drawn by BetterShot itself now and remembers the last rectangle. Next time it appears as a dashed ghost; press `Return`, `A`, or click inside it to capture exactly that area again. `Space` still switches to window selection (#122)
 - **Last region on the bar**: Opening the bar shows the last rectangle as a dashed ghost on screen; press `A` to capture it again without redrawing. The bar now takes keyboard focus while it is up (so `A` and `Esc` work when it is opened from the global shortcut) and hands focus back when it closes or a recording starts
 - **Preview card size**: Settings > Capture > Preview Thumbnail gains a Small, Medium, Large picker for the after-capture card. Small is the size the card has always been, so nothing changes unless you opt in, and the thumbnail is decoded at a resolution to match so Large stays sharp ([#123](https://github.com/KartikLabhshetwar/better-shot/pull/123), thanks [@BradleyAllanDavis](https://github.com/BradleyAllanDavis))
+- **Adjust the region before it is captured**: Letting go of the mouse no longer takes the shot. The rectangle stays on screen with handles on its corners and edges: drag a handle to resize, drag inside to move, then press `Return` or double-click inside it to capture, or `Esc` to cancel. Drawing outside starts a fresh rectangle, and the last-region ghost still captures on a single click ([#49](https://github.com/KartikLabhshetwar/better-shot/issues/49))
 
 ### Changed
 
