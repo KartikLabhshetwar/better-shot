@@ -52,12 +52,14 @@ own single-key shortcut on its button, and `⌘S` saves, `⇧⌘C` copies, `⌘Z
 ## Build from source
 
 ```bash
+brew install xcodegen
 git clone https://github.com/KartikLabhshetwar/better-shot.git
 cd better-shot
-make run
+make release
+open .build/Build/Products/Release/BetterShot.app
 ```
 
-Needs macOS 26 and Xcode 26 (Swift 6). Native Swift and SwiftUI throughout: no
+Needs macOS 26, Xcode 26 (Swift 6), and XcodeGen. Native Swift and SwiftUI throughout: no
 Electron, no web views, and a single Swift package (DockProgress).
 
 ## Contributing
