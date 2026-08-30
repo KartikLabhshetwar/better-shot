@@ -48,13 +48,13 @@ export function Comparison() {
   return (
     <section
       id="compare"
-      className="mx-auto max-w-[1240px] scroll-mt-20 border-t-2 border-rule px-6 py-14"
+      className="mx-auto max-w-[1100px] scroll-mt-20 px-6 py-14 sm:py-20"
     >
       <SectionLabel className="mb-3.5">Comparison</SectionLabel>
-      <h2 className="display -ml-[0.04em] max-w-[26ch] text-[clamp(30px,3.4vw,44px)]">
+      <h2 className="max-w-[26ch] text-[28px] font-extrabold tracking-tight sm:text-[32px]">
         One app instead of three subscriptions
       </h2>
-      <p className="mt-6 max-w-[60ch] text-[16px] leading-[28px] text-ink/80">
+      <p className="mt-6 max-w-[60ch] text-[16px] leading-[28px] text-zinc-500">
         Most people run CleanShot X for screenshots, Loom for walkthroughs, and CapCut when the
         recording needs an edit. Better Shot covers that path on your own machine.
       </p>
@@ -63,13 +63,13 @@ export function Comparison() {
         <table className="w-full min-w-[720px] border-collapse text-[14px]">
           <thead>
             <tr>
-              <th className="micro w-[34%] border-b-2 border-rule px-2 py-2 text-left text-[11px] font-semibold uppercase text-ink/60">
+              <th className="micro w-[34%] border-b border-zinc-200 px-2 py-2 text-left text-[11px] font-semibold uppercase text-zinc-500">
                 Feature
               </th>
               {products.map((product) => (
                 <th
                   key={product}
-                  className="micro whitespace-nowrap border-b-2 border-rule px-2 py-2 text-left text-[11px] font-semibold uppercase text-ink/60"
+                  className="micro whitespace-nowrap border-b border-zinc-200 px-2 py-2 text-left text-[11px] font-semibold uppercase text-zinc-500"
                 >
                   {product}
                 </th>
@@ -78,13 +78,13 @@ export function Comparison() {
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.label}>
-                <td className="border-b border-rule px-2 py-2 font-medium">{row.label}</td>
+              <tr key={row.label} className="transition-colors hover:bg-zinc-50">
+                <td className="border-b border-zinc-100 px-2 py-2 font-medium">{row.label}</td>
                 {row.cells.map((cell, i) => (
                   <td
                     key={products[i]}
-                    className={`border-b border-rule px-2 py-2 ${
-                      i === 0 ? "text-brand" : "text-ink/70"
+                    className={`border-b border-zinc-100 px-2 py-2 ${
+                      i === 0 ? "text-brand" : "text-zinc-500"
                     }`}
                   >
                     <CellValue value={cell} />
@@ -96,16 +96,16 @@ export function Comparison() {
         </table>
       </div>
 
-      <p className="mt-4 text-[13px] leading-[22px] text-ink/70">
-        <span aria-hidden>■</span> yes &nbsp; <span aria-hidden>□</span> with meaningful limits
-        &nbsp; <span aria-hidden>—</span> no. Competitor pricing as published in August 2026.
+      <p className="mt-4 text-[13px] leading-[22px] text-zinc-400">
+        <span aria-hidden>{"■"}</span> yes &nbsp; <span aria-hidden>{"□"}</span> with meaningful limits
+        &nbsp; <span aria-hidden>{"—"}</span> no. Competitor pricing as published in August 2026.
       </p>
       <p className="mt-6">
         <Link
           href="/blog/cleanshot-x-capcut-loom-alternative"
           className="text-[15px] font-semibold text-brand-700 outline-none transition-colors duration-150 hover:text-brand"
         >
-          Read the full comparison →
+          Read the full comparison &rarr;
         </Link>
       </p>
     </section>

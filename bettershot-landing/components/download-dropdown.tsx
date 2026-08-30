@@ -43,12 +43,12 @@ export function DownloadDropdown({
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          "inline-flex items-center justify-center font-semibold tracking-tight outline-none",
+          "inline-flex items-center justify-center rounded-xl font-semibold tracking-tight outline-none",
           "transition-colors duration-150",
           sizeClass[size],
           variant === "outline"
-            ? "border-2 border-rule text-ink hover:border-ink"
-            : "bg-brand text-canvas hover:bg-brand-600 active:bg-brand-700",
+            ? "border border-zinc-200 text-zinc-600 hover:border-zinc-400"
+            : "bg-brand text-white hover:bg-brand-600 active:bg-brand-700",
           className,
         )}
       >
@@ -59,36 +59,36 @@ export function DownloadDropdown({
       <DropdownMenuContent
         align="end"
         sideOffset={8}
-        className="w-64 border-2 border-ink bg-surface p-0"
+        className="w-64 rounded-xl border border-zinc-200 bg-white p-0 shadow-lg"
       >
         <DropdownMenuItem
           onClick={() => open(release.appleSilicon)}
-          className="cursor-pointer gap-3 border-b border-rule px-3 py-2.5 last:border-b-0"
+          className="cursor-pointer gap-3 border-b border-zinc-100 px-3 py-2.5 last:border-b-0"
         >
           <AppleLogoIcon size={16} weight="fill" />
           <span className="flex flex-col">
-            <span className="text-sm font-semibold text-ink">Apple Silicon</span>
-            <span className="text-xs text-ink/60">M1, M2, M3, M4</span>
+            <span className="text-sm font-semibold text-zinc-900">Apple Silicon</span>
+            <span className="text-xs text-zinc-500">M1, M2, M3, M4</span>
           </span>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => open(release.intel)}
-          className="cursor-pointer gap-3 border-b border-rule px-3 py-2.5 last:border-b-0"
+          className="cursor-pointer gap-3 border-b border-zinc-100 px-3 py-2.5 last:border-b-0"
         >
           <DownloadSimpleIcon size={16} weight="bold" />
           <span className="flex flex-col">
-            <span className="text-sm font-semibold text-ink">Intel</span>
-            <span className="text-xs text-ink/60">x86_64</span>
+            <span className="text-sm font-semibold text-zinc-900">Intel</span>
+            <span className="text-xs text-zinc-500">x86_64</span>
           </span>
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => open("https://formulae.brew.sh/cask/bettershot")}
-          className="cursor-pointer gap-3 border-b border-rule px-3 py-2.5 last:border-b-0"
+          className="cursor-pointer gap-3 border-b border-zinc-100 px-3 py-2.5 last:border-b-0"
         >
           <TerminalWindowIcon size={16} weight="bold" />
           <span className="flex flex-col">
-            <span className="text-sm font-semibold text-ink">Homebrew</span>
-            <span className="font-mono text-xs text-ink/60">brew install --cask bettershot</span>
+            <span className="text-sm font-semibold text-zinc-900">Homebrew</span>
+            <span className="font-mono text-xs text-zinc-500">brew install --cask bettershot</span>
           </span>
         </DropdownMenuItem>
       </DropdownMenuContent>

@@ -4,7 +4,7 @@ export function SectionLabel({ children, className }: { children: React.ReactNod
   return (
     <p
       className={cn(
-        "micro text-[13px] font-extrabold uppercase text-brand-700",
+        "text-[13px] font-medium uppercase tracking-widest text-zinc-400",
         className,
       )}
     >
@@ -22,7 +22,7 @@ export function GradientHeading({
   className?: string
   as?: "h1" | "h2"
 }) {
-  return <Tag className={cn("text-ink", className)}>{children}</Tag>
+  return <Tag className={cn("text-zinc-900", className)}>{children}</Tag>
 }
 
 export function PageHeader({
@@ -35,16 +35,16 @@ export function PageHeader({
   children?: React.ReactNode
 }) {
   return (
-    <header className="mx-auto max-w-[1240px] px-6 pb-14 pt-28 sm:pt-32">
+    <header className="mx-auto max-w-[1100px] px-6 pb-14 pt-28 sm:pt-32">
       <SectionLabel className="mb-5">{label}</SectionLabel>
       <GradientHeading
         as="h1"
-        className="display -ml-[0.04em] text-[42px] sm:text-[58px] lg:text-[68px]"
+        className="text-[42px] font-extrabold tracking-tight sm:text-[58px] lg:text-[68px]"
       >
         {title}
       </GradientHeading>
       {children && (
-        <div className="mt-6 max-w-[640px] text-[17px] leading-[28px] text-ink/70">{children}</div>
+        <div className="mt-6 max-w-[640px] text-[17px] leading-[28px] text-zinc-500">{children}</div>
       )}
     </header>
   )

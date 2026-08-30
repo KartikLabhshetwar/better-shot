@@ -27,7 +27,7 @@ export function CopyCommand({ command, className }: { command: string; className
         }
       }}
       className={cn(
-        "group inline-flex items-center gap-3 border-2 border-rule bg-transparent px-4 py-3 font-sans text-[15px] text-ink outline-none transition-colors duration-150 hover:border-ink",
+        "group inline-flex items-center gap-3 rounded-xl border border-zinc-200 bg-transparent px-4 py-3 font-sans text-[15px] text-zinc-600 outline-none transition-colors duration-150 hover:border-zinc-400",
         className,
       )}
     >

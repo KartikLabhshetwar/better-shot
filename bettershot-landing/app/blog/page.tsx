@@ -19,59 +19,54 @@ export const metadata: Metadata = {
 
 export default function BlogIndex() {
   return (
-    <div className="min-h-screen w-full bg-canvas text-ink">
+    <div className="min-h-screen w-full bg-white text-zinc-900">
       <SiteNav />
 
       <main id="main">
-        <div className="mx-auto max-w-[1240px] px-6">
-          <header className="pb-12 pt-[72px]">
-            <span className="micro block text-[13px] font-extrabold uppercase text-brand-700">
+        <div className="mx-auto max-w-[1100px] px-6">
+          <header className="pb-12 pt-28 sm:pt-32">
+            <span className="text-[13px] font-medium uppercase tracking-widest text-zinc-400">
               Blog
             </span>
-            <h1 className="display mt-3.5 -ml-[0.058em] text-[clamp(38px,5.4vw,72px)]">
+            <h1 className="mt-4 text-[clamp(38px,5.4vw,60px)] font-extrabold tracking-tight">
               Screen capture, written down
             </h1>
-            <p className="mt-6 max-w-[54ch] text-[17px] leading-[28px] text-ink/80">
+            <p className="mt-6 max-w-[54ch] text-[17px] leading-[28px] text-zinc-500">
               Comparisons and workflow notes for people who take a lot of screenshots and record a
               lot of screens.
             </p>
           </header>
 
-          <hr className="rule" />
-
-          {posts.map((post, index) => (
-            <Link
-              key={post.slug}
-              href={`/blog/${post.slug}`}
-              className="group grid items-start gap-6 border-b-2 border-rule py-[42px] text-ink lg:grid-cols-[88px_minmax(0,1fr)] lg:gap-x-[clamp(24px,4vw,64px)]"
-            >
-              <p className="text-[15px] font-extrabold leading-[24px] tabular-nums">
-                {String(index + 1).padStart(2, "0")}
-              </p>
-              <div>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
-                  <span className="inline-flex items-center bg-brand-100 px-2.5 py-[3px] text-[11px] tracking-[0.02em] text-brand-800">
+          <div className="space-y-0">
+            {posts.map((post) => (
+              <Link
+                key={post.slug}
+                href={`/blog/${post.slug}`}
+                className="group block border-t border-zinc-200 py-8 sm:py-10"
+              >
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <span className="rounded-full bg-brand-100 px-3 py-1 text-[12px] font-medium text-brand-700">
                     {post.tag}
                   </span>
-                  <span className="micro text-[13px] uppercase text-ink/70">
-                    {formatPostDate(post.date)} · {post.readingTime}
+                  <span className="text-[13px] text-zinc-400">
+                    {formatPostDate(post.date)} &middot; {post.readingTime}
                   </span>
                 </div>
-                <h2 className="display-sm mt-4 max-w-[30ch] text-[clamp(24px,2.6vw,34px)]">
+                <h2 className="mt-3 max-w-[36ch] text-[clamp(22px,2.4vw,30px)] font-extrabold tracking-tight">
                   {post.headline}
                 </h2>
-                <p className="mt-4 max-w-[60ch] text-[16px] leading-[28px] text-ink/80">
+                <p className="mt-3 max-w-[60ch] text-[16px] leading-[28px] text-zinc-500">
                   {post.description}
                 </p>
-                <p className="mt-5 text-[15px] font-semibold text-brand-700 transition-colors duration-150 group-hover:text-brand">
-                  Read post →
+                <p className="mt-4 text-[15px] font-semibold text-brand transition-colors duration-150 group-hover:text-brand-700">
+                  Read post &rarr;
                 </p>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            ))}
+          </div>
 
-          <section className="pb-[72px] pt-12">
-            <p className="max-w-[54ch] text-[15px] leading-[26px] text-ink/70">
+          <section className="border-t border-zinc-200 pb-16 pt-10">
+            <p className="max-w-[54ch] text-[15px] leading-[26px] text-zinc-400">
               More posts are on the way: recording a walkthrough people finish, redacting a demo
               before it ships, and setting up R2 share links on your own domain.
             </p>

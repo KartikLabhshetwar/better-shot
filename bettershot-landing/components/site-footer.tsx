@@ -47,29 +47,28 @@ const columns = [
   },
 ]
 
-const linkClass = "text-[14px] text-ink/70 outline-none transition-colors duration-150 hover:text-ink"
+const linkClass = "text-[14px] text-zinc-500 outline-none transition-colors duration-150 hover:text-zinc-900"
 
 export function SiteFooter() {
   return (
-    <footer className="bg-canvas">
-      <div className="mx-auto max-w-[1240px] px-6">
-        <hr className="rule" />
+    <footer className="border-t border-zinc-100">
+      <div className="mx-auto max-w-[1100px] px-6">
         <div className="grid grid-cols-2 gap-10 py-14 md:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
           <div className="col-span-2 md:col-span-1">
             <div className="mb-4 flex items-center gap-2.5">
-              <Image src="/logo.png" alt="" width={24} height={24} />
-              <span className="text-[18px] font-extrabold tracking-tight text-ink">Better Shot</span>
+              <Image src="/logo.png" alt="" width={24} height={24} className="rounded-md" />
+              <span className="text-[18px] font-extrabold tracking-tight text-zinc-900">Better Shot</span>
             </div>
-            <p className="max-w-[280px] text-[14px] leading-[24px] text-ink/70">
+            <p className="max-w-[280px] text-[14px] leading-[24px] text-zinc-500">
               Free, open source screen capture for macOS. Local first, no account, no subscription.
             </p>
-            <p className="mt-8 text-[13px] leading-[22px] text-ink/55">
+            <p className="mt-8 text-[13px] leading-[22px] text-zinc-400">
               &copy; {new Date().getFullYear()} Better Shot. BSD 3 Clause licensed. Built by{" "}
               <a
                 href="https://x.com/code_kartik"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-ink/70 underline underline-offset-2 outline-none transition-colors duration-150 hover:text-ink"
+                className="text-zinc-500 underline underline-offset-2 outline-none transition-colors duration-150 hover:text-zinc-900"
               >
                 Kartik Labhshetwar
               </a>
@@ -78,7 +77,7 @@ export function SiteFooter() {
 
           {columns.map((column) => (
             <nav key={column.title} aria-label={column.title}>
-              <p className="micro mb-5 text-[13px] font-extrabold uppercase text-ink">
+              <p className="mb-5 text-[13px] font-medium uppercase tracking-widest text-zinc-400">
                 {column.title}
               </p>
               <ul className="space-y-3">

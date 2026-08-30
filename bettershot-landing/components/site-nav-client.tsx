@@ -44,27 +44,27 @@ export function SiteNavClient({ release }: { release: ReleaseInfo }) {
     <>
       <nav
         aria-label="Main"
-        className="sticky top-0 z-50 border-b-2 border-rule bg-canvas"
+        className="fixed top-0 z-50 w-full border-b border-zinc-200 bg-white/80 backdrop-blur-xl"
       >
-        <div className="mx-auto flex h-[62px] max-w-[1240px] items-center gap-7 px-6">
+        <div className="mx-auto flex h-14 max-w-[1100px] items-center gap-6 px-6">
           <Link
             href="/"
             aria-current={pathname === "/" ? "page" : undefined}
             className="mr-auto flex shrink-0 items-center gap-2.5 outline-none"
           >
-            <Image src="/logo.png" alt="Better Shot" width={24} height={24} />
-            <span className="text-[18px] font-extrabold tracking-tight text-ink">Better Shot</span>
+            <Image src="/logo.png" alt="Better Shot" width={24} height={24} className="rounded-md" />
+            <span className="text-[18px] font-extrabold tracking-tight text-zinc-900">Better Shot</span>
           </Link>
 
-          <div className="hidden items-center gap-7 sm:flex">
+          <div className="hidden items-center gap-6 sm:flex">
             {links.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 aria-current={isCurrent(link.href) ? "page" : undefined}
                 className={cn(
-                  "text-[14px] font-semibold outline-none transition-colors duration-150",
-                  isCurrent(link.href) ? "text-brand-700" : "text-ink/70 hover:text-ink",
+                  "text-[13px] font-medium outline-none transition-colors duration-150",
+                  isCurrent(link.href) ? "text-zinc-900" : "text-zinc-500 hover:text-zinc-900",
                 )}
               >
                 {link.label}
@@ -74,9 +74,9 @@ export function SiteNavClient({ release }: { release: ReleaseInfo }) {
               href="https://github.com/KartikLabhshetwar/better-shot"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-[14px] font-semibold text-ink/70 outline-none transition-colors duration-150 hover:text-ink"
+              className="inline-flex items-center gap-1.5 text-[13px] font-medium text-zinc-500 outline-none transition-colors duration-150 hover:text-zinc-900"
             >
-              <GithubLogoIcon size={16} weight="bold" />
+              <GithubLogoIcon size={15} weight="bold" />
               <StarCount />
             </a>
           </div>
@@ -85,7 +85,7 @@ export function SiteNavClient({ release }: { release: ReleaseInfo }) {
             release={release}
             source="navbar"
             size="sm"
-            label="Download for macOS"
+            label="Download"
             className="hidden sm:inline-flex"
           />
 
@@ -99,13 +99,13 @@ export function SiteNavClient({ release }: { release: ReleaseInfo }) {
           >
             <span
               className={cn(
-                "absolute left-1/2 top-1/2 h-0.5 w-5 -translate-x-1/2 bg-ink transition-transform duration-300",
+                "absolute left-1/2 top-1/2 h-0.5 w-5 -translate-x-1/2 rounded-full bg-zinc-900 transition-transform duration-300",
                 open ? "translate-y-0 rotate-45" : "-translate-y-1",
               )}
             />
             <span
               className={cn(
-                "absolute left-1/2 top-1/2 h-0.5 w-5 -translate-x-1/2 bg-ink transition-transform duration-300",
+                "absolute left-1/2 top-1/2 h-0.5 w-5 -translate-x-1/2 rounded-full bg-zinc-900 transition-transform duration-300",
                 open ? "translate-y-0 -rotate-45" : "translate-y-1",
               )}
             />
@@ -118,7 +118,7 @@ export function SiteNavClient({ release }: { release: ReleaseInfo }) {
         inert={!open}
         aria-hidden={!open}
         className={cn(
-          "fixed inset-0 z-40 flex flex-col justify-center gap-3 bg-canvas px-6 transition-opacity duration-300 sm:hidden",
+          "fixed inset-0 z-40 flex flex-col justify-center gap-4 bg-white px-6 transition-opacity duration-300 sm:hidden",
           open ? "opacity-100" : "pointer-events-none opacity-0",
         )}
       >
@@ -128,8 +128,8 @@ export function SiteNavClient({ release }: { release: ReleaseInfo }) {
             href={link.href}
             aria-current={isCurrent(link.href) ? "page" : undefined}
             className={cn(
-              "border-t-2 border-rule pt-3 text-[34px] font-extrabold tracking-tight outline-none",
-              isCurrent(link.href) ? "text-brand-700" : "text-ink",
+              "border-t border-zinc-200 pt-4 text-[28px] font-extrabold tracking-tight outline-none",
+              isCurrent(link.href) ? "text-brand" : "text-zinc-900",
             )}
           >
             {link.label}
@@ -139,9 +139,9 @@ export function SiteNavClient({ release }: { release: ReleaseInfo }) {
           href="https://github.com/KartikLabhshetwar/better-shot"
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-4 inline-flex w-max items-center gap-2 text-[15px] font-semibold text-ink/70 outline-none"
+          className="mt-4 inline-flex w-max items-center gap-2 text-[15px] font-medium text-zinc-500 outline-none"
         >
-          <GithubLogoIcon size={20} weight="bold" />
+          <GithubLogoIcon size={18} weight="bold" />
           <StarCount />
         </a>
       </div>

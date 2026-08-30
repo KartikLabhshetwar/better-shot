@@ -50,27 +50,27 @@ export const faqs = [
 
 export function FaqSection() {
   return (
-    <section id="faq" className="mx-auto max-w-[1240px] scroll-mt-20 border-t-2 border-rule px-6 py-14">
+    <section id="faq" className="mx-auto max-w-[1100px] scroll-mt-20 px-6 py-14 sm:py-20">
       <div className="max-w-[760px]">
         <SectionLabel className="mb-4">FAQ</SectionLabel>
-        <h2 className="display-sm mb-4 text-[32px] leading-[38px]">Questions people ask</h2>
-        <p className="mb-10 max-w-[60ch] text-[16px] leading-[28px] text-ink/80">
+        <h2 className="mb-4 text-[28px] font-extrabold tracking-tight sm:text-[32px]">Frequently asked questions</h2>
+        <p className="mb-10 max-w-[60ch] text-[16px] leading-[28px] text-zinc-500">
           Pricing, privacy, and how Better Shot compares to the tools you are probably paying for
           today.
         </p>
 
-        <div className="divide-y divide-rule border-y-2 border-rule">
+        <div className="divide-y divide-zinc-200 overflow-hidden rounded-2xl border border-zinc-200">
           {faqs.map((faq) => (
             <details key={faq.q} className="group">
-              <summary className="flex cursor-pointer list-none items-start justify-between gap-6 py-4 outline-none">
-                <span className="text-[16px] font-semibold leading-normal text-ink">{faq.q}</span>
+              <summary className="flex cursor-pointer list-none items-start justify-between gap-6 bg-white px-5 py-4 outline-none transition-colors hover:bg-zinc-50">
+                <span className="text-[16px] font-semibold leading-normal text-zinc-900">{faq.q}</span>
                 <PlusIcon
                   size={16}
                   weight="bold"
-                  className="mt-1 shrink-0 text-brand-700 duration-300 group-open:rotate-45"
+                  className="mt-1 shrink-0 text-zinc-400 duration-300 group-open:rotate-45"
                 />
               </summary>
-              <p className="max-w-[68ch] pb-6 pr-10 text-[15px] leading-[26px] text-ink/80">{faq.a}</p>
+              <p className="max-w-[68ch] px-5 pb-6 pr-10 text-[15px] leading-[26px] text-zinc-500">{faq.a}</p>
             </details>
           ))}
         </div>
