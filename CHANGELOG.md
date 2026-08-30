@@ -5,12 +5,6 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Added
-
-- **Screenshot deck**: Successive captures now stack into a floating deck in the screen corner instead of replacing each other, up to five cards with the oldest evicted first. Every card keeps its own auto-dismiss timer (or stays until closed when the delay is set to Never) and its own copy, delete, pin, annotate and drag-out actions, and a Clear All button dismisses the whole deck at once ([#76](https://github.com/KartikLabhshetwar/better-shot/issues/76))
-
 ## [0.4.3] - 2026-08-30
 
 One shortcut for everything. The floating bar picks up the screenshot
@@ -21,6 +15,7 @@ System theme finally follows macOS dark mode.
 
 ### Added
 
+- **Screenshot deck**: Successive captures now stack into a floating deck in the screen corner instead of replacing each other, up to five cards with the oldest evicted first. Every card keeps its own auto-dismiss timer (or stays until closed when the delay is set to Never) and its own copy, delete, pin, annotate and drag-out actions, and a Clear All button dismisses the whole deck at once ([#76](https://github.com/KartikLabhshetwar/better-shot/issues/76))
 - **All-in-one bar**: The floating bar that `⌘⇧2` opens now carries the screenshot actions too: region, window, screen, OCR and color picker sit beside the recording sources, so one shortcut reaches everything (#122)
 - **Reuse the last region**: Region capture is drawn by BetterShot itself now and remembers the last rectangle. Next time it appears as a dashed ghost; press `Return`, `A`, or click inside it to capture exactly that area again. `Space` still switches to window selection (#122)
 - **Last region on the bar**: Opening the bar shows the last rectangle as a dashed ghost on screen; press `A` to capture it again without redrawing. The bar now takes keyboard focus while it is up (so `A` and `Esc` work when it is opened from the global shortcut) and hands focus back when it closes or a recording starts
