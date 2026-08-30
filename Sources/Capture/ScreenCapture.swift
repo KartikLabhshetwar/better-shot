@@ -33,13 +33,19 @@ final class ScreenCapture {
         isCapturing = true
         defer { isCapturing = false }
 
-        let tempPath = makeTempPath()
-        // -s is "only allow mouse selection mode", so space cannot reach window selection. -i is the
-        // mode that carries the toggle, -J pins the starting mode because -i alone reopens in
-        // whichever one was used last, and -o matches captureWindow's shadowless window shot.
-        let success = await runScreencapture(["-i", "-J", "selection", "-o", "-x", "-t", "png", tempPath])
-        guard success, FileManager.default.fileExists(atPath: tempPath) else { return nil }
-        return URL(fileURLWithPath: tempPath)
+        switch await RegionSelectionOverlay().selectRegion() {
+        case .cancelled:
+            return nil
+        case .window:
+            return try await windowShot(includeShadow: false)
+        case .region(let selection):
+            try? await Task.sleep(for: .milliseconds(80))
+            let tempPath = makeTempPath()
+            let region = RegionGeometry.screencaptureArgument(selection.pointsRect)
+            let success = await runScreencapture(["-R", region, "-x", "-t", "png", tempPath])
+            guard success, FileManager.default.fileExists(atPath: tempPath) else { return nil }
+            return URL(fileURLWithPath: tempPath)
+        }
     }
 
     // MARK: - Window (CLI screencapture -w)
@@ -48,7 +54,10 @@ final class ScreenCapture {
         guard !isCapturing else { return nil }
         isCapturing = true
         defer { isCapturing = false }
+        return try await windowShot(includeShadow: includeShadow)
+    }
 
+    private func windowShot(includeShadow: Bool) async throws -> URL? {
         let tempPath = makeTempPath()
         var args = ["-w"]
         if !includeShadow { args.append("-o") }

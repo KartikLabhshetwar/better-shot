@@ -5,6 +5,13 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] - 2026-08-30
+
+### Added
+
+- **All-in-one bar**: The floating bar that `⌘⇧2` opens now carries the screenshot actions too: region, window, screen, OCR and color picker sit beside the recording sources, so one shortcut reaches everything (#122)
+- **Reuse the last region**: Region capture is drawn by BetterShot itself now and remembers the last rectangle. Next time it appears as a dashed ghost; press `Return`, `A`, or click inside it to capture exactly that area again. `Space` still switches to window selection (#122)
+
 ## [0.4.2] - 2026-08-26
 
 The Recording Studio learns to hide things: masks blur or pixelate any region

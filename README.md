@@ -41,8 +41,11 @@ screenshot shortcuts.
 | OCR text scan | `⌘⇧O` |
 | Color picker (hex) | `⌘⇧C` |
 
-Press `Space` during region capture to switch to window selection. All of these
-are re-bindable in Settings > Shortcuts. In the editor, every tool carries its
+`⌘⇧2` opens the all-in-one bar: region, window, screen, OCR, color picker and
+recording all live on it. During region capture your last region is shown as a
+dashed ghost; press `Return`, `A`, or click inside it to capture it again, or
+`Space` to switch to window selection. All of these are re-bindable in
+Settings > Shortcuts. In the editor, every tool carries its
 own single-key shortcut on its button, and `⌘S` saves, `⇧⌘C` copies, `⌘Z` undoes.
 
 ## Build from source

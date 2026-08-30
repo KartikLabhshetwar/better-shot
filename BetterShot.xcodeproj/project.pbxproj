@@ -102,6 +102,7 @@
 		8023C4C4CBE10CB12EDF5508 /* AnnotationEditorActivationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43F5541590A45676EFD6B276 /* AnnotationEditorActivationPolicy.swift */; };
 		802FA2BCA250E8FCCE8909BA /* RecordingClipTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979BD0C592163200160BDC49 /* RecordingClipTimelineView.swift */; };
 		82252227C16A8C9208C7FF60 /* AnnotationBackgroundPreviewViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBB04739A2E2BF3D541F2161 /* AnnotationBackgroundPreviewViews.swift */; };
+		85CCAB85BAAB94FBC1A9B5A9 /* RegionGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2B128F33D1CBF0CBB6A6852 /* RegionGeometry.swift */; };
 		85FA3C0AC731BFFCF9840E69 /* AnnotationInspectorStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF466A0DB404559DBF22E36 /* AnnotationInspectorStyle.swift */; };
 		8782829F9AD2E1BE2B796AC7 /* ShortcutService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAE1EE5C32D7D0D099A88951 /* ShortcutService.swift */; };
 		88E571E986C805E582BE853A /* RecordingPointerTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AAC5749AE8D3AA8D0826D94 /* RecordingPointerTimeline.swift */; };
@@ -335,6 +336,7 @@
 		BD2210BD486C338B11D6608E /* AnnotationImageCropper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationImageCropper.swift; sourceTree = "<group>"; };
 		BE8FF05309B340FEAE149775 /* BackgroundStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundStyle.swift; sourceTree = "<group>"; };
 		C1546D84751A7403E9E6ACF0 /* AnnotationCropOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationCropOverlay.swift; sourceTree = "<group>"; };
+		C2B128F33D1CBF0CBB6A6852 /* RegionGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegionGeometry.swift; sourceTree = "<group>"; };
 		C5558B01BB764A6621835508 /* CaptureRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureRecord.swift; sourceTree = "<group>"; };
 		C62D5C1724054938F8BB681B /* TextMeasure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextMeasure.swift; sourceTree = "<group>"; };
 		C62E4421999FABC6B040B9CD /* ShapeRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShapeRenderer.swift; sourceTree = "<group>"; };
@@ -436,6 +438,7 @@
 				4B626577BDFABF32D144DC8B /* CaptureOrchestrator.swift */,
 				3E1907B91A013BCA494AB08A /* ColorPickerOverlay.swift */,
 				7DB9ADF51148B7B593827415 /* CountdownOverlay.swift */,
+				C2B128F33D1CBF0CBB6A6852 /* RegionGeometry.swift */,
 				868F0E1B6C8FC7DF50B4A79B /* RegionSelectionOverlay.swift */,
 				4495302A23BB2192D91C5ED3 /* ScreenCapture.swift */,
 			);
@@ -899,6 +902,7 @@
 				D4228DF9AE3F84716EC8E673 /* RecordingVideoMask.swift in Sources */,
 				77672549FF2EBFBAFD8DC199 /* RecordingViewportTimeline.swift in Sources */,
 				CAEEB8EC9C94B13B9CF30982 /* RecordingZoomFocusPad.swift in Sources */,
+				85CCAB85BAAB94FBC1A9B5A9 /* RegionGeometry.swift in Sources */,
 				3933094B835D8EF2F5F1EABB /* RegionSelectionOverlay.swift in Sources */,
 				615EE1453C9A7BDFD9248E09 /* ScreenCapture.swift in Sources */,
 				CB270F6BDD39E72E8CEE4F5D /* ScreenRecordingManager.swift in Sources */,
@@ -1077,12 +1081,12 @@
 				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = 8JL39GK2DC;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 0.4.2;
+				MARKETING_VERSION = 0.4.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bettershot.app;
 				PRODUCT_NAME = BetterShot;
 				SDKROOT = macosx;
@@ -1097,12 +1101,12 @@
 				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = 8JL39GK2DC;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 0.4.2;
+				MARKETING_VERSION = 0.4.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bettershot.app;
 				PRODUCT_NAME = BetterShot;
 				SDKROOT = macosx;
