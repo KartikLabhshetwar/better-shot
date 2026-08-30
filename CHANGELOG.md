@@ -7,10 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.3] - 2026-08-30
 
+One shortcut for everything. The floating bar picks up the screenshot
+actions next to the recording sources, region capture is drawn by BetterShot
+itself and remembers where you last drew it, share links for recordings stop
+going missing from the Library, Settings explains itself inline, and the
+System theme finally follows macOS dark mode.
+
 ### Added
 
 - **All-in-one bar**: The floating bar that `⌘⇧2` opens now carries the screenshot actions too: region, window, screen, OCR and color picker sit beside the recording sources, so one shortcut reaches everything (#122)
 - **Reuse the last region**: Region capture is drawn by BetterShot itself now and remembers the last rectangle. Next time it appears as a dashed ghost; press `Return`, `A`, or click inside it to capture exactly that area again. `Space` still switches to window selection (#122)
+
+### Changed
+
+- **Settings explains itself inline**: Every Recording and Capture control now carries its own one-line description under the label, replacing the paragraph of footnotes each section used to end with. Start delay is now Countdown, and Keystrokes says up front that it needs Input Monitoring and never records plain typing
+- **Sharing settings are easier to set up**: The Sharing tab shows a status card for the R2 connection, keeps its fields editable at all times, links straight to the Cloudflare R2 dashboard, and switches sharing on by itself the moment a connection test succeeds
+- **Library scopes say what they hold**: The Library's Local and Cloud tabs are now On This Mac and Shared Links. With no R2 bucket configured, the empty Shared Links view says so and offers a Set Up Sharing button that jumps to the Sharing tab
+
+### Fixed
+
+- **System theme follows macOS dark mode**: A legacy `NSRequiresAquaSystemAppearance` key in Info.plist forced the light Aqua appearance whenever the app was left on the System theme, so switching macOS to dark mode changed nothing. The key is gone, and the app now tracks the OS setting including live light/dark switches ([#120](https://github.com/KartikLabhshetwar/better-shot/issues/120))
+- **Preview card pill stays readable in dark mode**: The text in the thumbnail pill on the after-capture card inherited the system label color, so it turned white on a white pill in dark mode. It is pinned to black now ([#121](https://github.com/KartikLabhshetwar/better-shot/issues/121))
+- **Recording share links stay in the Library**: A recording opened from disk resolved to a bare `screen.mov` instead of its package, so the Studio had no session to attach the share link to and the link never reached the Library; the link was also keyed by the flattened export, which autosave could drop mid-upload. The Studio now resolves the package from `screen.mov`, imports it into history before uploading, and stores the link by session path
+- **Pinned screenshot close button stays put on hover**: The hover state was tracked on the image alone, so moving the pointer onto the close button counted as leaving and hid the button before you could click it. Hover now covers the whole pinned view
+- **Delete from the preview card removes the whole record**: The card's trash button matched history records by the raw capture path only, so deleting a beautified or edited shot from the card removed just the file and left the record and its other copies behind. It now matches the raw, beautified and edited paths and deletes the full record
 
 ## [0.4.2] - 2026-08-26
 
