@@ -53,7 +53,7 @@ export function FaqSection() {
     <section id="faq" className="mx-auto max-w-[1100px] scroll-mt-20 px-6 py-14 sm:py-20">
       <div className="max-w-[760px]">
         <SectionLabel className="mb-4">FAQ</SectionLabel>
-        <h2 className="mb-4 text-[28px] font-extrabold tracking-tight sm:text-[32px]">Frequently asked questions</h2>
+        <h2 className="mb-4 text-[28px] tracking-tight sm:text-[32px]">Frequently asked questions</h2>
         <p className="mb-10 max-w-[60ch] text-[16px] leading-[28px] text-zinc-500">
           Pricing, privacy, and how Better Shot compares to the tools you are probably paying for
           today.

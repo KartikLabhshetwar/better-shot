@@ -205,7 +205,7 @@
   }
   h1, h2, h3, h4, h5, h6 {
     text-wrap: balance;
-    font-weight: 800;
+    font-weight: 400;
     line-height: 1.12;
     letter-spacing: -0.015em;
   }

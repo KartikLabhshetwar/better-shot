@@ -16,7 +16,7 @@ export function MarkdownText({ children }: { children: string }) {
               href={link[2]}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-ink/70 underline decoration-ink/20 underline-offset-2 hover:decoration-ink/60 transition-colors"
+              className="text-zinc-600 underline decoration-zinc-300 underline-offset-2 transition-colors hover:decoration-zinc-500"
             >
               {link[1]}
             </a>
@@ -24,7 +24,7 @@ export function MarkdownText({ children }: { children: string }) {
         }
         if (part.startsWith("**") && part.endsWith("**")) {
           return (
-            <strong key={i} className="font-semibold text-ink/80">
+            <strong key={i} className="font-semibold text-zinc-700">
               {part.slice(2, -2)}
             </strong>
           )
@@ -33,7 +33,7 @@ export function MarkdownText({ children }: { children: string }) {
           return (
             <code
               key={i}
-              className="font-mono text-[0.92em] text-ink/70 bg-ink/[0.05] rounded px-1 py-[1px]"
+              className="rounded bg-zinc-100 px-1 py-[1px] font-mono text-[0.92em] text-zinc-600"
             >
               {part.slice(1, -1)}
             </code>

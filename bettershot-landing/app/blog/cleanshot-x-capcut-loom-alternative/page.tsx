@@ -90,7 +90,7 @@ export default async function Article() {
             <span className="rounded-full bg-brand-100 px-3 py-1 text-[12px] font-medium text-brand-700">
               {post.tag}
             </span>
-            <h1 className="mt-5 text-[clamp(34px,4.6vw,56px)] font-extrabold leading-[1.08] tracking-tight">
+            <h1 className="mt-5 text-[clamp(34px,4.6vw,56px)] leading-[1.08] tracking-tight">
               One free macOS app instead of CleanShot X, CapCut, and Loom
             </h1>
             <p className="mt-5 text-[15px] text-zinc-400">
@@ -157,7 +157,7 @@ export default async function Article() {
                 comments. The free Starter plan caps you at 25 videos per member and five minutes per
                 recording. Business runs $18 per seat per month.
               </P>
-              <blockquote className="my-9 max-w-[34ch] border-l-2 border-brand pl-6 text-[clamp(24px,2.6vw,32px)] font-extrabold leading-[1.24] tracking-tight">
+              <blockquote className="my-9 max-w-[34ch] border-l-2 border-brand pl-6 text-[clamp(24px,2.6vw,32px)] leading-[1.24] tracking-tight">
                 A limit you hit mid-demo is not a free tier. It is a sales call.
               </blockquote>
               <P>
@@ -386,7 +386,7 @@ export default async function Article() {
               </div>
 
               <div className="mt-14 rounded-2xl border border-zinc-200 p-8">
-                <h2 className="text-[28px] font-extrabold leading-[34px] tracking-tight">
+                <h2 className="text-[28px] leading-[34px] tracking-tight">
                   Try it before your next renewal
                 </h2>
                 <p className="mb-7 mt-4 max-w-[46ch] text-[16px] leading-[28px] text-zinc-600 ">
@@ -445,7 +445,7 @@ export default async function Article() {
 
 function H2({ id, children }: { id: string; children: React.ReactNode }) {
   return (
-    <h2 id={id} className="mb-5 mt-12 scroll-mt-20 text-[28px] font-extrabold leading-[34px]">
+    <h2 id={id} className="mb-5 mt-12 scroll-mt-20 text-[28px] leading-[34px]">
       {children}
     </h2>
   )
@@ -499,7 +499,7 @@ function OrderedList({ items }: { items: string[] }) {
           key={item}
           className="grid gap-x-6 border-t border-zinc-200 py-3 text-[16px] leading-[28px] text-zinc-600 sm:grid-cols-[32px_minmax(0,1fr)]"
         >
-          <span className="font-extrabold tabular-nums text-brand-700">
+          <span className="font-semibold tabular-nums text-brand-700">
             {String(i + 1).padStart(2, "0")}
           </span>
           <span>{item}</span>

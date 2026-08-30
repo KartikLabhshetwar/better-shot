@@ -31,9 +31,9 @@ export function ShareView({ share }: ShareViewProps) {
   ].filter(Boolean) as string[]
 
   return (
-    <div className="flex min-h-dvh flex-col bg-canvas text-ink selection:bg-brand/20">
-      <header className="sticky top-0 z-20 border-b border-ink/[0.06] bg-canvas/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-[1080px] items-center justify-between gap-3 px-6">
+    <div className="flex min-h-dvh flex-col bg-white text-zinc-900 selection:bg-brand/20">
+      <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-14 w-full max-w-[1100px] items-center justify-between gap-3 px-6">
           <a
             href="/"
             className={cn(
@@ -43,7 +43,7 @@ export function ShareView({ share }: ShareViewProps) {
             )}
           >
             <Image src="/logo.png" alt="" width={24} height={24} className="rounded-md" />
-            <span className="text-sm font-semibold tracking-tight text-ink/75">Better Shot</span>
+            <span className="text-sm font-semibold tracking-tight text-zinc-900">Better Shot</span>
           </a>
 
           <div className="flex items-center gap-2">
@@ -52,9 +52,9 @@ export function ShareView({ share }: ShareViewProps) {
             <a
               href={downloadUrl}
               className={cn(
-                "inline-flex items-center gap-2 whitespace-nowrap bg-ink px-3 py-2 text-xs font-semibold text-canvas outline-none",
+                "inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-brand px-3 py-2 text-xs font-semibold text-white outline-none",
                 fluid,
-                "hover:bg-ink/85 focus-visible:ring-2 focus-visible:ring-brand/60 active:scale-[0.98]",
+                "hover:bg-brand-600 focus-visible:ring-2 focus-visible:ring-brand/60 active:scale-[0.98]",
               )}
             >
               <DownloadSimpleIcon size={14} weight="bold" />
@@ -64,16 +64,16 @@ export function ShareView({ share }: ShareViewProps) {
         </div>
       </header>
 
-      <main id="main" className="mx-auto flex w-full max-w-[1080px] flex-1 flex-col px-6 pb-12 pt-8">
+      <main id="main" className="mx-auto flex w-full max-w-[1100px] flex-1 flex-col px-6 pb-12 pt-8">
         <div className="my-auto">
           <div className="mb-5">
-            <h1 className="display-sm break-words text-xl sm:text-2xl">{title}</h1>
-            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink/55">
+            <h1 className="break-words text-xl tracking-tight sm:text-2xl">{title}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400">
               {author && (
-                <span className="flex items-center gap-2 text-ink/75">
+                <span className="flex items-center gap-2 text-zinc-600">
                   <span
                     aria-hidden
-                    className="grid size-6 shrink-0 place-content-center rounded-full bg-brand text-[11px] font-bold uppercase text-canvas"
+                    className="grid size-6 shrink-0 place-content-center rounded-full bg-brand text-[11px] font-bold uppercase text-white"
                   >
                     {author.charAt(0)}
                   </span>
@@ -83,8 +83,8 @@ export function ShareView({ share }: ShareViewProps) {
               {meta.map((entry, index) => (
                 <span key={entry} className="flex items-center gap-2">
                   {(index > 0 || author) && (
-                    <span aria-hidden className="text-ink/20">
-                      ·
+                    <span aria-hidden className="text-zinc-200">
+                      &middot;
                     </span>
                   )}
                   {entry}
@@ -107,22 +107,22 @@ export function ShareView({ share }: ShareViewProps) {
           </div>
 
           {isVideo && (
-            <p className="mt-3 hidden text-center text-xs text-ink/60 sm:block">
-              Space play and pause · Arrow keys seek 5s · J and L seek 10s · M mute · F full screen
+            <p className="mt-3 hidden text-center text-xs text-zinc-400 sm:block">
+              Space play and pause &middot; Arrow keys seek 5s &middot; J and L seek 10s &middot; M mute &middot; F full screen
             </p>
           )}
         </div>
       </main>
 
-      <footer className="bg-brand text-canvas">
-        <div className="mx-auto flex w-full max-w-[1080px] flex-col items-start justify-between gap-4 px-6 py-8 sm:flex-row sm:items-center">
+      <footer className="border-t border-zinc-200 bg-zinc-50">
+        <div className="mx-auto flex w-full max-w-[1100px] flex-col items-start justify-between gap-4 px-6 py-8 sm:flex-row sm:items-center">
           <div className="flex items-center gap-3">
             <Image src="/logo.png" alt="" width={32} height={32} className="rounded-md" />
             <div>
-              <p className="text-sm font-semibold">
+              <p className="text-sm font-semibold text-zinc-900">
                 {isVideo ? "Recorded" : "Captured"} with Better Shot
               </p>
-              <p className="text-xs text-canvas/80">
+              <p className="text-xs text-zinc-600">
                 Free, open source screenshots and recordings for macOS. No account, no watermark.
               </p>
             </div>
@@ -132,8 +132,8 @@ export function ShareView({ share }: ShareViewProps) {
             target="_blank"
             rel="noreferrer"
             className={cn(
-              "inline-flex shrink-0 items-center whitespace-nowrap border border-canvas px-4 py-2.5 text-xs font-semibold outline-none",
-              "transition-colors duration-150 hover:bg-canvas hover:text-brand focus-visible:ring-2 focus-visible:ring-canvas/70",
+              "inline-flex shrink-0 items-center whitespace-nowrap rounded-xl border border-zinc-200 px-4 py-2.5 text-xs font-semibold text-zinc-900 outline-none",
+              "transition-colors duration-150 hover:border-zinc-400 focus-visible:ring-2 focus-visible:ring-brand/60",
             )}
           >
             Get Better Shot free
@@ -168,10 +168,10 @@ function CopyLinkButton() {
       onClick={copy}
       aria-live="polite"
       className={cn(
-        "inline-flex items-center gap-2 whitespace-nowrap border border-ink/[0.1] px-3 py-2 text-xs font-medium outline-none",
+        "inline-flex items-center gap-2 whitespace-nowrap rounded-xl border border-zinc-200 px-3 py-2 text-xs font-medium outline-none",
         fluid,
-        "hover:border-ink/[0.18] focus-visible:ring-2 focus-visible:ring-brand/60 active:scale-[0.98]",
-        copied ? "text-emerald-600" : "text-ink/60 hover:text-ink",
+        "hover:border-zinc-400 focus-visible:ring-2 focus-visible:ring-brand/60 active:scale-[0.98]",
+        copied ? "text-emerald-600" : "text-zinc-600 hover:text-zinc-900",
       )}
     >
       <span className="grid h-4 w-4 place-content-center">

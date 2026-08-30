@@ -53,7 +53,7 @@ export function SiteNavClient({ release }: { release: ReleaseInfo }) {
             className="mr-auto flex shrink-0 items-center gap-2.5 outline-none"
           >
             <Image src="/logo.png" alt="Better Shot" width={24} height={24} className="rounded-md" />
-            <span className="text-[18px] font-extrabold tracking-tight text-zinc-900">Better Shot</span>
+            <span className="text-[18px] font-semibold tracking-tight text-zinc-900">Better Shot</span>
           </Link>
 
           <div className="hidden items-center gap-6 sm:flex">
@@ -128,7 +128,7 @@ export function SiteNavClient({ release }: { release: ReleaseInfo }) {
             href={link.href}
             aria-current={isCurrent(link.href) ? "page" : undefined}
             className={cn(
-              "border-t border-zinc-200 pt-4 text-[28px] font-extrabold tracking-tight outline-none",
+              "border-t border-zinc-200 pt-4 text-[28px] font-semibold tracking-tight outline-none",
               isCurrent(link.href) ? "text-brand" : "text-zinc-900",
             )}
           >

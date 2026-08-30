@@ -57,7 +57,7 @@ export function SiteFooter() {
           <div className="col-span-2 md:col-span-1">
             <div className="mb-4 flex items-center gap-2.5">
               <Image src="/logo.png" alt="" width={24} height={24} className="rounded-md" />
-              <span className="text-[18px] font-extrabold tracking-tight text-zinc-900">Better Shot</span>
+              <span className="text-[18px] font-semibold tracking-tight text-zinc-900">Better Shot</span>
             </div>
             <p className="max-w-[280px] text-[14px] leading-[24px] text-zinc-500">
               Free, open source screen capture for macOS. Local first, no account, no subscription.

@@ -66,14 +66,14 @@ export default async function DownloadPage() {
 
       <main id="main">
         <div className={shell}>
-          <header className="pb-12 pt-28 sm:pt-32">
+          <header className="pb-12 pt-28 text-center sm:pt-36">
             <span className="text-[13px] font-medium uppercase tracking-widest text-zinc-400">
               Download &middot; v{release.version}
             </span>
-            <h1 className="mt-4 max-w-[22ch] text-[clamp(38px,5.4vw,60px)] font-extrabold tracking-tight">
+            <h1 className="mx-auto mt-6 max-w-[22ch] text-[clamp(2.5rem,6vw,4.5rem)] font-normal leading-[1.1] tracking-tight">
               Installed and capturing in under a minute
             </h1>
-            <p className="mt-6 max-w-[56ch] text-[17px] leading-[28px] text-zinc-600">
+            <p className="mx-auto mt-6 max-w-lg text-[17px] leading-relaxed text-zinc-600">
               No signup screen, no license key, no onboarding tour. Pick one of the two routes
               below.
             </p>
@@ -84,7 +84,7 @@ export default async function DownloadPage() {
           <Reveal className="my-14 grid gap-6 sm:grid-cols-2">
             <div className="rounded-2xl border border-zinc-200 px-8 py-9">
               <p className="text-[13px] font-medium uppercase tracking-widest text-zinc-400">Route one</p>
-              <h2 className="mt-4 text-[28px] font-extrabold leading-[34px] tracking-tight">Homebrew</h2>
+              <h2 className="mt-4 text-[24px] leading-[26px] tracking-tight">Homebrew</h2>
               <p className="mb-6 mt-4 text-[16px] leading-[28px] text-zinc-600">
                 One command, and <code className="font-mono">brew upgrade</code> keeps it current.
               </p>
@@ -95,7 +95,7 @@ export default async function DownloadPage() {
             </div>
             <div className="rounded-2xl border border-zinc-200 px-8 py-9">
               <p className="text-[13px] font-medium uppercase tracking-widest text-zinc-400">Route two</p>
-              <h2 className="mt-4 text-[28px] font-extrabold leading-[34px] tracking-tight">Direct DMG</h2>
+              <h2 className="mt-4 text-[24px] leading-[26px] tracking-tight">Direct DMG</h2>
               <p className="mb-6 mt-4 text-[16px] leading-[28px] text-zinc-600">
                 Pick your architecture. Updates can be checked and installed from inside the app.
               </p>
@@ -125,14 +125,14 @@ export default async function DownloadPage() {
           <div className="h-px bg-zinc-200" />
 
           <section className="py-14">
-            <h2 className="mb-10 text-[clamp(28px,3.2vw,40px)] font-extrabold tracking-tight">Then three steps</h2>
+            <h2 className="mb-10 text-[28px] leading-[26px] tracking-tight">Then three steps</h2>
             <div className="grid gap-8 sm:grid-cols-3 sm:gap-x-[clamp(24px,4vw,64px)]">
               {steps.map((step, i) => (
                 <Reveal key={step.index} delay={i === 0 ? 0 : i === 1 ? 100 : 200}>
                   <p className="mb-4 font-sans text-[15px] font-semibold tabular-nums text-zinc-400">
                     {step.index}
                   </p>
-                  <h3 className="text-[22px] font-extrabold leading-[26px] tracking-tight">{step.title}</h3>
+                  <h3 className="text-[18px] leading-[26px] tracking-tight">{step.title}</h3>
                   <p className="mt-4 text-[16px] leading-[28px] text-zinc-600">{step.body}</p>
                 </Reveal>
               ))}
@@ -143,7 +143,7 @@ export default async function DownloadPage() {
 
           <section className="grid gap-10 py-14 sm:grid-cols-2 sm:gap-x-[clamp(24px,5vw,80px)]">
             <div>
-              <h2 className="mb-6 text-[24px] font-extrabold leading-[30px] tracking-tight">Requirements</h2>
+              <h2 className="mb-6 text-[20px] leading-[26px] tracking-tight">Requirements</h2>
               <ul>
                 {requirements.map((req) => (
                   <li
@@ -157,7 +157,7 @@ export default async function DownloadPage() {
               </ul>
             </div>
             <div>
-              <h2 className="mb-6 text-[24px] font-extrabold leading-[30px] tracking-tight">Good to know</h2>
+              <h2 className="mb-6 text-[20px] leading-[26px] tracking-tight">Good to know</h2>
               <ul className="grid gap-4">
                 {goodToKnow.map((item) => (
                   <li key={item} className="text-[16px] leading-[28px] text-zinc-600">
@@ -171,7 +171,7 @@ export default async function DownloadPage() {
 
         <section className="bg-zinc-50">
           <div className={`${shell} py-16 sm:py-20`}>
-            <h2 className="max-w-[26ch] text-[clamp(28px,3.2vw,40px)] font-extrabold tracking-tight">
+            <h2 className="max-w-[26ch] text-[28px] leading-[26px] tracking-tight">
               Something broken? File it.
             </h2>
             <p className="mt-5 max-w-[46ch] text-[17px] leading-[28px] text-zinc-600">

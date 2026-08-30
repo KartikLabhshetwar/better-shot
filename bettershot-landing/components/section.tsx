@@ -39,7 +39,7 @@ export function PageHeader({
       <SectionLabel className="mb-5">{label}</SectionLabel>
       <GradientHeading
         as="h1"
-        className="text-[42px] font-extrabold tracking-tight sm:text-[58px] lg:text-[68px]"
+        className="text-[42px] tracking-tight sm:text-[58px] lg:text-[68px]"
       >
         {title}
       </GradientHeading>

@@ -12,8 +12,12 @@ Better Shot is a native macOS app built with Swift 6 and SwiftUI. It lives in th
 [Homepage]: https://bettershot.site - Features, comparison table, and download links
 [Changelog]: https://bettershot.site/changelog - Every release, version by version
 [Blog]: https://bettershot.site/blog - Comparisons and workflow guides
+[Loom Alternative]: https://bettershot.site/blog/loom-alternative - Why Better Shot is the best free Loom alternative for Mac
+[CleanShot X Alternative]: https://bettershot.site/blog/cleanshot-x-alternative - Better Shot vs CleanShot X feature comparison
 [CleanShot X, CapCut, and Loom comparison]: https://bettershot.site/blog/cleanshot-x-capcut-loom-alternative - How Better Shot replaces each paid tool, with pricing
+[Download]: https://bettershot.site/download - Apple Silicon, Intel, and Homebrew install options
 [Privacy]: https://bettershot.site/privacy - What is stored locally and what is never sent
+[Terms]: https://bettershot.site/terms - BSD 3 Clause license terms and usage
 [GitHub Repository]: https://github.com/KartikLabhshetwar/better-shot - Source code, issues, and releases
 [Contributing Guide]: https://github.com/KartikLabhshetwar/better-shot/blob/main/CONTRIBUTING.md - Setup, architecture, and contribution guidelines
 

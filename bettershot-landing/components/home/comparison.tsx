@@ -51,7 +51,7 @@ export function Comparison() {
       className="mx-auto max-w-[1100px] scroll-mt-20 px-6 py-14 sm:py-20"
     >
       <SectionLabel className="mb-3.5">Comparison</SectionLabel>
-      <h2 className="max-w-[26ch] text-[28px] font-extrabold tracking-tight sm:text-[32px]">
+      <h2 className="max-w-[26ch] text-[28px] tracking-tight sm:text-[32px]">
         One app instead of three subscriptions
       </h2>
       <p className="mt-6 max-w-[60ch] text-[16px] leading-[28px] text-zinc-500">

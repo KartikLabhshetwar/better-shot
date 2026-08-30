@@ -34,8 +34,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
       url: `${baseUrl}/blog/${post.slug}`,
       lastModified: new Date(`${post.date}T00:00:00Z`),
       changeFrequency: "monthly" as const,
-      priority: 0.9,
+      priority: 0.8,
     })),
+    {
+      url: `${baseUrl}/llms.txt`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.3,
+    },
     {
       url: `${baseUrl}/privacy`,
       lastModified: now,

@@ -76,56 +76,44 @@ export default function PrivacyPolicy() {
       <SiteNav />
 
       <main id="main">
-        <div className="mx-auto max-w-[1100px] px-6">
-          <header className="pb-12 pt-28 sm:pt-32">
-            <span className="text-[13px] font-medium uppercase tracking-widest text-zinc-400">
-              Privacy · Updated August 2026
-            </span>
-            <h1 className="mt-4 max-w-[24ch] text-[clamp(38px,5.4vw,60px)] font-extrabold tracking-tight">
+        <div className="mx-auto max-w-[680px] px-6">
+          <header className="pb-10 pt-28 sm:pt-36">
+            <p className="text-[13px] font-medium uppercase tracking-widest text-zinc-400">
+              Privacy &middot; Updated August 2026
+            </p>
+            <h1 className="mt-4 text-[clamp(2rem,5vw,3rem)] leading-[1.1] tracking-tight">
               Better Shot does not collect anything
             </h1>
-            <p className="mt-6 max-w-[56ch] text-[17px] leading-[28px] text-zinc-600">
+            <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-zinc-500">
               There is no account system, no telemetry, and no analytics inside the app. The long
               version follows, section by section.
             </p>
           </header>
 
-          <div className="h-px bg-zinc-200" />
+          <article>
+            {sections.map((section) => (
+              <section
+                key={section.id}
+                id={section.id}
+                className="scroll-mt-20 border-t border-zinc-100 py-8"
+              >
+                <h2 className="mb-4 text-[20px] leading-[26px] tracking-tight">{section.title}</h2>
+                {section.body.map((paragraph, i) => (
+                  <p key={i} className="mb-4 text-[16px] leading-[28px] text-zinc-500 last:mb-0">
+                    {paragraph}
+                  </p>
+                ))}
+              </section>
+            ))}
 
-          <div className="grid items-start gap-x-[clamp(24px,5vw,80px)] lg:grid-cols-[200px_minmax(0,1fr)]">
-            <nav aria-label="Sections" className="hidden gap-2.5 py-12 lg:sticky lg:top-20 lg:grid">
-              <p className="mb-1.5 text-[13px] font-medium uppercase tracking-widest text-zinc-400">
-                Sections
-              </p>
-              {sections.map((section) => (
-                <a
-                  key={section.id}
-                  href={`#${section.id}`}
-                  className="text-[14px] leading-[22px] text-zinc-900 outline-none transition-colors duration-150 hover:text-brand-700"
-                >
-                  {section.title}
-                </a>
-              ))}
-            </nav>
-
-            <article className="max-w-[68ch] pb-16 pt-12 lg:border-l lg:border-zinc-200 lg:pl-[clamp(20px,4vw,56px)]">
-              {sections.map((section) => (
-                <section key={section.id} id={section.id} className="mb-11 scroll-mt-20">
-                  <h2 className="mb-4 text-[26px] font-extrabold leading-[32px] tracking-tight">{section.title}</h2>
-                  {section.body.map((paragraph, i) => (
-                    <p key={i} className="mb-4 text-[17px] leading-[28px] text-zinc-600">
-                      {paragraph}
-                    </p>
-                  ))}
-                </section>
-              ))}
-              <p className="text-[15px] leading-[26px] text-zinc-400">
+            <div className="border-t border-zinc-100 py-8">
+              <p className="text-[14px] leading-[24px] text-zinc-400">
                 Questions about any of this belong in an{" "}
                 <a
                   href="https://github.com/KartikLabhshetwar/better-shot/issues"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-brand-700 underline underline-offset-2 outline-none transition-colors duration-150 hover:text-brand"
+                  className="text-brand-700 underline underline-offset-2 transition-colors hover:text-brand"
                 >
                   issue on GitHub
                 </a>
@@ -134,14 +122,14 @@ export default function PrivacyPolicy() {
                   href="https://x.com/code_kartik"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-brand-700 underline underline-offset-2 outline-none transition-colors duration-150 hover:text-brand"
+                  className="text-brand-700 underline underline-offset-2 transition-colors hover:text-brand"
                 >
                   X
                 </a>
                 .
               </p>
-            </article>
-          </div>
+            </div>
+          </article>
         </div>
       </main>
 

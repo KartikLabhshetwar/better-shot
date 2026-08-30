@@ -184,7 +184,7 @@ export default async function Home() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
             {stats.map((stat) => (
               <div key={stat.value} className="rounded-2xl border border-zinc-200 p-5 sm:p-6">
-                <p className="text-[clamp(28px,3vw,42px)] font-extrabold leading-[1.1] tracking-tight text-brand">
+                <p className="text-[clamp(28px,3vw,42px)] font-semibold leading-[1.1] tracking-tight text-brand">
                   {stat.value}
                 </p>
                 <p className="mt-2 text-[13px] leading-[18px] text-zinc-600">{stat.label}</p>
@@ -196,7 +196,7 @@ export default async function Home() {
         <section id="features" className="scroll-mt-20 py-20 sm:py-28">
           <div className="mx-auto max-w-[1100px] px-6">
             <Reveal className="mx-auto mb-16 max-w-lg text-center">
-              <h2 className="text-[28px] font-extrabold tracking-tight sm:text-[32px]">
+              <h2 className="text-[28px] tracking-tight sm:text-[32px]">
                 One app instead of four subscriptions
               </h2>
               <p className="mt-4 text-[16px] leading-relaxed text-zinc-600">
@@ -215,7 +215,7 @@ export default async function Home() {
                     <p className="mb-3 text-[13px] font-medium uppercase tracking-widest text-zinc-400">
                       {feature.label}
                     </p>
-                    <h3 className="text-[28px] font-extrabold leading-tight tracking-tight sm:text-[32px]">
+                    <h3 className="text-[28px] leading-tight tracking-tight sm:text-[32px]">
                       {feature.title}
                     </h3>
                     <p className="mt-4 max-w-md text-[16px] leading-relaxed text-zinc-600">{feature.body}</p>
@@ -249,7 +249,7 @@ export default async function Home() {
               <p className="mb-3 text-[13px] font-medium uppercase tracking-widest text-zinc-400">
                 Performance
               </p>
-              <h2 className="text-[28px] font-extrabold tracking-tight sm:text-[32px]">
+              <h2 className="text-[28px] tracking-tight sm:text-[32px]">
                 Built for macOS, not for Electron
               </h2>
               <p className="mt-4 text-[16px] leading-relaxed text-zinc-600">
@@ -260,7 +260,7 @@ export default async function Home() {
             <Reveal className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {performanceHighlights.map((item) => (
                 <div key={item.stat} className="rounded-2xl border border-zinc-200 bg-white p-6">
-                  <p className="text-[24px] font-extrabold tracking-tight text-brand">{item.stat}</p>
+                  <p className="text-[24px] tracking-tight text-brand">{item.stat}</p>
                   <p className="text-[13px] font-semibold uppercase tracking-widest text-zinc-400">{item.label}</p>
                   <p className="mt-3 text-[13px] leading-relaxed text-zinc-600">{item.body}</p>
                 </div>
@@ -272,7 +272,7 @@ export default async function Home() {
         <section className="py-16 sm:py-24">
           <div className="mx-auto max-w-[1100px] px-6">
             <Reveal className="mx-auto mb-12 max-w-lg text-center">
-              <h2 className="text-[28px] font-extrabold tracking-tight sm:text-[32px]">
+              <h2 className="text-[28px] tracking-tight sm:text-[32px]">
                 And everything else you need
               </h2>
               <p className="mt-4 text-[16px] leading-relaxed text-zinc-600">
@@ -304,13 +304,13 @@ export default async function Home() {
               height={64}
               className="mx-auto mb-8 rounded-2xl shadow-lg shadow-brand/10"
             />
-            <h2 className="text-[28px] font-extrabold tracking-tight sm:text-[32px]">
+            <h2 className="text-[28px] tracking-tight sm:text-[32px]">
               Ready to try Better Shot?
             </h2>
             <p className="mt-4 text-[16px] leading-relaxed text-zinc-600">
               Free, open source, installed in about thirty seconds.
             </p>
-            <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:gap-5 sm:justify-center">
               <DownloadDropdown release={release} source="cta" size="default" />
               <CopyCommand command="brew install --cask bettershot" />
             </div>

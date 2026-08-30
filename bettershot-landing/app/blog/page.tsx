@@ -24,14 +24,14 @@ export default function BlogIndex() {
 
       <main id="main">
         <div className="mx-auto max-w-[1100px] px-6">
-          <header className="pb-12 pt-28 sm:pt-32">
+          <header className="pb-12 pt-28 text-center sm:pt-36">
             <span className="text-[13px] font-medium uppercase tracking-widest text-zinc-400">
               Blog
             </span>
-            <h1 className="mt-4 text-[clamp(38px,5.4vw,60px)] font-extrabold tracking-tight">
+            <h1 className="mx-auto mt-6 max-w-[18ch] text-[clamp(2.5rem,6vw,4.5rem)] font-normal leading-[1.1] tracking-tight">
               Screen capture, written down
             </h1>
-            <p className="mt-6 max-w-[54ch] text-[17px] leading-[28px] text-zinc-600">
+            <p className="mx-auto mt-6 max-w-lg text-[17px] leading-relaxed text-zinc-600">
               Comparisons and workflow notes for people who take a lot of screenshots and record a
               lot of screens.
             </p>
@@ -52,7 +52,7 @@ export default function BlogIndex() {
                     {formatPostDate(post.date)} &middot; {post.readingTime}
                   </span>
                 </div>
-                <h2 className="mt-3 max-w-[36ch] text-[clamp(22px,2.4vw,30px)] font-extrabold tracking-tight">
+                <h2 className="mt-3 max-w-[36ch] text-[clamp(22px,2.4vw,30px)] tracking-tight">
                   {post.headline}
                 </h2>
                 <p className="mt-3 max-w-[60ch] text-[16px] leading-[28px] text-zinc-600">

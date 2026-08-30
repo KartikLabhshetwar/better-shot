@@ -132,8 +132,8 @@ export function ImageViewer({ src, title, aspectRatio }: ImageViewerProps) {
       >
         {failed ? (
           <div className="absolute inset-0 grid place-content-center gap-2 p-6 text-center">
-            <p className="text-sm font-medium text-ink">This screenshot could not be loaded</p>
-            <p className="text-xs text-ink/55">The file may have been moved or deleted.</p>
+            <p className="text-sm font-medium text-zinc-900">This screenshot could not be loaded</p>
+            <p className="text-xs text-zinc-400">The file may have been moved or deleted.</p>
           </div>
         ) : (
           <img
@@ -150,14 +150,14 @@ export function ImageViewer({ src, title, aspectRatio }: ImageViewerProps) {
         )}
 
         {!failed && (
-          <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-ink/10 bg-canvas/85 p-1 text-ink opacity-0 shadow-lg backdrop-blur-xl transition-opacity duration-200 focus-within:opacity-100 hover:opacity-100 motion-reduce:transition-none">
+          <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-full border border-zinc-200 bg-white/85 p-1 text-zinc-900 opacity-0 shadow-lg backdrop-blur-xl transition-opacity duration-200 focus-within:opacity-100 hover:opacity-100 motion-reduce:transition-none">
             <ZoomButton label="Zoom out" onClick={() => zoomAround(1 / ZOOM_STEP)} disabled={!zoomed}>
               <Minus className="size-4" />
             </ZoomButton>
             <button
               type="button"
               onClick={() => setTransform(IDENTITY)}
-              className="min-w-14 rounded-full px-2 py-1 text-xs font-semibold tabular-nums tracking-[0.01em] text-ink/75 transition-colors duration-100 hover:bg-ink/[0.07] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/30"
+              className="min-w-14 rounded-full px-2 py-1 text-xs font-semibold tabular-nums tracking-[0.01em] text-zinc-500 transition-colors duration-100 hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               {Math.round(transform.scale * 100)}%
             </button>
@@ -196,7 +196,7 @@ function ZoomButton({
       title={label}
       onClick={onClick}
       disabled={disabled}
-      className="grid size-8 place-content-center rounded-full text-ink/75 transition-[background-color,transform] duration-100 ease-out hover:bg-ink/[0.07] hover:text-ink active:scale-[0.92] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/30 disabled:opacity-30 motion-reduce:transition-none motion-reduce:active:scale-100"
+      className="grid size-8 place-content-center rounded-full text-zinc-500 transition-[background-color,transform] duration-100 ease-out hover:bg-zinc-100 hover:text-zinc-900 active:scale-[0.92] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:opacity-30 motion-reduce:transition-none motion-reduce:active:scale-100"
     >
       {children}
     </button>
