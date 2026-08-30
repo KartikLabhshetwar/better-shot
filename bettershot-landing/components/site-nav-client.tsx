@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { GithubLogoIcon } from "@phosphor-icons/react/dist/ssr"
+import { GitHubIcon } from "@/components/github-icon"
 import { DownloadDropdown } from "@/components/download-dropdown"
 import { StarCount } from "@/components/star-count"
 import type { ReleaseInfo } from "@/lib/downloads"
@@ -76,7 +76,7 @@ export function SiteNavClient({ release }: { release: ReleaseInfo }) {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-[13px] font-medium text-zinc-500 outline-none transition-colors duration-150 hover:text-zinc-900"
             >
-              <GithubLogoIcon size={15} weight="bold" />
+              <GitHubIcon className="size-4" />
               <StarCount />
             </a>
           </div>
@@ -141,7 +141,7 @@ export function SiteNavClient({ release }: { release: ReleaseInfo }) {
           rel="noopener noreferrer"
           className="mt-4 inline-flex w-max items-center gap-2 text-[15px] font-medium text-zinc-500 outline-none"
         >
-          <GithubLogoIcon size={18} weight="bold" />
+          <GitHubIcon className="size-[18px]" />
           <StarCount />
         </a>
       </div>

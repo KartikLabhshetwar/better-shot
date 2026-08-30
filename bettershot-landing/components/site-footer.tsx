@@ -25,6 +25,11 @@ const columns = [
         label: "GitHub",
         external: true,
       },
+      {
+        href: "https://x.com/bettershotsite",
+        label: "X (Twitter)",
+        external: true,
+      },
       { href: "/llms.txt", label: "llms.txt" },
     ],
   },

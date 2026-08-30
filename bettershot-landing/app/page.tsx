@@ -1,15 +1,15 @@
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowUpRightIcon, GithubLogoIcon } from "@phosphor-icons/react/dist/ssr"
+import { ArrowUpRightIcon } from "@phosphor-icons/react/dist/ssr"
 import { DownloadDropdown } from "@/components/download-dropdown"
-import { getLatestRelease } from "@/lib/downloads"
+import { getLatestRelease, getDownloadCount } from "@/lib/downloads"
 import { SiteNav } from "@/components/site-nav"
 import { SiteFooter } from "@/components/site-footer"
 import { Reveal } from "@/components/reveal"
 import { CopyCommand } from "@/components/copy-command"
 import { Comparison } from "@/components/home/comparison"
 import { FaqSection, faqs } from "@/components/home/faq"
-import { StarCount } from "@/components/star-count"
+import { SocialProof } from "@/components/social-proof"
 
 const faqJsonLd = {
   "@context": "https://schema.org",
@@ -21,11 +21,10 @@ const faqJsonLd = {
   })),
 }
 
-const stats = [
-  { value: "$0", label: "Forever. No tiers, no trial" },
-  { value: "14K+", label: "Downloads and counting" },
-  { value: "25 MB", label: "Lightweight native app" },
-]
+function formatCount(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}K+`
+  return String(n)
+}
 
 const features = [
   {
@@ -94,7 +93,13 @@ const featureVideos = [
 ]
 
 export default async function Home() {
-  const release = await getLatestRelease()
+  const [release, downloads] = await Promise.all([getLatestRelease(), getDownloadCount()])
+
+  const stats = [
+    { value: "$0", label: "Forever. No tiers, no trial" },
+    { value: downloads > 0 ? formatCount(downloads) : "14K+", label: "Downloads and counting" },
+    { value: "25 MB", label: "Lightweight native app" },
+  ]
 
   return (
     <div className="min-h-screen bg-white text-zinc-900">
@@ -146,20 +151,9 @@ export default async function Home() {
             </Reveal>
 
             <Reveal>
-              <p className="mt-6 flex items-center justify-center gap-2 text-[14px] text-zinc-600">
-                <span className="text-amber-400">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
-                <span>
-                  Open source &middot; 25 MB &middot;{" "}
-                  <a
-                    href="https://github.com/KartikLabhshetwar/better-shot"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-brand transition-colors hover:text-brand-700"
-                  >
-                    <StarCount /> on GitHub
-                  </a>
-                </span>
-              </p>
+              <div className="mt-8 flex justify-center">
+                <SocialProof />
+              </div>
             </Reveal>
 
             <Reveal>

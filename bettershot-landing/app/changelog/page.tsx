@@ -39,7 +39,7 @@ export default function ChangelogPage() {
             </p>
             <div className="mt-5">
               <a
-                href="https://x.com/code_kartik"
+                href="https://x.com/bettershotsite"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-1.5 text-[13px] text-zinc-500 transition-colors hover:border-zinc-400 hover:text-zinc-900"

@@ -118,7 +118,7 @@ export function ImageViewer({ src, title, aspectRatio }: ImageViewerProps) {
       <div
         ref={stageRef}
         className={cn(
-          "relative overflow-hidden rounded-2xl bg-ink/[0.03] shadow-lg ring-1 ring-ink/10",
+          "relative overflow-hidden rounded-2xl bg-zinc-50 shadow-lg ring-1 ring-zinc-200",
           zoomed ? (dragging ? "cursor-grabbing" : "cursor-grab") : "cursor-zoom-in"
         )}
         style={{ aspectRatio }}
