@@ -53,7 +53,9 @@ export default function ChangelogPage() {
           </header>
 
           <div className="space-y-0">
-            {changelog.map((version) => (
+            {changelog.map((version) => {
+              let labelShown = false
+              return (
               <section
                 key={version.version}
                 id={anchor(version.version)}
@@ -64,6 +66,8 @@ export default function ChangelogPage() {
                     const match = item.match(/^\*\*(.+?)\*\*\s*[:.]?\s*(.*)$/)
                     const title = match ? match[1] : item
                     const detail = match ? match[2] : ""
+                    const showLabel = !labelShown
+                    if (showLabel) labelShown = true
 
                     return (
                       <div
@@ -71,7 +75,7 @@ export default function ChangelogPage() {
                         className="grid gap-x-10 border-t border-zinc-100 py-6 sm:grid-cols-[120px_minmax(0,1fr)]"
                       >
                         <div className="mb-2 sm:mb-0 sm:pt-0.5">
-                          {itemIndex === 0 && (
+                          {showLabel && (
                             <>
                               <p className="text-[13px] font-medium tabular-nums text-zinc-900">
                                 v{version.version}
@@ -97,7 +101,8 @@ export default function ChangelogPage() {
                   }),
                 )}
               </section>
-            ))}
+              )
+            })}
           </div>
 
           <div className="border-t border-zinc-100 py-10">
