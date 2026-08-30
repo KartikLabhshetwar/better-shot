@@ -20,11 +20,12 @@ final class PreviewOverlay {
 
     var panelSize: CGSize {
         let size = AppPreferences.overlayCardSize
+        let base = size.panelSize(margin: AppPreferences.overlayEdgeMargin)
         let extraCards = CGFloat(max(items.count - 1, 0))
-        let height = size.panelSize.height
+        let height = base.height
             + extraCards * (size.thumbnailSize.height + Self.cardSpacing)
             + (items.count > 1 ? Self.clearAllHeight : 0)
-        return CGSize(width: size.panelSize.width, height: height)
+        return CGSize(width: base.width, height: height)
     }
 
     private init() {}
@@ -178,8 +179,10 @@ final class PreviewOverlay {
 struct PreviewDeckView: View {
     let overlay: PreviewOverlay
 
+    private var pinnedLeft: Bool { AppPreferences.overlayPosition == .bottomLeft }
+
     var body: some View {
-        VStack(alignment: .trailing, spacing: 10) {
+        VStack(alignment: pinnedLeft ? .leading : .trailing, spacing: 10) {
             if overlay.items.count > 1 {
                 HStack(spacing: 6) {
                     if overlay.hasStagedItems {
@@ -192,9 +195,8 @@ struct PreviewDeckView: View {
                 PreviewCardView(overlay: overlay, url: url)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-        .padding(.trailing, 20)
-        .padding(.bottom, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: pinnedLeft ? .bottomLeading : .bottomTrailing)
+        .padding(pinnedLeft ? [.leading, .bottom] : [.trailing, .bottom], AppPreferences.overlayEdgeMargin)
         .frame(width: overlay.panelSize.width, height: overlay.panelSize.height)
     }
 
@@ -221,6 +223,7 @@ struct PreviewCardView: View {
     // always nils the panel and `show()` always rebuilds it, so a size change
     // in Settings takes effect on the next capture without any extra wiring.
     private var cardSize: CGSize { AppPreferences.overlayCardSize.thumbnailSize }
+    private var controlScale: CGFloat { AppPreferences.overlayCardSize.controlScale }
 
     private var isVideo: Bool { Self.isVideo(url) }
 
@@ -241,7 +244,7 @@ struct PreviewCardView: View {
 
                     if isVideo {
                         Image(systemName: "play.circle.fill")
-                            .font(.system(size: 28))
+                            .font(.system(size: 28 * controlScale))
                             .foregroundStyle(.white.opacity(0.9))
                             .shadow(radius: 4)
                     }
@@ -340,10 +343,10 @@ struct PreviewCardView: View {
                     }
                 }
             }
-            .padding(6)
+            .padding(6 * controlScale)
 
             // Center pill actions
-            HStack(spacing: 6) {
+            HStack(spacing: 6 * controlScale) {
                 pillButton("Copy") {
                     // Copy the capture itself, not the card's thumbnail.
                     do {
@@ -379,7 +382,7 @@ struct PreviewCardView: View {
             Image(systemName: systemName)
                 .symbolRenderingMode(.palette)
                 .foregroundStyle(.white, .white.opacity(0.25))
-                .font(.system(size: 16))
+                .font(.system(size: 16 * controlScale))
         }
         .buttonStyle(.plain)
     }
@@ -387,10 +390,10 @@ struct PreviewCardView: View {
     private func pillButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: 10 * controlScale, weight: .semibold))
                 .foregroundStyle(.black.opacity(0.85))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
+                .padding(.horizontal, 8 * controlScale)
+                .padding(.vertical, 3 * controlScale)
                 .background(.white.opacity(0.85), in: Capsule())
         }
         .buttonStyle(.plain)

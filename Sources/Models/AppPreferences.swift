@@ -11,6 +11,7 @@ enum AppPreferences {
     private static let overlayPositionKey = "bs_overlayPosition"
     private static let overlayDismissDelayKey = "bs_overlayDismissDelay"
     private static let overlayCardSizeKey = "bs_overlayCardSize"
+    private static let overlayEdgeMarginKey = "bs_overlayEdgeMargin"
     private static let exportFormatKey = "bs_exportFormat"
     private static let exportQualityKey = "bs_exportQuality"
     private static let selfTimerKey = "bs_selfTimerDelay"
@@ -98,6 +99,14 @@ enum AppPreferences {
             return size
         }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: overlayCardSizeKey) }
+    }
+
+    static let overlayEdgeMarginDefault: Double = 20
+    static let overlayEdgeMarginRange: ClosedRange<Double> = 0...48
+
+    static var overlayEdgeMargin: Double {
+        get { UserDefaults.standard.object(forKey: overlayEdgeMarginKey) as? Double ?? overlayEdgeMarginDefault }
+        set { UserDefaults.standard.set(newValue, forKey: overlayEdgeMarginKey) }
     }
 
     // MARK: - Export
@@ -241,14 +250,22 @@ enum OverlayCardSize: String, CaseIterable, Identifiable {
         }
     }
 
-    /// The floating NSPanel's bounds. Must stay >= thumbnailSize plus the
-    /// card's own trailing/bottom inset (PreviewCardView) or the thumbnail
-    /// clips against the panel edge.
-    var panelSize: CGSize {
+    /// Room for the card's `.shadow(radius: 14, y: 6)` to draw inside the panel bounds.
+    private static let shadowHeadroom: CGFloat = 24
+
+    func panelSize(margin: Double) -> CGSize {
+        CGSize(
+            width: thumbnailSize.width + margin + Self.shadowHeadroom,
+            height: thumbnailSize.height + margin + Self.shadowHeadroom
+        )
+    }
+
+    /// Hover control scale, deliberately sub-linear to the thumbnail ratio.
+    var controlScale: CGFloat {
         switch self {
-        case .small: return CGSize(width: 200, height: 170)
-        case .medium: return CGSize(width: 280, height: 220)
-        case .large: return CGSize(width: 360, height: 270)
+        case .small: return 1.0
+        case .medium: return 1.25
+        case .large: return 1.5
         }
     }
 
