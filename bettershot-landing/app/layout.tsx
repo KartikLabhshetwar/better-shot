@@ -6,7 +6,7 @@ import "./globals.css"
 
 const title = "Better Shot: free screenshot and screen recorder for macOS"
 const description =
-  "Free, open source screenshot and screen recording app for macOS. Cursor tracked auto zoom, face cam, on device captions, a keystroke overlay, redaction masks, annotations, backgrounds, and share links on your own storage. No account, no subscription, no uploads."
+  "The free, open source alternative to Loom and CleanShot X for macOS. Record polished screen videos with cursor auto-zoom, face cam, on-device captions, and a full editor. No account, no subscription, no watermark."
 
 export const metadata: Metadata = {
   title,

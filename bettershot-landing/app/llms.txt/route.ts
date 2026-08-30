@@ -3,7 +3,7 @@ export const dynamic = "force-static"
 export async function GET() {
   const llmsContent = `# Better Shot
 
-> A free, open-source alternative to CleanShot X, Loom, and CapCut for macOS. Capture screenshots, record your screen with cursor auto-zoom and a face cam, edit, and share. Local-first, no account, no cloud, no telemetry.
+> The free, open-source alternative to Loom and CleanShot X for macOS. Record polished screen videos with cursor auto-zoom, face cam, on-device captions, and a full editor. No account, no subscription, no watermark.
 
 Better Shot is a native macOS app built with Swift 6 and SwiftUI. It lives in the menu bar and provides capture, screen recording, annotation, video editing, and beautification without subscriptions or a vendor cloud. Files stay on your Mac unless you turn on share links, which upload to a Cloudflare R2 bucket you own.
 
@@ -25,8 +25,11 @@ Better Shot is a native macOS app built with Swift 6 and SwiftUI. It lives in th
 
 ### Capture
 - Region, fullscreen, and window screenshots via the native macOS screencapture CLI
+- Screenshot deck: successive captures stack into a floating deck (up to five cards), each with copy, delete, pin, annotate, and drag-out actions
+- Keep-until-saved mode: captures stay in the deck until explicitly saved, copied, or discarded
 - Screen recording with ScreenCaptureKit: pause, resume, restart, discard
-- Cursor auto-zoom that follows pointer activity and zooms in on what you are doing
+- Crash-safe fragmented MP4 writes every frame as it arrives
+- Cursor auto-zoom that follows pointer activity and zooms in on what you are doing (30 Hz sampling)
 - Face cam bubble from any connected camera, positioned over the recording
 - Microphone capture alongside system audio
 - Configurable recording: FPS (24/30/60), cursor visibility, display or window scope
@@ -41,6 +44,8 @@ Better Shot is a native macOS app built with Swift 6 and SwiftUI. It lives in th
 - Layout: aspect ratio (Auto, 1:1, 4:3, 3:2, 16:9, 9:16) and a 9-point alignment grid
 - Video editor: multi-clip timeline, split, trim, crop, reorder, and delete clips
 - Per-clip playback speed from 0.25x to 4x
+- Transitions: crossfade and fade-through-black between clips
+- 3D camera tilt and color grading
 - Export as PNG or JPEG for screenshots, MP4 for recordings, with no watermark
 
 ### Annotate
@@ -48,6 +53,12 @@ Better Shot is a native macOS app built with Swift 6 and SwiftUI. It lives in th
 - Single-key shortcuts for each tool (R, F, O, L, A, D, T, N, B, G)
 - Text annotations with font selection, size, bold, italic, underline, alignment
 - Blur and pixelate redaction with adjustable density
+
+### Video overlays
+- On-device captions: transcription runs locally via Apple's speech framework, editable per line
+- Keystroke overlay: records keystrokes and renders them under the video, collapsing typing into words
+- Blur, pixelate, and spotlight masks as timeline lanes with start and end times
+- Hide masks destroy pixels on export so sensitive content never ships in the file
 
 ### Share and workflow
 - Optional share links uploaded directly from your Mac to your own Cloudflare R2 bucket

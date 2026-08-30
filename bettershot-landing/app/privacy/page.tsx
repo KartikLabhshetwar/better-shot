@@ -14,14 +14,14 @@ const sections = [
     id: "short",
     title: "The short version",
     body: [
-      "Better Shot is a free, open source screenshot and screen recording app for macOS. The app has no account system, no telemetry, and no analytics. Nothing you capture is sent anywhere unless you explicitly click Share, and even then it goes to storage you own.",
+      "Better Shot is the free, open source alternative to Loom and CleanShot X for macOS. The app has no account system, no telemetry, and no analytics. Nothing you capture is sent anywhere unless you explicitly click Share, and even then it goes to storage you own.",
     ],
   },
   {
     id: "captures",
     title: "What the app stores",
     body: [
-      "Screenshots and recordings are written to the save folder you choose. Capture history, your preferences, and your default effects are stored locally in Application Support and UserDefaults. History keeps the 100 most recent captures by default and can be changed or cleared in Settings.",
+      "Screenshots and recordings are written to the save folder you choose, or held in the screenshot deck until you save or discard them. Capture history, your preferences, and your default effects are stored locally in Application Support and UserDefaults. History keeps the 100 most recent captures by default and can be changed or cleared in Settings.",
       "If you configure share links, your Cloudflare R2 access key ID and secret access key are stored in the macOS Keychain. Non-secret configuration (account ID, bucket name, public base URL) lives in UserDefaults.",
     ],
   },
@@ -29,7 +29,7 @@ const sections = [
     id: "processing",
     title: "On device processing",
     body: [
-      "Editing, annotation, redaction, cropping, transcription, and export all run locally. Caption transcription uses your Mac's own speech recognition where it is supported, so the audio does not leave the machine.",
+      "Editing, annotation, redaction, cropping, transcription, video overlays (captions, keystroke overlay, blur and spotlight masks), and export all run locally. Caption transcription uses your Mac's own speech recognition where it is supported, so the audio does not leave the machine. Face cam compositing, cursor auto-zoom, and 3D tilt rendering also run entirely on device.",
     ],
   },
   {
@@ -119,7 +119,7 @@ export default function PrivacyPolicy() {
                 </a>
                 , where the answer is public. You can also reach out on{" "}
                 <a
-                  href="https://x.com/code_kartik"
+                  href="https://x.com/bettershotsite"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-brand-700 underline underline-offset-2 transition-colors hover:text-brand"

@@ -5,7 +5,7 @@ import { SiteFooter } from "@/components/site-footer"
 export const metadata: Metadata = {
   title: "Terms of Use | Better Shot",
   description:
-    "The terms that cover Better Shot, the free open source screenshot and screen recording app for macOS, and the bettershot.site website.",
+    "The terms that cover Better Shot, the free open source alternative to Loom and CleanShot X for macOS, and the bettershot.site website.",
   alternates: { canonical: "/terms" },
 }
 
@@ -30,15 +30,15 @@ const sections = [
     id: "warranty",
     title: "No warranty",
     body: [
-      "The software is provided as is, without warranty of any kind. Screen capture touches recording permissions, display drivers, and video encoding, and it can fail in ways that lose a recording. Keep your own backups of anything that matters. The authors and contributors are not liable for any damages arising from use of the software.",
+      "The software is provided as is, without warranty of any kind. Screen capture touches recording permissions, display drivers, and video encoding, and it can fail in ways that lose a recording. Crash-safe fragmented MP4 writes reduce that risk but do not eliminate it. Keep your own backups of anything that matters. The authors and contributors are not liable for any damages arising from use of the software.",
     ],
   },
   {
     id: "content",
     title: "What you capture is yours",
     body: [
-      "Better Shot has no server. Captures are written to your Mac, and share links upload directly from your Mac to a Cloudflare R2 bucket you own and control. We do not host, moderate, index, or have any ability to access what you capture or share.",
-      "You are responsible for what you record and share, including consent, confidentiality obligations, and anything visible on screen. Redaction masks destroy their pixels on export, but checking the export before you send it is still your job.",
+      "Better Shot has no server. Captures are written to your Mac (or held in the screenshot deck until saved), and share links upload directly from your Mac to a Cloudflare R2 bucket you own and control. We do not host, moderate, index, or have any ability to access what you capture or share.",
+      "You are responsible for what you record and share, including consent, confidentiality obligations, and anything visible on screen. Redaction masks (blur, pixelate, spotlight) destroy their pixels on export, but checking the export before you send it is still your job.",
     ],
   },
   {

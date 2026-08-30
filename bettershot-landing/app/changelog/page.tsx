@@ -7,7 +7,7 @@ import { SiteFooter } from "@/components/site-footer"
 export const metadata: Metadata = {
   title: "Changelog | Better Shot for macOS",
   description:
-    "Every release of Better Shot, the free open source screenshot and screen recording app for macOS. New features, changes, and fixes, version by version.",
+    "Every release of Better Shot, the free open source alternative to Loom and CleanShot X for macOS. New features, changes, and fixes, version by version.",
   alternates: { canonical: "/changelog" },
   openGraph: {
     title: "Changelog | Better Shot for macOS",
@@ -70,9 +70,18 @@ export default function ChangelogPage() {
                         key={`${version.version}-${section.label}-${itemIndex}`}
                         className="grid gap-x-10 border-t border-zinc-100 py-6 sm:grid-cols-[120px_minmax(0,1fr)]"
                       >
-                        <p className="mb-2 text-[13px] tabular-nums text-zinc-400 sm:mb-0 sm:pt-0.5">
-                          {itemIndex === 0 ? version.date.toUpperCase() : ""}
-                        </p>
+                        <div className="mb-2 sm:mb-0 sm:pt-0.5">
+                          {itemIndex === 0 && (
+                            <>
+                              <p className="text-[13px] font-medium tabular-nums text-zinc-900">
+                                v{version.version}
+                              </p>
+                              <p className="text-[12px] tabular-nums text-zinc-400">
+                                {version.date.toUpperCase()}
+                              </p>
+                            </>
+                          )}
+                        </div>
                         <div>
                           <h3 className="text-[15px] font-medium leading-[26px] text-zinc-900">
                             {title}

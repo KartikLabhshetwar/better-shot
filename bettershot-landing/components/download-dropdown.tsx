@@ -52,7 +52,7 @@ export function DownloadDropdown({
           className,
         )}
       >
-        <AppleLogoIcon size={16} weight="fill" />
+        <AppleLogoIcon size={20} weight="fill" />
         {label ?? "Download for macOS"}
         <CaretDownIcon size={12} weight="bold" className="opacity-50" />
       </DropdownMenuTrigger>

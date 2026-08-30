@@ -65,7 +65,7 @@ export function SiteFooter() {
               <span className="text-[18px] font-semibold tracking-tight text-zinc-900">Better Shot</span>
             </div>
             <p className="max-w-[280px] text-[14px] leading-[24px] text-zinc-500">
-              Free, open source screen capture for macOS. Local first, no account, no subscription.
+              The free, open source alternative to Loom and CleanShot X. Record, edit, and share polished videos from your Mac.
             </p>
             <p className="mt-8 text-[13px] leading-[22px] text-zinc-400">
               &copy; {new Date().getFullYear()} Better Shot. BSD 3 Clause licensed. Built by{" "}
