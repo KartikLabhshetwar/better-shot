@@ -13,6 +13,8 @@ final class PreviewOverlay {
     private var dismissTask: Task<Void, Never>?
     private var targetScreen: NSScreen?
 
+    var currentScreen: NSScreen? { targetScreen }
+
     private init() {}
 
     func show(url: URL, on screen: NSScreen? = nil) {
@@ -41,6 +43,11 @@ final class PreviewOverlay {
         panel = nil
         isVisible = false
         currentURL = nil
+    }
+
+    func cancelScheduledDismiss() {
+        dismissTask?.cancel()
+        dismissTask = nil
     }
 
     // MARK: - Panel Setup
@@ -280,10 +287,12 @@ struct PreviewCardView: View {
                         // Reading the file can fail if the capture moved or was deleted
                         // between the shot and the click. The card stays up so the copy
                         // can be retried, or the capture dragged out instead.
+                        overlay.cancelScheduledDismiss()
                         ToastWindow.shared.show(
                             title: "Copy Failed",
                             message: error.localizedDescription,
-                            systemIcon: "exclamationmark.triangle"
+                            systemIcon: "exclamationmark.triangle",
+                            on: overlay.currentScreen
                         )
                     }
                 }
