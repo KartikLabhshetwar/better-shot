@@ -28,6 +28,7 @@ System theme finally follows macOS dark mode.
 - **Settings explains itself inline**: Every Recording and Capture control now carries its own one-line description under the label, replacing the paragraph of footnotes each section used to end with. Start delay is now Countdown, and Keystrokes says up front that it needs Input Monitoring and never records plain typing
 - **Sharing settings are easier to set up**: The Sharing tab shows a status card for the R2 connection, keeps its fields editable at all times, links straight to the Cloudflare R2 dashboard, and switches sharing on by itself the moment a connection test succeeds
 - **Library scopes say what they hold**: The Library's Local and Cloud tabs are now On This Mac and Shared Links. With no R2 bucket configured, the empty Shared Links view says so and offers a Set Up Sharing button that jumps to the Sharing tab
+- **Every push and pull request is built in CI**: A GitHub Actions workflow builds the app on every push to main and every pull request. The Makefile also runs its recipes under `bash -o pipefail`, so a failed `xcodebuild` no longer hides behind the `tail` at the end of the pipeline and reports green ([#125](https://github.com/KartikLabhshetwar/better-shot/pull/125), thanks [@BradleyAllanDavis](https://github.com/BradleyAllanDavis))
 
 ### Fixed
 
