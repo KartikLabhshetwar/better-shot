@@ -117,11 +117,6 @@ struct PinnedScreenshotView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .shadow(color: .black.opacity(0.4), radius: 12, x: 0, y: 4)
                 .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
-                .onHover { hovering in
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        isHovered = hovering
-                    }
-                }
 
             // Close (X) button — visible on hover
             if isHovered {
@@ -137,6 +132,11 @@ struct PinnedScreenshotView: View {
             }
         }
         .frame(width: w, height: h)
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = hovering
+            }
+        }
         // Resize via scroll wheel
         .onScrollWheel { delta in
             let newScale = (scaleFactor + delta * 0.05).clamped(to: minScale...maxScale)

@@ -128,6 +128,16 @@ final class HistoryStore {
         return storageDir.appendingPathComponent(record.filename)
     }
 
+    /// Matches the raw capture, its beautified output, or the edited copy the preview card shows.
+    func record(matching url: URL) -> CaptureRecord? {
+        let path = url.standardizedFileURL.path
+        return records.first { record in
+            urlForRecord(record).standardizedFileURL.path == path
+                || record.beautifiedPath.map { URL(fileURLWithPath: $0).standardizedFileURL.path == path } == true
+                || displayURLForRecord(record).standardizedFileURL.path == path
+        }
+    }
+
     func displayURLForRecord(_ record: CaptureRecord) -> URL {
         var capturePaths = [urlForRecord(record).standardizedFileURL.path]
         if let beautifiedPath = record.beautifiedPath {
