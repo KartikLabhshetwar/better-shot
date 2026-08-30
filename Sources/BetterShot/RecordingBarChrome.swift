@@ -90,6 +90,12 @@ enum BarTooltip {
 /// label changing - Pause becomes Resume without becoming a different
 /// control.
 enum BarTooltipID: String {
+    case screenshotRegion
+    case screenshotWindow
+    case screenshotFullscreen
+    case ocr
+    case colorPicker
+
     case display
     case window
     case area

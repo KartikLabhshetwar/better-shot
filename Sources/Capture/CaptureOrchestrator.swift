@@ -31,6 +31,15 @@ final class CaptureOrchestrator {
         captureInProgress = false
     }
 
+    func captureLastRegion(on screen: NSScreen? = nil) async {
+        guard !captureInProgress, AppPreferences.lastRegionRect != nil else { return }
+        captureInProgress = true
+        captureScreen = screen
+        await captureAndProcess { try await ScreenCapture.shared.captureLastRegion() }
+        captureScreen = nil
+        captureInProgress = false
+    }
+
     private func executeCapture(_ action: ShortcutService.Action) async {
         switch action {
         case .region:
@@ -60,6 +69,11 @@ final class CaptureOrchestrator {
             guard let url = try await capture() else { return }
 
             ScreenCapture.shared.playShutterSound()
+
+            if AppPreferences.keepInDeckUntilSaved, !AppPreferences.openEditorAfterCapture {
+                await stageForDeck(url)
+                return
+            }
 
             let record = HistoryStore.shared.importCapture(from: url)
             if let record {
@@ -108,6 +122,27 @@ final class CaptureOrchestrator {
         }
     }
 
+    private func stageForDeck(_ url: URL) async {
+        let config = AppPreferences.defaultBeautifierConfig
+
+        let stagedURL = await Task.detached { () -> URL? in
+            guard (try? DeckStaging.prepareDirectory()) != nil,
+                  let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+                  let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil),
+                  let rendered = BeautifierRenderer.render(image: cgImage, config: config) else { return nil }
+            return Self.saveImage(rendered, in: DeckStaging.directory.path)
+        }.value
+
+        guard let stagedURL else {
+            try? FileManager.default.removeItem(at: url)
+            return
+        }
+
+        try? FileManager.default.moveItem(at: url, to: DeckStaging.rawURL(for: stagedURL))
+        lastCaptureURL = stagedURL
+        PreviewOverlay.shared.show(url: stagedURL, on: captureScreen)
+    }
+
     private func galleryApplyAndSave(_ url: URL, recordID: UUID? = nil) async {
         let config = AppPreferences.defaultBeautifierConfig
 
@@ -115,7 +150,7 @@ final class CaptureOrchestrator {
             guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
                   let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil),
                   let rendered = BeautifierRenderer.render(image: cgImage, config: config) else { return (false, nil) }
-            return (true, Self.saveImage(rendered))
+            return (true, Self.saveImage(rendered, in: AppPreferences.saveDirectory))
         }.value
 
         guard didRender else { return }
@@ -146,8 +181,7 @@ final class CaptureOrchestrator {
         }
     }
 
-    private nonisolated static func saveImage(_ cgImage: CGImage) -> URL? {
-        let dir = AppPreferences.saveDirectory
+    private nonisolated static func saveImage(_ cgImage: CGImage, in dir: String) -> URL? {
         let stamp = Int(Date().timeIntervalSince1970 * 1000)
         let ext = AppPreferences.exportFormat.fileExtension
         let path = "\(dir)/bettershot_\(stamp).\(ext)"

@@ -7,13 +7,20 @@ struct RegionSelection {
     let displayID: CGDirectDisplayID
 }
 
+enum RegionSelectionOutcome {
+    case region(RegionSelection)
+    case window
+    case cancelled
+}
+
 @MainActor
 final class RegionSelectionOverlay {
 
     private var overlayWindows: [NSWindow] = []
-    private var continuation: CheckedContinuation<RegionSelection?, Never>?
+    private var selectionViews: [SelectionView] = []
+    private var continuation: CheckedContinuation<RegionSelectionOutcome, Never>?
 
-    func selectRegion() async -> RegionSelection? {
+    func selectRegion() async -> RegionSelectionOutcome {
         await withCheckedContinuation { cont in
             self.continuation = cont
             showOverlays()
@@ -38,15 +45,23 @@ final class RegionSelectionOverlay {
             window.acceptsMouseMovedEvents = true
             window.collectionBehavior = [.canJoinAllSpaces, .fullScreenPrimary]
 
-            let overlayView = SelectionView(screen: screen, cursor: crosshair) { [weak self] rect in
+            let ghost = AppPreferences.lastRegionRect
+                .flatMap { screen.frame.contains($0) ? RegionGeometry.localRect(global: $0, screenFrame: screen.frame) : nil }
+            let overlayView = SelectionView(screen: screen, cursor: crosshair, ghost: ghost) { [weak self] rect in
                 self?.finishSelection(rect: rect, screen: screen)
             } onCancel: { [weak self] in
-                self?.cancelSelection()
+                self?.finish(.cancelled)
+            } onWindow: { [weak self] in
+                self?.finish(.window)
             }
 
+            overlayView.onBeginSelection = { [weak self, weak overlayView] in
+                self?.selectionViews.forEach { if $0 !== overlayView { $0.clearSelection() } }
+            }
             window.contentView = overlayView
             window.makeKeyAndOrderFront(nil)
             overlayWindows.append(window)
+            selectionViews.append(overlayView)
         }
 
         NSApp.activate(ignoringOtherApps: true)
@@ -55,35 +70,21 @@ final class RegionSelectionOverlay {
     }
 
     private func finishSelection(rect: CGRect, screen: NSScreen) {
-        NSCursor.pop()
-
-        let primaryHeight = CGDisplayBounds(CGMainDisplayID()).height
-
-        let globalX = screen.frame.origin.x + rect.origin.x
-        let globalY = primaryHeight - (screen.frame.origin.y + rect.origin.y + rect.height)
-
-        let pointsRect = CGRect(
-            x: globalX,
-            y: globalY,
-            width: rect.width,
-            height: rect.height
-        )
+        let globalRect = RegionGeometry.globalRect(local: rect, screenFrame: screen.frame)
+        AppPreferences.lastRegionRect = globalRect
 
         let selection = RegionSelection(
-            pointsRect: pointsRect,
+            pointsRect: RegionGeometry.pointsRect(global: globalRect, primaryHeight: CGDisplayBounds(CGMainDisplayID()).height),
             scaleFactor: screen.backingScaleFactor,
             displayID: ActiveDisplayResolver.displayID(for: screen) ?? CGMainDisplayID()
         )
-
-        closeOverlays()
-        continuation?.resume(returning: selection)
-        continuation = nil
+        finish(.region(selection))
     }
 
-    private func cancelSelection() {
+    private func finish(_ outcome: RegionSelectionOutcome) {
         NSCursor.pop()
         closeOverlays()
-        continuation?.resume(returning: nil)
+        continuation?.resume(returning: outcome)
         continuation = nil
     }
 
@@ -92,6 +93,7 @@ final class RegionSelectionOverlay {
             window.orderOut(nil)
         }
         overlayWindows.removeAll()
+        selectionViews.removeAll()
     }
 }
 
@@ -172,17 +174,33 @@ private final class SelectionView: NSView {
     private var dragStart: NSPoint?
     private var dragCurrent: NSPoint?
     private var mouseLocation: NSPoint?
+    private var selection: CGRect?
+    private var activeHandle: RegionHandle?
+    private var handleDragOrigin: NSPoint?
+    private var handleDragRect: CGRect?
+    var onBeginSelection: () -> Void = {}
     private var trackingArea: NSTrackingArea?
     private let screen: NSScreen
     private let crosshairCursor: NSCursor
+    private let ghost: CGRect?
     private let onSelect: (CGRect) -> Void
     private let onCancel: () -> Void
+    private let onWindow: () -> Void
 
-    init(screen: NSScreen, cursor: NSCursor, onSelect: @escaping (CGRect) -> Void, onCancel: @escaping () -> Void) {
+    init(
+        screen: NSScreen,
+        cursor: NSCursor,
+        ghost: CGRect?,
+        onSelect: @escaping (CGRect) -> Void,
+        onCancel: @escaping () -> Void,
+        onWindow: @escaping () -> Void
+    ) {
         self.screen = screen
         self.crosshairCursor = cursor
+        self.ghost = ghost
         self.onSelect = onSelect
         self.onCancel = onCancel
+        self.onWindow = onWindow
         super.init(frame: screen.frame)
     }
 
@@ -229,9 +247,30 @@ private final class SelectionView: NSView {
 
         if let start = dragStart, let current = dragCurrent {
             drawSelection(start: start, current: current)
-        } else if let mouse = mouseLocation {
-            drawGuideLines(at: mouse)
+        } else if let selection {
+            drawAdjustableSelection(selection)
+        } else {
+            if let ghost {
+                drawGhost(ghost)
+            }
+            if let mouse = mouseLocation {
+                drawGuideLines(at: mouse)
+            }
         }
+    }
+
+    private func drawGhost(_ rect: CGRect) {
+        let hovered = mouseLocation.map(rect.contains) ?? false
+        NSColor.white.withAlphaComponent(hovered ? 0.16 : 0.08).setFill()
+        rect.fill()
+
+        NSColor.white.withAlphaComponent(hovered ? 1 : 0.8).setStroke()
+        let path = NSBezierPath(rect: rect)
+        path.lineWidth = 1
+        path.setLineDash([6, 4], count: 2, phase: 0)
+        path.stroke()
+
+        drawLabel("\(pixelSize(rect))  ·  ↩ / A / click to reuse", below: rect)
     }
 
     private func drawGuideLines(at point: NSPoint) {
@@ -264,17 +303,45 @@ private final class SelectionView: NSView {
         borderPath.lineWidth = 1.5
         borderPath.stroke()
 
-        let w = Int(selectionRect.width * screen.backingScaleFactor)
-        let h = Int(selectionRect.height * screen.backingScaleFactor)
-        let label = "\(w) × \(h)" as NSString
+        drawLabel(pixelSize(selectionRect), below: selectionRect)
+    }
+
+    private func drawAdjustableSelection(_ rect: CGRect) {
+        NSColor.clear.setFill()
+        rect.fill(using: .copy)
+
+        NSColor.white.setStroke()
+        let borderPath = NSBezierPath(rect: rect)
+        borderPath.lineWidth = 1.5
+        borderPath.stroke()
+
+        for handle in RegionHandle.allCases where handle != .move {
+            let p = handle.point(in: rect)
+            let dot = NSBezierPath(ovalIn: CGRect(x: p.x - 4, y: p.y - 4, width: 8, height: 8))
+            NSColor.white.setFill()
+            dot.fill()
+            NSColor.black.withAlphaComponent(0.5).setStroke()
+            dot.lineWidth = 1
+            dot.stroke()
+        }
+
+        drawLabel("\(pixelSize(rect))  ·  drag to adjust  ·  ↩ to capture  ·  esc", below: rect)
+    }
+
+    private func pixelSize(_ rect: CGRect) -> String {
+        "\(Int(rect.width * screen.backingScaleFactor)) × \(Int(rect.height * screen.backingScaleFactor))"
+    }
+
+    private func drawLabel(_ text: String, below rect: CGRect) {
+        let label = text as NSString
         let attrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .medium),
             .foregroundColor: NSColor.white,
         ]
         let labelSize = label.size(withAttributes: attrs)
         let labelRect = CGRect(
-            x: selectionRect.midX - labelSize.width / 2 - 6,
-            y: selectionRect.minY - labelSize.height - 8,
+            x: rect.midX - labelSize.width / 2 - 6,
+            y: rect.minY - labelSize.height - 8,
             width: labelSize.width + 12,
             height: labelSize.height + 4
         )
@@ -285,47 +352,122 @@ private final class SelectionView: NSView {
 
     // MARK: - Mouse Events
 
+    func clearSelection() {
+        selection = nil
+        needsDisplay = true
+    }
+
+    private func updateCursor(at point: NSPoint) {
+        guard let selection, let handle = RegionAdjustment.handle(at: point, in: selection) else {
+            crosshairCursor.set()
+            return
+        }
+        Self.cursor(for: handle, dragging: false).set()
+    }
+
+    private static func cursor(for handle: RegionHandle, dragging: Bool) -> NSCursor {
+        let position: NSCursor.FrameResizePosition
+        switch handle {
+        case .move: return dragging ? .closedHand : .openHand
+        case .topLeft: position = .topLeft
+        case .top: position = .top
+        case .topRight: position = .topRight
+        case .right: position = .right
+        case .bottomRight: position = .bottomRight
+        case .bottom: position = .bottom
+        case .bottomLeft: position = .bottomLeft
+        case .left: position = .left
+        }
+        return .frameResize(position: position, directions: .all)
+    }
+
     override func mouseEntered(with event: NSEvent) {
-        crosshairCursor.set()
+        updateCursor(at: convert(event.locationInWindow, from: nil))
     }
 
     override func mouseMoved(with event: NSEvent) {
-        crosshairCursor.set()
-        mouseLocation = convert(event.locationInWindow, from: nil)
+        let loc = convert(event.locationInWindow, from: nil)
+        mouseLocation = loc
+        updateCursor(at: loc)
         needsDisplay = true
     }
 
     override func mouseDown(with event: NSEvent) {
-        crosshairCursor.set()
         let loc = convert(event.locationInWindow, from: nil)
+        mouseLocation = nil
+        if let selection, let handle = RegionAdjustment.handle(at: loc, in: selection) {
+            if handle == .move, event.clickCount == 2 {
+                onSelect(selection)
+                return
+            }
+            activeHandle = handle
+            handleDragOrigin = loc
+            handleDragRect = selection
+            Self.cursor(for: handle, dragging: true).set()
+            return
+        }
+        crosshairCursor.set()
         dragStart = loc
         dragCurrent = loc
-        mouseLocation = nil
         needsDisplay = true
     }
 
     override func mouseDragged(with event: NSEvent) {
-        crosshairCursor.set()
-        dragCurrent = convert(event.locationInWindow, from: nil)
+        let loc = convert(event.locationInWindow, from: nil)
+        if let handle = activeHandle, let origin = handleDragOrigin, let base = handleDragRect {
+            let delta = CGSize(width: loc.x - origin.x, height: loc.y - origin.y)
+            selection = RegionAdjustment.apply(handle, delta: delta, to: base, within: bounds)
+        } else {
+            crosshairCursor.set()
+            dragCurrent = loc
+        }
         needsDisplay = true
     }
 
     override func mouseUp(with event: NSEvent) {
-        guard let start = dragStart else { return }
         let end = convert(event.locationInWindow, from: nil)
+        if activeHandle != nil {
+            activeHandle = nil
+            handleDragOrigin = nil
+            handleDragRect = nil
+            updateCursor(at: end)
+            return
+        }
+        guard let start = dragStart else { return }
+        dragStart = nil
+        dragCurrent = nil
         let rect = rectFromPoints(start, end)
 
         if rect.width > 3, rect.height > 3 {
-            onSelect(rect)
-        } else {
+            onBeginSelection()
+            selection = rect
+            updateCursor(at: end)
+        } else if selection == nil, let ghost, ghost.contains(end) {
+            onSelect(ghost)
+        } else if selection == nil {
             onCancel()
         }
+        needsDisplay = true
     }
 
     override func keyDown(with event: NSEvent) {
-        if event.keyCode == 53 {
+        switch event.keyCode {
+        case 53:
             onCancel()
+        case 49:
+            onWindow()
+        case 36, 76:
+            if let selection { onSelect(selection) } else { reuseGhost() }
+        default:
+            if selection == nil, event.charactersIgnoringModifiers?.lowercased() == "a" {
+                reuseGhost()
+            }
         }
+    }
+
+    private func reuseGhost() {
+        guard let ghost else { return }
+        onSelect(ghost)
     }
 
     private func rectFromPoints(_ a: NSPoint, _ b: NSPoint) -> CGRect {

@@ -128,6 +128,21 @@ final class HistoryStore {
         return storageDir.appendingPathComponent(record.filename)
     }
 
+    /// Matches the raw capture, its beautified output, the edited copy the preview card shows,
+    /// or any flattened deliverable inside a recording's project package.
+    func record(matching url: URL) -> CaptureRecord? {
+        let path = url.standardizedFileURL.path
+        let packagePath = url.standardizedFileURL.deletingLastPathComponent().path
+        return records.first { record in
+            urlForRecord(record).standardizedFileURL.path == path
+                || record.beautifiedPath.map { URL(fileURLWithPath: $0).standardizedFileURL.path == path } == true
+                || displayURLForRecord(record).standardizedFileURL.path == path
+                || (record.kind == .recording
+                    && urlForRecord(record).standardizedFileURL.deletingLastPathComponent().path == packagePath
+                    && RecordingSession.isSessionDirectory(URL(fileURLWithPath: packagePath, isDirectory: true)))
+        }
+    }
+
     func displayURLForRecord(_ record: CaptureRecord) -> URL {
         var capturePaths = [urlForRecord(record).standardizedFileURL.path]
         if let beautifiedPath = record.beautifiedPath {

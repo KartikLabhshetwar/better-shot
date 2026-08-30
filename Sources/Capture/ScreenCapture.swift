@@ -33,11 +33,30 @@ final class ScreenCapture {
         isCapturing = true
         defer { isCapturing = false }
 
+        switch await RegionSelectionOverlay().selectRegion() {
+        case .cancelled:
+            return nil
+        case .window:
+            return try await windowShot(includeShadow: false)
+        case .region(let selection):
+            return try await regionShot(selection.pointsRect)
+        }
+    }
+
+    /// Captures the remembered rectangle straight away, no selection overlay.
+    func captureLastRegion() async throws -> URL? {
+        guard !isCapturing, let globalRect = AppPreferences.lastRegionRect else { return nil }
+        isCapturing = true
+        defer { isCapturing = false }
+        let pointsRect = RegionGeometry.pointsRect(global: globalRect, primaryHeight: CGDisplayBounds(CGMainDisplayID()).height)
+        return try await regionShot(pointsRect)
+    }
+
+    private func regionShot(_ pointsRect: CGRect) async throws -> URL? {
+        try? await Task.sleep(for: .milliseconds(80))
         let tempPath = makeTempPath()
-        // -s is "only allow mouse selection mode", so space cannot reach window selection. -i is the
-        // mode that carries the toggle, -J pins the starting mode because -i alone reopens in
-        // whichever one was used last, and -o matches captureWindow's shadowless window shot.
-        let success = await runScreencapture(["-i", "-J", "selection", "-o", "-x", "-t", "png", tempPath])
+        let region = RegionGeometry.screencaptureArgument(pointsRect)
+        let success = await runScreencapture(["-R", region, "-x", "-t", "png", tempPath])
         guard success, FileManager.default.fileExists(atPath: tempPath) else { return nil }
         return URL(fileURLWithPath: tempPath)
     }
@@ -48,7 +67,10 @@ final class ScreenCapture {
         guard !isCapturing else { return nil }
         isCapturing = true
         defer { isCapturing = false }
+        return try await windowShot(includeShadow: includeShadow)
+    }
 
+    private func windowShot(includeShadow: Bool) async throws -> URL? {
         let tempPath = makeTempPath()
         var args = ["-w"]
         if !includeShadow { args.append("-o") }

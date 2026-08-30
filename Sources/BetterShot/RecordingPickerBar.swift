@@ -49,6 +49,10 @@ struct RecordingPickerControls: View {
 
     var body: some View {
         HStack(spacing: BarMetrics.itemSpacing) {
+            screenshotGroup
+
+            BarDivider()
+
             displaySource
             windowSource
             BarActionButton(
@@ -118,6 +122,31 @@ struct RecordingPickerControls: View {
         .task {
             await sources.refresh()
         }
+    }
+
+    // MARK: Screenshots
+
+    private static let screenshotActions: [(BarTooltipID, ShortcutService.Action, String, String)] = [
+        (.screenshotRegion, .region, "Capture a region", "rectangle.dashed.badge.record"),
+        (.screenshotWindow, .window, "Capture a window", "macwindow.badge.plus"),
+        (.screenshotFullscreen, .fullscreen, "Capture the whole screen", "desktopcomputer"),
+        (.ocr, .ocr, "Copy text from the screen", "doc.text.viewfinder"),
+        (.colorPicker, .colorPicker, "Pick a color", "eyedropper"),
+    ]
+
+    private var screenshotGroup: some View {
+        ForEach(Self.screenshotActions, id: \.0) { id, action, title, icon in
+            BarActionButton(id: id, title: title, systemImage: icon) {
+                captureScreenshot(action)
+            }
+        }
+    }
+
+    private func captureScreenshot(_ action: ShortcutService.Action) {
+        let screen = ActiveDisplayResolver.activeScreen(preferPointer: true)
+        RecordingBarPresenter.shared.hide()
+        Task { await CameraRecordingManager.shared.stopPreview() }
+        Task { await CaptureOrchestrator.shared.performCapture(action, on: screen) }
     }
 
     // MARK: Sources
@@ -215,7 +244,7 @@ struct RecordingPickerControls: View {
     /// Backs out of the picker without recording: stop any warm camera
     /// preview so it doesn't keep running in the background.
     private func dismissPicker() {
-        RecordingBarPresenter.shared.hide()
+        RecordingBarPresenter.shared.dismiss()
         Task { await CameraRecordingManager.shared.stopPreview() }
     }
 

@@ -78,8 +78,8 @@ struct PreferencesView: View {
         case .recording: RecordingSettingsTab()
         case .shortcuts: ShortcutSettingsTab()
         case .sharing: SharingSettingsTab()
-        case .screenshots: CaptureLibraryTab(kind: .screenshot)
-        case .recordings: CaptureLibraryTab(kind: .recording)
+        case .screenshots: CaptureLibraryTab(kind: .screenshot, selection: $selection)
+        case .recordings: CaptureLibraryTab(kind: .recording, selection: $selection)
         case .about: AboutTab()
         }
     }
@@ -149,7 +149,7 @@ struct GeneralSettingsTab: View {
                 }
 
                 Toggle("Copy to the clipboard after saving", isOn: $copyAfterSave)
-                Toggle("Play a shutter sound when capturing", isOn: $playSound)
+                Toggle("Play a shutter sound", isOn: $playSound)
             } header: {
                 Text("Saving")
             } footer: {
@@ -638,6 +638,7 @@ struct CaptureSettingsTab: View {
     @AppStorage("bs_overlayCardSize") private var overlayCardSizeRaw: String = OverlayCardSize.small.rawValue
     @AppStorage("bs_overlayEdgeMargin") private var overlayEdgeMargin: Double = AppPreferences.overlayEdgeMarginDefault
     @AppStorage("bs_openEditorAfterCapture") private var openEditorAfterCapture = false
+    @AppStorage("bs_keepInDeckUntilSaved") private var keepInDeckUntilSaved = false
     @State private var isConfirmingReset = false
 
     private var selfTimerDelay: Binding<SelfTimerDelay> {
@@ -715,11 +716,17 @@ struct CaptureSettingsTab: View {
             }
 
             Section {
-                Toggle("Open the editor straight away", isOn: $openEditorAfterCapture)
+                Toggle(isOn: $openEditorAfterCapture) {
+                    Text("Open the editor straight away")
+                    Text("Off, the screenshot is saved and copied at once, and the thumbnail is there if you want to edit it.")
+                }
+                Toggle(isOn: $keepInDeckUntilSaved) {
+                    Text("Keep screenshots in the deck until saved")
+                    Text("Nothing reaches your save folder or the Library until you save, copy, drag, pin or annotate a card. Cards stay up until you act on them, and clearing the deck deletes what is left.")
+                }
+                .disabled(openEditorAfterCapture)
             } header: {
                 Text("After Capture")
-            } footer: {
-                Text("Off by default: the screenshot is saved and copied immediately, and the thumbnail is there if you want to edit it.")
             }
 
             Section {
@@ -739,6 +746,7 @@ struct CaptureSettingsTab: View {
                 overlayCardSizeRaw = OverlayCardSize.small.rawValue
                 overlayEdgeMargin = AppPreferences.overlayEdgeMarginDefault
                 openEditorAfterCapture = false
+                keepInDeckUntilSaved = false
             }
             Button("Cancel", role: .cancel) {}
         }
@@ -775,37 +783,48 @@ struct RecordingSettingsTab: View {
                         Text(device.localizedName).tag(device.uniqueID)
                     }
                 }
-                Toggle("System audio", isOn: $captureAudio)
-                Toggle("The keys I type", isOn: $captureKeystrokes)
-                    .onChange(of: captureKeystrokes) { _, isOn in
-                        if isOn && !CGPreflightListenEventAccess() { CGRequestListenEventAccess() }
-                    }
+                Toggle(isOn: $captureAudio) {
+                    Text("System audio")
+                    Text("The sound your Mac is playing.")
+                }
+                Toggle(isOn: $captureKeystrokes) {
+                    Text("Keystrokes")
+                    Text("Shows shortcuts and special keys in the recording, never plain typing. Needs Input Monitoring.")
+                }
+                .onChange(of: captureKeystrokes) { _, isOn in
+                    if isOn && !CGPreflightListenEventAccess() { CGRequestListenEventAccess() }
+                }
             } header: {
                 Text("Include")
             } footer: {
-                Text("Camera, microphone, and system audio can also be picked from the recording bar right before you hit record: both places set the same thing. The cursor is never burned into the capture: its path is saved beside the recording, so the editor draws it back and you can restyle it after the fact. Recording keys needs Input Monitoring, captures only shortcuts and special keys (never plain typing), and stays off until you turn it on.")
+                Text("The recording bar offers the same camera, microphone and audio choices right before you record. The cursor is always saved separately so you can restyle it in the editor.")
             }
 
             Section {
-                Picker("Start delay", selection: $startDelaySeconds) {
+                Picker(selection: $startDelaySeconds) {
                     Text("None").tag(0)
                     Text("1 second").tag(1)
                     Text("3 seconds").tag(3)
                     Text("5 seconds").tag(5)
+                } label: {
+                    Text("Countdown")
+                    Text("Shown on screen before the capture begins.")
                 }
-                Toggle("Teleprompter", isOn: $teleprompterEnabled)
+                Toggle(isOn: $teleprompterEnabled) {
+                    Text("Teleprompter")
+                    Text("Floats your script over the recording area without appearing in the capture.")
+                }
             } header: {
                 Text("Before Recording")
-            } footer: {
-                Text("The delay counts down on screen before the capture begins. The teleprompter floats your script over the recording area without appearing in the capture.")
             }
 
             Section {
-                Toggle("Open the editor when I stop", isOn: $openEditor)
+                Toggle(isOn: $openEditor) {
+                    Text("Open the editor when I stop")
+                    Text("Off, you get a preview card and can open the editor from there.")
+                }
             } header: {
                 Text("After Recording")
-            } footer: {
-                Text("Turn this off to get a preview card instead, and open the editor from there when you want it.")
             }
 
             Section {
@@ -1050,12 +1069,11 @@ final class ShortcutRecorderNSView: NSView {
 
 struct CaptureLibraryTab: View {
     let kind: CaptureKind
+    @Binding var selection: SettingsSection
 
-    private enum LibraryScope: String, CaseIterable, Identifiable {
-        case local = "Local"
-        case cloud = "Cloud"
-
-        var id: String { rawValue }
+    private enum LibraryScope {
+        case local
+        case cloud
     }
 
     @State private var scope: LibraryScope = .local
@@ -1077,9 +1095,8 @@ struct CaptureLibraryTab: View {
     var body: some View {
         VStack(spacing: 0) {
             Picker("Library", selection: $scope) {
-                ForEach(LibraryScope.allCases) { scope in
-                    Text(scope.rawValue).tag(scope)
-                }
+                Text("On This Mac").tag(LibraryScope.local)
+                Text("Shared Links").tag(LibraryScope.cloud)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
@@ -1137,9 +1154,16 @@ struct CaptureLibraryTab: View {
 
     private var cloudEmptyState: some View {
         ContentUnavailableView {
-            Label("No Cloud Links Yet", systemImage: "icloud")
+            Label("No Share Links Yet", systemImage: "icloud")
         } description: {
-            Text("Share a \(noun) from the editor and its link shows up here.")
+            Text(R2CredentialStore.shared.isConfigured
+                 ? "Share a \(noun) from the editor and its link shows up here."
+                 : "Share links need your own Cloudflare R2 bucket. Set it up once under Sharing.")
+        } actions: {
+            if !R2CredentialStore.shared.isConfigured {
+                Button("Set Up Sharing") { selection = .sharing }
+                    .buttonStyle(.borderedProminent)
+            }
         }
     }
 

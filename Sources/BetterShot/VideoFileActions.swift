@@ -86,6 +86,9 @@ enum VideoFileActions {
     static var exportContentType: UTType { VideoExportContainer.default.contentType }
 
     static func copyToClipboard(from url: URL) throws {
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw CocoaError(.fileReadNoSuchFile)
+        }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         guard pasteboard.writeObjects([url as NSURL]) else {

@@ -2398,6 +2398,9 @@ final class RecordingStudioModel {
 
                 guard let self, !Task.isCancelled else { return }
                 self.shareState = .uploading
+                if let session {
+                    await ScreenshotHistoryStore.shared.importRecordingSession(session)
+                }
                 let itemID = self.historyItemID(for: session) ?? UUID()
                 self.shareItemID = itemID
                 let result = try await CloudUploader.shared.upload(
@@ -2408,8 +2411,8 @@ final class RecordingStudioModel {
 
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(result.url, forType: .string)
-                if session != nil {
-                    ScreenshotHistoryStore.shared.setCloudURL(for: uploadURL, cloudURL: result.url)
+                if let session {
+                    ScreenshotHistoryStore.shared.setCloudURL(forSession: session, cloudURL: result.url)
                 }
                 self.shareState = .finished(result.url)
             } catch is CancellationError {

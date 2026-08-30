@@ -17,6 +17,7 @@ enum AppPreferences {
     private static let selfTimerKey = "bs_selfTimerDelay"
     static let recordingCaptureKeystrokesKey = "bs_recordingCaptureKeystrokes"
     private static let openEditorAfterCaptureKey = "bs_openEditorAfterCapture"
+    private static let keepInDeckUntilSavedKey = "bs_keepInDeckUntilSaved"
     private static let historyRetentionKey = "bs_historyRetentionLimit"
     private static let recordingCaptureMicrophoneKey = "bs_recordingCaptureMicrophone"
     private static let recordingStartDelaySecondsKey = "bs_recordingStartDelaySeconds"
@@ -24,6 +25,7 @@ enum AppPreferences {
     private static let recordingCameraSizeKey = "bs_recordingCameraSize"
     private static let recordingCameraDeviceIDKey = "bs_recordingCameraDeviceID"
     private static let recordingMicrophoneDeviceIDKey = "bs_recordingMicrophoneDeviceID"
+    private static let lastRegionRectKey = "bs_lastRegionRect"
 
     // MARK: - Appearance
     static var appearance: AppAppearance {
@@ -54,6 +56,16 @@ enum AppPreferences {
     static var playSound: Bool {
         get { UserDefaults.standard.object(forKey: playSoundKey) as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: playSoundKey) }
+    }
+
+    /// Last region screenshot in global AppKit screen coordinates, redrawn as a ghost next time.
+    static var lastRegionRect: CGRect? {
+        get {
+            guard let raw = UserDefaults.standard.string(forKey: lastRegionRectKey) else { return nil }
+            let rect = NSRectFromString(raw)
+            return rect.isEmpty ? nil : rect
+        }
+        set { UserDefaults.standard.set(newValue.map(NSStringFromRect), forKey: lastRegionRectKey) }
     }
 
     // MARK: - Overlay
@@ -173,6 +185,11 @@ enum AppPreferences {
     static var openEditorAfterCapture: Bool {
         get { UserDefaults.standard.object(forKey: openEditorAfterCaptureKey) as? Bool ?? false }
         set { UserDefaults.standard.set(newValue, forKey: openEditorAfterCaptureKey) }
+    }
+
+    static var keepInDeckUntilSaved: Bool {
+        get { UserDefaults.standard.bool(forKey: keepInDeckUntilSavedKey) }
+        set { UserDefaults.standard.set(newValue, forKey: keepInDeckUntilSavedKey) }
     }
 
     // MARK: - History

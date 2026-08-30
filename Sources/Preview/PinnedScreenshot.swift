@@ -1,5 +1,20 @@
 import AppKit
+import AVFoundation
+import AVKit
 import SwiftUI
+import UniformTypeIdentifiers
+
+enum PinnedMedia {
+    case image(NSImage)
+    case video(url: URL, player: AVQueuePlayer, looper: AVPlayerLooper, size: CGSize)
+
+    var size: CGSize {
+        switch self {
+        case .image(let image): image.size
+        case .video(_, _, _, let size): size
+        }
+    }
+}
 
 // MARK: - PinnedScreenshotController
 
@@ -24,13 +39,39 @@ final class PinnedScreenshotController {
         )
     }
 
-    /// Creates a new borderless, always-on-top floating panel showing the image at `url`.
+    /// Creates a new borderless, always-on-top floating panel showing the capture at `url`.
     func pin(url: URL, on preferredScreen: NSScreen? = nil) {
-        guard let image = NSImage(contentsOf: url) else { return }
+        let isVideo = UTType(filenameExtension: url.pathExtension)?.conforms(to: .movie) == true
+        guard isVideo else {
+            if let image = NSImage(contentsOf: url) { pin(.image(image), on: preferredScreen) }
+            return
+        }
+        Task { @MainActor in
+            guard let media = await Self.loadVideo(url) else { return }
+            pin(media, on: preferredScreen)
+        }
+    }
 
-        // Compute initial panel size: scale image to max 400pt on longest side.
+    private static func loadVideo(_ url: URL) async -> PinnedMedia? {
+        let asset = AVURLAsset(url: url)
+        guard let track = try? await asset.loadTracks(withMediaType: .video).first,
+              let (naturalSize, transform) = try? await track.load(.naturalSize, .preferredTransform) else {
+            return nil
+        }
+        let rotated = naturalSize.applying(transform)
+        let size = CGSize(width: abs(rotated.width), height: abs(rotated.height))
+        guard size.width > 0, size.height > 0 else { return nil }
+        let player = AVQueuePlayer()
+        player.isMuted = true
+        let looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(asset: asset))
+        player.play()
+        return .video(url: url, player: player, looper: looper, size: size)
+    }
+
+    private func pin(_ media: PinnedMedia, on preferredScreen: NSScreen?) {
+        // Compute initial panel size: scale to max 400pt on longest side.
         let maxSide: CGFloat = 400
-        let imgSize = image.size
+        let imgSize = media.size
         let scale: CGFloat
         if imgSize.width >= imgSize.height {
             scale = min(maxSide / imgSize.width, 1)
@@ -57,7 +98,7 @@ final class PinnedScreenshotController {
         panel.isMovableByWindowBackground = true
 
         let contentView = PinnedScreenshotView(
-            image: image,
+            media: media,
             originalDisplaySize: panelSize,
             onClose: { [weak self, weak panel] in
                 guard let self, let panel else { return }
@@ -93,7 +134,7 @@ final class PinnedScreenshotController {
 
 /// SwiftUI content view for a single pinned screenshot panel.
 struct PinnedScreenshotView: View {
-    let image: NSImage
+    let media: PinnedMedia
     let originalDisplaySize: CGSize
     let onClose: () -> Void
     let onResize: (CGSize) -> Void
@@ -109,23 +150,16 @@ struct PinnedScreenshotView: View {
         let h = originalDisplaySize.height * scaleFactor
 
         ZStack(alignment: .topTrailing) {
-            Image(nsImage: image)
-                .resizable()
-                .aspectRatio(contentMode: .fill)
+            mediaView
                 .frame(width: w, height: h)
                 .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .shadow(color: .black.opacity(0.4), radius: 12, x: 0, y: 4)
                 .shadow(color: .black.opacity(0.15), radius: 4, x: 0, y: 2)
-                .onHover { hovering in
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        isHovered = hovering
-                    }
-                }
 
             // Close (X) button — visible on hover
             if isHovered {
-                Button(action: onClose) {
+                Button(action: close) {
                     Image(systemName: "xmark.circle.fill")
                         .symbolRenderingMode(.palette)
                         .foregroundStyle(.white, .black.opacity(0.6))
@@ -137,6 +171,11 @@ struct PinnedScreenshotView: View {
             }
         }
         .frame(width: w, height: h)
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = hovering
+            }
+        }
         // Resize via scroll wheel
         .onScrollWheel { delta in
             let newScale = (scaleFactor + delta * 0.05).clamped(to: minScale...maxScale)
@@ -146,17 +185,63 @@ struct PinnedScreenshotView: View {
         }
         // Right-click context menu
         .contextMenu {
-            Button("Copy Image") {
+            Button(copyTitle) {
                 let pb = NSPasteboard.general
                 pb.clearContents()
-                pb.writeObjects([image])
+                switch media {
+                case .image(let image): pb.writeObjects([image])
+                case .video(let url, _, _, _): pb.writeObjects([url as NSURL])
+                }
             }
-            Button("Close") {
-                onClose()
-            }
+            Button("Close", action: close)
         }
     }
 
+    @ViewBuilder
+    private var mediaView: some View {
+        switch media {
+        case .image(let image):
+            Image(nsImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+        case .video(_, let player, _, _):
+            PassthroughPlayerView(player: player)
+        }
+    }
+
+    private var copyTitle: String {
+        if case .video = media { return "Copy Video" }
+        return "Copy Image"
+    }
+
+    private func close() {
+        if case .video(_, let player, _, _) = media { player.pause() }
+        onClose()
+    }
+}
+
+// MARK: - Video surface
+
+/// Draws the looping player while staying invisible to hit-testing, so hover,
+/// scroll-zoom, drag-to-move and the context menu keep working like the image pin.
+private struct PassthroughPlayerView: NSViewRepresentable {
+    let player: AVPlayer
+
+    func makeNSView(context: Context) -> AVPlayerView {
+        let view = _PassthroughAVPlayerView()
+        view.player = player
+        view.controlsStyle = .none
+        view.videoGravity = .resizeAspectFill
+        return view
+    }
+
+    func updateNSView(_ nsView: AVPlayerView, context: Context) {
+        nsView.player = player
+    }
+}
+
+private final class _PassthroughAVPlayerView: AVPlayerView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 // MARK: - Scroll-wheel modifier

@@ -34,6 +34,9 @@ final class RecordingBarPresenter {
     var barFrameInPanel: CGRect = .zero
 
     @ObservationIgnored private var panel: NSPanel?
+    /// The app that had focus before the picker activated BetterShot, so
+    /// closing the bar (or starting a recording) hands the keyboard back.
+    @ObservationIgnored private var previousApp: NSRunningApplication?
 
     private init() {}
 
@@ -56,12 +59,31 @@ final class RecordingBarPresenter {
         mode = .picker
         position(panel, displayID: ActiveDisplayResolver.activeDisplayID(preferPointer: false))
         panel.orderFrontRegardless()
-        // Key without activating (the panel is nonactivating): pointer styles
-        // and Esc both resolve against the key window. Key-ness is dormant
-        // while BetterShot isn't the active app, so this never pulls
-        // keystrokes out of the app being recorded.
+        // The picker is driven from the keyboard too (Esc, A for the last
+        // region), and key events only reach the panel while BetterShot is
+        // the active app. Focus is handed back when the picker leaves.
+        previousApp = NSApp.isActive ? nil : NSWorkspace.shared.frontmostApplication
+        NSApp.activate(ignoringOtherApps: true)
         panel.makeKey()
+        LastRegionGhostPresenter.shared.show()
         warmCameraPreviewIfEnabled()
+    }
+
+    /// The remembered region, captured without going through the selection
+    /// overlay. The ghost on screen is what the user is confirming.
+    func captureLastRegion() {
+        guard mode == .picker, AppPreferences.lastRegionRect != nil else { return }
+        let screen = ActiveDisplayResolver.activeScreen(preferPointer: true)
+        hide()
+        Task {
+            await CameraRecordingManager.shared.stopPreview()
+            await CaptureOrchestrator.shared.captureLastRegion(on: screen)
+        }
+    }
+
+    private func restoreFocus() {
+        previousApp?.activate()
+        previousApp = nil
     }
 
     // MARK: Recording
@@ -73,6 +95,8 @@ final class RecordingBarPresenter {
         let panel = panel ?? makePanel()
         PreviewWindowCaptureExclusion.shared.register(window: panel)
         TeleprompterComposerPresenter.shared.hide()
+        LastRegionGhostPresenter.shared.hide()
+        restoreFocus()
 
         let isMorphing = panel.isVisible && isPositioned(panel, onDisplayID: displayID)
         if isMorphing {
@@ -92,11 +116,21 @@ final class RecordingBarPresenter {
         // bar hides has to be ended by hand - it holds the pointing hand.
         BarControlHoverView.endActiveHover()
         panel?.orderOut(nil)
+        LastRegionGhostPresenter.shared.hide()
         // The composer only makes sense floating above the bar.
         TeleprompterComposerPresenter.shared.hide()
         // Next appearance should always start as the picker, and without
         // animating out of a mode nobody can see.
         mode = .picker
+    }
+
+    /// The user backed out of the picker: hide it and give the keyboard
+    /// back. `hide()` alone keeps BetterShot active, which the selection
+    /// overlays that follow it (area recording, region capture) rely on:
+    /// their cursor and Esc only hold while this app is frontmost.
+    func dismiss() {
+        hide()
+        restoreFocus()
     }
 
     func containsScreenPoint(_ point: CGPoint) -> Bool {
@@ -224,11 +258,21 @@ private final class RecordingBarPanel: NSPanel {
         false
     }
 
+    override func keyDown(with event: NSEvent) {
+        guard RecordingBarPresenter.shared.mode == .picker,
+              event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty,
+              event.charactersIgnoringModifiers?.lowercased() == "a" else {
+            super.keyDown(with: event)
+            return
+        }
+        RecordingBarPresenter.shared.captureLastRegion()
+    }
+
     override func cancelOperation(_ sender: Any?) {
         // Escape backs out of picking a source; it must not abandon a
         // recording that's already running.
         guard RecordingBarPresenter.shared.mode == .picker else { return }
-        RecordingBarPresenter.shared.hide()
+        RecordingBarPresenter.shared.dismiss()
         Task { await CameraRecordingManager.shared.stopPreview() }
     }
 }

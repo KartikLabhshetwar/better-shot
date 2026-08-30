@@ -5,6 +5,41 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] - 2026-08-30
+
+One shortcut for everything. The floating bar picks up the screenshot
+actions next to the recording sources, region capture is drawn by BetterShot
+itself and remembers where you last drew it, share links for recordings stop
+going missing from the Library, Settings explains itself inline, and the
+System theme finally follows macOS dark mode.
+
+### Added
+
+- **Screenshot deck**: Successive captures now stack into a floating deck in the screen corner instead of replacing each other, up to five cards with the oldest evicted first. Every card keeps its own auto-dismiss timer (or stays until closed when the delay is set to Never) and its own copy, delete, pin, annotate and drag-out actions, and a Clear All button dismisses the whole deck at once ([#76](https://github.com/KartikLabhshetwar/better-shot/issues/76))
+- **Keep screenshots in the deck until saved**: A new Capture setting stops captures from landing in the save folder and the Library right away. They wait in the deck instead, where cards never time out, and are saved the moment you press Save, Copy, drag one out, pin it, or open it in the editor; Save All saves every card at once, while closing a card, Trash, or Clear All deletes what was never saved. Whatever is left over is cleaned up on the next launch ([#76](https://github.com/KartikLabhshetwar/better-shot/issues/76))
+- **All-in-one bar**: The floating bar that `⌘⇧2` opens now carries the screenshot actions too: region, window, screen, OCR and color picker sit beside the recording sources, so one shortcut reaches everything (#122)
+- **Reuse the last region**: Region capture is drawn by BetterShot itself now and remembers the last rectangle. Next time it appears as a dashed ghost; press `Return`, `A`, or click inside it to capture exactly that area again. `Space` still switches to window selection (#122)
+- **Last region on the bar**: Opening the bar shows the last rectangle as a dashed ghost on screen; press `A` to capture it again without redrawing. The bar now takes keyboard focus while it is up (so `A` and `Esc` work when it is opened from the global shortcut) and hands focus back when it closes or a recording starts
+- **Preview card size**: Settings > Capture > Preview Thumbnail gains a Small, Medium, Large picker for the after-capture card. Small is the size the card has always been, so nothing changes unless you opt in, and the thumbnail is decoded at a resolution to match so Large stays sharp ([#123](https://github.com/KartikLabhshetwar/better-shot/pull/123), thanks [@BradleyAllanDavis](https://github.com/BradleyAllanDavis))
+- **Adjust the region before it is captured**: Letting go of the mouse no longer takes the shot. The rectangle stays on screen with handles on its corners and edges: drag a handle to resize, drag inside to move, then press `Return` or double-click inside it to capture, or `Esc` to cancel. Drawing outside starts a fresh rectangle, and the last-region ghost still captures on a single click ([#49](https://github.com/KartikLabhshetwar/better-shot/issues/49))
+
+### Changed
+
+- **Settings explains itself inline**: Every Recording and Capture control now carries its own one-line description under the label, replacing the paragraph of footnotes each section used to end with. Start delay is now Countdown, and Keystrokes says up front that it needs Input Monitoring and never records plain typing
+- **Sharing settings are easier to set up**: The Sharing tab shows a status card for the R2 connection, keeps its fields editable at all times, links straight to the Cloudflare R2 dashboard, and switches sharing on by itself the moment a connection test succeeds
+- **Library scopes say what they hold**: The Library's Local and Cloud tabs are now On This Mac and Shared Links. With no R2 bucket configured, the empty Shared Links view says so and offers a Set Up Sharing button that jumps to the Sharing tab
+
+### Fixed
+
+- **System theme follows macOS dark mode**: A legacy `NSRequiresAquaSystemAppearance` key in Info.plist forced the light Aqua appearance whenever the app was left on the System theme, so switching macOS to dark mode changed nothing. The key is gone, and the app now tracks the OS setting including live light/dark switches ([#120](https://github.com/KartikLabhshetwar/better-shot/issues/120))
+- **Preview card pill stays readable in dark mode**: The text in the thumbnail pill on the after-capture card inherited the system label color, so it turned white on a white pill in dark mode. It is pinned to black now ([#121](https://github.com/KartikLabhshetwar/better-shot/issues/121))
+- **Recording share links stay in the Library**: A recording opened from disk resolved to a bare `screen.mov` instead of its package, so the Studio had no session to attach the share link to and the link never reached the Library; the link was also keyed by the flattened export, which autosave could drop mid-upload. The Studio now resolves the package from `screen.mov`, imports it into history before uploading, and stores the link by session path
+- **Pinned screenshot close button stays put on hover**: The hover state was tracked on the image alone, so moving the pointer onto the close button counted as leaving and hid the button before you could click it. Hover now covers the whole pinned view
+- **Delete from the preview card removes the whole record**: The card's trash button matched history records by the raw capture path only, so deleting a beautified or edited shot from the card removed just the file and left the record and its other copies behind. It now matches the raw, beautified and edited paths and deletes the full record
+- **A failed Copy says so**: Since 0.4.2 the preview card's Copy reads the capture from disk, and a file moved or deleted between the shot and the click left an empty clipboard, no message, and a card that closed as if it had worked. It now shows a Copy Failed toast on the card's screen and keeps the card up so you can retry or drag the capture out instead; missing recordings are caught the same way ([#119](https://github.com/KartikLabhshetwar/better-shot/pull/119), thanks [@zergzorg](https://github.com/zergzorg))
+- **Pin and delete work for recordings on the preview card**: Pin tried to load a movie as a still image and silently did nothing; a pinned recording now floats as a muted looping panel. Delete on a recording whose card showed the flattened export inside the project package removed only that file and left the history record behind; it now removes the whole record
+- **The plus cursor survives picking an area from the bar**: Hiding the bar to hand off to the area selector gave focus back to the previous app, which took the crosshair cursor with it. Focus is now returned only when you back out of the picker or a recording starts
+
 ## [0.4.2] - 2026-08-26
 
 The Recording Studio learns to hide things: masks blur or pixelate any region
