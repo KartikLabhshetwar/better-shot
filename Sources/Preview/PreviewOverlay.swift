@@ -179,24 +179,10 @@ final class PreviewOverlay {
 struct PreviewDeckView: View {
     let overlay: PreviewOverlay
 
-    // The deck hugs whichever corner the panel is pinned to, so the margin
-    // measures from the same screen edges the user picked. Pinning it to the
-    // trailing edge regardless left the bottom-left deck floating a panel's
-    // width in from the screen instead of a margin's width.
-    private var deckAlignment: Alignment {
-        AppPreferences.overlayPosition == .bottomLeft ? .bottomLeading : .bottomTrailing
-    }
-
-    private var stackAlignment: HorizontalAlignment {
-        AppPreferences.overlayPosition == .bottomLeft ? .leading : .trailing
-    }
-
-    private var marginEdges: Edge.Set {
-        AppPreferences.overlayPosition == .bottomLeft ? [.leading, .bottom] : [.trailing, .bottom]
-    }
+    private var pinnedLeft: Bool { AppPreferences.overlayPosition == .bottomLeft }
 
     var body: some View {
-        VStack(alignment: stackAlignment, spacing: 10) {
+        VStack(alignment: pinnedLeft ? .leading : .trailing, spacing: 10) {
             if overlay.items.count > 1 {
                 HStack(spacing: 6) {
                     if overlay.hasStagedItems {
@@ -209,8 +195,8 @@ struct PreviewDeckView: View {
                 PreviewCardView(overlay: overlay, url: url)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: deckAlignment)
-        .padding(marginEdges, AppPreferences.overlayEdgeMargin)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: pinnedLeft ? .bottomLeading : .bottomTrailing)
+        .padding(pinnedLeft ? [.leading, .bottom] : [.trailing, .bottom], AppPreferences.overlayEdgeMargin)
         .frame(width: overlay.panelSize.width, height: overlay.panelSize.height)
     }
 

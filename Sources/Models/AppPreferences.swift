@@ -104,17 +104,8 @@ enum AppPreferences {
     static let overlayEdgeMarginDefault: Double = 20
     static let overlayEdgeMarginRange: ClosedRange<Double> = 0...48
 
-    /// How far the preview card is held off the screen edges it is pinned to.
     static var overlayEdgeMargin: Double {
-        get {
-            // Zero is a real choice here (card flush into the corner), so an
-            // unset key has to be told apart from a stored 0 rather than
-            // leaning on `double(forKey:)` returning 0 for both.
-            guard UserDefaults.standard.object(forKey: overlayEdgeMarginKey) != nil else {
-                return overlayEdgeMarginDefault
-            }
-            return UserDefaults.standard.double(forKey: overlayEdgeMarginKey)
-        }
+        get { UserDefaults.standard.object(forKey: overlayEdgeMarginKey) as? Double ?? overlayEdgeMarginDefault }
         set { UserDefaults.standard.set(newValue, forKey: overlayEdgeMarginKey) }
     }
 
@@ -259,17 +250,9 @@ enum OverlayCardSize: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Room the panel needs beyond the thumbnail and its edge inset so the
-    /// card's drop shadow (`radius: 14, y: 6` in PreviewCardView) has
-    /// somewhere to render instead of clipping against the panel bounds.
+    /// Room for the card's `.shadow(radius: 14, y: 6)` to draw inside the panel bounds.
     private static let shadowHeadroom: CGFloat = 24
 
-    /// The floating NSPanel's bounds. The card is inset from the panel's
-    /// screen-facing corner by `margin`, so the panel has to hold the
-    /// thumbnail, that inset, and the shadow headroom. The panel is
-    /// transparent and `positionPanel()` pins it flush to the screen edge, so
-    /// these bounds decide only where the shadow may draw, never where the
-    /// card lands on screen.
     func panelSize(margin: Double) -> CGSize {
         CGSize(
             width: thumbnailSize.width + margin + Self.shadowHeadroom,
@@ -277,10 +260,7 @@ enum OverlayCardSize: String, CaseIterable, Identifiable {
         )
     }
 
-    /// The hover controls scale with the card so they do not shrink into
-    /// nothing on a Large one. Deliberately sub-linear: matching the
-    /// thumbnail's own 1.0/1.46/1.92 width ratio makes the Large icons
-    /// cartoonishly big next to the rest of the system UI.
+    /// Hover control scale, deliberately sub-linear to the thumbnail ratio.
     var controlScale: CGFloat {
         switch self {
         case .small: return 1.0
