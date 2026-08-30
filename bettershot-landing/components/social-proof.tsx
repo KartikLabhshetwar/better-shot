@@ -1,5 +1,3 @@
-import { GitHubIcon } from "@/components/github-icon"
-
 const REPO = "KartikLabhshetwar/better-shot"
 const AVATAR_COUNT = 8
 
@@ -76,16 +74,7 @@ export async function SocialProof() {
           </span>
         </div>
         <span className="text-[13px] text-zinc-500">
-          Open source &middot; 25 MB &middot;{" "}
-          <a
-            href={`https://github.com/${REPO}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-brand transition-colors hover:text-brand-700"
-          >
-            <GitHubIcon className="size-3" />
-            Star on GitHub
-          </a>
+          Founders, developers, and SaaS teams ship demos with it.
         </span>
       </div>
     </div>
