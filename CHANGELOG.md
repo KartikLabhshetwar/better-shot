@@ -5,6 +5,12 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Screenshot deck**: Successive captures now stack into a floating deck in the screen corner instead of replacing each other, up to five cards with the oldest evicted first. Every card keeps its own auto-dismiss timer (or stays until closed when the delay is set to Never) and its own copy, delete, pin, annotate and drag-out actions, and a Clear All button dismisses the whole deck at once ([#76](https://github.com/KartikLabhshetwar/better-shot/issues/76))
+
 ## [0.4.3] - 2026-08-30
 
 One shortcut for everything. The floating bar picks up the screenshot

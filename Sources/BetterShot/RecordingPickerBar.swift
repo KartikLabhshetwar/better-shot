@@ -144,7 +144,8 @@ struct RecordingPickerControls: View {
 
     private func captureScreenshot(_ action: ShortcutService.Action) {
         let screen = ActiveDisplayResolver.activeScreen(preferPointer: true)
-        dismissPicker()
+        RecordingBarPresenter.shared.hide()
+        Task { await CameraRecordingManager.shared.stopPreview() }
         Task { await CaptureOrchestrator.shared.performCapture(action, on: screen) }
     }
 
@@ -243,7 +244,7 @@ struct RecordingPickerControls: View {
     /// Backs out of the picker without recording: stop any warm camera
     /// preview so it doesn't keep running in the background.
     private func dismissPicker() {
-        RecordingBarPresenter.shared.hide()
+        RecordingBarPresenter.shared.dismiss()
         Task { await CameraRecordingManager.shared.stopPreview() }
     }
 

@@ -1,29 +1,43 @@
 import AppKit
 import SwiftUI
 
-/// Shows a floating preview card after capture. Uses a borderless NSPanel.
+/// Shows a floating deck of preview cards after capture. Uses a borderless NSPanel.
 @MainActor
 @Observable
 final class PreviewOverlay {
     static let shared = PreviewOverlay()
 
-    private(set) var currentURL: URL?
-    private(set) var isVisible = false
+    static let maxItems = 5
+    private static let cardSpacing: CGFloat = 10
+    private static let clearAllHeight: CGFloat = 26
+
+    private(set) var items: [URL] = []
     private var panel: NSPanel?
-    private var dismissTask: Task<Void, Never>?
+    private var dismissTasks: [URL: Task<Void, Never>] = [:]
     private var targetScreen: NSScreen?
 
     var currentScreen: NSScreen? { targetScreen }
 
+    var panelSize: CGSize {
+        let size = AppPreferences.overlayCardSize
+        let extraCards = CGFloat(max(items.count - 1, 0))
+        let height = size.panelSize.height
+            + extraCards * (size.thumbnailSize.height + Self.cardSpacing)
+            + (items.count > 1 ? Self.clearAllHeight : 0)
+        return CGSize(width: size.panelSize.width, height: height)
+    }
+
     private init() {}
 
     func show(url: URL, on screen: NSScreen? = nil) {
-        dismissTask?.cancel()
-        dismissTask = nil
-
-        currentURL = url
+        cancelScheduledDismiss(for: url)
+        items.removeAll { $0 == url }
+        items.append(url)
+        while items.count > Self.maxItems {
+            let evicted = items.removeFirst()
+            cancelScheduledDismiss(for: evicted)
+        }
         targetScreen = screen
-        isVisible = true
 
         if panel == nil {
             createPanel()
@@ -32,29 +46,36 @@ final class PreviewOverlay {
         positionPanel()
         panel?.orderFront(nil)
 
-        scheduleDismiss()
+        scheduleDismiss(for: url)
+    }
+
+    func remove(_ url: URL) {
+        cancelScheduledDismiss(for: url)
+        items.removeAll { $0 == url }
+        if items.isEmpty {
+            dismiss()
+        } else {
+            positionPanel()
+        }
     }
 
     func dismiss() {
-        dismissTask?.cancel()
-        dismissTask = nil
+        dismissTasks.values.forEach { $0.cancel() }
+        dismissTasks.removeAll()
 
         panel?.orderOut(nil)
         panel = nil
-        isVisible = false
-        currentURL = nil
+        items.removeAll()
     }
 
-    func cancelScheduledDismiss() {
-        dismissTask?.cancel()
-        dismissTask = nil
+    func cancelScheduledDismiss(for url: URL) {
+        dismissTasks.removeValue(forKey: url)?.cancel()
     }
 
     // MARK: - Panel Setup
 
-    func openAnnotateEditor() {
-        guard let url = currentURL else { return }
-        dismiss()
+    func openAnnotateEditor(for url: URL) {
+        remove(url)
         PreviewPanelPresenter.shared.openEditor(for: url)
     }
 
@@ -73,7 +94,7 @@ final class PreviewOverlay {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isMovableByWindowBackground = false
 
-        let hostingView = NSHostingView(rootView: PreviewCardView(overlay: self))
+        let hostingView = NSHostingView(rootView: PreviewDeckView(overlay: self))
         panel.contentView = hostingView
 
         self.panel = panel
@@ -87,7 +108,7 @@ final class PreviewOverlay {
         guard let panel, let screen else { return }
 
         let screenFrame = screen.visibleFrame
-        let panelSize = AppPreferences.overlayCardSize.panelSize
+        let panelSize = panelSize
 
         let x: CGFloat
         let y: CGFloat
@@ -104,14 +125,40 @@ final class PreviewOverlay {
         panel.setFrame(NSRect(origin: NSPoint(x: x, y: y), size: panelSize), display: true)
     }
 
-    private func scheduleDismiss() {
-        dismissTask?.cancel()
+    private func scheduleDismiss(for url: URL) {
         guard AppPreferences.overlayDismisses(after: AppPreferences.overlayDismissDelay) else { return }
-        dismissTask = Task {
+        dismissTasks[url] = Task {
             try? await Task.sleep(for: .seconds(AppPreferences.overlayDismissDelay))
             guard !Task.isCancelled else { return }
-            dismiss()
+            remove(url)
         }
+    }
+}
+
+// MARK: - Preview Deck SwiftUI View
+
+struct PreviewDeckView: View {
+    let overlay: PreviewOverlay
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 10) {
+            if overlay.items.count > 1 {
+                Button("Clear All") { overlay.dismiss() }
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(.black.opacity(0.55), in: Capsule())
+                    .buttonStyle(.plain)
+            }
+            ForEach(overlay.items, id: \.self) { url in
+                PreviewCardView(overlay: overlay, url: url)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        .padding(.trailing, 20)
+        .padding(.bottom, 24)
+        .frame(width: overlay.panelSize.width, height: overlay.panelSize.height)
     }
 }
 
@@ -119,6 +166,7 @@ final class PreviewOverlay {
 
 struct PreviewCardView: View {
     let overlay: PreviewOverlay
+    let url: URL
     @State private var isHovered = false
     @State private var thumbnail: NSImage?
 
@@ -126,12 +174,8 @@ struct PreviewCardView: View {
     // always nils the panel and `show()` always rebuilds it, so a size change
     // in Settings takes effect on the next capture without any extra wiring.
     private var cardSize: CGSize { AppPreferences.overlayCardSize.thumbnailSize }
-    private var panelSize: CGSize { AppPreferences.overlayCardSize.panelSize }
 
-    private var isVideo: Bool {
-        guard let url = overlay.currentURL else { return false }
-        return Self.isVideo(url)
-    }
+    private var isVideo: Bool { Self.isVideo(url) }
 
     private static func isVideo(_ url: URL) -> Bool {
         let ext = url.pathExtension.lowercased()
@@ -173,36 +217,23 @@ struct PreviewCardView: View {
                     }
                 }
                 .onTapGesture {
-                    overlay.openAnnotateEditor()
+                    overlay.openAnnotateEditor(for: url)
                 }
                 .onDrag {
-                    if let url = overlay.currentURL,
-                       let provider = NSItemProvider(contentsOf: url) {
+                    if let provider = NSItemProvider(contentsOf: url) {
                         provider.suggestedName = url.lastPathComponent
                         return provider
                     }
                     return NSItemProvider(object: image)
                 }
+            } else {
+                Color.clear.frame(width: cardSize.width, height: cardSize.height)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-        .padding(.trailing, 20)
-        .padding(.bottom, 24)
-        .frame(width: panelSize.width, height: panelSize.height)
-        .onChange(of: overlay.currentURL) { _, newURL in
-            loadThumbnail(from: newURL)
-        }
-        .onAppear {
-            loadThumbnail(from: overlay.currentURL)
-        }
+        .onAppear(perform: loadThumbnail)
     }
 
-    private func loadThumbnail(from url: URL?) {
-        guard let url else {
-            thumbnail = nil
-            return
-        }
-
+    private func loadThumbnail() {
         // Both kinds go through the history store's decoder: it samples a bounded
         // thumbnail rather than the full bitmap, and it is nonisolated, so the
         // decode runs off the main actor instead of on the tick that just
@@ -214,11 +245,7 @@ struct PreviewCardView: View {
         let sampleSize = max(cardSize.width, cardSize.height) * 2 // retina headroom at the current card size
         Task.detached(priority: .userInitiated) {
             let image = HistoryStore.decodeThumbnail(source, maxSize: sampleSize)
-            // Two captures in quick succession race: the older decode can land last
-            // and paint the previous capture onto the current card.
-            await MainActor.run {
-                if overlay.currentURL == url { thumbnail = image }
-            }
+            await MainActor.run { thumbnail = image }
         }
     }
 
@@ -228,7 +255,7 @@ struct PreviewCardView: View {
             Color.black.opacity(0.45)
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    overlay.openAnnotateEditor()
+                    overlay.openAnnotateEditor(for: url)
                 }
 
             // Corner actions
@@ -236,19 +263,17 @@ struct PreviewCardView: View {
                 HStack {
                     // Delete
                     cornerButton("trash.circle.fill") {
-                        if let url = overlay.currentURL {
-                            if let record = HistoryStore.shared.record(matching: url) {
-                                HistoryStore.shared.deleteRecord(record)
-                            } else {
-                                try? FileManager.default.removeItem(at: url)
-                            }
+                        if let record = HistoryStore.shared.record(matching: url) {
+                            HistoryStore.shared.deleteRecord(record)
+                        } else {
+                            try? FileManager.default.removeItem(at: url)
                         }
-                        overlay.dismiss()
+                        overlay.remove(url)
                     }
                     Spacer()
                     // Dismiss
                     cornerButton("xmark.circle.fill") {
-                        overlay.dismiss()
+                        overlay.remove(url)
                     }
                 }
 
@@ -257,15 +282,13 @@ struct PreviewCardView: View {
                 HStack {
                     // Annotate (pen icon)
                     cornerButton("pencil.circle.fill") {
-                        overlay.openAnnotateEditor()
+                        overlay.openAnnotateEditor(for: url)
                     }
                     Spacer()
                     // Pin screenshot
                     cornerButton("pin.circle.fill") {
-                        if let url = overlay.currentURL {
-                            PinnedScreenshotController.shared.pin(url: url)
-                        }
-                        overlay.dismiss()
+                        PinnedScreenshotController.shared.pin(url: url)
+                        overlay.remove(url)
                     }
                 }
             }
@@ -275,22 +298,18 @@ struct PreviewCardView: View {
             HStack(spacing: 6) {
                 pillButton("Copy") {
                     // Copy the capture itself, not the card's thumbnail.
-                    guard let url = overlay.currentURL else {
-                        overlay.dismiss()
-                        return
-                    }
                     do {
                         if Self.isVideo(url) {
                             try VideoFileActions.copyToClipboard(from: url)
                         } else {
                             try ScreenshotFileActions.copyImageToClipboard(from: url)
                         }
-                        overlay.dismiss()
+                        overlay.remove(url)
                     } catch {
                         // Reading the file can fail if the capture moved or was deleted
                         // between the shot and the click. The card stays up so the copy
                         // can be retried, or the capture dragged out instead.
-                        overlay.cancelScheduledDismiss()
+                        overlay.cancelScheduledDismiss(for: url)
                         ToastWindow.shared.show(
                             title: "Copy Failed",
                             message: error.localizedDescription,
@@ -300,7 +319,7 @@ struct PreviewCardView: View {
                     }
                 }
                 pillButton("Save") {
-                    overlay.dismiss()
+                    overlay.remove(url)
                 }
             }
         }

@@ -62,10 +62,8 @@ final class RecordingBarPresenter {
         // The picker is driven from the keyboard too (Esc, A for the last
         // region), and key events only reach the panel while BetterShot is
         // the active app. Focus is handed back when the picker leaves.
-        if !NSApp.isActive {
-            previousApp = NSWorkspace.shared.frontmostApplication
-            NSApp.activate(ignoringOtherApps: true)
-        }
+        previousApp = NSApp.isActive ? nil : NSWorkspace.shared.frontmostApplication
+        NSApp.activate(ignoringOtherApps: true)
         panel.makeKey()
         LastRegionGhostPresenter.shared.show()
         warmCameraPreviewIfEnabled()
@@ -119,12 +117,20 @@ final class RecordingBarPresenter {
         BarControlHoverView.endActiveHover()
         panel?.orderOut(nil)
         LastRegionGhostPresenter.shared.hide()
-        restoreFocus()
         // The composer only makes sense floating above the bar.
         TeleprompterComposerPresenter.shared.hide()
         // Next appearance should always start as the picker, and without
         // animating out of a mode nobody can see.
         mode = .picker
+    }
+
+    /// The user backed out of the picker: hide it and give the keyboard
+    /// back. `hide()` alone keeps BetterShot active, which the selection
+    /// overlays that follow it (area recording, region capture) rely on:
+    /// their cursor and Esc only hold while this app is frontmost.
+    func dismiss() {
+        hide()
+        restoreFocus()
     }
 
     func containsScreenPoint(_ point: CGPoint) -> Bool {
@@ -266,7 +272,7 @@ private final class RecordingBarPanel: NSPanel {
         // Escape backs out of picking a source; it must not abandon a
         // recording that's already running.
         guard RecordingBarPresenter.shared.mode == .picker else { return }
-        RecordingBarPresenter.shared.hide()
+        RecordingBarPresenter.shared.dismiss()
         Task { await CameraRecordingManager.shared.stopPreview() }
     }
 }
