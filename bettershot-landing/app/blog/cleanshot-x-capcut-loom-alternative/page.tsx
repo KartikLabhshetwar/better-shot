@@ -72,18 +72,6 @@ const jsonLd = {
   ],
 }
 
-const toc = [
-  { id: "the-stack", label: "The usual stack" },
-  { id: "what-each-tool-does", label: "What each tool is for" },
-  { id: "cleanshot-x-alternative", label: "As a CleanShot X alternative" },
-  { id: "loom-alternative", label: "As a Loom alternative" },
-  { id: "capcut-alternative", label: "As a CapCut alternative" },
-  { id: "honest-limits", label: "Where the other three win" },
-  { id: "cost", label: "What the stack costs" },
-  { id: "privacy", label: "Your screen, their servers" },
-  { id: "switching", label: "Switching takes five minutes" },
-  { id: "faq", label: "Common questions" },
-]
 
 const th = "text-[13px] font-medium uppercase tracking-widest border-b border-zinc-200 px-2 py-2 text-left text-[11px] font-semibold text-zinc-400"
 const td = "border-b border-zinc-200 px-2 py-2"
@@ -98,25 +86,22 @@ export default async function Article() {
 
       <main id="main">
         <div className="mx-auto max-w-[1100px] px-6">
-          <header className="max-w-[1000px] pb-10 pt-28 sm:pt-32">
-            <p className="mb-3.5 text-[13px] font-medium uppercase tracking-widest text-brand-700">
-              <Link href="/blog" className="outline-none transition-colors duration-150 hover:text-brand">
-                Blog
-              </Link>{" "}
-              / {post.tag}
-            </p>
-            <h1 className="text-[clamp(34px,4.6vw,60px)] font-extrabold tracking-tight">
+          <header className="mx-auto max-w-[680px] pb-10 pt-28 sm:pt-32">
+            <span className="rounded-full bg-brand-100 px-3 py-1 text-[12px] font-medium text-brand-700">
+              {post.tag}
+            </span>
+            <h1 className="mt-5 text-[clamp(34px,4.6vw,56px)] font-extrabold leading-[1.08] tracking-tight">
               One free macOS app instead of CleanShot X, CapCut, and Loom
             </h1>
-            <p className="mt-6 text-[13px] font-medium uppercase tracking-widest text-zinc-400">
-              <time dateTime={post.date}>{formatPostDate(post.date)}</time> · {post.readingTime}
+            <p className="mt-5 text-[15px] text-zinc-400">
+              <time dateTime={post.date}>{formatPostDate(post.date)}</time> &middot; {post.readingTime}
             </p>
           </header>
 
-          <hr className="rule" />
+          <div className="mx-auto max-w-[680px] h-px bg-zinc-200" />
 
-          <div className="grid items-start gap-x-[clamp(24px,5vw,80px)] lg:grid-cols-[minmax(0,720px)_minmax(0,1fr)]">
-            <article className="max-w-[720px] pb-[72px] pt-12 lg:border-r lg:border-zinc-200 lg:pr-[clamp(24px,4vw,64px)]">
+          <div>
+            <article className="mx-auto max-w-[680px] pb-16 pt-12">
               <p className="mb-8 text-[19px] leading-[32px] text-zinc-900">
                 If you take screenshots for work, record walkthroughs for teammates, and trim those
                 recordings before sending them, you are probably paying three companies for one job.
@@ -294,7 +279,7 @@ export default async function Article() {
                     className="grid gap-x-8 gap-y-1.5 border-t border-zinc-200 py-3.5 sm:grid-cols-[minmax(0,140px)_minmax(0,1fr)]"
                   >
                     <span className="text-[15px] font-semibold leading-[24px]">{row.tool}</span>
-                    <span className="text-[15px] leading-[24px] text-zinc-500">{row.reason}</span>
+                    <span className="text-[15px] leading-[24px] text-zinc-600">{row.reason}</span>
                   </li>
                 ))}
               </ul>
@@ -404,7 +389,7 @@ export default async function Article() {
                 <h2 className="text-[28px] font-extrabold leading-[34px] tracking-tight">
                   Try it before your next renewal
                 </h2>
-                <p className="mb-7 mt-4 max-w-[46ch] text-[16px] leading-[28px] text-zinc-500 ">
+                <p className="mb-7 mt-4 max-w-[46ch] text-[16px] leading-[28px] text-zinc-600 ">
                   Free, open source, macOS 14+. No account, no card, no trial countdown. Compare it
                   side by side with what you pay for now.
                 </p>
@@ -449,20 +434,6 @@ export default async function Article() {
               </div>
             </article>
 
-            <nav aria-label="On this page" className="hidden gap-2.5 py-12 lg:sticky lg:top-20 lg:grid lg:max-w-[220px]">
-              <p className="mb-1.5 text-[13px] font-medium uppercase tracking-widest text-zinc-400">
-                On this page
-              </p>
-              {toc.map((entry) => (
-                <a
-                  key={entry.id}
-                  href={`#${entry.id}`}
-                  className="text-[14px] leading-[22px] text-zinc-900 outline-none transition-colors duration-150 hover:text-brand-700"
-                >
-                  {entry.label}
-                </a>
-              ))}
-            </nav>
           </div>
         </div>
       </main>
@@ -481,7 +452,7 @@ function H2({ id, children }: { id: string; children: React.ReactNode }) {
 }
 
 function P({ children }: { children: React.ReactNode }) {
-  return <p className="mb-5 text-[16px] leading-[28px] text-zinc-500">{children}</p>
+  return <p className="mb-5 text-[16px] leading-[28px] text-zinc-600">{children}</p>
 }
 
 function Strong({ children }: { children: React.ReactNode }) {
@@ -511,7 +482,7 @@ function List({ items }: { items: string[] }) {
       {items.map((item) => (
         <li
           key={item}
-          className="border-t border-zinc-200 py-3 text-[16px] leading-[28px] text-zinc-500"
+          className="border-t border-zinc-200 py-3 text-[16px] leading-[28px] text-zinc-600"
         >
           {item}
         </li>
@@ -526,7 +497,7 @@ function OrderedList({ items }: { items: string[] }) {
       {items.map((item, i) => (
         <li
           key={item}
-          className="grid gap-x-6 border-t border-zinc-200 py-3 text-[16px] leading-[28px] text-zinc-500 sm:grid-cols-[32px_minmax(0,1fr)]"
+          className="grid gap-x-6 border-t border-zinc-200 py-3 text-[16px] leading-[28px] text-zinc-600 sm:grid-cols-[32px_minmax(0,1fr)]"
         >
           <span className="font-extrabold tabular-nums text-brand-700">
             {String(i + 1).padStart(2, "0")}
@@ -540,7 +511,7 @@ function OrderedList({ items }: { items: string[] }) {
 
 function TldrItem({ children }: { children: React.ReactNode }) {
   return (
-    <li className="border-t border-zinc-200 py-3 text-[15px] leading-[24px] text-zinc-500 first:border-t-0 first:pt-0">
+    <li className="border-t border-zinc-200 py-3 text-[15px] leading-[24px] text-zinc-600 first:border-t-0 first:pt-0">
       {children}
     </li>
   )
@@ -550,7 +521,7 @@ function Faq({ q, children }: { q: string; children: React.ReactNode }) {
   return (
     <div className="py-5 px-6">
       <h3 className="mb-2 text-[16px] font-semibold">{q}</h3>
-      <p className="text-[15px] leading-[26px] text-zinc-500">{children}</p>
+      <p className="text-[15px] leading-[26px] text-zinc-600">{children}</p>
     </div>
   )
 }

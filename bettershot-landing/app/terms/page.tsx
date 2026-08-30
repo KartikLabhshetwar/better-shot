@@ -80,54 +80,54 @@ const sections = [
 
 export default function TermsOfUse() {
   return (
-    <div className="min-h-screen w-full bg-canvas text-ink">
+    <div className="min-h-screen w-full bg-white text-zinc-900">
       <SiteNav />
 
       <main id="main">
-        <div className="mx-auto max-w-[1240px] px-6">
-          <header className="pb-10 pt-[72px]">
-            <span className="micro block text-[13px] font-extrabold uppercase text-brand-700">
-              Terms · Updated August 2026
+        <div className="mx-auto max-w-[1100px] px-6">
+          <header className="pb-12 pt-28 sm:pt-32">
+            <span className="text-[13px] font-medium uppercase tracking-widest text-zinc-400">
+              Terms &middot; Updated August 2026
             </span>
-            <h1 className="display mt-3.5 -ml-[0.058em] max-w-[24ch] text-[clamp(38px,5.4vw,68px)]">
+            <h1 className="mt-4 max-w-[24ch] text-[clamp(38px,5.4vw,60px)] font-extrabold tracking-tight">
               The license is the agreement
             </h1>
-            <p className="mt-6 max-w-[56ch] text-[18px] leading-[30px] text-ink/80">
+            <p className="mt-6 max-w-[56ch] text-[17px] leading-[28px] text-zinc-600">
               Better Shot is distributed under the BSD 3 Clause license. These terms restate what
               that means in practice and cover the website.
             </p>
           </header>
 
-          <hr className="rule" />
+          <div className="h-px bg-zinc-200" />
 
           <div className="grid items-start gap-x-[clamp(24px,5vw,80px)] lg:grid-cols-[200px_minmax(0,1fr)]">
             <nav aria-label="Sections" className="hidden gap-2.5 py-12 lg:sticky lg:top-20 lg:grid">
-              <p className="micro mb-1.5 text-[13px] font-extrabold uppercase text-ink/70">
+              <p className="mb-1.5 text-[13px] font-medium uppercase tracking-widest text-zinc-400">
                 Sections
               </p>
               {sections.map((section) => (
                 <a
                   key={section.id}
                   href={`#${section.id}`}
-                  className="text-[14px] leading-[22px] text-ink outline-none transition-colors duration-150 hover:text-brand-700"
+                  className="text-[14px] leading-[22px] text-zinc-900 outline-none transition-colors duration-150 hover:text-brand-700"
                 >
                   {section.title}
                 </a>
               ))}
             </nav>
 
-            <article className="max-w-[68ch] pb-[72px] pt-12 lg:border-l-2 lg:border-rule lg:pl-[clamp(20px,4vw,56px)]">
+            <article className="max-w-[68ch] pb-16 pt-12 lg:border-l lg:border-zinc-200 lg:pl-[clamp(20px,4vw,56px)]">
               {sections.map((section) => (
                 <section key={section.id} id={section.id} className="mb-11 scroll-mt-20">
-                  <h2 className="mb-4 text-[26px] font-extrabold leading-[32px]">{section.title}</h2>
+                  <h2 className="mb-4 text-[26px] font-extrabold leading-[32px] tracking-tight">{section.title}</h2>
                   {section.body.map((paragraph, i) => (
-                    <p key={i} className="mb-4 text-[17px] leading-[30px] text-ink/80">
+                    <p key={i} className="mb-4 text-[17px] leading-[28px] text-zinc-600">
                       {paragraph}
                     </p>
                   ))}
                 </section>
               ))}
-              <p className="text-[15px] leading-[26px] text-ink/70">
+              <p className="text-[15px] leading-[26px] text-zinc-400">
                 Questions about any of this belong in an{" "}
                 <a
                   href="https://github.com/KartikLabhshetwar/better-shot/issues"

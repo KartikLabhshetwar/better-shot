@@ -31,7 +31,7 @@ export default function BlogIndex() {
             <h1 className="mt-4 text-[clamp(38px,5.4vw,60px)] font-extrabold tracking-tight">
               Screen capture, written down
             </h1>
-            <p className="mt-6 max-w-[54ch] text-[17px] leading-[28px] text-zinc-500">
+            <p className="mt-6 max-w-[54ch] text-[17px] leading-[28px] text-zinc-600">
               Comparisons and workflow notes for people who take a lot of screenshots and record a
               lot of screens.
             </p>
@@ -55,7 +55,7 @@ export default function BlogIndex() {
                 <h2 className="mt-3 max-w-[36ch] text-[clamp(22px,2.4vw,30px)] font-extrabold tracking-tight">
                   {post.headline}
                 </h2>
-                <p className="mt-3 max-w-[60ch] text-[16px] leading-[28px] text-zinc-500">
+                <p className="mt-3 max-w-[60ch] text-[16px] leading-[28px] text-zinc-600">
                   {post.description}
                 </p>
                 <p className="mt-4 text-[15px] font-semibold text-brand transition-colors duration-150 group-hover:text-brand-700">

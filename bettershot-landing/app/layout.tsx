@@ -1,15 +1,8 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Archivo } from "next/font/google"
+import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import "./globals.css"
-
-const archivo = Archivo({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "800"],
-  variable: "--font-archivo",
-  display: "swap",
-})
 
 const title = "Better Shot: free screenshot and screen recorder for macOS"
 const description =
@@ -122,7 +115,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${archivo.variable} ${GeistMono.variable}`}>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <head>
         <meta
           name="google-site-verification"
@@ -138,7 +131,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className="antialiased">
+      <body className="font-sans antialiased">
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:bg-ink focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-canvas"

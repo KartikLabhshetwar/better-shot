@@ -18,8 +18,8 @@ export function DownloadLink({ href, label, primary, source = "hero" }: Download
       className={cn(
         "inline-flex items-center justify-center px-5 py-3 text-[15px] font-semibold tracking-tight outline-none transition-colors duration-150",
         primary
-          ? "bg-brand text-canvas hover:bg-brand-600 active:bg-brand-700"
-          : "border-2 border-rule text-ink hover:border-ink",
+          ? "rounded-xl bg-brand text-white hover:bg-brand-600 active:bg-brand-700"
+          : "rounded-xl border border-zinc-200 text-zinc-900 hover:border-zinc-400",
       )}
     >
       {label}

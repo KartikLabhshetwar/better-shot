@@ -37,9 +37,6 @@
   --sidebar-accent-foreground: #121113;
   --sidebar-border: oklch(0.9276 0.0058 264.5313);
   --sidebar-ring: oklch(0.541 0.256 293);
-  --font-sans: var(--font-archivo), system-ui, -apple-system, sans-serif;
-  --font-serif: serif;
-  --font-mono: JetBrains Mono, monospace;
   --radius: 0.75rem;
   --ease-fluid: cubic-bezier(0.32, 0.72, 0, 1);
   --shadow-2xs: 0px 1px 4px 0px hsl(0 0% 0% / 0.03);
@@ -87,9 +84,6 @@
   --sidebar-accent-foreground: oklch(0.8109 0 0);
   --sidebar-border: oklch(0.252 0 0);
   --sidebar-ring: oklch(0.67 0.17 293);
-  --font-sans: var(--font-archivo), system-ui, -apple-system, sans-serif;
-  --font-serif: serif;
-  --font-mono: JetBrains Mono, monospace;
   --radius: 0.75rem;
   --ease-fluid: cubic-bezier(0.32, 0.72, 0, 1);
   --shadow-2xs: 0px 1px 4px 0px hsl(0 0% 0% / 0.03);
@@ -103,8 +97,9 @@
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-sans: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+  --font-serif: serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -149,10 +144,6 @@
   --color-brand-800: #4c1d95;
   --color-rule: #e4e4e7;
 
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-mono);
-  --font-serif: var(--font-serif);
-
   --radius-xs: 0.25rem;
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
@@ -178,27 +169,6 @@
   --tracking-wide: calc(var(--tracking-normal) + 0.025em);
   --tracking-wider: calc(var(--tracking-normal) + 0.05em);
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
-}
-
-body {
-  letter-spacing: var(--tracking-normal);
-}
-
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  text-wrap: balance;
-  font-weight: 800;
-  line-height: 1.12;
-  letter-spacing: -0.015em;
-}
-
-p,
-li {
-  text-wrap: pretty;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -231,6 +201,16 @@ li {
   }
   body {
     @apply bg-background text-foreground;
+    letter-spacing: var(--tracking-normal);
+  }
+  h1, h2, h3, h4, h5, h6 {
+    text-wrap: balance;
+    font-weight: 800;
+    line-height: 1.12;
+    letter-spacing: -0.015em;
+  }
+  p, li {
+    text-wrap: pretty;
   }
 }
 

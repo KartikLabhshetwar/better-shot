@@ -71,20 +71,6 @@ const jsonLd = {
   ],
 }
 
-const toc = [
-  { id: "what-loom-does", label: "What Loom does well" },
-  { id: "where-loom-falls-short", label: "Where it falls short" },
-  { id: "better-shot-recording", label: "Recording in Better Shot" },
-  { id: "cursor-auto-zoom", label: "Cursor auto-zoom" },
-  { id: "editing", label: "A real timeline editor" },
-  { id: "captions", label: "On-device captions" },
-  { id: "sharing", label: "Share links you own" },
-  { id: "performance", label: "Native macOS performance" },
-  { id: "comparison", label: "Side-by-side comparison" },
-  { id: "cost", label: "Pricing" },
-  { id: "switching", label: "Switching from Loom" },
-  { id: "faq", label: "Common questions" },
-]
 
 const th = "border-b border-zinc-200 px-3 py-2.5 text-left text-[12px] font-semibold uppercase tracking-widest text-zinc-400"
 const td = "border-b border-zinc-100 px-3 py-2.5"
@@ -99,14 +85,11 @@ export default async function Article() {
 
       <main id="main">
         <div className="mx-auto max-w-[1100px] px-6">
-          <header className="max-w-[860px] pb-10 pt-28 sm:pt-32">
-            <p className="mb-3.5 text-[13px] font-medium uppercase tracking-widest text-brand-700">
-              <Link href="/blog" className="outline-none transition-colors duration-150 hover:text-brand">
-                Blog
-              </Link>{" "}
-              / {post.tag}
-            </p>
-            <h1 className="text-[clamp(34px,4.6vw,56px)] font-extrabold leading-[1.08] tracking-tight">
+          <header className="mx-auto max-w-[680px] pb-10 pt-28 sm:pt-32">
+            <span className="rounded-full bg-brand-100 px-3 py-1 text-[12px] font-medium text-brand-700">
+              {post.tag}
+            </span>
+            <h1 className="mt-4 text-[clamp(34px,4.6vw,56px)] font-extrabold leading-[1.08] tracking-tight">
               {post.headline}
             </h1>
             <p className="mt-6 text-[13px] uppercase tracking-widest text-zinc-400">
@@ -114,10 +97,10 @@ export default async function Article() {
             </p>
           </header>
 
-          <div className="border-t border-zinc-200" />
+          <div className="mx-auto max-w-[680px] border-t border-zinc-200" />
 
-          <div className="grid items-start gap-x-[clamp(24px,5vw,80px)] lg:grid-cols-[minmax(0,680px)_minmax(0,1fr)]">
-            <article className="max-w-[680px] pb-16 pt-12 lg:border-r lg:border-zinc-200 lg:pr-[clamp(24px,4vw,64px)]">
+          <div>
+            <article className="mx-auto max-w-[680px] pb-16 pt-12">
               <p className="mb-8 text-[19px] leading-[32px] text-zinc-600">
                 Loom made async video a habit. But $18 per seat per month, a five-minute cap on the
                 free plan, and every recording routed through someone else&apos;s servers is a lot to
@@ -310,8 +293,8 @@ export default async function Article() {
                     ].map(([feature, loom, bettershot]) => (
                       <tr key={feature} className="transition-colors hover:bg-zinc-50">
                         <td className={`${td} font-medium`}>{feature}</td>
-                        <td className={`${td} text-zinc-500`}>{loom}</td>
-                        <td className={`${td} text-zinc-500`}>{bettershot}</td>
+                        <td className={`${td} text-zinc-600`}>{loom}</td>
+                        <td className={`${td} text-zinc-600`}>{bettershot}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -338,8 +321,8 @@ export default async function Article() {
                       return (
                         <tr key={tool} className="transition-colors hover:bg-zinc-50">
                           <td className={`${td} font-medium ${isLast ? "text-brand" : ""}`}>{tool}</td>
-                          <td className={`${td} text-right text-zinc-500`}>{monthly}</td>
-                          <td className={`${td} text-right tabular-nums ${isLast ? "font-semibold text-brand" : "text-zinc-500"}`}>
+                          <td className={`${td} text-right text-zinc-600`}>{monthly}</td>
+                          <td className={`${td} text-right tabular-nums ${isLast ? "font-semibold text-brand" : "text-zinc-600"}`}>
                             {total}
                           </td>
                         </tr>
@@ -399,7 +382,7 @@ export default async function Article() {
                 <h2 className="text-[28px] font-extrabold leading-[34px] tracking-tight">
                   Try it before your Loom renews
                 </h2>
-                <p className="mb-7 mt-4 max-w-[46ch] text-[16px] leading-[28px] text-zinc-500">
+                <p className="mb-7 mt-4 max-w-[46ch] text-[16px] leading-[28px] text-zinc-600">
                   Free, open source, macOS 14+. No account, no card, no trial countdown. Record
                   something and compare it side by side.
                 </p>
@@ -444,20 +427,6 @@ export default async function Article() {
               </div>
             </article>
 
-            <nav aria-label="On this page" className="hidden gap-2.5 py-12 lg:sticky lg:top-20 lg:grid lg:max-w-[220px]">
-              <p className="mb-1.5 text-[13px] font-semibold uppercase tracking-widest text-zinc-400">
-                On this page
-              </p>
-              {toc.map((entry) => (
-                <a
-                  key={entry.id}
-                  href={`#${entry.id}`}
-                  className="text-[14px] leading-[22px] text-zinc-600 outline-none transition-colors duration-150 hover:text-brand-700"
-                >
-                  {entry.label}
-                </a>
-              ))}
-            </nav>
           </div>
         </div>
       </main>
@@ -476,7 +445,7 @@ function H2({ id, children }: { id: string; children: React.ReactNode }) {
 }
 
 function P({ children }: { children: React.ReactNode }) {
-  return <p className="mb-5 text-[17px] leading-[30px] text-zinc-500">{children}</p>
+  return <p className="mb-5 text-[17px] leading-[30px] text-zinc-600">{children}</p>
 }
 
 function Strong({ children }: { children: React.ReactNode }) {
@@ -506,7 +475,7 @@ function List({ items }: { items: string[] }) {
       {items.map((item) => (
         <li
           key={item}
-          className="border-t border-zinc-200 py-3 text-[16px] leading-[28px] text-zinc-500"
+          className="border-t border-zinc-200 py-3 text-[16px] leading-[28px] text-zinc-600"
         >
           {item}
         </li>
@@ -521,7 +490,7 @@ function OrderedList({ items }: { items: string[] }) {
       {items.map((item, i) => (
         <li
           key={item}
-          className="grid gap-x-6 border-t border-zinc-200 py-3 text-[16px] leading-[28px] text-zinc-500 sm:grid-cols-[32px_minmax(0,1fr)]"
+          className="grid gap-x-6 border-t border-zinc-200 py-3 text-[16px] leading-[28px] text-zinc-600 sm:grid-cols-[32px_minmax(0,1fr)]"
         >
           <span className="font-extrabold tabular-nums text-brand-700">
             {String(i + 1).padStart(2, "0")}
@@ -535,7 +504,7 @@ function OrderedList({ items }: { items: string[] }) {
 
 function TldrItem({ children }: { children: React.ReactNode }) {
   return (
-    <li className="border-t border-zinc-200 py-3 text-[15px] leading-[24px] text-zinc-500 first:border-t-0 first:pt-0">
+    <li className="border-t border-zinc-200 py-3 text-[15px] leading-[24px] text-zinc-600 first:border-t-0 first:pt-0">
       {children}
     </li>
   )
@@ -545,7 +514,7 @@ function Faq({ q, children }: { q: string; children: React.ReactNode }) {
   return (
     <div className="px-6 py-5">
       <h3 className="mb-2 text-[16px] font-semibold text-zinc-900">{q}</h3>
-      <p className="text-[15px] leading-[26px] text-zinc-500">{children}</p>
+      <p className="text-[15px] leading-[26px] text-zinc-600">{children}</p>
     </div>
   )
 }

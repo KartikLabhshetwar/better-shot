@@ -9,6 +9,7 @@ import { Reveal } from "@/components/reveal"
 import { CopyCommand } from "@/components/copy-command"
 import { Comparison } from "@/components/home/comparison"
 import { FaqSection, faqs } from "@/components/home/faq"
+import { StarCount } from "@/components/star-count"
 
 const faqJsonLd = {
   "@context": "https://schema.org",
@@ -22,9 +23,8 @@ const faqJsonLd = {
 
 const stats = [
   { value: "$0", label: "Forever. No tiers, no trial" },
-  { value: "0 KB", label: "Uploaded by default" },
-  { value: "30 Hz", label: "Pointer sampled while recording" },
-  { value: "BSD 3", label: "Clause licensed, auditable" },
+  { value: "14K+", label: "Downloads and counting" },
+  { value: "25 MB", label: "Lightweight native app" },
 ]
 
 const features = [
@@ -51,18 +51,6 @@ const features = [
     title: "Links you own, on your storage",
     body: "Connect a Cloudflare R2 bucket and Share uploads the edited recording straight from the app, then copies the link. No proxy, no vendor in the middle, no viewer limit.",
     tags: ["Your own R2 bucket", "Keychain keys", "Direct SigV4", "Edits baked in"],
-  },
-  {
-    label: "Capture",
-    title: "Screenshots, one shortcut away",
-    body: "Region, window, or fullscreen from one shortcut. A floating preview appears after every shot, so you can edit it, copy it, pin it above your work, or drag the file straight into Figma, Slack, or Finder.",
-    tags: ["Region", "Window", "Fullscreen", "OCR", "Color picker", "Pin on top"],
-  },
-  {
-    label: "Annotate",
-    title: "Arrows, shapes, text, badges",
-    body: "Arrows, shapes, text, and numbered badges, each with its key printed in the corner of its button. Backgrounds, padding, shadow, and corner radius make the result presentable without a second app.",
-    tags: ["Arrows", "Shapes", "Numbered badges", "Crop", "Backgrounds"],
   },
 ]
 
@@ -98,13 +86,11 @@ const moreFeatures = [
   { title: "No watermark, no account", body: "Every export is clean. No trial, no upsell. BSD 3 Clause licensed and auditable." },
 ]
 
-const placeholderGradients = [
-  "from-violet-50 to-purple-50",
-  "from-indigo-50 to-violet-50",
-  "from-fuchsia-50 to-violet-50",
-  "from-violet-50 to-blue-50",
-  "from-purple-50 to-pink-50",
-  "from-violet-50 to-indigo-50",
+const featureVideos = [
+  "/feature-1.mp4",
+  "/feature-2.mp4",
+  "/feature-3.mp4",
+  "/feature-4.mp4",
 ]
 
 export default async function Home() {
@@ -119,12 +105,12 @@ export default async function Home() {
       <SiteNav />
 
       <main id="main">
-        <section className="pb-10 pt-28 sm:pt-36">
+        <section className="pb-12 pt-28 sm:pt-36">
           <div className="mx-auto max-w-[1100px] px-6 text-center">
             <Reveal>
               <Link
                 href="/changelog"
-                className="inline-flex items-center gap-2 rounded-full border border-zinc-200 px-4 py-1.5 text-[13px] text-zinc-500 transition-colors hover:border-zinc-400"
+                className="inline-flex items-center gap-2 rounded-full border border-zinc-200 px-4 py-1.5 text-[13px] text-zinc-600 transition-colors hover:border-zinc-400"
               >
                 <span className="font-semibold text-zinc-900">v{release.version}</span>
                 <span className="h-3 w-px bg-zinc-200" />
@@ -134,52 +120,74 @@ export default async function Home() {
             </Reveal>
 
             <Reveal>
-              <h1 className="mx-auto mt-10 max-w-3xl text-[clamp(2.25rem,5.5vw,3.75rem)] font-extrabold leading-[1.08] tracking-tight">
-                The free Loom alternative
-                <br />
-                <span className="text-brand">for macOS.</span>
+              <h1 className="mx-auto mt-10 max-w-[18ch] text-[clamp(2.5rem,6vw,4.5rem)] font-normal leading-[1.1] tracking-tight text-zinc-900">
+                Screen recorder for Mac.{" "}
+                <span className="text-zinc-400">Free and open source.</span>
               </h1>
             </Reveal>
 
             <Reveal>
-              <p className="mx-auto mt-7 max-w-xl text-[17px] leading-relaxed text-zinc-500">
-                Record your screen with cursor auto-zoom, edit on a real timeline with captions and
-                masks, and share from your own R2 bucket. No subscription, no account, no
-                five-minute cap. Free, open source, native macOS.
+              <p className="mx-auto mt-6 max-w-lg text-[17px] leading-relaxed text-zinc-600">
+                A Mac screen recorder for clear, polished videos without complicated editing.
+                Cursor auto-zoom, face cam, on-device captions, and share links you own.
               </p>
             </Reveal>
 
             <Reveal>
-              <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+              <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
                 <DownloadDropdown release={release} source="hero" />
                 <a
-                  href="https://github.com/KartikLabhshetwar/better-shot"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 px-6 py-3.5 text-[14px] font-semibold text-zinc-600 transition-all hover:border-zinc-300 hover:bg-zinc-50"
+                  href="#features"
+                  className="text-[15px] font-medium text-zinc-600 transition-colors hover:text-zinc-900"
                 >
-                  <GithubLogoIcon size={16} weight="bold" />
-                  View source
+                  See what it does &rsaquo;
                 </a>
               </div>
             </Reveal>
 
             <Reveal>
-              <p className="mt-5 text-[13px] text-zinc-400">
-                Free forever &middot; No account &middot; macOS 14+ &middot; Apple Silicon and Intel
+              <p className="mt-6 flex items-center justify-center gap-2 text-[14px] text-zinc-600">
+                <span className="text-amber-400">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
+                <span>
+                  Open source &middot; 25 MB &middot;{" "}
+                  <a
+                    href="https://github.com/KartikLabhshetwar/better-shot"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-brand transition-colors hover:text-brand-700"
+                  >
+                    <StarCount /> on GitHub
+                  </a>
+                </span>
               </p>
+            </Reveal>
+
+            <Reveal>
+              <div className="mx-auto mt-12 max-w-[900px]">
+                <div className="overflow-hidden rounded-2xl border border-zinc-200 shadow-xl shadow-zinc-200/50">
+                  <video
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full"
+                  >
+                    <source src="/launch.mp4" type="video/mp4" />
+                  </video>
+                </div>
+              </div>
             </Reveal>
           </div>
         </section>
 
         <Reveal as="section" className="mx-auto max-w-[1100px] px-6 py-14" aria-label="Better Shot in numbers">
-          <div className="grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
             {stats.map((stat) => (
               <div key={stat.value} className="rounded-2xl border border-zinc-200 p-5 sm:p-6">
                 <p className="text-[clamp(28px,3vw,42px)] font-extrabold leading-[1.1] tracking-tight text-brand">
                   {stat.value}
                 </p>
-                <p className="mt-2 text-[13px] leading-[18px] text-zinc-500">{stat.label}</p>
+                <p className="mt-2 text-[13px] leading-[18px] text-zinc-600">{stat.label}</p>
               </div>
             ))}
           </div>
@@ -191,7 +199,7 @@ export default async function Home() {
               <h2 className="text-[28px] font-extrabold tracking-tight sm:text-[32px]">
                 One app instead of four subscriptions
               </h2>
-              <p className="mt-4 text-[16px] leading-relaxed text-zinc-500">
+              <p className="mt-4 text-[16px] leading-relaxed text-zinc-600">
                 Record, edit, caption, and share. Plus screenshots and annotations. All on your Mac.
               </p>
             </Reveal>
@@ -210,7 +218,7 @@ export default async function Home() {
                     <h3 className="text-[28px] font-extrabold leading-tight tracking-tight sm:text-[32px]">
                       {feature.title}
                     </h3>
-                    <p className="mt-4 max-w-md text-[16px] leading-relaxed text-zinc-500">{feature.body}</p>
+                    <p className="mt-4 max-w-md text-[16px] leading-relaxed text-zinc-600">{feature.body}</p>
                     <div className="mt-5 flex flex-wrap gap-1.5">
                       {feature.tags.map((tag) => (
                         <span
@@ -223,8 +231,10 @@ export default async function Home() {
                     </div>
                   </div>
                   <div className={reversed ? "order-2 lg:order-1" : ""}>
-                    <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50">
-                      <div className={`aspect-[4/3] bg-gradient-to-br ${placeholderGradients[i]}`} />
+                    <div className="overflow-hidden rounded-2xl border border-zinc-200">
+                      <video autoPlay loop muted playsInline className="w-full">
+                        <source src={featureVideos[i]} type="video/mp4" />
+                      </video>
                     </div>
                   </div>
                 </Reveal>
@@ -242,7 +252,7 @@ export default async function Home() {
               <h2 className="text-[28px] font-extrabold tracking-tight sm:text-[32px]">
                 Built for macOS, not for Electron
               </h2>
-              <p className="mt-4 text-[16px] leading-relaxed text-zinc-500">
+              <p className="mt-4 text-[16px] leading-relaxed text-zinc-600">
                 Native from top to bottom. Light on CPU, light on battery, fast on every Mac.
               </p>
             </Reveal>
@@ -252,7 +262,7 @@ export default async function Home() {
                 <div key={item.stat} className="rounded-2xl border border-zinc-200 bg-white p-6">
                   <p className="text-[24px] font-extrabold tracking-tight text-brand">{item.stat}</p>
                   <p className="text-[13px] font-semibold uppercase tracking-widest text-zinc-400">{item.label}</p>
-                  <p className="mt-3 text-[13px] leading-relaxed text-zinc-500">{item.body}</p>
+                  <p className="mt-3 text-[13px] leading-relaxed text-zinc-600">{item.body}</p>
                 </div>
               ))}
             </Reveal>
@@ -265,7 +275,7 @@ export default async function Home() {
               <h2 className="text-[28px] font-extrabold tracking-tight sm:text-[32px]">
                 And everything else you need
               </h2>
-              <p className="mt-4 text-[16px] leading-relaxed text-zinc-500">
+              <p className="mt-4 text-[16px] leading-relaxed text-zinc-600">
                 From raw capture to the file you send, nothing missing.
               </p>
             </Reveal>
@@ -274,7 +284,7 @@ export default async function Home() {
               {moreFeatures.map((f) => (
                 <div key={f.title} className="bg-white p-6 transition-colors hover:bg-zinc-50">
                   <h3 className="text-[15px] font-semibold text-zinc-900">{f.title}</h3>
-                  <p className="mt-2 text-[13px] leading-relaxed text-zinc-500">{f.body}</p>
+                  <p className="mt-2 text-[13px] leading-relaxed text-zinc-600">{f.body}</p>
                 </div>
               ))}
             </Reveal>
@@ -297,11 +307,11 @@ export default async function Home() {
             <h2 className="text-[28px] font-extrabold tracking-tight sm:text-[32px]">
               Ready to try Better Shot?
             </h2>
-            <p className="mt-4 text-[16px] leading-relaxed text-zinc-500">
+            <p className="mt-4 text-[16px] leading-relaxed text-zinc-600">
               Free, open source, installed in about thirty seconds.
             </p>
-            <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-              <DownloadDropdown release={release} source="cta" />
+            <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+              <DownloadDropdown release={release} source="cta" size="default" />
               <CopyCommand command="brew install --cask bettershot" />
             </div>
             <p className="mt-4 text-[13px] text-zinc-400">
