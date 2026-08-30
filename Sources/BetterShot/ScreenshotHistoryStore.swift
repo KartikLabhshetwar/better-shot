@@ -449,6 +449,17 @@ final class ScreenshotHistoryStore {
         saveMetadata()
     }
 
+    /// Keyed by the package path, which outlives the flattened deliverable that autosave may drop mid-upload.
+    func setCloudURL(forSession session: RecordingSession, cloudURL: String) {
+        let standardizedPath = session.directoryURL.standardizedFileURL.path
+        guard let index = items.firstIndex(where: { $0.recordingSessionPath == standardizedPath }) else {
+            return
+        }
+        items[index].cloudURL = cloudURL
+        items[index].updatedAt = Date()
+        saveMetadata()
+    }
+
     /// Clears a previously-set cloud URL, e.g. after deleting the upload from the cloud.
     func clearCloudURL(for fileURL: URL) {
         let standardized = fileURL.standardizedFileURL
@@ -479,7 +490,7 @@ final class ScreenshotHistoryStore {
         }) {
             return item.editorURL
         }
-        return mediaURL
+        return RecordingSession.sessionDirectory(containing: mediaURL) ?? mediaURL
     }
 
     func annotationEditorURL(for url: URL) -> URL {

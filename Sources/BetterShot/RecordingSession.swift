@@ -153,6 +153,13 @@ nonisolated struct RecordingSession: Sendable, Equatable {
             && FileManager.default.fileExists(atPath: url.appendingPathComponent(screenFileName).path)
     }
 
+    /// The project package a media URL belongs to: the package itself, or the package around its screen master.
+    static func sessionDirectory(containing url: URL) -> URL? {
+        if isSessionDirectory(url) { return url }
+        let parent = url.deletingLastPathComponent()
+        return url.lastPathComponent == screenFileName && isSessionDirectory(parent) ? parent : nil
+    }
+
     func loadCaptureManifest() -> CaptureManifest? {
         guard let data = try? Data(contentsOf: captureManifestURL) else { return nil }
         return try? CaptureManifest.decoder.decode(CaptureManifest.self, from: data)

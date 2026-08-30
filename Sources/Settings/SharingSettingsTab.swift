@@ -19,52 +19,31 @@ struct SharingSettingsTab: View {
         case failed(String)
     }
 
+    private static let dashboardURL = URL(string: "https://dash.cloudflare.com/?to=/:account/r2")!
+
     var body: some View {
         Form {
             Section {
-                Toggle("Upload captures to my own storage", isOn: $enabled)
-                    .onChange(of: enabled) { _, _ in save() }
-            } header: {
-                Text("Share Links")
-            } footer: {
-                Text("Off, BetterShot keeps everything on this Mac. On, sharing a capture uploads it to your Cloudflare R2 bucket and copies a link.")
-            }
-
-            if case .blocked(let status) = store.keychainAccess {
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("Your R2 keys are locked", systemImage: "key.slash")
-                            .font(.callout.weight(.semibold))
-                            .foregroundStyle(.orange)
-
-                        Text("\(R2CredentialStore.explain(status)) This happens after BetterShot is rebuilt or reinstalled, because the Keychain ties saved keys to the exact copy of the app that wrote them. Clear them and paste them in again, and the new copy owns them.")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Button("Clear Locked Keys") {
-                            store.forgetStoredKeys()
-                            accessKeyID = ""
-                            secretAccessKey = ""
-                            testStatus = .idle
-                        }
-                    }
-                    .padding(.vertical, 2)
-                }
+                statusRow
             }
 
             Section {
-                credentialField("Account ID", text: $accountID, prompt: "your-account-id")
-                secureField("Access Key ID", text: $accessKeyID, prompt: "Access key ID")
-                secureField("Secret Access Key", text: $secretAccessKey, prompt: "Secret access key")
+                credentialField("Account ID", text: $accountID, prompt: "From the R2 overview page")
+                secureField("Access Key ID", text: $accessKeyID, prompt: "From your API token")
+                secureField("Secret Access Key", text: $secretAccessKey, prompt: "Shown once when the token is created")
                 credentialField("Bucket", text: $bucket, prompt: "my-bucket")
-                credentialField("Public Base URL", text: $publicBaseURL, prompt: "https://share.example.com")
+                credentialField("Public URL", text: $publicBaseURL, prompt: "https://share.example.com")
             } header: {
-                Text("Cloudflare R2")
+                HStack {
+                    Text("Cloudflare R2")
+                    Spacer()
+                    Link("Open R2 Dashboard", destination: Self.dashboardURL)
+                        .font(.callout)
+                        .textCase(.none)
+                }
             } footer: {
-                Text("Create an API token in the Cloudflare dashboard under R2 \u{203A} Manage API Tokens, scoped to Object Read & Write. Your bucket needs public access turned on, or a custom domain bound to it, for links to open in a browser. Keys are stored in your login Keychain.")
+                Text("In the dashboard, create a bucket, turn on public access or bind a custom domain to it, then create an API token under R2 \u{203A} Manage API Tokens with Object Read & Write. Keys are saved to your login Keychain and never leave this Mac.")
             }
-            .disabled(!enabled)
 
             Section {
                 HStack(spacing: 12) {
@@ -79,13 +58,17 @@ struct SharingSettingsTab: View {
                             Text("Test Connection")
                         }
                     }
-                    .disabled(isTesting || !enabled || !store.isConfigured)
+                    .disabled(isTesting || !store.isConfigured)
 
                     switch testStatus {
                     case .idle:
-                        EmptyView()
+                        if !store.isConfigured {
+                            Text("Fill in all five fields first.")
+                                .foregroundStyle(.secondary)
+                                .font(.callout)
+                        }
                     case .success:
-                        Label("Connected. Share links are ready to use.", systemImage: "checkmark.circle.fill")
+                        Label("Connected", systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.green)
                             .font(.callout)
                     case .failed(let message):
@@ -98,14 +81,82 @@ struct SharingSettingsTab: View {
 
                     Spacer(minLength: 0)
                 }
-            } footer: {
-                if enabled && !store.isConfigured && !store.keychainAccess.isBlocked {
-                    Text("Fill in all five fields above to test the connection.")
+
+                Toggle(isOn: $enabled) {
+                    Text("Upload when I share")
+                    Text("Sharing a screenshot or recording uploads it to this bucket and copies a link.")
                 }
+                .disabled(!store.isConfigured)
+                .onChange(of: enabled) { _, isOn in store.enabled = isOn }
+            } footer: {
+                Text("A successful test turns uploads on for you. With uploads off, everything stays on this Mac.")
             }
         }
         .formStyle(.grouped)
         .onAppear { loadFromStore() }
+    }
+
+    @ViewBuilder
+    private var statusRow: some View {
+        if case .blocked(let status) = store.keychainAccess {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Your saved keys are locked", systemImage: "key.slash")
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.orange)
+
+                Text("\(R2CredentialStore.explain(status)) This happens after BetterShot is rebuilt or reinstalled. Clear the old keys and paste them in again.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button("Clear Locked Keys") {
+                    store.forgetStoredKeys()
+                    accessKeyID = ""
+                    secretAccessKey = ""
+                    testStatus = .idle
+                }
+            }
+            .padding(.vertical, 2)
+        } else if !store.isConfigured {
+            statusLabel(
+                "Share links are not set up",
+                detail: "Add your Cloudflare R2 details below and every share becomes a link.",
+                systemImage: "icloud.slash",
+                tint: .secondary
+            )
+        } else if !enabled {
+            statusLabel(
+                "Set up, uploads are off",
+                detail: "Turn on Upload when I share below and sharing will copy a link.",
+                systemImage: "icloud",
+                tint: .secondary
+            )
+        } else {
+            statusLabel(
+                "Share links are ready",
+                detail: "Share a capture from the editor and the link lands on your clipboard. Shared captures are listed under Library.",
+                systemImage: "checkmark.icloud.fill",
+                tint: .green
+            )
+        }
+    }
+
+    private func statusLabel(_ title: String, detail: String, systemImage: String, tint: Color) -> some View {
+        Label {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.callout.weight(.semibold))
+                Text(detail)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } icon: {
+            Image(systemName: systemImage)
+                .foregroundStyle(tint)
+                .font(.title3)
+        }
+        .padding(.vertical, 2)
     }
 
     private func credentialField(_ label: String, text: Binding<String>, prompt: String) -> some View {
@@ -136,13 +187,15 @@ struct SharingSettingsTab: View {
     }
 
     private func save() {
-        store.enabled = enabled
         store.accountID = accountID.trimmingCharacters(in: .whitespacesAndNewlines)
         store.accessKeyID = accessKeyID.trimmingCharacters(in: .whitespacesAndNewlines)
         store.secretAccessKey = secretAccessKey.trimmingCharacters(in: .whitespacesAndNewlines)
         store.bucket = bucket.trimmingCharacters(in: .whitespacesAndNewlines)
         store.publicBaseURL = publicBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         testStatus = .idle
+        if !store.isConfigured {
+            enabled = false
+        }
     }
 
     private func testConnection() async {
@@ -151,6 +204,7 @@ struct SharingSettingsTab: View {
         do {
             try await R2Uploader.testConnection(credentials: store.snapshot())
             testStatus = .success
+            enabled = true
         } catch {
             let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             testStatus = .failed(message)
