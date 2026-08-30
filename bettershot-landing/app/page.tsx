@@ -1,6 +1,4 @@
-import Link from "next/link"
 import Image from "next/image"
-import { ArrowUpRightIcon } from "@phosphor-icons/react/dist/ssr"
 import { DownloadDropdown } from "@/components/download-dropdown"
 import { getLatestRelease, getDownloadCount } from "@/lib/downloads"
 import { SiteNav } from "@/components/site-nav"
@@ -10,6 +8,7 @@ import { CopyCommand } from "@/components/copy-command"
 import { Comparison } from "@/components/home/comparison"
 import { FaqSection, faqs } from "@/components/home/faq"
 import { SocialProof } from "@/components/social-proof"
+import { CountUp } from "@/components/count-up"
 
 const faqJsonLd = {
   "@context": "https://schema.org",
@@ -113,19 +112,7 @@ export default async function Home() {
         <section className="pb-12 pt-28 sm:pt-36">
           <div className="mx-auto max-w-[1100px] px-6 text-center">
             <Reveal>
-              <Link
-                href="/changelog"
-                className="inline-flex items-center gap-2 rounded-full border border-zinc-200 px-4 py-1.5 text-[13px] text-zinc-600 transition-colors hover:border-zinc-400"
-              >
-                <span className="font-semibold text-zinc-900">v{release.version}</span>
-                <span className="h-3 w-px bg-zinc-200" />
-                Auto-zoom, face cam, share links you own
-                <ArrowUpRightIcon size={11} weight="bold" className="text-zinc-400" />
-              </Link>
-            </Reveal>
-
-            <Reveal>
-              <h1 className="mx-auto mt-10 max-w-[18ch] text-[clamp(2.5rem,6vw,4.5rem)] font-normal leading-[1.1] tracking-tight text-zinc-900">
+              <h1 className="mx-auto max-w-[18ch] text-[clamp(2.5rem,6vw,4.5rem)] font-normal leading-[1.1] tracking-tight text-zinc-900">
                 Screen recorder for Mac.{" "}
                 <span className="text-zinc-400">Free and open source.</span>
               </h1>
@@ -179,7 +166,7 @@ export default async function Home() {
             {stats.map((stat) => (
               <div key={stat.value} className="rounded-2xl border border-zinc-200 p-5 sm:p-6">
                 <p className="text-[clamp(28px,3vw,42px)] font-semibold leading-[1.1] tracking-tight text-brand">
-                  {stat.value}
+                  <CountUp value={stat.value} />
                 </p>
                 <p className="mt-2 text-[13px] leading-[18px] text-zinc-600">{stat.label}</p>
               </div>

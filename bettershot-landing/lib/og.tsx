@@ -1,10 +1,16 @@
 import { ImageResponse } from "next/og"
+import fs from "fs"
+import path from "path"
 
 export const ogAlt = "Better Shot: free, open source screen recorder for Mac"
 export const ogSize = { width: 1200, height: 630 }
 export const ogContentType = "image/png"
 
 export function renderOgImage() {
+  const logoPath = path.join(process.cwd(), "public", "logo.png")
+  const logoData = fs.readFileSync(logoPath)
+  const logoSrc = `data:image/png;base64,${logoData.toString("base64")}`
+
   return new ImageResponse(
     (
       <div
@@ -20,27 +26,12 @@ export function renderOgImage() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          <div
-            style={{
-              width: 52,
-              height: 52,
-              borderRadius: 16,
-              background: "#7c3aed",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <div
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: 11,
-                background: "#ffffff",
-                display: "flex",
-              }}
-            />
-          </div>
+          <img
+            src={logoSrc}
+            width={56}
+            height={56}
+            style={{ borderRadius: 16 }}
+          />
           <span
             style={{
               fontSize: 32,

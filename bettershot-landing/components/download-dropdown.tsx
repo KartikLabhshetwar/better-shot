@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils"
 const sizeClass = {
   sm: "px-3.5 py-2 text-[14px] gap-2",
   default: "px-4 py-2.5 text-[15px] gap-2",
-  lg: "px-6 py-3.5 text-[15px] gap-2.5",
+  lg: "px-10 py-3.5 text-[15px] gap-2.5",
 } as const
 
 interface DownloadDropdownProps {
