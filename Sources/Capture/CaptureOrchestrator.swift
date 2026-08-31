@@ -45,7 +45,7 @@ final class CaptureOrchestrator {
         case .region:
             await captureAndProcess { try await ScreenCapture.shared.captureRegion() }
         case .fullscreen:
-            await captureAndProcess { try await ScreenCapture.shared.captureFullscreen() }
+            await captureAndProcess { try await ScreenCapture.shared.captureFullscreen(on: captureScreen) }
         case .window:
             await captureAndProcess { try await ScreenCapture.shared.captureWindow() }
         case .ocr:

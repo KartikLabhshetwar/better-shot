@@ -159,12 +159,12 @@ final class ShortcutService {
             if keyCode == shortcut.keyCode && carbonMods == shortcut.modifiers {
                 let pointerLocation = event.location
                 Task { @MainActor in
-                    let mouseScreen = ActiveDisplayResolver.activeScreen(preferPointer: true)
                     if action == .recording {
                         guard !ScreenRecordingManager.shared.isActive else { return }
                         RecordingBarPresenter.shared.togglePicker()
                     } else {
-                        await CaptureOrchestrator.shared.performCapture(action, on: mouseScreen)
+                        let screen = ActiveDisplayResolver.screenForScreenshotCapture()
+                        await CaptureOrchestrator.shared.performCapture(action, on: screen)
                     }
                 }
                 return nil

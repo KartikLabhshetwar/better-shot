@@ -139,10 +139,11 @@ final class PreviewOverlay {
     }
 
     private func positionPanel() {
-        let mouseLocation = NSEvent.mouseLocation
-        let screen = targetScreen
-            ?? NSScreen.screens.first { $0.frame.contains(mouseLocation) }
-            ?? NSScreen.main
+        // An explicit target (the screen a capture actually happened on)
+        // always wins; only a nil target (re-showing a card with no capture
+        // context, e.g. from History) falls through to the same follow-mouse
+        // / pinned-display resolution a fresh capture would use.
+        let screen = targetScreen ?? ActiveDisplayResolver.screenForScreenshotCapture()
         guard let panel, let screen else { return }
 
         let screenFrame = screen.visibleFrame

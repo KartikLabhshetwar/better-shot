@@ -637,6 +637,8 @@ struct CaptureSettingsTab: View {
     @AppStorage("bs_overlayDismissDelay") private var overlayDismissDelay: Double = 5.0
     @AppStorage("bs_overlayCardSize") private var overlayCardSizeRaw: String = OverlayCardSize.small.rawValue
     @AppStorage("bs_overlayEdgeMargin") private var overlayEdgeMargin: Double = AppPreferences.overlayEdgeMarginDefault
+    @AppStorage("bs_overlayFollowsMouse") private var overlayFollowsMouse: Bool = true
+    @AppStorage("bs_overlayPinnedDisplayID") private var overlayPinnedDisplayIDRaw: Int = 0
     @AppStorage("bs_openEditorAfterCapture") private var openEditorAfterCapture = false
     @AppStorage("bs_keepInDeckUntilSaved") private var keepInDeckUntilSaved = false
     @State private var isConfirmingReset = false
@@ -659,6 +661,27 @@ struct CaptureSettingsTab: View {
         Binding(
             get: { OverlayCardSize(rawValue: overlayCardSizeRaw) ?? .small },
             set: { overlayCardSizeRaw = $0.rawValue }
+        )
+    }
+
+    /// Every connected display, paired with the ID the picker below tags
+    /// each row with. `NSScreen.screens` can't produce a nil ID in
+    /// practice (every real display carries NSScreenNumber), but the
+    /// compactMap keeps a screen that somehow lacks one out of the list
+    /// rather than crashing the tag lookup.
+    private var connectedScreens: [(id: CGDirectDisplayID, screen: NSScreen)] {
+        NSScreen.screens.compactMap { screen in
+            guard let id = ActiveDisplayResolver.displayID(for: screen) else { return nil }
+            return (id, screen)
+        }
+    }
+
+    private var overlayPinnedDisplayID: Binding<CGDirectDisplayID?> {
+        Binding(
+            get: {
+                overlayPinnedDisplayIDRaw == 0 ? nil : CGDirectDisplayID(overlayPinnedDisplayIDRaw)
+            },
+            set: { overlayPinnedDisplayIDRaw = Int($0 ?? 0) }
         )
     }
 
@@ -709,6 +732,25 @@ struct CaptureSettingsTab: View {
                             .frame(width: 44, alignment: .trailing)
                     }
                 }
+
+                Picker("Show it on", selection: $overlayFollowsMouse) {
+                    Text("Whatever screen my mouse is on").tag(true)
+                    Text("A specific screen").tag(false)
+                }
+                .onChange(of: overlayFollowsMouse) { _, followsMouse in
+                    guard !followsMouse, overlayPinnedDisplayIDRaw == 0,
+                          let mainScreen = NSScreen.main ?? NSScreen.screens.first,
+                          let mainID = ActiveDisplayResolver.displayID(for: mainScreen) else { return }
+                    overlayPinnedDisplayIDRaw = Int(mainID)
+                }
+
+                if !overlayFollowsMouse {
+                    Picker("Screen", selection: overlayPinnedDisplayID) {
+                        ForEach(connectedScreens, id: \.id) { entry in
+                            Text(entry.screen.localizedName).tag(Optional(entry.id))
+                        }
+                    }
+                }
             } header: {
                 Text("Preview Thumbnail")
             } footer: {
@@ -745,6 +787,8 @@ struct CaptureSettingsTab: View {
                 overlayDismissDelay = 5.0
                 overlayCardSizeRaw = OverlayCardSize.small.rawValue
                 overlayEdgeMargin = AppPreferences.overlayEdgeMarginDefault
+                overlayFollowsMouse = true
+                overlayPinnedDisplayIDRaw = 0
                 openEditorAfterCapture = false
                 keepInDeckUntilSaved = false
             }
