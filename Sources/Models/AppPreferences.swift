@@ -26,6 +26,7 @@ enum AppPreferences {
     private static let recordingCameraDeviceIDKey = "bs_recordingCameraDeviceID"
     private static let recordingMicrophoneDeviceIDKey = "bs_recordingMicrophoneDeviceID"
     private static let lastRegionRectKey = "bs_lastRegionRect"
+    private static let captureRegionOnReleaseKey = "bs_captureRegionOnRelease"
 
     // MARK: - Appearance
     static var appearance: AppAppearance {
@@ -181,6 +182,14 @@ enum AppPreferences {
     static var keepInDeckUntilSaved: Bool {
         get { UserDefaults.standard.bool(forKey: keepInDeckUntilSavedKey) }
         set { UserDefaults.standard.set(newValue, forKey: keepInDeckUntilSavedKey) }
+    }
+
+    /// Takes the shot the moment the mouse comes up, skipping the adjustable
+    /// rectangle. The pre-0.4.3 flow, kept for people who draw the region in one
+    /// stroke and never nudge it.
+    static var captureRegionOnRelease: Bool {
+        get { UserDefaults.standard.bool(forKey: captureRegionOnReleaseKey) }
+        set { UserDefaults.standard.set(newValue, forKey: captureRegionOnReleaseKey) }
     }
 
     // MARK: - History
