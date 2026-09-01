@@ -11,6 +11,7 @@ private enum AnnotationCanvasCursor: Equatable {
     case placement
     case openHand
     case closedHand
+    case text
 
     var nsCursor: NSCursor {
         switch self {
@@ -22,6 +23,8 @@ private enum AnnotationCanvasCursor: Equatable {
             .openHand
         case .closedHand:
             .closedHand
+        case .text:
+            .iBeam
         }
     }
 }
@@ -674,6 +677,14 @@ struct AnnotationCanvas: View {
                 boundaryFrame: boundaryFrame
             ) != nil
             setCursor(hovering ? .openHand : .arrow)
+        } else if model.selectedTool == .text,
+                  model.hoveredAnnotation(
+                      at: location,
+                      imageFrame: imageFrame,
+                      boundaryFrame: boundaryFrame
+                  )?.isText == true {
+            // Text is the one tool that edits what it lands on instead of adding to it.
+            setCursor(.text)
         } else {
             setCursor(.placement)
         }
