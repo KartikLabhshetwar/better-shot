@@ -639,6 +639,7 @@ struct CaptureSettingsTab: View {
     @AppStorage("bs_overlayEdgeMargin") private var overlayEdgeMargin: Double = AppPreferences.overlayEdgeMarginDefault
     @AppStorage("bs_openEditorAfterCapture") private var openEditorAfterCapture = false
     @AppStorage("bs_keepInDeckUntilSaved") private var keepInDeckUntilSaved = false
+    @AppStorage("bs_captureRegionOnRelease") private var captureRegionOnRelease = false
     @State private var isConfirmingReset = false
 
     private var selfTimerDelay: Binding<SelfTimerDelay> {
@@ -675,6 +676,17 @@ struct CaptureSettingsTab: View {
                 Text("Timer")
             } footer: {
                 Text("Buys you a moment to open a menu or hover something before the shot is taken.")
+            }
+
+            Section {
+                Toggle(isOn: $captureRegionOnRelease) {
+                    Text("Capture as soon as I let go")
+                    Text("Off, the rectangle stays up with handles so you can nudge it, and Return or a double-click takes the shot.")
+                }
+            } header: {
+                Text("Region")
+            } footer: {
+                Text("Space still switches to window selection, and Escape still cancels. Your last region stays a click away either way.")
             }
 
             Section {
@@ -747,6 +759,7 @@ struct CaptureSettingsTab: View {
                 overlayEdgeMargin = AppPreferences.overlayEdgeMarginDefault
                 openEditorAfterCapture = false
                 keepInDeckUntilSaved = false
+                captureRegionOnRelease = false
             }
             Button("Cancel", role: .cancel) {}
         }

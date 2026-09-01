@@ -29,6 +29,8 @@ final class RegionSelectionOverlay {
 
     private func showOverlays() {
         let crosshair = CrosshairCursor.shared.makeCursor()
+        // Read once, so the flow cannot change under a selection already in progress.
+        let capturesOnRelease = AppPreferences.captureRegionOnRelease
 
         for screen in NSScreen.screens {
             let window = OverlayWindow(
@@ -47,7 +49,12 @@ final class RegionSelectionOverlay {
 
             let ghost = AppPreferences.lastRegionRect
                 .flatMap { screen.frame.contains($0) ? RegionGeometry.localRect(global: $0, screenFrame: screen.frame) : nil }
-            let overlayView = SelectionView(screen: screen, cursor: crosshair, ghost: ghost) { [weak self] rect in
+            let overlayView = SelectionView(
+                screen: screen,
+                cursor: crosshair,
+                ghost: ghost,
+                capturesOnRelease: capturesOnRelease
+            ) { [weak self] rect in
                 self?.finishSelection(rect: rect, screen: screen)
             } onCancel: { [weak self] in
                 self?.finish(.cancelled)
@@ -183,6 +190,7 @@ private final class SelectionView: NSView {
     private let screen: NSScreen
     private let crosshairCursor: NSCursor
     private let ghost: CGRect?
+    private let capturesOnRelease: Bool
     private let onSelect: (CGRect) -> Void
     private let onCancel: () -> Void
     private let onWindow: () -> Void
@@ -191,6 +199,7 @@ private final class SelectionView: NSView {
         screen: NSScreen,
         cursor: NSCursor,
         ghost: CGRect?,
+        capturesOnRelease: Bool,
         onSelect: @escaping (CGRect) -> Void,
         onCancel: @escaping () -> Void,
         onWindow: @escaping () -> Void
@@ -198,6 +207,7 @@ private final class SelectionView: NSView {
         self.screen = screen
         self.crosshairCursor = cursor
         self.ghost = ghost
+        self.capturesOnRelease = capturesOnRelease
         self.onSelect = onSelect
         self.onCancel = onCancel
         self.onWindow = onWindow
@@ -439,6 +449,10 @@ private final class SelectionView: NSView {
         let rect = rectFromPoints(start, end)
 
         if rect.width > 3, rect.height > 3 {
+            if capturesOnRelease {
+                onSelect(rect)
+                return
+            }
             onBeginSelection()
             selection = rect
             updateCursor(at: end)
