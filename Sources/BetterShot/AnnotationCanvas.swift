@@ -664,10 +664,16 @@ struct AnnotationCanvas: View {
 
         if hasActiveInteraction {
             setCursor(model.isTransformingExistingAnnotation ? .closedHand : .placement)
-        } else if model.hoveredAnnotation(at: location, imageFrame: imageFrame, boundaryFrame: boundaryFrame) != nil {
-            setCursor(.openHand)
         } else if model.selectedTool == .select {
-            setCursor(.arrow)
+            // The grab cursor is a promise that a press picks the shape up, which only
+            // Select keeps. A drawing tool draws over whatever is under the pointer, so
+            // it stays on the crosshair however many shapes are already there.
+            let hovering = model.hoveredAnnotation(
+                at: location,
+                imageFrame: imageFrame,
+                boundaryFrame: boundaryFrame
+            ) != nil
+            setCursor(hovering ? .openHand : .arrow)
         } else {
             setCursor(.placement)
         }
