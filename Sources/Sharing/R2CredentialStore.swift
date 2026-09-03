@@ -6,6 +6,7 @@ struct R2Credentials: Sendable {
     let accountID: String
     let bucket: String
     let publicBaseURL: String
+    let useDirectLinks: Bool
     let accessKeyID: String
     let secretAccessKey: String
     let enabled: Bool
@@ -28,6 +29,7 @@ final class R2CredentialStore {
         static let accountID = "bs_r2_accountID"
         static let bucket = "bs_r2_bucket"
         static let publicBaseURL = "bs_r2_publicBaseURL"
+        static let useDirectLinks = "bs_r2_useDirectLinks"
         static let enabled = "bs_r2_enabled"
         static let accessKeyID = "accessKeyID"
         static let secretAccessKey = "secretAccessKey"
@@ -36,6 +38,7 @@ final class R2CredentialStore {
     private(set) var _accountID: String = ""
     private(set) var _bucket: String = ""
     private(set) var _publicBaseURL: String = ""
+    private(set) var _useDirectLinks: Bool = false
     private(set) var _enabled: Bool = false
     private(set) var _accessKeyID: String = ""
     private(set) var _secretAccessKey: String = ""
@@ -74,6 +77,15 @@ final class R2CredentialStore {
         }
     }
 
+    /// Off by default: an existing install keeps handing out viewer links until someone opts out.
+    var useDirectLinks: Bool {
+        get { _useDirectLinks }
+        set {
+            _useDirectLinks = newValue
+            defaults.set(newValue, forKey: Keys.useDirectLinks)
+        }
+    }
+
     var enabled: Bool {
         get { _enabled }
         set {
@@ -107,6 +119,7 @@ final class R2CredentialStore {
             accountID: _accountID,
             bucket: _bucket,
             publicBaseURL: _publicBaseURL,
+            useDirectLinks: _useDirectLinks,
             accessKeyID: _accessKeyID,
             secretAccessKey: _secretAccessKey,
             enabled: _enabled
@@ -117,6 +130,7 @@ final class R2CredentialStore {
         _accountID = defaults.string(forKey: Keys.accountID) ?? ""
         _bucket = defaults.string(forKey: Keys.bucket) ?? ""
         _publicBaseURL = defaults.string(forKey: Keys.publicBaseURL) ?? ""
+        _useDirectLinks = defaults.bool(forKey: Keys.useDirectLinks)
         _enabled = defaults.bool(forKey: Keys.enabled)
 
         let accessKey = Self.getKeychainItem(key: Keys.accessKeyID)

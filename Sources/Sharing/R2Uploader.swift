@@ -310,11 +310,25 @@ final class R2Uploader {
     ) async throws -> URL {
         let id = ShareBundle.slug(for: itemID)
         guard let pageURL = ShareBundle.pageURL(id: id, publicBaseURL: credentials.publicBaseURL) else {
-            throw R2UploadError(message: "The Public Base URL must start with https:// to build a share link.")
+            throw R2UploadError(message: "The Public Bucket URL must start with https:// to build a share link.")
         }
 
         let contents = await ShareBundle.make(id: id, fileURL: fileURL, title: title)
         let prefix = ShareBundle.objectPrefix(id: id)
+
+        let shareURL: URL
+        if credentials.useDirectLinks {
+            guard let directURL = ShareBundle.directURL(
+                id: id,
+                filename: contents.mediaFilename,
+                publicBaseURL: credentials.publicBaseURL
+            ) else {
+                throw R2UploadError(message: "Could not build a direct link to \(contents.mediaFilename).")
+            }
+            shareURL = directURL
+        } else {
+            shareURL = pageURL
+        }
 
         try await putObject(
             key: prefix + contents.mediaFilename,
@@ -345,7 +359,7 @@ final class R2Uploader {
         )
 
         progress(1)
-        return pageURL
+        return shareURL
     }
 
     private enum Payload: Sendable {
