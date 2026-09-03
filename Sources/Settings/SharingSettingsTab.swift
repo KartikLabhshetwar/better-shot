@@ -98,8 +98,7 @@ struct SharingSettingsTab: View {
                     Text("Copy direct file links")
                     Text("Link straight to the file in your bucket instead of a viewer page on bettershot.site.")
                 }
-                // Deliberately not gated on isConfigured, which an empty Public Bucket URL
-                // already fails: a dead switch cannot explain why it will not turn on.
+                // Not gated on isConfigured, which an empty URL already fails: a dead switch cannot explain itself.
                 .onChange(of: useDirectLinks) { _, isOn in directLinksToggled(isOn) }
 
                 if let directLinksProblem {
@@ -192,9 +191,7 @@ struct SharingSettingsTab: View {
                     .focused($publicURLFocused)
                     .onChange(of: publicBaseURL) { _, _ in publicURLChanged() }
                     .onChange(of: publicURLFocused) { _, focused in
-                        // Judge the field only once the user moves on. Flagging while they
-                        // type would call "https:/" a mistake mid-keystroke. An empty field
-                        // is not a mistake yet either - the toggle below is what insists on it.
+                        // Only once the user moves on, or "https:/" is an error mid-keystroke.
                         guard !focused else { return }
                         showPublicURLProblem = publicURLProblem != nil && publicURLProblem != .empty
                     }
@@ -210,8 +207,6 @@ struct SharingSettingsTab: View {
         }
     }
 
-    /// Says what is blocked, not just what is wrong. The field's own message reads
-    /// oddly under a switch, where the question is why the switch will not stay on.
     private static func blockedMessage(for problem: ShareBundle.PublicBaseURLProblem) -> String {
         problem == .empty
             ? "Add the Public Bucket URL above first - a direct link points straight at it."
@@ -221,13 +216,8 @@ struct SharingSettingsTab: View {
     private func publicURLChanged() {
         save()
 
-        // Direct links are built from this address and nothing else. Leaving the switch
-        // on while it is unusable would promise a link the uploader cannot build, so it
-        // goes off on its own. The switch moving is the feedback; the message below is
-        // reserved for a tap, where the user has actually asked for something.
         if useDirectLinks, publicURLProblem != nil {
-            // Store first: the assignment below echoes into directLinksToggled, which
-            // compares against the store to tell a real tap from an echo.
+            // Store first, so the echo below sees the new value.
             store.useDirectLinks = false
             useDirectLinks = false
             return
@@ -239,8 +229,7 @@ struct SharingSettingsTab: View {
     }
 
     private func directLinksToggled(_ isOn: Bool) {
-        // loadFromStore and the revert below both echo back through onChange.
-        // Neither is the user pressing the switch.
+        // loadFromStore and the revert below echo back through here; neither is a tap.
         guard isOn != store.useDirectLinks else { return }
 
         guard isOn else {
@@ -249,8 +238,6 @@ struct SharingSettingsTab: View {
             return
         }
 
-        // A direct link is built straight from this field, so an unusable address has to
-        // be caught here rather than at share time, when the capture is already gone.
         if let publicURLProblem {
             directLinksProblem = Self.blockedMessage(for: publicURLProblem)
             showPublicURLProblem = publicURLProblem != .empty
@@ -289,10 +276,7 @@ struct SharingSettingsTab: View {
         publicBaseURL = store.publicBaseURL
         useDirectLinks = store.useDirectLinks
 
-        // A stored "on" can outlive the address it depends on, because the URL may have
-        // been cleared in an earlier session. Nothing changes on appear, so no handler
-        // would fire: reconcile here or the switch shows on against an empty field.
-        // Silently - an error on a pane the user just opened is scolding, not helping.
+        // Nothing changes on appear, so no handler would fire: reconcile the stored value here.
         if useDirectLinks, publicURLProblem != nil {
             store.useDirectLinks = false
             useDirectLinks = false

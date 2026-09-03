@@ -309,7 +309,6 @@ final class R2Uploader {
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> URL {
         let id = ShareBundle.slug(for: itemID)
-        // Reject a bad origin up front so it fails instantly, rather than after the whole file has already gone up.
         guard let pageURL = ShareBundle.pageURL(id: id, publicBaseURL: credentials.publicBaseURL) else {
             throw R2UploadError(message: "The Public Bucket URL must start with https:// to build a share link.")
         }
@@ -317,7 +316,6 @@ final class R2Uploader {
         let contents = await ShareBundle.make(id: id, fileURL: fileURL, title: title)
         let prefix = ShareBundle.objectPrefix(id: id)
 
-        // A direct link points at the media object, whose filename only exists once the bundle is made.
         let shareURL: URL
         if credentials.useDirectLinks {
             guard let directURL = ShareBundle.directURL(

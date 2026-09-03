@@ -52,7 +52,6 @@ enum ShareLinkCheck {
             fatalError("an https origin should produce a direct URL")
         }
 
-        // The whole point of a direct link is that it lands on the key we uploaded, so assert against that key rather than a hand-written string.
         let key = ShareBundle.objectPrefix(id: slug) + "clip.mp4"
         expect(url.absoluteString == "https://cdn.example.com/\(key)", "direct URL must match the uploaded object key: \(url)")
         expect(!url.absoluteString.contains(ShareBundle.pageBaseURL), "a direct link must not route through the viewer: \(url)")
@@ -70,8 +69,6 @@ enum ShareLinkCheck {
         expect(ShareBundle.validatePublicBaseURL("   ") == .empty, "whitespace only is still empty")
         expect(ShareBundle.validatePublicBaseURL("cdn.example.com") == .notHTTPS, "a bare domain has no scheme")
         expect(ShareBundle.validatePublicBaseURL("http://cdn.example.com") == .notHTTPS, "http is rejected")
-        // Half-typed input: normalizedOrigin strips the trailing slashes off this and
-        // would blame the scheme, so the scheme check has to run before it.
         expect(ShareBundle.validatePublicBaseURL("https://") == .invalidHost, "a scheme with no domain is a missing host, not a missing scheme")
         expect(ShareBundle.validatePublicBaseURL("https://localhost") == .invalidHost, "a single label is not a public bucket domain")
         expect(ShareBundle.validatePublicBaseURL("https://cdn.example.com?x=1") == .hasQueryOrFragment, "a query would land in the middle of the key")
@@ -86,8 +83,6 @@ enum ShareLinkCheck {
         ]
         for origin in valid {
             expect(ShareBundle.validatePublicBaseURL(origin) == nil, "should be accepted: \(origin)")
-            // The point of accepting an address is that both link shapes can be built
-            // from it, so the validator must never green-light one the builders reject.
             expect(ShareBundle.directURL(id: "abc", filename: "a.png", publicBaseURL: origin) != nil, "accepted origin must build a direct link: \(origin)")
             expect(ShareBundle.pageURL(id: "abc", publicBaseURL: origin) != nil, "accepted origin must build a viewer link: \(origin)")
         }
