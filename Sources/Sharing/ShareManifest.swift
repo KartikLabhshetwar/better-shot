@@ -178,6 +178,57 @@ extension ShareBundle {
         return origin
     }
 
+    /// Why a pasted Public Bucket URL will not work. The uploader rejects the same
+    /// strings when a share is already in flight, so catching them in Settings is the
+    /// difference between a fixable typo and a capture that fails to upload.
+    enum PublicBaseURLProblem: Equatable {
+        case empty
+        case notHTTPS
+        case invalidHost
+        case hasQueryOrFragment
+
+        nonisolated var message: String {
+            switch self {
+            case .empty:
+                return "Add the public address of your bucket, like https://share.example.com."
+            case .notHTTPS:
+                return "The address has to start with https:// - a public bucket is served over HTTPS."
+            case .invalidHost:
+                return "That is not a complete address. Use the domain your bucket is served from, like https://share.example.com."
+            case .hasQueryOrFragment:
+                return "Remove everything after the address - a share link is built by adding to it."
+            }
+        }
+    }
+
+    /// Returns nil when the address is usable. A path is deliberately allowed, because
+    /// a bucket bound under a subfolder is a normal setup.
+    nonisolated static func validatePublicBaseURL(_ publicBaseURL: String) -> PublicBaseURLProblem? {
+        let trimmed = publicBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return .empty }
+        // Checked before normalizedOrigin, which strips the trailing slashes off a bare
+        // "https://" and would then blame the scheme for a missing domain.
+        guard trimmed.lowercased().hasPrefix("https://") else { return .notHTTPS }
+        guard let components = URLComponents(string: trimmed) else { return .invalidHost }
+        guard components.query == nil, components.fragment == nil else { return .hasQueryOrFragment }
+        guard let host = components.host, isHostname(host) else { return .invalidHost }
+        // Whatever is accepted here has to survive the normalisation the links go through.
+        guard normalizedOrigin(trimmed) != nil else { return .invalidHost }
+        return nil
+    }
+
+    /// A public bucket always sits on a dotted domain, so a single label like
+    /// "localhost" is a typo rather than a setup worth supporting.
+    nonisolated private static func isHostname(_ host: String) -> Bool {
+        let labels = host.split(separator: ".", omittingEmptySubsequences: false)
+        guard labels.count >= 2 else { return false }
+        return labels.allSatisfy { label in
+            !label.isEmpty
+                && label.first != "-" && label.last != "-"
+                && label.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }
+        }
+    }
+
     /// A path segment must not smuggle in a separator, so drop "/" from the allowed set even though sanitizedFilename already strips it.
     private nonisolated static let pathSegmentAllowed = CharacterSet.urlPathAllowed
         .subtracting(CharacterSet(charactersIn: "/"))

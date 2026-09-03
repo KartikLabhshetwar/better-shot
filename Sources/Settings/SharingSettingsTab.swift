@@ -11,6 +11,10 @@ struct SharingSettingsTab: View {
     @State private var publicBaseURL = ""
     @State private var useDirectLinks = false
 
+    @FocusState private var publicURLFocused: Bool
+    @State private var showPublicURLProblem = false
+    @State private var directLinksProblem: String?
+
     @State private var isTesting = false
     @State private var testStatus: TestStatus = .idle
 
@@ -33,7 +37,7 @@ struct SharingSettingsTab: View {
                 secureField("Access Key ID", text: $accessKeyID, prompt: "From your API token")
                 secureField("Secret Access Key", text: $secretAccessKey, prompt: "Shown once when the token is created")
                 credentialField("Bucket", text: $bucket, prompt: "my-bucket")
-                credentialField("Public Bucket URL", text: $publicBaseURL, prompt: "https://share.example.com")
+                publicURLField
             } header: {
                 HStack {
                     Text("Cloudflare R2")
@@ -94,8 +98,16 @@ struct SharingSettingsTab: View {
                     Text("Copy direct file links")
                     Text("Link straight to the file in your bucket instead of a viewer page on bettershot.site.")
                 }
-                .disabled(!store.isConfigured)
-                .onChange(of: useDirectLinks) { _, isOn in store.useDirectLinks = isOn }
+                // Deliberately not gated on isConfigured, which an empty Public Bucket URL
+                // already fails: a dead switch cannot explain why it will not turn on.
+                .onChange(of: useDirectLinks) { _, isOn in directLinksToggled(isOn) }
+
+                if let directLinksProblem {
+                    Label(directLinksProblem, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                        .font(.callout)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             } footer: {
                 Text("A successful test turns uploads on for you. With uploads off, everything stays on this Mac. A viewer link shows the title, a poster and a download button, and hides the filename behind a random ID; a direct link is the raw file, filename and all.")
             }
@@ -167,6 +179,89 @@ struct SharingSettingsTab: View {
         .padding(.vertical, 2)
     }
 
+    private var publicURLProblem: ShareBundle.PublicBaseURLProblem? {
+        ShareBundle.validatePublicBaseURL(publicBaseURL)
+    }
+
+    private var publicURLField: some View {
+        LabeledContent("Public Bucket URL") {
+            VStack(alignment: .leading, spacing: 4) {
+                TextField("Public Bucket URL", text: $publicBaseURL, prompt: Text("https://share.example.com"))
+                    .labelsHidden()
+                    .textFieldStyle(.roundedBorder)
+                    .focused($publicURLFocused)
+                    .onChange(of: publicBaseURL) { _, _ in publicURLChanged() }
+                    .onChange(of: publicURLFocused) { _, focused in
+                        // Judge the field only once the user moves on. Flagging while they
+                        // type would call "https:/" a mistake mid-keystroke. An empty field
+                        // is not a mistake yet either - the toggle below is what insists on it.
+                        guard !focused else { return }
+                        showPublicURLProblem = publicURLProblem != nil && publicURLProblem != .empty
+                    }
+
+                if showPublicURLProblem, let publicURLProblem {
+                    Label(publicURLProblem.message, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                        .font(.callout)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    /// Says what is blocked, not just what is wrong. The field's own message reads
+    /// oddly under a switch, where the question is why the switch will not stay on.
+    private static func blockedMessage(for problem: ShareBundle.PublicBaseURLProblem) -> String {
+        problem == .empty
+            ? "Add the Public Bucket URL above first - a direct link points straight at it."
+            : problem.message
+    }
+
+    private func publicURLChanged() {
+        save()
+
+        // Direct links are built from this address and nothing else. Leaving the switch
+        // on while it is unusable would promise a link the uploader cannot build, so it
+        // goes off on its own. The switch moving is the feedback; the message below is
+        // reserved for a tap, where the user has actually asked for something.
+        if useDirectLinks, publicURLProblem != nil {
+            // Store first: the assignment below echoes into directLinksToggled, which
+            // compares against the store to tell a real tap from an echo.
+            store.useDirectLinks = false
+            useDirectLinks = false
+            return
+        }
+
+        guard publicURLProblem == nil else { return }
+        showPublicURLProblem = false
+        directLinksProblem = nil
+    }
+
+    private func directLinksToggled(_ isOn: Bool) {
+        // loadFromStore and the revert below both echo back through onChange.
+        // Neither is the user pressing the switch.
+        guard isOn != store.useDirectLinks else { return }
+
+        guard isOn else {
+            store.useDirectLinks = false
+            directLinksProblem = nil
+            return
+        }
+
+        // A direct link is built straight from this field, so an unusable address has to
+        // be caught here rather than at share time, when the capture is already gone.
+        if let publicURLProblem {
+            directLinksProblem = Self.blockedMessage(for: publicURLProblem)
+            showPublicURLProblem = publicURLProblem != .empty
+            useDirectLinks = false
+            return
+        }
+
+        directLinksProblem = nil
+        store.useDirectLinks = true
+    }
+
     private func credentialField(_ label: String, text: Binding<String>, prompt: String) -> some View {
         LabeledContent(label) {
             TextField(label, text: text, prompt: Text(prompt))
@@ -193,6 +288,15 @@ struct SharingSettingsTab: View {
         bucket = store.bucket
         publicBaseURL = store.publicBaseURL
         useDirectLinks = store.useDirectLinks
+
+        // A stored "on" can outlive the address it depends on, because the URL may have
+        // been cleared in an earlier session. Nothing changes on appear, so no handler
+        // would fire: reconcile here or the switch shows on against an empty field.
+        // Silently - an error on a pane the user just opened is scolding, not helping.
+        if useDirectLinks, publicURLProblem != nil {
+            store.useDirectLinks = false
+            useDirectLinks = false
+        }
     }
 
     private func save() {
