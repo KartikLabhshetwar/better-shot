@@ -169,11 +169,28 @@ extension ShareBundle {
 
     nonisolated static func objectPrefix(id: String) -> String { "s/\(id)/" }
 
-    nonisolated static func pageURL(id: String, publicBaseURL: String) -> URL? {
+    /// Accepts an origin pasted with or without a trailing slash. Returns nil for anything that is not https, because the viewer refuses non-https origins and a direct link over http would be no better.
+    nonisolated private static func normalizedOrigin(_ publicBaseURL: String) -> String? {
         let origin = publicBaseURL
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         guard origin.lowercased().hasPrefix("https://") else { return nil }
+        return origin
+    }
+
+    /// A path segment must not smuggle in a separator, so drop "/" from the allowed set even though sanitizedFilename already strips it.
+    private nonisolated static let pathSegmentAllowed = CharacterSet.urlPathAllowed
+        .subtracting(CharacterSet(charactersIn: "/"))
+
+    /// Links straight at the uploaded object rather than the viewer page, for people who would rather their shares not route through bettershot.site.
+    nonisolated static func directURL(id: String, filename: String, publicBaseURL: String) -> URL? {
+        guard !filename.isEmpty, let origin = normalizedOrigin(publicBaseURL) else { return nil }
+        guard let segment = filename.addingPercentEncoding(withAllowedCharacters: pathSegmentAllowed) else { return nil }
+        return URL(string: "\(origin)/\(objectPrefix(id: id))\(segment)")
+    }
+
+    nonisolated static func pageURL(id: String, publicBaseURL: String) -> URL? {
+        guard let origin = normalizedOrigin(publicBaseURL) else { return nil }
 
         let encodedOrigin = Data(origin.utf8)
             .base64EncodedString()

@@ -42,6 +42,27 @@ enum ShareLinkCheck {
         expect(decodeBase64URL(encoded) == "https://cdn.example.com", "b should round-trip to the trimmed origin")
     }
 
+    static func checkDirectURL() {
+        let slug = "abcDEF-123_xyz"
+        expect(ShareBundle.directURL(id: slug, filename: "clip.mp4", publicBaseURL: "http://cdn.example.com") == nil, "http origins must be rejected")
+        expect(ShareBundle.directURL(id: slug, filename: "clip.mp4", publicBaseURL: "") == nil, "empty origins must be rejected")
+        expect(ShareBundle.directURL(id: slug, filename: "", publicBaseURL: "https://cdn.example.com") == nil, "an empty filename has nothing to link to")
+
+        guard let url = ShareBundle.directURL(id: slug, filename: "clip.mp4", publicBaseURL: "https://cdn.example.com/") else {
+            fatalError("an https origin should produce a direct URL")
+        }
+
+        // The whole point of a direct link is that it lands on the key we uploaded, so assert against that key rather than a hand-written string.
+        let key = ShareBundle.objectPrefix(id: slug) + "clip.mp4"
+        expect(url.absoluteString == "https://cdn.example.com/\(key)", "direct URL must match the uploaded object key: \(url)")
+        expect(!url.absoluteString.contains(ShareBundle.pageBaseURL), "a direct link must not route through the viewer: \(url)")
+
+        guard let spaced = ShareBundle.directURL(id: slug, filename: "my clip.mp4", publicBaseURL: "https://cdn.example.com") else {
+            fatalError("a filename needing encoding should still produce a URL")
+        }
+        expect(!spaced.absoluteString.contains(" "), "spaces must be percent-encoded: \(spaced)")
+    }
+
     static func checkManifestEncoding() throws {
         let manifest = ShareManifest(
             version: ShareManifest.currentVersion,
@@ -86,6 +107,7 @@ enum ShareLinkCheck {
     static func main() throws {
         checkSlug()
         checkPageURL()
+        checkDirectURL()
         try checkManifestEncoding()
         checkSanitizedFilename()
         print("ShareLinkCheck: all assertions passed")
