@@ -237,11 +237,31 @@ struct PreviewCardView: View {
         Group {
             if let image = thumbnail {
                 ZStack {
+                    // onDrag/onTapGesture live on this base image, not on the
+                    // ZStack as a whole: the hover buttons below are siblings
+                    // drawn on top of it, and a drag-source recognizer
+                    // spanning the whole card (buttons included) beats a
+                    // physical mouse's tiny mouseDown-to-mouseUp jitter to
+                    // the punch, starting a native drag under the Copy/Save
+                    // buttons that snaps back on release — trackpad taps
+                    // don't have enough movement to trigger it, which is why
+                    // this only showed up with a mouse.
                     Image(nsImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(width: cardSize.width, height: cardSize.height)
                         .clipped()
+                        .onTapGesture {
+                            overlay.openAnnotateEditor(for: url)
+                        }
+                        .onDrag {
+                            DeckStaging.promote(url)
+                            if let provider = NSItemProvider(contentsOf: url) {
+                                provider.suggestedName = url.lastPathComponent
+                                return provider
+                            }
+                            return NSItemProvider(object: image)
+                        }
 
                     if isVideo {
                         Image(systemName: "play.circle.fill")
@@ -266,17 +286,6 @@ struct PreviewCardView: View {
                     withAnimation(.easeInOut(duration: 0.15)) {
                         isHovered = hovering
                     }
-                }
-                .onTapGesture {
-                    overlay.openAnnotateEditor(for: url)
-                }
-                .onDrag {
-                    DeckStaging.promote(url)
-                    if let provider = NSItemProvider(contentsOf: url) {
-                        provider.suggestedName = url.lastPathComponent
-                        return provider
-                    }
-                    return NSItemProvider(object: image)
                 }
             } else {
                 Color.clear.frame(width: cardSize.width, height: cardSize.height)
