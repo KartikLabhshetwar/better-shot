@@ -40,9 +40,19 @@ final class PreviewOverlay {
         }
         targetScreen = screen
 
-        if panel == nil {
-            createPanel()
-        }
+        // Always build a fresh panel rather than repositioning a reused
+        // one. A back-to-back capture (before the previous card's dismiss
+        // timer fires) used to reuse the existing NSPanel and just move it
+        // via setFrame -- moving an existing window between screens with
+        // different backing scale factors (Retina main vs. non-Retina
+        // externals) is a known AppKit trouble spot: it can repaint at the
+        // new position while its cached hit-testing state still points at
+        // the screen it was last shown on, so clicks land somewhere other
+        // than where the buttons are drawn. A panel created fresh on its
+        // final screen, before ever being ordered on-screen, never crosses
+        // that boundary.
+        teardownPanel()
+        createPanel()
 
         positionPanel()
         panel?.orderFront(nil)
@@ -65,8 +75,7 @@ final class PreviewOverlay {
         dismissTasks.values.forEach { $0.cancel() }
         dismissTasks.removeAll()
 
-        panel?.orderOut(nil)
-        panel = nil
+        teardownPanel()
         items.removeAll()
     }
 
@@ -107,6 +116,11 @@ final class PreviewOverlay {
 
     func cancelScheduledDismiss(for url: URL) {
         dismissTasks.removeValue(forKey: url)?.cancel()
+    }
+
+    private func teardownPanel() {
+        panel?.orderOut(nil)
+        panel = nil
     }
 
     // MARK: - Panel Setup
