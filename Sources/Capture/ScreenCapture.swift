@@ -34,6 +34,14 @@ final class ScreenCapture {
             ?? ActiveDisplayResolver.screenForScreenshotCapture().flatMap(ActiveDisplayResolver.displayID(for:))
         if let targetDisplayID, let index = ActiveDisplayResolver.screencaptureDisplayIndex(for: targetDisplayID) {
             args.append(contentsOf: ["-D", String(index)])
+        } else {
+            // Falling through here means screencapture grabs the main
+            // display regardless of which one was actually active -- the
+            // exact silent-wrong-display bug this whole fix exists to
+            // prevent. Only expected to happen in a narrow race (e.g. the
+            // target display disconnected between resolution and the sleep
+            // above), but it should be diagnosable if it does.
+            print("BetterShot: could not resolve target display for -D; screencapture will fall back to the main display")
         }
         args.append(tempPath)
 
