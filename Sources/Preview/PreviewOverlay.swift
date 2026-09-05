@@ -15,6 +15,8 @@ final class PreviewOverlay {
     private var panel: NSPanel?
     private var dismissTasks: [URL: Task<Void, Never>] = [:]
     private var targetScreen: NSScreen?
+    private var mouseMovedGlobalMonitor: Any?
+    private var mouseMovedLocalMonitor: Any?
 
     var currentScreen: NSScreen? { targetScreen }
 
@@ -58,6 +60,7 @@ final class PreviewOverlay {
         panel?.orderFront(nil)
 
         scheduleDismiss(for: url)
+        startMouseTrackingIfNeeded()
     }
 
     func remove(_ url: URL) {
@@ -75,6 +78,7 @@ final class PreviewOverlay {
         dismissTasks.values.forEach { $0.cancel() }
         dismissTasks.removeAll()
 
+        stopMouseTracking()
         teardownPanel()
         items.removeAll()
     }
@@ -123,6 +127,54 @@ final class PreviewOverlay {
         panel = nil
     }
 
+    /// Keeps the card on whichever display the mouse is actually on, live,
+    /// for as long as it's showing -- not just at capture time. Only runs
+    /// when Settings > Capture > Preview Thumbnail is set to follow the
+    /// mouse rather than a pinned display; a pinned card should never move.
+    ///
+    /// A screen change always tears the panel down and rebuilds it (the
+    /// same thing show() does) rather than repositioning the existing one
+    /// via setFrame -- moving a live window across a scale-factor boundary
+    /// (Retina main vs. non-Retina externals) is exactly the bug that
+    /// motivated that fix in the first place, and doing it continuously as
+    /// the mouse crosses monitors would hit it far more often than a single
+    /// capture-time reposition ever did.
+    private func startMouseTrackingIfNeeded() {
+        stopMouseTracking()
+        guard AppPreferences.overlayFollowsMouse else { return }
+
+        mouseMovedGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] _ in
+            Task { @MainActor in self?.handleMouseMoved() }
+        }
+        mouseMovedLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
+            Task { @MainActor in self?.handleMouseMoved() }
+            return event
+        }
+    }
+
+    private func stopMouseTracking() {
+        if let monitor = mouseMovedGlobalMonitor {
+            NSEvent.removeMonitor(monitor)
+            mouseMovedGlobalMonitor = nil
+        }
+        if let monitor = mouseMovedLocalMonitor {
+            NSEvent.removeMonitor(monitor)
+            mouseMovedLocalMonitor = nil
+        }
+    }
+
+    private func handleMouseMoved() {
+        guard !items.isEmpty, AppPreferences.overlayFollowsMouse else { return }
+        guard let newScreen = ActiveDisplayResolver.activeScreen(preferPointer: true),
+              newScreen != targetScreen else { return }
+
+        targetScreen = newScreen
+        teardownPanel()
+        createPanel()
+        positionPanel()
+        panel?.orderFront(nil)
+    }
+
     // MARK: - Panel Setup
 
     func openAnnotateEditor(for url: URL) {
@@ -159,6 +211,7 @@ final class PreviewOverlay {
         // / pinned-display resolution a fresh capture would use.
         let screen = targetScreen ?? ActiveDisplayResolver.screenForScreenshotCapture()
         guard let panel, let screen else { return }
+        targetScreen = screen // remember what we actually resolved, so live mouse-tracking can diff against it
 
         let screenFrame = screen.visibleFrame
         let panelSize = panelSize
