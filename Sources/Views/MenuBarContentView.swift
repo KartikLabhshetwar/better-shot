@@ -195,7 +195,7 @@ struct MenuBarContentView: View {
     }
 
     private func dismissAndRun(_ action: ShortcutService.Action) {
-        nonisolated(unsafe) let screen = originScreen
+        nonisolated(unsafe) let screen = ActiveDisplayResolver.screenForScreenshotCapture()
         dismissPopover()
         Task.detached {
             try? await Task.sleep(nanoseconds: 200_000_000)
@@ -212,7 +212,7 @@ struct MenuBarContentView: View {
         } else {
             for record in recentScreenshots.prefix(8) {
                 screenshotItems.append(TrayMenuItem(title: record.filename, icon: "photo") { [record] in
-                    let screen = originScreen
+                    let screen = ActiveDisplayResolver.screenForScreenshotCapture()
                     dismissPopover()
                     let url = HistoryStore.shared.displayURLForRecord(record)
                     PreviewOverlay.shared.show(url: url, on: screen)
@@ -233,7 +233,7 @@ struct MenuBarContentView: View {
         } else {
             for record in recentRecordings.prefix(8) {
                 recordingItems.append(TrayMenuItem(title: record.filename, icon: "video") { [record] in
-                    let screen = originScreen
+                    let screen = ActiveDisplayResolver.screenForScreenshotCapture()
                     dismissPopover()
                     let url = HistoryStore.shared.displayURLForRecord(record)
                     PreviewOverlay.shared.show(url: url, on: screen)

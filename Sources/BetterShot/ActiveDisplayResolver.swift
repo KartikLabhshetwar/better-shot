@@ -37,6 +37,33 @@ enum ActiveDisplayResolver {
         return screenContainingFrontmostWindow() ?? pointerScreen ?? NSScreen.main ?? NSScreen.screens.first
     }
 
+    /// Resolves which display a screenshot capture -- and the preview card
+    /// it produces -- should target. Honors Settings > Capture > Preview
+    /// Thumbnail's "Show it on" choice: whichever display the mouse is on
+    /// (the default), or a display the user pinned. Falls back to the
+    /// mouse-follow behavior if no display was pinned yet, or the pinned
+    /// one got disconnected.
+    static func screenForScreenshotCapture() -> NSScreen? {
+        guard !AppPreferences.overlayFollowsMouse,
+              let pinnedScreen = screen(for: AppPreferences.overlayPinnedDisplayID) else {
+            return activeScreen(preferPointer: true)
+        }
+        return pinnedScreen
+    }
+
+    /// `screencapture -D<n>` indexes displays by their position in
+    /// CGGetActiveDisplayList's ordering (1 = main, 2 = secondary, ...)
+    /// rather than by CGDirectDisplayID, so a target display has to be
+    /// translated through that same list before it can reach the CLI.
+    static func screencaptureDisplayIndex(for displayID: CGDirectDisplayID) -> Int? {
+        var count: UInt32 = 0
+        guard CGGetActiveDisplayList(0, nil, &count) == .success, count > 0 else { return nil }
+        var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
+        guard CGGetActiveDisplayList(count, &ids, &count) == .success else { return nil }
+        guard let position = ids.firstIndex(of: displayID) else { return nil }
+        return position + 1
+    }
+
     private static func screenContainingMouse() -> NSScreen? {
         screen(containing: NSEvent.mouseLocation)
     }
