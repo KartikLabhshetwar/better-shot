@@ -27,7 +27,7 @@ final class RecordingProjectsWindowController: NSWindowController, NSWindowDeleg
 
     private init() {
         let window = NSWindow(
-            contentRect: NSRect(origin: .zero, size: CGSize(width: 900, height: 620)),
+            contentRect: NSRect(origin: .zero, size: CGSize(width: 1100, height: 720)),
             styleMask: [
                 .titled,
                 .closable,
@@ -51,17 +51,17 @@ final class RecordingProjectsWindowController: NSWindowController, NSWindowDeleg
     private func configureWindow() {
         guard let window else { return }
 
-        window.title = "Recording Projects"
+        window.title = "Media Gallery"
         window.titleVisibility = .visible
         window.toolbarStyle = .unified
         window.animationBehavior = .none
         window.isMovableByWindowBackground = false
         window.setFrameAutosaveName("RecordingProjectsWindow")
-        window.minSize = NSSize(width: 720, height: 480)
+        window.minSize = NSSize(width: 900, height: 580)
         window.center()
         window.delegate = self
 
-        window.contentViewController = NSHostingController(rootView: RecordingProjectsView())
+        window.contentViewController = NSHostingController(rootView: MediaGalleryView())
         PreviewWindowCaptureExclusion.shared.register(window: window)
     }
 

@@ -29,6 +29,7 @@ struct AnnotationEditorWindow: View {
     @State private var backgroundPresetStore = AnnotationBackgroundPresetStore.shared
     @State private var isInspectorPresented = true
     @State private var isSaving = false
+    @State private var isExporting = false
     @State private var saveFlash = false
     @State private var isCopying = false
     @State private var copyFlash = false
@@ -40,6 +41,7 @@ struct AnnotationEditorWindow: View {
 
     var body: some View {
         mainContent
+            .editorFullScreenByDefault()
             .navigationTitle("BetterShot Annotate")
             .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
             .toolbar {
@@ -163,7 +165,7 @@ struct AnnotationEditorWindow: View {
             }
         }
         .keyboardShortcut("s", modifiers: .command)
-        .disabled(!model.hasUnsavedChanges || isSaving)
+        .disabled(!model.hasUnsavedChanges || isSaving || isExporting)
         .help("Save your edits in BetterShot (⌘S)")
 
         if CloudUploader.shared.isConfigured {
@@ -176,7 +178,7 @@ struct AnnotationEditorWindow: View {
                     .padding(.horizontal, 6)
             }
             .help("Upload and copy a share link")
-            .disabled(model.previewImage == nil || model.imageSize == .zero || uploadPhase.isUploading)
+            .disabled(model.previewImage == nil || model.imageSize == .zero || uploadPhase.isUploading || isExporting)
         }
 
         Button(action: copyToClipboard) {
@@ -192,15 +194,20 @@ struct AnnotationEditorWindow: View {
             }
         }
         .keyboardShortcut("c", modifiers: [.command, .shift])
-        .disabled(model.previewImage == nil || model.imageSize == .zero || isCopying)
+        .disabled(model.previewImage == nil || model.imageSize == .zero || isCopying || isExporting)
         .help("Copy the finished image to the clipboard (⇧⌘C)")
 
         Button(action: exportImage) {
-            Label("Export", systemImage: "arrow.down.circle")
-                .labelStyle(.titleAndIcon)
+            if isExporting {
+                ProgressView().controlSize(.small)
+            } else {
+                Label("Export", systemImage: "arrow.down.circle")
+                    .labelStyle(.titleAndIcon)
+            }
         }
         .tint(.accentColor)
-        .disabled(model.previewImage == nil || model.imageSize == .zero)
+        .disabled(model.previewImage == nil || model.imageSize == .zero || isExporting || isSaving || isCopying || uploadPhase.isUploading)
+        .accessibilityLabel(isExporting ? "Exporting image" : "Export image")
         .help("Save the finished image to your Mac")
 
         Button {
@@ -388,7 +395,7 @@ struct AnnotationEditorWindow: View {
     /// costs no save panel and leaves no file to hunt down afterwards.
     private func copyToClipboard() {
         clearInspectorFocus()
-        guard let sourceURL = model.sourceURL, !isCopying else { return }
+        guard let sourceURL = model.sourceURL, !isCopying, !isExporting else { return }
         let baseURL = model.baseImageURL ?? sourceURL
 
         isCopying = true
@@ -421,29 +428,39 @@ struct AnnotationEditorWindow: View {
 
     private func exportImage() {
         clearInspectorFocus()
-        guard let sourceURL = model.sourceURL else { return }
+        guard let sourceURL = model.sourceURL, !isExporting, !isSaving, !isCopying,
+              !uploadPhase.isUploading else { return }
         let baseURL = model.baseImageURL ?? sourceURL
+        let shapes = model.shapes
+        let backgroundSettings = model.backgroundSettings
+        let contentType = ScreenshotFileActions.exportContentType
+        isExporting = true
+        model.errorMessage = nil
 
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [ScreenshotFileActions.exportContentType]
+        panel.allowedContentTypes = [contentType]
+        panel.directoryURL = BetterShotPreferences.exportDirectory
         panel.nameFieldStringValue = ScreenshotFileActions.exportFileName(for: sourceURL)
         panel.canCreateDirectories = true
         panel.title = "Export Screenshot"
 
         panel.begin { response in
-            guard response == .OK, let destinationURL = panel.url else { return }
-
+            guard response == .OK, let destinationURL = panel.url else {
+                isExporting = false
+                return
+            }
             Task {
+                defer { isExporting = false }
                 do {
                     try await AnnotationRenderer.renderInBackground(
                         sourceURL: baseURL,
-                        shapes: model.shapes,
-                        backgroundSettings: model.backgroundSettings,
+                        shapes: shapes,
+                        backgroundSettings: backgroundSettings,
                         destinationURL: destinationURL,
-                        contentType: ScreenshotFileActions.exportContentType
+                        contentType: contentType
                     )
                 } catch {
-                    model.errorMessage = "Failed to save annotation: \(error.localizedDescription)"
+                    model.errorMessage = "Failed to export image: \(error.localizedDescription)"
                 }
             }
         }
@@ -469,7 +486,7 @@ struct AnnotationEditorWindow: View {
 
     private func uploadAnnotation(options: CloudUploadOptions) {
         clearInspectorFocus()
-        guard model.sourceURL != nil, !uploadPhase.isUploading else { return }
+        guard model.sourceURL != nil, !uploadPhase.isUploading, !isExporting else { return }
 
         let itemID = UUID()
         lastUploadOptions = options
@@ -583,7 +600,7 @@ struct AnnotationEditorWindow: View {
         clearInspectorFocus()
         // Committing re-renders the composite, so a Cmd-S with nothing
         // changed should cost nothing.
-        guard model.sourceURL != nil, model.hasUnsavedChanges, !isSaving else { return }
+        guard model.sourceURL != nil, model.hasUnsavedChanges, !isSaving, !isExporting else { return }
 
         isSaving = true
         Task {

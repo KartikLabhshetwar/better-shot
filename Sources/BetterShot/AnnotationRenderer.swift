@@ -4,16 +4,10 @@
 //
 
 import AppKit
-import CoreImage
-import CoreImage.CIFilterBuiltins
 import ImageIO
 import UniformTypeIdentifiers
 
 enum AnnotationRenderer {
-    /// `CIContext` is immutable after creation and documented for reuse across
-    /// render calls (same contract as `AnnotationMockupEffectsRenderer`).
-    nonisolated(unsafe) private static let ciContext = CIContext(options: [.cacheIntermediates: false])
-
     /// Off-main variants: large exports (full-resolution compose + Core Image
     /// blur) are slow enough to beachball the UI, and the whole render graph
     /// is nonisolated, so hop to a background thread and await the result.
@@ -73,73 +67,81 @@ enum AnnotationRenderer {
         destinationURL: URL,
         contentType: UTType
     ) throws {
-        defer {
-            ciContext.clearCaches()
-            AnnotationMockupEffectsRenderer.clearCaches()
+        // Encode beside the destination, then replace atomically. A failed
+        // render must never remove the user's previous export.
+        let stagingURL = destinationURL.deletingLastPathComponent()
+            .appendingPathComponent(".BetterShot-\(UUID().uuidString).\(destinationURL.pathExtension)")
+        defer { try? FileManager.default.removeItem(at: stagingURL) }
+
+        if shapes.isEmpty, !backgroundSettings.hasRenderableContent,
+           contentType == .png,
+           let source = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
+           CGImageSourceGetType(source) as String? == UTType.png.identifier {
+            try FileManager.default.copyItem(at: sourceURL, to: stagingURL)
+        } else {
+            try autoreleasepool {
+                let sourceImage = try loadSourceImage(sourceURL: sourceURL)
+                // Keep the screenshot's own (typically Display P3) color space so
+                // wide-gamut colors survive the export instead of being pulled
+                // down to device RGB. Previews already render this way.
+                let colorSpace = exportColorSpace(for: sourceImage)
+                let renderedImage: CGImage
+                if backgroundSettings.hasRenderableContent {
+                    renderedImage = try AnnotationBackgroundRenderer.compose(
+                        contentImage: sourceImage,
+                        settings: backgroundSettings,
+                        colorSpace: colorSpace,
+                        foregroundOverlay: { context, layout, imageRect, imageClipPath in
+                            drawAnnotations(
+                                shapes,
+                                in: imageRect,
+                                pageSize: CGSize(width: sourceImage.width, height: sourceImage.height),
+                                canvasSize: layout.canvasSize,
+                                context: context,
+                                colorSpace: colorSpace,
+                                highlightClipPath: imageClipPath
+                            )
+                        },
+                        canvasOverlay: { context, layout, _ in
+                            AnnotationBackgroundRenderer.drawWatermark(
+                                backgroundSettings.watermark,
+                                in: CGRect(origin: .zero, size: layout.canvasSize),
+                                context: context
+                            )
+                        }
+                    )
+                } else {
+                    renderedImage = try renderAnnotatedImage(sourceImage, shapes: shapes, colorSpace: colorSpace)
+                }
+
+                guard let destination = CGImageDestinationCreateWithURL(
+                    stagingURL as CFURL,
+                    contentType.identifier as CFString,
+                    1,
+                    nil
+                ) else {
+                    throw CocoaError(.fileWriteUnknown)
+                }
+
+                var options: CFDictionary?
+                if contentType != .png {
+                    options = [
+                        kCGImageDestinationLossyCompressionQuality: BetterShotPreferences.compressionQuality
+                    ] as CFDictionary
+                }
+
+                CGImageDestinationAddImage(destination, renderedImage, options)
+
+                guard CGImageDestinationFinalize(destination) else {
+                    throw CocoaError(.fileWriteUnknown)
+                }
+            }
         }
-
-        try autoreleasepool {
-            let sourceImage = try loadSourceImage(sourceURL: sourceURL)
-            // Keep the screenshot's own (typically Display P3) color space so
-            // wide-gamut colors survive the export instead of being pulled
-            // down to device RGB. Previews already render this way.
-            let colorSpace = exportColorSpace(for: sourceImage)
-            let renderedImage: CGImage
-            if backgroundSettings.hasRenderableContent {
-                renderedImage = try AnnotationBackgroundRenderer.compose(
-                    contentImage: sourceImage,
-                    settings: backgroundSettings,
-                    colorSpace: colorSpace,
-                    foregroundOverlay: { context, layout, imageRect, imageClipPath in
-                        drawAnnotations(
-                            shapes,
-                            in: imageRect,
-                            pageSize: CGSize(width: sourceImage.width, height: sourceImage.height),
-                            canvasSize: layout.canvasSize,
-                            context: context,
-                            colorSpace: colorSpace,
-                            highlightClipPath: imageClipPath
-                        )
-                    },
-                    canvasOverlay: { context, layout, _ in
-                        AnnotationBackgroundRenderer.drawWatermark(
-                            backgroundSettings.watermark,
-                            in: CGRect(origin: .zero, size: layout.canvasSize),
-                            context: context
-                        )
-                    }
-                )
-            } else {
-                renderedImage = try renderAnnotatedImage(sourceImage, shapes: shapes, colorSpace: colorSpace)
-            }
-
-            if FileManager.default.fileExists(atPath: destinationURL.path) {
-                try FileManager.default.removeItem(at: destinationURL)
-            }
-
-            guard let destination = CGImageDestinationCreateWithURL(
-                destinationURL as CFURL,
-                contentType.identifier as CFString,
-                1,
-                nil
-            ) else {
-                throw CocoaError(.fileWriteUnknown)
-            }
-
-            var options: CFDictionary?
-            if contentType != .png {
-                options = [
-                    kCGImageDestinationLossyCompressionQuality: BetterShotPreferences.compressionQuality
-                ] as CFDictionary
-            }
-
-            CGImageDestinationAddImage(destination, renderedImage, options)
-
-            guard CGImageDestinationFinalize(destination) else {
-                throw CocoaError(.fileWriteUnknown)
-            }
+        if FileManager.default.fileExists(atPath: destinationURL.path) {
+            _ = try FileManager.default.replaceItemAt(destinationURL, withItemAt: stagingURL)
+        } else {
+            try FileManager.default.moveItem(at: stagingURL, to: destinationURL)
         }
-
     }
 
     nonisolated private static func loadSourceImage(sourceURL: URL) throws -> CGImage {
@@ -183,6 +185,7 @@ enum AnnotationRenderer {
         shapes: [AnnoShape],
         colorSpace: CGColorSpace
     ) throws -> CGImage {
+        guard !shapes.isEmpty else { return cgImage }
         let width = cgImage.width
         let height = cgImage.height
 

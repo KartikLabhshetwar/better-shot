@@ -115,12 +115,7 @@ enum BetterShotPreferences {
     }
 
     /// Whether to play the shutter sound after a screenshot. Defaults to on.
-    static var playSounds: Bool {
-        if UserDefaults.standard.object(forKey: playSoundsKey) == nil {
-            return true
-        }
-        return UserDefaults.standard.bool(forKey: playSoundsKey)
-    }
+    static var playSounds: Bool { AppPreferences.playSound }
 
     /// Whether the menu bar icon is shown. Defaults to on.
     static var showMenuBarIcon: Bool {

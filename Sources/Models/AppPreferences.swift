@@ -172,6 +172,23 @@ enum AppPreferences {
         set { UserDefaults.standard.set(newValue, forKey: recordingMicrophoneDeviceIDKey) }
     }
 
+    static let editorOpensFullScreenKey = "bs_editorOpensFullScreen"
+    static var editorOpensFullScreen: Bool {
+        UserDefaults.standard.object(forKey: editorOpensFullScreenKey) as? Bool ?? true
+    }
+
+    static let openEditorAfterRecordingKey = "bs_openEditorAfterRecording"
+    static func migrateEditorPreferences() {
+        if UserDefaults.standard.object(forKey: openEditorAfterRecordingKey) == nil {
+            UserDefaults.standard.set(openEditorAfterCapture, forKey: openEditorAfterRecordingKey)
+        }
+    }
+
+    static var openEditorAfterRecording: Bool {
+        UserDefaults.standard.object(forKey: openEditorAfterRecordingKey) as? Bool
+            ?? openEditorAfterCapture
+    }
+
     // MARK: - Screenshot
     static var openEditorAfterCapture: Bool {
         get { UserDefaults.standard.object(forKey: openEditorAfterCaptureKey) as? Bool ?? false }

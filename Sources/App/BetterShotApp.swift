@@ -44,7 +44,7 @@ struct BetterShotApp: App {
             Task { @MainActor in
                 let historyURL = await ScreenshotHistoryStore.shared.importRecordingSession(session)
                 RecordingProjectStore.shared.reload()
-                if AppPreferences.openEditorAfterCapture {
+                if AppPreferences.openEditorAfterRecording {
                     PreviewPanelPresenter.shared.onEditVideo?(historyURL)
                 } else {
                     PreviewOverlay.shared.show(url: historyURL)

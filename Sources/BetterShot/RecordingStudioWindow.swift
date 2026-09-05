@@ -144,6 +144,7 @@ private struct RecordingStudioContent: View {
                 }
             }
         }
+        .editorFullScreenByDefault()
         .navigationTitle(windowTitle)
         .onWindowChange { window in
             configureCloseGuard()

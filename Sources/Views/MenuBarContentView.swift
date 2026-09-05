@@ -145,6 +145,11 @@ struct MenuBarContentView: View {
                 }
             }
 
+            TrayGridButton(title: "Media Gallery", icon: "square.grid.2x2") {
+                MenuBarPopoverController.shared.closePopover()
+                RecordingProjectsWindowController.show()
+            }
+
             TrayGridMenu(title: "Recent Captures", icon: "clock.arrow.circlepath", menuItems: recentMenuItems())
                 .frame(height: 32)
         }

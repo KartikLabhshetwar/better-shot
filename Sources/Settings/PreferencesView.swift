@@ -4,12 +4,11 @@ import Carbon
 import UniformTypeIdentifiers
 
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case general, capture, recording, shortcuts, sharing, screenshots, recordings, about
+    case general, capture, recording, shortcuts, sharing, about
 
     var id: String { rawValue }
 
     static let preferenceGroup: [SettingsSection] = [.general, .capture, .recording, .shortcuts, .sharing]
-    static let libraryGroup: [SettingsSection] = [.screenshots, .recordings]
 
     var title: String {
         switch self {
@@ -18,8 +17,6 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .recording: "Recording"
         case .shortcuts: "Shortcuts"
         case .sharing: "Sharing"
-        case .screenshots: "Screenshots"
-        case .recordings: "Recordings"
         case .about: "About"
         }
     }
@@ -31,24 +28,23 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .recording: "record.circle"
         case .shortcuts: "command"
         case .sharing: "link"
-        case .screenshots: "photo.on.rectangle.angled"
-        case .recordings: "film"
         case .about: "info.circle"
         }
     }
 }
 
 struct PreferencesView: View {
-    @State private var selection: SettingsSection = .general
+    @State private var selection: SettingsSection
+
+    init(selection: SettingsSection = .general) {
+        _selection = State(initialValue: selection)
+    }
 
     var body: some View {
         NavigationSplitView {
             List(selection: $selection) {
                 Section("Preferences") {
                     ForEach(SettingsSection.preferenceGroup, content: row)
-                }
-                Section("Library") {
-                    ForEach(SettingsSection.libraryGroup, content: row)
                 }
                 Section {
                     row(.about)
@@ -78,8 +74,6 @@ struct PreferencesView: View {
         case .recording: RecordingSettingsTab()
         case .shortcuts: ShortcutSettingsTab()
         case .sharing: SharingSettingsTab()
-        case .screenshots: CaptureLibraryTab(kind: .screenshot, selection: $selection)
-        case .recordings: CaptureLibraryTab(kind: .recording, selection: $selection)
         case .about: AboutTab()
         }
     }
@@ -96,6 +90,7 @@ struct GeneralSettingsTab: View {
     @AppStorage("bs_exportQuality") private var exportQuality: Double = 0.9
     @AppStorage("bs_historyRetentionLimit") private var historyRetentionLimit = 100
 
+    @AppStorage(AppPreferences.editorOpensFullScreenKey) private var editorFullScreen = true
     @State private var defaultConfig = AppPreferences.defaultBeautifierConfig
     @State private var isConfirmingReset = false
 
@@ -133,6 +128,10 @@ struct GeneralSettingsTab: View {
                 Text("Appearance")
             } footer: {
                 Text("System follows whatever macOS is set to.")
+            }
+
+            Section("Editor") {
+                Toggle("Open editors in full screen", isOn: $editorFullScreen)
             }
 
             Section {
@@ -244,7 +243,7 @@ struct GeneralSettingsTab: View {
             }
         }
         .formStyle(.grouped)
-        .confirmationDialog("Restore General settings to their defaults?", isPresented: $isConfirmingReset) {
+        .alert("Restore General settings to their defaults?", isPresented: $isConfirmingReset) {
             Button("Restore Defaults", role: .destructive, action: restoreDefaults)
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -274,6 +273,7 @@ struct GeneralSettingsTab: View {
         exportFormatRaw = ExportFormat.png.rawValue
         exportQuality = 0.9
         historyRetentionLimit = 100
+        editorFullScreen = true
         defaultConfig = .default
         AppPreferences.defaultBeautifierConfig = .default
     }
@@ -738,7 +738,7 @@ struct CaptureSettingsTab: View {
             }
         }
         .formStyle(.grouped)
-        .confirmationDialog("Restore Capture settings to their defaults?", isPresented: $isConfirmingReset) {
+        .alert("Restore Capture settings to their defaults?", isPresented: $isConfirmingReset) {
             Button("Restore Defaults", role: .destructive) {
                 selfTimerRaw = 0
                 overlayPositionRaw = OverlayPosition.bottomRight.rawValue
@@ -762,8 +762,9 @@ struct RecordingSettingsTab: View {
     @AppStorage(AppPreferences.recordingCaptureKeystrokesKey) private var captureKeystrokes: Bool = false
     @AppStorage(BetterShotPreferences.recordingStartDelaySecondsKey) private var startDelaySeconds: Int = 0
     @AppStorage(BetterShotPreferences.recordingTeleprompterEnabledKey) private var teleprompterEnabled: Bool = false
-    @AppStorage("bs_openEditorAfterCapture") private var openEditor: Bool = false
+    @AppStorage(AppPreferences.openEditorAfterRecordingKey) private var openEditor = AppPreferences.openEditorAfterRecording
     @State private var isConfirmingReset = false
+    @State private var exportSettings = RecordingExportPreferences.lastSettings
 
     private var cameras: [AVCaptureDevice] { RecordingDeviceCatalog.cameras() }
     private var microphones: [AVCaptureDevice] { RecordingDeviceCatalog.microphones() }
@@ -773,12 +774,18 @@ struct RecordingSettingsTab: View {
             Section {
                 Picker("Camera", selection: $cameraID) {
                     Text("Off").tag("")
+                    if !cameraID.isEmpty && !cameras.contains(where: { $0.uniqueID == cameraID }) {
+                        Text("Selected camera (disconnected)").tag(cameraID)
+                    }
                     ForEach(cameras, id: \.uniqueID) { device in
                         Text(device.localizedName).tag(device.uniqueID)
                     }
                 }
                 Picker("Microphone", selection: $microphoneID) {
                     Text("Off").tag("")
+                    if !microphoneID.isEmpty && !microphones.contains(where: { $0.uniqueID == microphoneID }) {
+                        Text("Selected microphone (disconnected)").tag(microphoneID)
+                    }
                     ForEach(microphones, id: \.uniqueID) { device in
                         Text(device.localizedName).tag(device.uniqueID)
                     }
@@ -828,13 +835,30 @@ struct RecordingSettingsTab: View {
             }
 
             Section {
+                Picker("Render speed", selection: $exportSettings.speed) {
+                    ForEach(VideoCompressionSpeed.allCases) { Text($0.rawValue).tag($0) }
+                }
+                Picker("Resolution", selection: $exportSettings.resolution) {
+                    ForEach(VideoCompressionResolution.allCases) { Text($0.rawValue).tag($0) }
+                }
+                Picker("Codec", selection: $exportSettings.codec) {
+                    ForEach(VideoCompressionCodec.allCases) { Text($0.rawValue).tag($0) }
+                }
+            } header: {
+                Text("Default Video Export")
+            } footer: {
+                Text("Used for new projects. Fast keeps 60 fps with fewer motion blur samples. Smaller resolutions take less time to render.")
+            }
+            .onChange(of: exportSettings) { RecordingExportPreferences.lastSettings = exportSettings }
+
+            Section {
                 Button("Restore Defaults\u{2026}", role: .destructive) {
                     isConfirmingReset = true
                 }
             }
         }
         .formStyle(.grouped)
-        .confirmationDialog("Restore Recording settings to their defaults?", isPresented: $isConfirmingReset) {
+        .alert("Restore Recording settings to their defaults?", isPresented: $isConfirmingReset) {
             Button("Restore Defaults", role: .destructive) {
                 cameraID = ""
                 microphoneID = ""
@@ -843,6 +867,8 @@ struct RecordingSettingsTab: View {
                 startDelaySeconds = 0
                 teleprompterEnabled = false
                 openEditor = false
+                exportSettings = VideoCompressionSettings()
+                RecordingExportPreferences.lastSettings = exportSettings
             }
             Button("Cancel", role: .cancel) {}
         }
@@ -883,7 +909,7 @@ struct ShortcutSettingsTab: View {
             }
         }
         .formStyle(.grouped)
-        .confirmationDialog("Restore all shortcuts to their defaults?", isPresented: $isConfirmingReset) {
+        .alert("Restore all shortcuts to their defaults?", isPresented: $isConfirmingReset) {
             Button("Restore Defaults", role: .destructive) {
                 ShortcutService.shared.restoreDefaults()
                 resetID = UUID()
@@ -1063,385 +1089,6 @@ final class ShortcutRecorderNSView: NSView {
 
     override func keyDown(with event: NSEvent) {}
     override func flagsChanged(with event: NSEvent) {}
-}
-
-// MARK: - Library
-
-struct CaptureLibraryTab: View {
-    let kind: CaptureKind
-    @Binding var selection: SettingsSection
-
-    private enum LibraryScope {
-        case local
-        case cloud
-    }
-
-    @State private var scope: LibraryScope = .local
-    @State private var thumbnails: [String: NSImage] = [:]
-    @State private var isConfirmingClear = false
-    @State private var isConfirmingCloudClear = false
-    @State private var isClearingCloud = false
-
-    private var records: [CaptureRecord] {
-        HistoryStore.shared.records.filter { $0.kind == kind }
-    }
-
-    private var cloudItems: [ScreenshotHistoryItem] {
-        ScreenshotHistoryStore.shared.items.filter {
-            $0.cloudURL != nil && $0.isVideo == (kind == .recording)
-        }
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Picker("Library", selection: $scope) {
-                Text("On This Mac").tag(LibraryScope.local)
-                Text("Shared Links").tag(LibraryScope.cloud)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(maxWidth: 240)
-            .padding(.top, 12)
-            .padding(.bottom, 8)
-
-            switch scope {
-            case .local:
-                if records.isEmpty {
-                    emptyState
-                } else {
-                    list
-                }
-            case .cloud:
-                if cloudItems.isEmpty {
-                    cloudEmptyState
-                } else {
-                    cloudList
-                }
-            }
-        }
-        .onAppear {
-            if kind == .recording {
-                HistoryStore.shared.syncRecordingsFromDisk()
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .confirmationDialog(
-            "Remove \(records.count) \(records.count == 1 ? noun : plural) from the Library?",
-            isPresented: $isConfirmingClear
-        ) {
-            Button("Remove", role: .destructive) {
-                thumbnails.removeAll()
-                records.forEach { HistoryStore.shared.deleteRecord($0) }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This clears the copies BetterShot keeps. The files already in your save folder stay where they are.")
-        }
-    }
-
-    private var emptyState: some View {
-        ContentUnavailableView {
-            Label(kind == .screenshot ? "No Screenshots Yet" : "No Recordings Yet", systemImage: icon)
-        } description: {
-            Text(kind == .screenshot
-                 ? "Everything you capture shows up here, ready to reopen, edit or drag somewhere else."
-                 : "Everything you record shows up here, ready to reopen and trim.")
-        } actions: {
-            Button(kind == .screenshot ? "Capture a Region" : "Start Recording", action: startCapture)
-                .buttonStyle(.borderedProminent)
-        }
-    }
-
-    private var cloudEmptyState: some View {
-        ContentUnavailableView {
-            Label("No Share Links Yet", systemImage: "icloud")
-        } description: {
-            Text(R2CredentialStore.shared.isConfigured
-                 ? "Share a \(noun) from the editor and its link shows up here."
-                 : "Share links need your own Cloudflare R2 bucket. Set it up once under Sharing.")
-        } actions: {
-            if !R2CredentialStore.shared.isConfigured {
-                Button("Set Up Sharing") { selection = .sharing }
-                    .buttonStyle(.borderedProminent)
-            }
-        }
-    }
-
-    private var cloudList: some View {
-        VStack(spacing: 0) {
-            List {
-                ForEach(cloudItems) { item in
-                    cloudRow(item)
-                }
-            }
-            .listStyle(.inset)
-
-            Divider()
-
-            HStack {
-                Text("\(cloudItems.count) shared \(cloudItems.count == 1 ? noun : plural)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                if isClearingCloud {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Button("Delete From Cloud\u{2026}", role: .destructive) {
-                        isConfirmingCloudClear = true
-                    }
-                    .controlSize(.small)
-                    .disabled(!R2CredentialStore.shared.isConfigured)
-                    .help("Delete these uploads from your R2 bucket")
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-        }
-        .confirmationDialog(
-            "Delete \(cloudItems.count) shared \(cloudItems.count == 1 ? noun : plural) from your cloud storage?",
-            isPresented: $isConfirmingCloudClear
-        ) {
-            Button("Delete", role: .destructive) {
-                clearCloudUploads()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This deletes the uploaded copies from your R2 bucket, so their share links stop working. Local copies stay on this Mac.")
-        }
-    }
-
-    private var list: some View {
-        VStack(spacing: 0) {
-            List {
-                Section("On This Mac") {
-                    ForEach(records) { record in
-                        row(record)
-                    }
-                }
-            }
-            .listStyle(.inset)
-
-            Divider()
-
-            HStack {
-                Text("\(records.count) \(records.count == 1 ? noun : plural)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                Button("Clear \(plural.capitalized)\u{2026}", role: .destructive) {
-                    isConfirmingClear = true
-                }
-                .controlSize(.small)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-        }
-    }
-
-    private func row(_ record: CaptureRecord) -> some View {
-        HStack(spacing: 14) {
-            thumbnail(record)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(record.filename)
-                    .font(.callout.weight(.medium))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Text("\(record.pixelWidth) \u{00D7} \(record.pixelHeight)  \u{00B7}  \(record.createdAt.formatted(.relative(presentation: .named)))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 8)
-
-            Button(action: { open(record) }) {
-                Image(systemName: kind == .screenshot ? "eye" : "slider.horizontal.below.rectangle")
-            }
-            .buttonStyle(.borderless)
-            .help(kind == .screenshot ? "Preview this screenshot" : "Open in the trim editor")
-            .accessibilityLabel(kind == .screenshot ? "Preview \(record.filename)" : "Edit \(record.filename)")
-
-            Button(role: .destructive) {
-                thumbnails.removeValue(forKey: record.id.uuidString)
-                HistoryStore.shared.deleteRecord(record)
-            } label: {
-                Image(systemName: "trash")
-            }
-            .buttonStyle(.borderless)
-            .help("Remove from the Library")
-            .accessibilityLabel("Remove \(record.filename)")
-        }
-        .padding(.vertical, 5)
-    }
-
-    @ViewBuilder
-    private func cloudRow(_ item: ScreenshotHistoryItem) -> some View {
-        if let link = item.cloudURL, let shareURL = URL(string: link) {
-            HStack(spacing: 14) {
-                itemThumbnail(item)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(item.fileName)
-                        .font(.callout.weight(.medium))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Text(link)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .textSelection(.enabled)
-                }
-
-                Spacer(minLength: 8)
-
-                Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(link, forType: .string)
-                    ToastWindow.shared.show(title: "Link Copied", message: link, systemIcon: "link")
-                } label: {
-                    Image(systemName: "link")
-                }
-                .buttonStyle(.borderless)
-                .help("Copy the share link")
-                .accessibilityLabel("Copy link for \(item.fileName)")
-
-                Button {
-                    NSWorkspace.shared.open(shareURL)
-                } label: {
-                    Image(systemName: "arrow.up.forward.app")
-                }
-                .buttonStyle(.borderless)
-                .help("Open the share page")
-                .accessibilityLabel("Open share page for \(item.fileName)")
-            }
-            .padding(.vertical, 5)
-        }
-    }
-
-    @ViewBuilder
-    private func thumbnail(_ record: CaptureRecord) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
-        Group {
-            if let thumb = thumbnails[record.id.uuidString] {
-                Image(nsImage: thumb)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } else {
-                Rectangle()
-                    .fill(.quaternary)
-                    .onAppear { loadThumbnail(for: record) }
-            }
-        }
-        .frame(width: 72, height: 48)
-        .clipShape(shape)
-        .overlay(shape.strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
-    }
-
-    private var noun: String { kind == .screenshot ? "screenshot" : "recording" }
-    private var plural: String { noun + "s" }
-    private var icon: String { kind == .screenshot ? "photo.on.rectangle.angled" : "film" }
-
-    private func open(_ record: CaptureRecord) {
-        if kind == .screenshot {
-            PreviewOverlay.shared.show(url: HistoryStore.shared.displayURLForRecord(record))
-        } else {
-            PreviewPanelPresenter.shared.onEditVideo?(HistoryStore.shared.urlForRecord(record))
-        }
-    }
-
-    private func clearCloudUploads() {
-        let credentials = R2CredentialStore.shared.snapshot()
-        let items = cloudItems
-        isClearingCloud = true
-        Task {
-            var failures = 0
-            for item in items {
-                guard let link = item.cloudURL, let slug = R2Uploader.slug(fromShareLink: link) else { continue }
-                do {
-                    try await R2Uploader.deleteShare(slug: slug, credentials: credentials)
-                    ScreenshotHistoryStore.shared.clearCloudURL(for: item.url)
-                } catch {
-                    failures += 1
-                }
-            }
-            isClearingCloud = false
-            if failures > 0 {
-                ToastWindow.shared.show(
-                    title: "Cloud Delete Failed",
-                    message: "\(failures) of \(items.count) uploads could not be deleted.",
-                    systemIcon: "exclamationmark.icloud"
-                )
-            } else {
-                ToastWindow.shared.show(
-                    title: "Cloud \(plural.capitalized) Deleted",
-                    message: "The share links no longer work.",
-                    systemIcon: "icloud.slash"
-                )
-            }
-        }
-    }
-
-    private func startCapture() {
-        let screen = NSApp.keyWindow?.screen
-        SettingsWindowController.shared.close()
-        if kind == .screenshot {
-            Task { await CaptureOrchestrator.shared.performCapture(.region, on: screen) }
-        } else {
-            RecordingBarPresenter.shared.showPicker()
-        }
-    }
-
-    private func loadThumbnail(for record: CaptureRecord) {
-        let source = HistoryStore.shared.thumbnailSource(for: record)
-        Task.detached {
-            let thumb = HistoryStore.decodeThumbnail(source, maxSize: 96)
-            await MainActor.run {
-                if let thumb {
-                    thumbnails[record.id.uuidString] = thumb
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func itemThumbnail(_ item: ScreenshotHistoryItem) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
-        Group {
-            if let thumb = thumbnails[item.id.uuidString] {
-                Image(nsImage: thumb)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } else {
-                Rectangle()
-                    .fill(.quaternary)
-                    .onAppear { loadItemThumbnail(for: item) }
-            }
-        }
-        .frame(width: 72, height: 48)
-        .clipShape(shape)
-        .overlay(shape.strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
-    }
-
-    private func loadItemThumbnail(for item: ScreenshotHistoryItem) {
-        let source = HistoryStore.ThumbnailSource(
-            url: item.url,
-            kind: item.isVideo ? .recording : .screenshot
-        )
-        Task.detached {
-            let thumb = HistoryStore.decodeThumbnail(source, maxSize: 96)
-            await MainActor.run {
-                if let thumb {
-                    thumbnails[item.id.uuidString] = thumb
-                }
-            }
-        }
-    }
 }
 
 // MARK: - About

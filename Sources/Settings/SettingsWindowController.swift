@@ -11,19 +11,23 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     private override init() { super.init() }
 
-    func open(on screen: NSScreen? = nil) {
+    func open(on screen: NSScreen? = nil, section: SettingsSection? = nil) {
         if let existing = window, existing.isVisible {
+            if let section {
+                existing.contentViewController = NSHostingController(rootView: PreferencesView(selection: section))
+            }
             existing.orderFrontRegardless()
             NSApp.activate(ignoringOtherApps: true)
             existing.makeKeyAndOrderFront(nil)
             return
         }
 
-        let controller = NSHostingController(rootView: PreferencesView())
+        let controller = NSHostingController(rootView: PreferencesView(selection: section ?? .general))
 
         let win = NSWindow(contentViewController: controller)
         win.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         win.setContentSize(NSSize(width: 820, height: 660))
+        win.minSize = NSSize(width: 780, height: 620)
         win.titlebarAppearsTransparent = true
         win.title = "Settings"
         win.isReleasedWhenClosed = false

@@ -102,6 +102,7 @@ struct RecordingProjectsView: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Clear search")
                 }
             }
             .padding(.horizontal, 8)
@@ -131,6 +132,7 @@ struct RecordingProjectsView: View {
                 Image(systemName: "arrow.clockwise")
             }
             .help("Refresh")
+            .accessibilityLabel("Refresh projects")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
@@ -140,11 +142,14 @@ struct RecordingProjectsView: View {
     private var content: some View {
         Group {
             if store.projects.isEmpty {
-                ContentUnavailableView(
-                    "No Recording Projects",
-                    systemImage: "film.stack",
-                    description: Text("Screen recordings you make are kept here so you can reopen and keep editing them.")
-                )
+                ContentUnavailableView {
+                    Label("No Recording Projects", systemImage: "film.stack")
+                } description: {
+                    Text("Screen recordings are kept here so you can reopen and keep editing them.")
+                } actions: {
+                    Button("Start Recording") { RecordingBarPresenter.shared.showPicker() }
+                        .buttonStyle(.borderedProminent)
+                }
             } else if visibleProjects.isEmpty {
                 ContentUnavailableView.search(text: searchText)
             } else {
@@ -235,68 +240,69 @@ private struct RecordingProjectCard: View {
     private let posterInset: CGFloat = 6
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            posterView
-                .frame(maxWidth: .infinity)
-                .aspectRatio(16 / 9, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: posterRadius, style: .continuous))
-                .overlay(alignment: .bottomTrailing) {
-                    if project.duration > 0 {
-                        Text(RecordingProjectFormatting.duration(project.duration))
-                            .font(.caption2.monospacedDigit())
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(.black.opacity(0.6), in: Capsule())
-                            .foregroundStyle(.white)
-                            .padding(6)
+        Button(action: onOpen) {
+            VStack(alignment: .leading, spacing: 0) {
+                posterView
+                    .frame(maxWidth: .infinity)
+                    .aspectRatio(16 / 9, contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: posterRadius, style: .continuous))
+                    .overlay(alignment: .bottomTrailing) {
+                        if project.duration > 0 {
+                            Text(RecordingProjectFormatting.duration(project.duration))
+                                .font(.caption2.monospacedDigit())
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(.black.opacity(0.6), in: Capsule())
+                                .foregroundStyle(.white)
+                                .padding(6)
+                        }
                     }
-                }
-                .overlay(alignment: .topLeading) {
-                    if project.hasUnsavedDraft {
-                        Text("Unsaved")
-                            .font(.caption2.weight(.semibold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.orange, in: Capsule())
-                            .foregroundStyle(.black)
-                            .padding(6)
+                    .overlay(alignment: .topLeading) {
+                        if project.hasUnsavedDraft {
+                            Text("Unsaved")
+                                .font(.caption2.weight(.semibold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(.orange, in: Capsule())
+                                .foregroundStyle(.black)
+                                .padding(6)
+                        }
                     }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(project.displayName)
+                        .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    Text(metaLine)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(project.displayName)
-                    .font(.subheadline.weight(.medium))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                Text(metaLine)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 4)
+                .padding(.top, 8)
+                .padding(.bottom, 2)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 4)
-            .padding(.top, 8)
-            .padding(.bottom, 2)
+            .padding(posterInset)
+            .background(
+                RoundedRectangle(cornerRadius: outerRadius, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: outerRadius, style: .continuous)
+                    .stroke(Color.primary.opacity(isHovering ? 0.18 : 0.08), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: outerRadius, style: .continuous))
+            .onHover { isHovering = $0 }
         }
-        .padding(posterInset)
-        .background(
-            RoundedRectangle(cornerRadius: outerRadius, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: outerRadius, style: .continuous)
-                .stroke(Color.primary.opacity(isHovering ? 0.18 : 0.08), lineWidth: 1)
-        )
-        .contentShape(RoundedRectangle(cornerRadius: outerRadius, style: .continuous))
-        .onHover { isHovering = $0 }
-        // Single click would fight the context menu and selection; opening on
-        // double click matches how Finder and Screen Studio behave.
-        .onTapGesture(count: 2, perform: onOpen)
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open \(project.displayName) in Studio")
         .task {
             poster = await RecordingProjectStore.poster(for: project.session)
         }
-        .help("Double-click to open in Studio")
+        .help("Open in Studio")
     }
 
     @ViewBuilder

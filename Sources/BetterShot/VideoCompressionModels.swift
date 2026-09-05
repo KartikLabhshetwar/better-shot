@@ -46,6 +46,16 @@ enum VideoCompressionSpeed: String, CaseIterable, Identifiable, Codable, Sendabl
     var ffmpegPreset: String {
         rawValue.lowercased()
     }
+
+    /// Preserve 60 fps; only the temporal blur sampling budget changes.
+    var motionBlurSamples: Int {
+        switch self {
+        case .ultrafast: 1
+        case .fast: 4
+        case .medium: 12
+        case .slow: 24
+        }
+    }
 }
 
 enum VideoCompressionCodec: String, CaseIterable, Identifiable, Codable, Sendable {

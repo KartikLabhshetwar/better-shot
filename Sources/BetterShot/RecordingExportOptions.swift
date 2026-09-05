@@ -60,6 +60,12 @@ struct RecordingExportOptionsPopover: View {
                 .font(.inspectorSectionHeader)
                 .padding(.bottom, 2)
 
+            segmented("Render Speed", options: VideoCompressionSpeed.allCases, selection: $settings.speed)
+            Text("Fast keeps 60 fps with lighter motion blur. Slow uses more blur samples during zooms.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
             segmented("Quality", options: VideoCompressionQuality.allCases, selection: $settings.quality)
             segmented("Codec", options: VideoCompressionCodec.allCases, selection: $settings.codec)
             segmented("Resolution", options: VideoCompressionResolution.allCases, selection: $settings.resolution)
@@ -130,7 +136,7 @@ struct RecordingExportOptionsPopover: View {
     private var formatHint: String {
         switch settings.effectiveContainer {
         case .mov:
-            "The recording's native format. Exports without re-writing the file."
+            "QuickTime format. Edited recordings still need rendering."
         case .mp4:
             "Plays on more platforms, including Windows, browsers, and Slack."
         }

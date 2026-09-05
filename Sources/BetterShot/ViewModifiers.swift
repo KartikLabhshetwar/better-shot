@@ -246,3 +246,26 @@ extension View {
         }
     }
 }
+
+private struct EditorFullScreenModifier: ViewModifier {
+    @State private var didConfigure = false
+
+    func body(content: Content) -> some View {
+        content.onWindowChange { window in
+            guard let window, !didConfigure else { return }
+            didConfigure = true
+            guard AppPreferences.editorOpensFullScreen else { return }
+            window.collectionBehavior.insert(.fullScreenPrimary)
+            DispatchQueue.main.async {
+                guard !window.styleMask.contains(.fullScreen) else { return }
+                window.toggleFullScreen(nil)
+            }
+        }
+    }
+}
+
+extension View {
+    func editorFullScreenByDefault() -> some View {
+        modifier(EditorFullScreenModifier())
+    }
+}

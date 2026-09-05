@@ -32,6 +32,7 @@ func resolveRawSource(for url: URL, beautifiedPath: String?, rawURL: URL) -> URL
     return url
 }
 
+@MainActor
 func annotationEditorURL(for url: URL, beautifiedPath: String?, rawURL: URL) -> URL {
     if hasEditDocument(for: url) { return url }
     let raw = resolveRawSource(for: url, beautifiedPath: beautifiedPath, rawURL: rawURL)
@@ -82,6 +83,7 @@ try! FileManager.default.removeItem(at: historyURL.appendingPathExtension("bette
 let cleared = annotationEditorURL(for: desktopURL, beautifiedPath: desktopURL.path, rawURL: rawURL)
 assert(cleared == rawURL, "a stale mapping without a sidecar must fall back to the raw source")
 
+@MainActor
 func editedHistoryURL(forCapturePaths capturePaths: [String]) -> URL? {
     guard let item = items.first(where: { item in
         guard item.hasEdits, let sourceCapturePath = item.sourceCapturePath else { return false }
@@ -92,6 +94,7 @@ func editedHistoryURL(forCapturePaths capturePaths: [String]) -> URL? {
     return item.url
 }
 
+@MainActor
 func displayURL(rawURL: URL, beautifiedPath: String?) -> URL {
     var capturePaths = [rawURL.standardizedFileURL.path]
     if let beautifiedPath {

@@ -5,6 +5,32 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.4] - 2026-09-06
+
+Faster image and video exports, a dedicated media gallery, and more reliable
+settings. The editor keeps its familiar preview, timeline, and right-hand
+inspector layout.
+
+### Added
+
+- **Media Gallery**: Browse images, videos, shared links, and editable recording projects from the menu bar. Local captures use large thumbnail cards with search, editor access, and Finder actions.
+- **Full-screen editors by default**: Image and video editors open in full screen, with a preference in Settings → General to turn this off.
+- **Video export defaults**: Choose render speed, resolution, and codec in Recording settings; export options expose the motion-blur sampling budget.
+
+### Changed
+
+- **GPU video rendering**: Scaling and temporal zoom blur run together through a reusable Core Image context instead of repeated full-frame CPU draws. Static backgrounds remain cached, hardware encoding is enabled where available, and exports retain their 60 fps cadence.
+- **Faster image effects**: Perspective and progressive blur reuse the GPU context. Unedited PNG exports copy the existing file without decoding or encoding it again.
+- **Settings and media are separate**: Captures now live in the Media Gallery instead of Settings.
+
+### Fixed
+
+- Video exports now retain their rendered project deliverable so repeat exports and sharing can reuse it.
+- Image exports replace the destination atomically; a failed render preserves the previous file. The export button shows progress, prevents duplicate exports, and opens the configured save folder.
+- Video export checks writer failures while waiting for capacity, responds to cancellation, and reports reader failures instead of completing a truncated movie.
+- Screenshot and recording “open editor” preferences are independent, preserving the previous choice on upgrade.
+- Shutter sound settings use the same preference throughout the app. Disconnected camera and microphone selections remain visible in Settings.
+
 ## [0.4.3] - 2026-08-30
 
 One shortcut for everything. The floating bar picks up the screenshot

@@ -53,7 +53,7 @@ nonisolated enum AnnotationMockupEffectsRenderer {
             canvasSize: canvasSize
         )
 
-        draw(
+        try draw(
             output,
             in: canvasRect,
             colorSpace: colorSpace,
@@ -73,7 +73,7 @@ nonisolated enum AnnotationMockupEffectsRenderer {
             CIImage(cgImage: image),
             settings: progressiveBlurSettings
         )
-        draw(
+        try draw(
             output,
             in: canvasRect,
             colorSpace: colorSpace,
@@ -86,22 +86,15 @@ nonisolated enum AnnotationMockupEffectsRenderer {
         in canvasRect: CGRect,
         colorSpace: CGColorSpace,
         into destinationContext: CGContext
-    ) {
-        // Render directly into the already-allocated final canvas. This avoids
-        // materializing another full-canvas RGBA bitmap for large compositions.
-        let destination = CIContext(
-            cgContext: destinationContext,
-            options: [
-                .cacheIntermediates: false,
-                .workingColorSpace: colorSpace,
-                .outputColorSpace: colorSpace
-            ]
-        )
-        destination.draw(image, in: canvasRect, from: canvasRect)
-    }
-
-    static func clearCaches() {
-        context.clearCaches()
+    ) throws {
+        // Reuse the GPU context; a CGContext-backed CIContext is recreated
+        // for every effect and cannot reuse its compiled filter pipeline.
+        guard let rendered = context.createCGImage(
+            image, from: canvasRect, format: .RGBA8, colorSpace: colorSpace
+        ) else {
+            throw AnnotationMockupEffectsError.cameraProjectionFailed
+        }
+        destinationContext.draw(rendered, in: canvasRect)
     }
 
     nonisolated private static func blurMask(

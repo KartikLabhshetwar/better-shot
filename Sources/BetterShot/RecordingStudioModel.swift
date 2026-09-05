@@ -2081,6 +2081,7 @@ final class RecordingStudioModel {
         // to what this render would produce - same configuration builds
         // both - so exporting becomes a plain copy into the save folder.
         if let cached = freshDeliverableURL {
+            exportState = .exporting(progress: 0.98)
             let suggestedFileName = exportSuggestedFileName
             exportTask = Task { [weak self] in
                 do {
@@ -2102,6 +2103,8 @@ final class RecordingStudioModel {
 
         let configuration = makeExportConfiguration()
         let suggestedFileName = exportSuggestedFileName
+        let session = session
+        let renderedDocument = currentDocument()
 
         let dockProgressID = DockExportProgressCoordinator.shared.start()
 
@@ -2116,11 +2119,15 @@ final class RecordingStudioModel {
                         }
                     }
                 }
+                defer { try? FileManager.default.removeItem(at: temporaryURL) }
+                try Task.checkCancellation()
+                let deliverableURL = try session?.installFinalVideo(
+                    movingFrom: temporaryURL, renderedFrom: renderedDocument
+                ) ?? temporaryURL
                 let savedURL = try await VideoFileActions.saveToDefaultLocation(
-                    from: temporaryURL,
+                    from: deliverableURL,
                     suggestedFileName: suggestedFileName
                 )
-                try? FileManager.default.removeItem(at: temporaryURL)
                 DockExportProgressCoordinator.shared.finish(dockProgressID)
                 RecordingExportNotifier.notifySuccess(fileURL: savedURL)
                 RecordingExportNotifier.revealIfPreferred(fileURL: savedURL)
@@ -2197,11 +2204,12 @@ final class RecordingStudioModel {
                         }
                     }
                 }
+                defer { try? FileManager.default.removeItem(at: temporaryURL) }
+                try Task.checkCancellation()
                 let savedURL = try await VideoFileActions.saveToDefaultLocation(
                     from: temporaryURL,
                     suggestedFileName: suggestedFileName
                 )
-                try? FileManager.default.removeItem(at: temporaryURL)
                 DockExportProgressCoordinator.shared.finish(dockProgressID)
                 RecordingExportNotifier.notifySuccess(fileURL: savedURL)
                 RecordingExportNotifier.revealIfPreferred(fileURL: savedURL)

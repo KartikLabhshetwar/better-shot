@@ -18,10 +18,12 @@ import AppKit
 import AVFoundation
 import CoreGraphics
 import CoreImage
+import CoreImage.CIFilterBuiltins
 import CoreText
 import Foundation
 import ImageIO
 import SwiftUI
+import VideoToolbox
 
 nonisolated final class RecordingStudioExporter: @unchecked Sendable {
     /// Fixed output cadence for both the writer's frame clock and the
@@ -157,6 +159,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         cancelFlag: CancelFlag,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> URL {
+        try Task.checkCancellation()
         let sourceAsset = AVURLAsset(url: configuration.screenURL)
         let sourceDuration = try await sourceAsset.load(.duration).seconds
         let clipTimeline = configuration.clipTimeline.normalized(to: sourceDuration)
@@ -249,6 +252,9 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         let codec: AVVideoCodecType = configuration.exportSettings.codec == .hevc ? .hevc : .h264
         let videoSettings: [String: Any] = [
             AVVideoCodecKey: codec,
+            AVVideoEncoderSpecificationKey: [
+                kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder as String: true
+            ],
             AVVideoWidthKey: canvasWidth,
             AVVideoHeightKey: canvasHeight,
             AVVideoCompressionPropertiesKey: [
@@ -314,7 +320,8 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             reframe: configuration.reframe,
             fitContentAspect: configuration.fitContentAspect,
             crop: configuration.crop,
-            masks: configuration.masks
+            masks: configuration.masks,
+            maximumBlurSamples: configuration.exportSettings.speed.motionBlurSamples
         )
 
         let screenAudioOutput = audioOutput
@@ -328,12 +335,14 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
                 compositor: compositor,
                 cameraFeed: cameraFeed,
                 clipTimeline: clipTimeline,
+                writer: writer,
                 cancelFlag: cancelFlag,
                 progress: progress
             )
             async let audioDone: Void = pumpAudio(
                 output: screenAudioOutput,
                 input: writerAudioInput,
+                writer: writer,
                 cancelFlag: cancelFlag
             )
             _ = try await (videoDone, audioDone)
@@ -347,6 +356,16 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         }
 
         cameraFeed?.cancel()
+        if screenReader.status == .failed || replacementReader?.status == .failed {
+            writer.cancelWriting()
+            try? FileManager.default.removeItem(at: outputURL)
+            throw screenReader.error ?? replacementReader?.error ?? ExportError.writerFailed(nil)
+        }
+        if cancelFlag.isCancelled {
+            writer.cancelWriting()
+            try? FileManager.default.removeItem(at: outputURL)
+            throw ExportError.cancelled
+        }
 
         await withCheckedContinuation { continuation in
             writer.finishWriting {
@@ -368,6 +387,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         compositor: StudioFrameCompositor,
         cameraFeed: CameraFrameFeed?,
         clipTimeline: RecordingClipTimeline,
+        writer: AVAssetWriter,
         cancelFlag: CancelFlag,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws {
@@ -396,6 +416,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
 
         for frame in 0..<frameCount {
             if cancelFlag.isCancelled { throw ExportError.cancelled }
+            try Task.checkCancellation()
             let editorTime = Double(frame) / frameRate
             guard let location = clipTimeline.location(at: editorTime) else { break }
             let sourceTime = location.sourceTime
@@ -421,6 +442,8 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
 
             while !input.isReadyForMoreMediaData {
                 if cancelFlag.isCancelled { throw ExportError.cancelled }
+                try Task.checkCancellation()
+                guard writer.status == .writing else { throw ExportError.writerFailed(writer.error) }
                 try await Task.sleep(nanoseconds: 2_000_000)
             }
 
@@ -433,20 +456,22 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
                 throw ExportError.writerFailed(nil)
             }
 
-            let cameraBuffer = cameraFeed?.latestFrame(at: sourceTime)
-            try compositor.render(
-                screenFrame: sourceBuffer,
-                cameraFrame: cameraBuffer,
-                editorTime: editorTime,
-                sourceTime: sourceTime,
-                into: destinationBuffer
-            )
+            try autoreleasepool {
+                let cameraBuffer = cameraFeed?.latestFrame(at: sourceTime)
+                try compositor.render(
+                    screenFrame: sourceBuffer,
+                    cameraFrame: cameraBuffer,
+                    editorTime: editorTime,
+                    sourceTime: sourceTime,
+                    into: destinationBuffer
+                )
 
-            let pts = CMTime(seconds: editorTime, preferredTimescale: 600)
-            if !adaptor.append(destinationBuffer, withPresentationTime: pts) {
-                throw ExportError.writerFailed(nil)
+                let pts = CMTime(seconds: editorTime, preferredTimescale: 600)
+                if !adaptor.append(destinationBuffer, withPresentationTime: pts) {
+                    throw ExportError.writerFailed(nil)
+                }
+
             }
-
             if frame % 10 == 0 {
                 progress(min(0.98, Double(frame) / Double(frameCount)))
             }
@@ -457,14 +482,18 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
     private func pumpAudio(
         output: AVAssetReaderAudioMixOutput?,
         input: AVAssetWriterInput?,
+        writer: AVAssetWriter,
         cancelFlag: CancelFlag
     ) async throws {
         guard let output, let input else { return }
 
         while let sampleBuffer = output.copyNextSampleBuffer() {
             if cancelFlag.isCancelled { throw ExportError.cancelled }
+            try Task.checkCancellation()
             while !input.isReadyForMoreMediaData {
                 if cancelFlag.isCancelled { throw ExportError.cancelled }
+                try Task.checkCancellation()
+                guard writer.status == .writing else { throw ExportError.writerFailed(writer.error) }
                 try await Task.sleep(nanoseconds: 2_000_000)
             }
             if !input.append(sampleBuffer) {
@@ -598,7 +627,7 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
     private let reframe: ReframeTrack?
     private let crop: CGRect
     private let masks: [RecordingMaskSegment]
-    private let maskContext: CIContext?
+    private let renderContext = CIContext(options: [.cacheIntermediates: false])
     private var artworkImageCache: [String: CGImage] = [:]
     private let pointerScale: CGFloat
     private let colorSpace: CGColorSpace
@@ -608,6 +637,7 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
     /// motion-blur supersampling is always exactly one output frame - no
     /// need to measure elapsed time between calls.
     private let outputFrameInterval: TimeInterval
+    private let maximumBlurSamples: Int
 
     init(
         canvasSize: CGSize,
@@ -625,8 +655,10 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
         reframe: ReframeTrack? = nil,
         fitContentAspect: CGFloat? = nil,
         crop: CGRect = RecordingVideoCrop.unit,
-        masks: [RecordingMaskSegment] = []
+        masks: [RecordingMaskSegment] = [],
+        maximumBlurSamples: Int = 4
     ) {
+        self.maximumBlurSamples = max(1, maximumBlurSamples)
         self.canvasSize = canvasSize
         self.layout = RecordingStudioLayout.make(
             canvasSize: canvasSize,
@@ -646,7 +678,6 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
         self.reframe = reframe
         self.crop = crop
         self.masks = masks
-        self.maskContext = masks.isEmpty ? nil : CIContext(options: [.cacheIntermediates: false])
         self.outputFrameInterval = outputFrameInterval
         self.pointerScale = style.cursorScale
         self.colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
@@ -702,53 +733,65 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
             context.fill(CGRect(origin: .zero, size: canvasSize))
         }
 
-        if let screenImage = Self.makeImage(from: screenFrame, colorSpace: colorSpace) {
-            // Motion blur by temporal supersampling: while the virtual camera
-            // is moving, average several sub-frame camera states across the
-            // frame's shutter interval. Pans smear linearly, zooms radially,
-            // and settled frames pay for a single draw. The viewport timeline
-            // runs on the gapless output clock, so the shutter is always
-            // exactly one output frame - no per-call time tracking needed.
-            let shutter = outputFrameInterval
-            let sampleCount = blurSampleCount(at: editorTime, shutter: shutter)
-
-            context.saveGState()
-            context.addPath(roundedPath(for: layout.cardRect, radius: layout.cardCornerRadius))
-            context.clip()
-            for sample in 0..<sampleCount {
-                let sampleTime = editorTime - shutter / 2
-                    + shutter * (Double(sample) + 0.5) / Double(sampleCount)
-                let drawRect = contentRect(at: sampleTime)
-                // Drawing sample i at alpha 1/(i+1) keeps the buffer equal to
-                // the running average of all samples so far.
-                context.setAlpha(1 / CGFloat(sample + 1))
-                context.draw(screenImage, in: flipped(drawRect))
-
-            }
-            if let maskContext, !masks.isEmpty {
-                context.setAlpha(1)
-                let content = contentRect(at: editorTime)
-                let sourceImage = CIImage(cgImage: screenImage)
-                for segment in masks {
-                    guard segment.isActive(at: editorTime),
-                    let region = RecordingMaskRenderer.filteredRegion(
-                        source: sourceImage,
-                        segment: segment
-                    ),
-                    let regionImage = maskContext.createCGImage(region, from: region.extent) else {
-                        continue
-                    }
-                    let drawRect = CGRect(
-                        x: content.minX + segment.rect.minX * content.width,
-                        y: content.minY + segment.rect.minY * content.height,
-                        width: segment.rect.width * content.width,
-                        height: segment.rect.height * content.height
-                    )
-                    context.draw(regionImage, in: flipped(drawRect))
+        let sourceImage = CIImage(cvPixelBuffer: screenFrame)
+        let shutter = outputFrameInterval
+        let sampleCount = blurSampleCount(at: editorTime, shutter: shutter)
+        var averaged: CIImage?
+        for sample in 0..<sampleCount {
+            let sampleTime = editorTime - shutter / 2
+                + shutter * (Double(sample) + 0.5) / Double(sampleCount)
+            let rect = flipped(contentRect(at: sampleTime))
+            let transformed = sourceImage.transformed(by: CGAffineTransform(
+                a: rect.width / sourceImage.extent.width, b: 0,
+                c: 0, d: rect.height / sourceImage.extent.height,
+                tx: rect.minX, ty: rect.minY
+            ))
+            if let previous = averaged {
+                let opacity = CIFilter.colorMatrix()
+                opacity.inputImage = transformed
+                opacity.aVector = CIVector(x: 0, y: 0, z: 0, w: 1 / CGFloat(sample + 1))
+                guard let sampleImage = opacity.outputImage else {
+                    throw RecordingStudioExporter.ExportError.writerFailed(nil)
                 }
+                averaged = sampleImage.composited(over: previous)
+            } else {
+                averaged = transformed
             }
-            context.restoreGState()
         }
+        let cardRect = flipped(layout.cardRect).integral
+        guard let averaged, let screenImage = renderContext.createCGImage(
+            averaged, from: cardRect, format: .BGRA8, colorSpace: colorSpace
+        ) else {
+            throw RecordingStudioExporter.ExportError.writerFailed(nil)
+        }
+        context.saveGState()
+        context.addPath(roundedPath(for: layout.cardRect, radius: layout.cardCornerRadius))
+        context.clip()
+        // Scaling and temporal sampling happen together on the GPU. Quartz
+        // only copies the card-sized result and draws the small overlays.
+        context.draw(screenImage, in: cardRect)
+        if !masks.isEmpty {
+            context.setAlpha(1)
+            let content = contentRect(at: editorTime)
+            for segment in masks {
+                guard segment.isActive(at: editorTime) else { continue }
+                guard let region = RecordingMaskRenderer.filteredRegion(
+                    source: sourceImage,
+                    segment: segment
+                ),
+                let regionImage = renderContext.createCGImage(region, from: region.extent) else {
+                    throw RecordingStudioExporter.ExportError.writerFailed(nil)
+                }
+                let drawRect = CGRect(
+                    x: content.minX + segment.rect.minX * content.width,
+                    y: content.minY + segment.rect.minY * content.height,
+                    width: segment.rect.width * content.width,
+                    height: segment.rect.height * content.height
+                )
+                context.draw(regionImage, in: flipped(drawRect))
+            }
+        }
+        context.restoreGState()
 
         // Pointer motion is resolved independently from viewport shutter
         // blur. Its interaction magnification and tilt stay anchored at the
@@ -813,6 +856,7 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
     /// still, up to twenty-four when it sweeps, spaced so consecutive samples
     /// land roughly two output pixels apart.
     private func blurSampleCount(at editorTime: TimeInterval, shutter: TimeInterval) -> Int {
+        guard maximumBlurSamples > 1 else { return 1 }
         let a = contentRect(at: editorTime - shutter / 2)
         let b = contentRect(at: editorTime + shutter / 2)
         let displacement = max(
@@ -820,7 +864,7 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
             max(abs(a.maxX - b.maxX), abs(a.maxY - b.maxY))
         )
         guard displacement > 1.5 else { return 1 }
-        return min(24, max(2, Int((displacement / 2).rounded(.up))))
+        return min(maximumBlurSamples, max(2, Int((displacement / 2).rounded(.up))))
     }
 
     private func drawPointer(editorTime: TimeInterval, in context: CGContext) {
