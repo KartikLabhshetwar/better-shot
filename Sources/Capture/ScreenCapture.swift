@@ -13,7 +13,7 @@ final class ScreenCapture {
 
     // MARK: - Fullscreen 
 
-    func captureFullscreen() async throws -> URL? {
+    func captureFullscreen(on screen: NSScreen? = nil) async throws -> URL? {
         guard !isCapturing else { return nil }
         isCapturing = true
         defer { isCapturing = false }
@@ -21,7 +21,31 @@ final class ScreenCapture {
         try? await Task.sleep(for: .milliseconds(200))
 
         let tempPath = makeTempPath()
-        let success = await runScreencapture(["-x", "-t", "png", tempPath])
+        var args = ["-x", "-t", "png"]
+        // Without -D, screencapture always grabs the main display, regardless
+        // of which one is actually active -- so on a multi-monitor setup a
+        // capture triggered with the mouse on a secondary screen would
+        // silently save the wrong display's content while the preview card
+        // still showed up on the right one. Resolve the same screen the
+        // caller already picked (or fall back to the same follow-mouse /
+        // pinned-display resolution the preview card uses) and target it
+        // explicitly.
+        let targetDisplayID = screen.flatMap(ActiveDisplayResolver.displayID(for:))
+            ?? ActiveDisplayResolver.screenForScreenshotCapture().flatMap(ActiveDisplayResolver.displayID(for:))
+        if let targetDisplayID, let index = ActiveDisplayResolver.screencaptureDisplayIndex(for: targetDisplayID) {
+            args.append(contentsOf: ["-D", String(index)])
+        } else {
+            // Falling through here means screencapture grabs the main
+            // display regardless of which one was actually active -- the
+            // exact silent-wrong-display bug this whole fix exists to
+            // prevent. Only expected to happen in a narrow race (e.g. the
+            // target display disconnected between resolution and the sleep
+            // above), but it should be diagnosable if it does.
+            print("BetterShot: could not resolve target display for -D; screencapture will fall back to the main display")
+        }
+        args.append(tempPath)
+
+        let success = await runScreencapture(args)
         guard success, FileManager.default.fileExists(atPath: tempPath) else { return nil }
         return URL(fileURLWithPath: tempPath)
     }

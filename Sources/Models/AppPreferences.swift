@@ -12,6 +12,8 @@ enum AppPreferences {
     private static let overlayDismissDelayKey = "bs_overlayDismissDelay"
     private static let overlayCardSizeKey = "bs_overlayCardSize"
     private static let overlayEdgeMarginKey = "bs_overlayEdgeMargin"
+    private static let overlayFollowsMouseKey = "bs_overlayFollowsMouse"
+    private static let overlayPinnedDisplayIDKey = "bs_overlayPinnedDisplayID"
     private static let exportFormatKey = "bs_exportFormat"
     private static let exportQualityKey = "bs_exportQuality"
     private static let selfTimerKey = "bs_selfTimerDelay"
@@ -107,6 +109,23 @@ enum AppPreferences {
     static var overlayEdgeMargin: Double {
         get { UserDefaults.standard.object(forKey: overlayEdgeMarginKey) as? Double ?? overlayEdgeMarginDefault }
         set { UserDefaults.standard.set(newValue, forKey: overlayEdgeMarginKey) }
+    }
+
+    /// True (the default) shows the preview card on whichever display the
+    /// mouse is on. False pins it to `overlayPinnedDisplayID` instead.
+    static var overlayFollowsMouse: Bool {
+        get { UserDefaults.standard.object(forKey: overlayFollowsMouseKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: overlayFollowsMouseKey) }
+    }
+
+    /// The fixed display used when `overlayFollowsMouse` is false. 0 means
+    /// "none chosen yet" -- CGDirectDisplayID 0 is never a real display.
+    static var overlayPinnedDisplayID: CGDirectDisplayID? {
+        get {
+            let raw = UserDefaults.standard.integer(forKey: overlayPinnedDisplayIDKey)
+            return raw == 0 ? nil : CGDirectDisplayID(raw)
+        }
+        set { UserDefaults.standard.set(Int(newValue ?? 0), forKey: overlayPinnedDisplayIDKey) }
     }
 
     // MARK: - Export

@@ -15,6 +15,8 @@ final class PreviewOverlay {
     private var panel: NSPanel?
     private var dismissTasks: [URL: Task<Void, Never>] = [:]
     private var targetScreen: NSScreen?
+    private var mouseMovedGlobalMonitor: Any?
+    private var mouseMovedLocalMonitor: Any?
 
     var currentScreen: NSScreen? { targetScreen }
 
@@ -40,14 +42,25 @@ final class PreviewOverlay {
         }
         targetScreen = screen
 
-        if panel == nil {
-            createPanel()
-        }
+        // Always build a fresh panel rather than repositioning a reused
+        // one. A back-to-back capture (before the previous card's dismiss
+        // timer fires) used to reuse the existing NSPanel and just move it
+        // via setFrame -- moving an existing window between screens with
+        // different backing scale factors (Retina main vs. non-Retina
+        // externals) is a known AppKit trouble spot: it can repaint at the
+        // new position while its cached hit-testing state still points at
+        // the screen it was last shown on, so clicks land somewhere other
+        // than where the buttons are drawn. A panel created fresh on its
+        // final screen, before ever being ordered on-screen, never crosses
+        // that boundary.
+        teardownPanel()
+        createPanel()
 
         positionPanel()
         panel?.orderFront(nil)
 
         scheduleDismiss(for: url)
+        startMouseTrackingIfNeeded()
     }
 
     func remove(_ url: URL) {
@@ -65,8 +78,8 @@ final class PreviewOverlay {
         dismissTasks.values.forEach { $0.cancel() }
         dismissTasks.removeAll()
 
-        panel?.orderOut(nil)
-        panel = nil
+        stopMouseTracking()
+        teardownPanel()
         items.removeAll()
     }
 
@@ -109,6 +122,59 @@ final class PreviewOverlay {
         dismissTasks.removeValue(forKey: url)?.cancel()
     }
 
+    private func teardownPanel() {
+        panel?.orderOut(nil)
+        panel = nil
+    }
+
+    /// Keeps the card on whichever display the mouse is actually on, live,
+    /// for as long as it's showing -- not just at capture time. Only runs
+    /// when Settings > Capture > Preview Thumbnail is set to follow the
+    /// mouse rather than a pinned display; a pinned card should never move.
+    ///
+    /// A screen change always tears the panel down and rebuilds it (the
+    /// same thing show() does) rather than repositioning the existing one
+    /// via setFrame -- moving a live window across a scale-factor boundary
+    /// (Retina main vs. non-Retina externals) is exactly the bug that
+    /// motivated that fix in the first place, and doing it continuously as
+    /// the mouse crosses monitors would hit it far more often than a single
+    /// capture-time reposition ever did.
+    private func startMouseTrackingIfNeeded() {
+        stopMouseTracking()
+        guard AppPreferences.overlayFollowsMouse else { return }
+
+        mouseMovedGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] _ in
+            Task { @MainActor in self?.handleMouseMoved() }
+        }
+        mouseMovedLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
+            Task { @MainActor in self?.handleMouseMoved() }
+            return event
+        }
+    }
+
+    private func stopMouseTracking() {
+        if let monitor = mouseMovedGlobalMonitor {
+            NSEvent.removeMonitor(monitor)
+            mouseMovedGlobalMonitor = nil
+        }
+        if let monitor = mouseMovedLocalMonitor {
+            NSEvent.removeMonitor(monitor)
+            mouseMovedLocalMonitor = nil
+        }
+    }
+
+    private func handleMouseMoved() {
+        guard !items.isEmpty, AppPreferences.overlayFollowsMouse else { return }
+        guard let newScreen = ActiveDisplayResolver.activeScreen(preferPointer: true),
+              newScreen != targetScreen else { return }
+
+        targetScreen = newScreen
+        teardownPanel()
+        createPanel()
+        positionPanel()
+        panel?.orderFront(nil)
+    }
+
     // MARK: - Panel Setup
 
     func openAnnotateEditor(for url: URL) {
@@ -139,11 +205,13 @@ final class PreviewOverlay {
     }
 
     private func positionPanel() {
-        let mouseLocation = NSEvent.mouseLocation
-        let screen = targetScreen
-            ?? NSScreen.screens.first { $0.frame.contains(mouseLocation) }
-            ?? NSScreen.main
+        // An explicit target (the screen a capture actually happened on)
+        // always wins; only a nil target (re-showing a card with no capture
+        // context, e.g. from History) falls through to the same follow-mouse
+        // / pinned-display resolution a fresh capture would use.
+        let screen = targetScreen ?? ActiveDisplayResolver.screenForScreenshotCapture()
         guard let panel, let screen else { return }
+        targetScreen = screen // remember what we actually resolved, so live mouse-tracking can diff against it
 
         let screenFrame = screen.visibleFrame
         let panelSize = panelSize
@@ -236,11 +304,31 @@ struct PreviewCardView: View {
         Group {
             if let image = thumbnail {
                 ZStack {
+                    // onDrag/onTapGesture live on this base image, not on the
+                    // ZStack as a whole: the hover buttons below are siblings
+                    // drawn on top of it, and a drag-source recognizer
+                    // spanning the whole card (buttons included) beats a
+                    // physical mouse's tiny mouseDown-to-mouseUp jitter to
+                    // the punch, starting a native drag under the Copy/Save
+                    // buttons that snaps back on release — trackpad taps
+                    // don't have enough movement to trigger it, which is why
+                    // this only showed up with a mouse.
                     Image(nsImage: image)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(width: cardSize.width, height: cardSize.height)
                         .clipped()
+                        .onTapGesture {
+                            overlay.openAnnotateEditor(for: url)
+                        }
+                        .onDrag {
+                            DeckStaging.promote(url)
+                            if let provider = NSItemProvider(contentsOf: url) {
+                                provider.suggestedName = url.lastPathComponent
+                                return provider
+                            }
+                            return NSItemProvider(object: image)
+                        }
 
                     if isVideo {
                         Image(systemName: "play.circle.fill")
@@ -265,17 +353,6 @@ struct PreviewCardView: View {
                     withAnimation(.easeInOut(duration: 0.15)) {
                         isHovered = hovering
                     }
-                }
-                .onTapGesture {
-                    overlay.openAnnotateEditor(for: url)
-                }
-                .onDrag {
-                    DeckStaging.promote(url)
-                    if let provider = NSItemProvider(contentsOf: url) {
-                        provider.suggestedName = url.lastPathComponent
-                        return provider
-                    }
-                    return NSItemProvider(object: image)
                 }
             } else {
                 Color.clear.frame(width: cardSize.width, height: cardSize.height)
