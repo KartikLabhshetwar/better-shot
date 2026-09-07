@@ -81,7 +81,13 @@ final class PreviewOverlay {
     }
 
     func saveAll() {
+        let staged = items.filter { !Self.isVideo($0) && DeckStaging.isStaged($0) }
+        staged.forEach {
+            DeckStaging.promote($0)
+            remove($0)
+        }
         items.forEach(save)
+        showSavedToast(count: staged.count)
     }
 
     func save(_ url: URL) {
@@ -98,7 +104,7 @@ final class PreviewOverlay {
                     ToastWindow.shared.show(message: "Recording saved!", on: screen)
                 } catch {
                     ToastWindow.shared.show(
-                        title: "Save Failed",
+                        title: "Couldn't save recording",
                         message: error.localizedDescription,
                         systemIcon: "exclamationmark.triangle",
                         on: screen
