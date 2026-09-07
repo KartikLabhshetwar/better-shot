@@ -57,6 +57,8 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         return view.subviews.lazy.compactMap { segmentedControl(in: $0) }.first
     }
     let tabs = segmentedControl(in: tabHost)!
+    precondition(tabs.selectedSegmentBezelColor == StudioChrome.accentNSColor,
+                 "Inspector selection must use the landing page brand color")
     for (index, tab) in StudioInspectorTab.allCases.enumerated() {
         precondition(tabs.toolTip(forSegment: index)?.contains(tab.title) == true,
                      "Every inspector segment needs a native tooltip")
@@ -84,6 +86,13 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     let output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         .appendingPathComponent(".build/editor-snapshots")
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+    var effectToggle = StudioEffectToggleState()
+    precondition(effectToggle.amount(enabled: true, current: 0, defaultValue: 0.45) == 0.45)
+    precondition(effectToggle.amount(enabled: false, current: 0.75, defaultValue: 0.45) == 0)
+    precondition(effectToggle.amount(enabled: true, current: 0, defaultValue: 0.45) == 0.75)
+    precondition(effectToggle.amount(enabled: false, current: 0, defaultValue: 0.45) == 0)
+    precondition(effectToggle.amount(enabled: true, current: 0, defaultValue: 0.45) == 0.75)
+    print("PASS effect toggle defaults and previous amount restoration")
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
         try snapshot(
@@ -97,6 +106,13 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
                  scheme: .light, width: 980, to: output.appendingPathComponent("image-compact.png"))
     try snapshot(RecordingStudioContent(model: videoModel),
                  scheme: .light, width: 1100, to: output.appendingPathComponent("video-compact.png"))
+    videoModel.selectedCueID = nil
+    videoModel.selectedClipID = nil
+    for scheme in [ColorScheme.light, .dark] {
+        let name = scheme == .light ? "light" : "dark"
+        try snapshot(RecordingStudioContent(model: videoModel), scheme: scheme, width: 1100,
+                     to: output.appendingPathComponent("video-effects-\(name).png"))
+    }
     print("PASS editor zoom bounds, fit, and light/dark view snapshots: \(output.path)")
 }
 
@@ -111,7 +127,13 @@ private func snapshot<V: View>(
         .frame(width: width, height: 800))
     hosting.appearance = app.appearance
     hosting.frame = NSRect(x: 0, y: 0, width: width, height: 800)
+    let window = NSWindow(contentRect: hosting.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    window.appearance = app.appearance
+    window.contentView = hosting
+    defer { window.contentView = nil; window.close() }
     hosting.layoutSubtreeIfNeeded()
+    window.displayIfNeeded()
     guard let bitmap = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else {
         preconditionFailure("Editor failed to render")
     }

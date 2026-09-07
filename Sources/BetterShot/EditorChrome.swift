@@ -1,4 +1,24 @@
+import AppKit
 import SwiftUI
+
+/// Matches bettershot-landing/app/globals.css --color-brand. Scoped to the video editor.
+enum StudioChrome {
+    static let accentNSColor = NSColor(annoHex: "#7c3aed")
+    static let accent = Color(nsColor: accentNSColor)
+}
+
+private struct StudioGlassSurface: ViewModifier {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    func body(content: Content) -> some View {
+        if reduceTransparency {
+            content.background(EditorChrome.panel, in: RoundedRectangle(cornerRadius: 16))
+                .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(EditorChrome.border) }
+        } else {
+            content.glassEffect(.regular, in: .rect(cornerRadius: 16))
+        }
+    }
+}
 
 /// Shared editor chrome built on native controls; rendering stays in the existing canvases.
 enum EditorChrome {
@@ -58,6 +78,13 @@ struct EditorPopover<Content: View>: View {
 }
 
 extension View {
+    func studioGlass() -> some View { modifier(StudioGlassSurface()) }
+
+    func studioEffectCard() -> some View {
+        background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(EditorChrome.border) }
+    }
+
     func editorPanel() -> some View {
         background(EditorChrome.panel)
             .clipShape(RoundedRectangle(cornerRadius: 12))

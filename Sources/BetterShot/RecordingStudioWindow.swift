@@ -73,7 +73,7 @@ struct RecordingStudioContent: View {
                 if isInspectorPresented {
                     StudioInspector(model: model)
                         .frame(width: 360)
-                        .editorPanel()
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
             }
 
@@ -84,6 +84,8 @@ struct RecordingStudioContent: View {
         }
         .padding(8)
         .background(EditorChrome.workspace)
+        .tint(StudioChrome.accent)
+        .accentColor(StudioChrome.accent)
         .frame(minWidth: 1100, minHeight: 720)
         .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
         .toolbar {
@@ -1247,6 +1249,9 @@ private struct StudioTimelineEditor: View {
     var body: some View {
         VStack(spacing: StudioTimelineMetrics.rowSpacing) {
             transport
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .studioGlass()
             lanes
         }
         .padding(.horizontal, 16)
@@ -2555,7 +2560,6 @@ private extension ZoomAnchorMode {
 
 private enum StudioInspectorSection: Hashable {
     case background
-    case layout
     case motion
     case cursor
     case keystrokes
@@ -2584,7 +2588,7 @@ private struct StudioInspector: View {
     @State private var wallpaperStore = AnnotationWallpaperStore.shared
     @State private var stylePresetStore = RecordingStudioStylePresetStore.shared
     @State private var expandedSections: Set<StudioInspectorSection> = [
-        .background, .layout, .motion, .cursor, .keystrokes, .transcription, .camera, .audio
+        .background, .motion, .cursor, .keystrokes, .transcription, .camera, .audio
     ]
     @State private var transcriptTab: StudioTranscriptTab = .captions
     @Environment(\.colorScheme) private var colorScheme
@@ -2595,10 +2599,11 @@ private struct StudioInspector: View {
         VStack(spacing: 0) {
             inspectorHeader
             ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 10) {
                     if selectedTab == .background {
-                        InspectorDisclosureSection(
+                        StudioEffectSection(
                             title: "Background",
+                            systemImage: "photo",
                             isExpanded: expansionBinding(for: .background),
                             accessory: {
                                 if model.style.background != .none {
@@ -2611,21 +2616,15 @@ private struct StudioInspector: View {
                             backgroundControls
                         }
 
-                        InspectorDisclosureSection(
-                            title: "Layout",
-                            isExpanded: expansionBinding(for: .layout),
-                            accessory: {
-                                if !usesDefaultLayout {
-                                    InspectorClearButton(help: "Reset layout") {
-                                        model.style.padding = 0.06
-                                        model.style.cornerRadius = 0.02
-                                        model.style.shadow = 0.45
-                                    }
-                                }
-                            }
-                        ) {
-                            layoutControls
-                        }
+                        StudioAmountEffect(title: "Padding", systemImage: "rectangle.inset.filled",
+                            value: $model.style.padding, range: 0...0.18, defaultValue: 0.06,
+                            presets: [0, 0.04, 0.08, 0.12, 0.18])
+                        StudioAmountEffect(title: "Rounded Corners", systemImage: "rectangle.roundedtop",
+                            value: $model.style.cornerRadius, range: 0...0.08, defaultValue: 0.02,
+                            presets: [0, 0.01, 0.02, 0.04, 0.08])
+                        StudioAmountEffect(title: "Shadow", systemImage: "square.3.layers.3d",
+                            value: $model.style.shadow, range: 0...1, defaultValue: 0.45,
+                            presets: [0, 0.25, 0.45, 0.75, 1])
 
                     }
 
@@ -2654,16 +2653,17 @@ private struct StudioInspector: View {
                             ) {
                                 selectedZoomControls(for: selected)
                             }
-                            InspectorSectionDivider()
+                            .studioEffectCard()
                         } else if let selectedClip = model.selectedClip {
                             InspectorSection("Selected Clip") {
                                 selectedClipControls(for: selectedClip)
                             }
-                            InspectorSectionDivider()
+                            .studioEffectCard()
                         }
 
-                        InspectorDisclosureSection(
+                        StudioEffectSection(
                             title: "Zoom & Clicks",
+                            systemImage: "plus.magnifyingglass",
                             isExpanded: expansionBinding(for: .motion),
                             accessory: {
                                 Toggle("Enable zooms", isOn: $model.zoomEnabled)
@@ -2678,8 +2678,9 @@ private struct StudioInspector: View {
                     }
 
                     if selectedTab == .cursor {
-                        InspectorDisclosureSection(
+                        StudioEffectSection(
                             title: "Cursor",
+                            systemImage: "cursorarrow",
                             isExpanded: expansionBinding(for: .cursor),
                             accessory: {
                                 if model.style.cursorScale != RecordingStudioStyle.defaultCursorScale {
@@ -2694,8 +2695,9 @@ private struct StudioInspector: View {
                     }
 
                     if selectedTab == .keyboard {
-                        InspectorDisclosureSection(
+                        StudioEffectSection(
                             title: "Keystrokes",
+                            systemImage: "keyboard",
                             isExpanded: expansionBinding(for: .keystrokes),
                             accessory: {
                                 Toggle("Show keystrokes", isOn: $model.showsKeystrokes)
@@ -2709,8 +2711,9 @@ private struct StudioInspector: View {
                     }
 
                     if selectedTab == .captions {
-                        InspectorDisclosureSection(
+                        StudioEffectSection(
                             title: "Transcription",
+                            systemImage: "captions.bubble",
                             isExpanded: expansionBinding(for: .transcription),
                             accessory: {
                                 if model.hasSubtitles {
@@ -2746,8 +2749,9 @@ private struct StudioInspector: View {
                     }
 
                     if selectedTab == .camera {
-                        InspectorDisclosureSection(
+                        StudioEffectSection(
                             title: "Camera",
+                            systemImage: "web.camera",
                             isExpanded: expansionBinding(for: .camera),
                             accessory: {
                                 Toggle("Show camera", isOn: $model.style.camera.isVisible)
@@ -2761,8 +2765,9 @@ private struct StudioInspector: View {
                     }
 
                     if selectedTab == .audio {
-                        InspectorDisclosureSection(
+                        StudioEffectSection(
                             title: "Audio",
+                            systemImage: "speaker.wave.2",
                             isExpanded: expansionBinding(for: .audio),
                             accessory: {
                                 if model.replacementAudio != nil {
@@ -2781,12 +2786,13 @@ private struct StudioInspector: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
+                .padding(12)
                 .padding(.bottom, PreviewPeekTab.pillHeight * 1.1)
             }
             .scrollContentBackground(.hidden)
             .scrollEdgeEffectSoftIfAvailable()
         }
-        .background(sidebarBackground)
+        .background(.thinMaterial)
         .frame(minWidth: 260, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task {
             await wallpaperStore.reload()
@@ -2799,14 +2805,41 @@ private struct StudioInspector: View {
         }
     }
 
+    private var effectActions: some View {
+        HStack(spacing: 8) {
+            Button { model.beginVideoCrop() } label: {
+                Label("Crop", systemImage: "crop")
+                    .foregroundStyle(Color(nsColor: .labelColor))
+                    .frame(maxWidth: .infinity)
+            }
+            .help("Crop the recording on the canvas")
+            Button { model.beginMaskEditing() } label: {
+                Label("Censor", systemImage: "eye.slash")
+                    .foregroundStyle(Color(nsColor: .labelColor))
+                    .frame(maxWidth: .infinity)
+            }
+            .help("Blur or pixelate part of the recording")
+        }
+        .buttonStyle(.glass)
+        .controlSize(.large)
+        .disabled(!model.isLoaded)
+        .padding(.horizontal, 12)
+    }
+
     private var inspectorHeader: some View {
         VStack(spacing: 0) {
-            StudioInspectorTabs(selection: $selectedTab, isAvailable: isAvailable)
-                .frame(height: 36)
-                .padding(12)
-            Divider()
+            GlassEffectContainer(spacing: 8) {
+                VStack(spacing: 0) {
+                    StudioInspectorTabs(selection: $selectedTab, isAvailable: isAvailable)
+                        .frame(height: 36)
+                        .padding(8)
+                        .studioGlass()
+                        .padding(12)
+                    effectActions
+                }
+            }
             HStack {
-                Text(selectedTab.title).font(.headline)
+                Text(selectedTab.title).font(.system(size: 13, weight: .semibold))
                 Spacer()
             }
             .padding(16)
@@ -2818,7 +2851,6 @@ private struct StudioInspector: View {
                 .fill(Color(nsColor: .separatorColor).opacity(0.45))
                 .frame(height: 0.5)
         }
-        .background(sidebarBackground)
     }
 
     private func isAvailable(_ tab: StudioInspectorTab) -> Bool {
@@ -2962,31 +2994,6 @@ private struct StudioInspector: View {
         }
     }
 
-    // MARK: Layout
-
-    private var layoutControls: some View {
-        VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
-            InspectorSlider(
-                "Padding",
-                value: $model.style.padding,
-                range: 0...0.18,
-                format: .percent()
-            )
-            InspectorSlider(
-                "Corners",
-                value: $model.style.cornerRadius,
-                range: 0...0.08,
-                format: .percent()
-            )
-            InspectorSlider(
-                "Shadow",
-                value: $model.style.shadow,
-                range: 0...1,
-                format: .percent()
-            )
-        }
-    }
-
     // MARK: Zoom
 
     private var zoomControls: some View {
@@ -3109,7 +3116,7 @@ private struct StudioInspector: View {
                     model.updateZoomCue(updated)
                 }
             } else {
-                InspectorSlider(
+                StudioEffectSlider(
                     "Edge in Frame",
                     value: Binding(
                         get: { CGFloat(selected.boundsBias) },
@@ -3147,7 +3154,7 @@ private struct StudioInspector: View {
 
     private func selectedClipControls(for clip: RecordingClipSegment) -> some View {
         VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
-            InspectorSlider(
+            StudioEffectSlider(
                 "Speed",
                 value: Binding(
                     get: { CGFloat(clip.speed) },
@@ -3170,7 +3177,7 @@ private struct StudioInspector: View {
 
     private var cursorControls: some View {
         VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
-            InspectorSlider(
+            StudioEffectSlider(
                 "Size",
                 value: $model.style.cursorScale,
                 range: 1...4,
@@ -3293,7 +3300,7 @@ private struct StudioInspector: View {
         let verticalRange = SubtitleBarStyle.verticalRange
         let fontScaleRange = SubtitleBarStyle.fontScaleRange
         return VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
-            InspectorSlider(
+            StudioEffectSlider(
                 "Position",
                 value: Binding(
                     get: { CGFloat(model.subtitleStyle.verticalPosition) },
@@ -3303,7 +3310,7 @@ private struct StudioInspector: View {
                 format: .percent()
             )
 
-            InspectorSlider(
+            StudioEffectSlider(
                 "Text Size",
                 value: Binding(
                     get: { CGFloat(model.subtitleStyle.fontScale) },
@@ -3424,13 +3431,13 @@ private struct StudioInspector: View {
 
     private var cameraControls: some View {
         VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
-            InspectorSlider(
+            StudioEffectSlider(
                 "Size",
                 value: $model.style.camera.size,
                 range: 0.12...0.45,
                 format: .percent()
             )
-            InspectorSlider(
+            StudioEffectSlider(
                 "Rounding",
                 value: $model.style.camera.roundness,
                 range: 0.05...0.5,
@@ -3612,16 +3619,6 @@ private struct StudioInspector: View {
     private static func spanText(_ seconds: TimeInterval) -> String {
         let value = max(0, seconds)
         return value < 60 ? String(format: "%.1fs", value) : clockText(value)
-    }
-
-    private var usesDefaultLayout: Bool {
-        abs(model.style.padding - 0.06) < 0.0001
-            && abs(model.style.cornerRadius - 0.02) < 0.0001
-            && abs(model.style.shadow - 0.45) < 0.0001
-    }
-
-    private var sidebarBackground: Color {
-        InspectorControlPalette.panelBackground(for: colorScheme)
     }
 
     private func expansionBinding(for section: StudioInspectorSection) -> Binding<Bool> {

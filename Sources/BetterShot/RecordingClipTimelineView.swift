@@ -805,7 +805,7 @@ final class RecordingClipTimelineControl: NSView {
         let time = snapped ?? hoverTime
         let isSnapped = allowSnap && snapped == playheadTime && hoverTime != playheadTime
         let x = xPosition(for: time)
-        NSColor.controlAccentColor.withAlphaComponent(isSnapped ? 0.85 : 0.42).setFill()
+        StudioChrome.accentNSColor.withAlphaComponent(isSnapped ? 0.85 : 0.42).setFill()
         CGRect(x: x - 0.5, y: timelineRect.minY, width: 1, height: timelineRect.height).fill()
     }
 

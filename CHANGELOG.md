@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Branded video editor**: Replaced the system-blue editor accent with the landing page's violet (`#7C3AED`), including native inspector tabs and timeline feedback.
+- **Glass editor controls**: Native Liquid Glass groups the inspector navigation and playback controls, with material-backed effect cards and a solid fallback for reduced transparency.
+- **Consistent video effects**: Background, camera, cursor, keystrokes, captions, audio, and zoom use matching expandable cards. Effect amounts have visible sliders and editable values; padding, rounded corners, and shadow gain toggles that remember their amounts and quick presets. Crop and Censor are available directly in the inspector.
 - **Cap timeline interactions**: Timeline navigation now uses Cap's seconds-visible transform, 10% zoom steps, playhead/pointer anchoring, matching ruler intervals, and a minimap with draggable zoom handles. Pinch and modifier-scroll work across every track.
 - **Cap zoom workflow**: Hover over blank Zoom-track space to preview a segment, click to add it, or drag to set its duration. Blocks show Auto/Manual mode and amount; moving and resizing stop at neighboring blocks, and double-clicking an edge extends it to the next boundary. The inspector adds zoom amount presets and grouped amount edits for undo.
 - **Split tool**: Press S or select the scissors tool, then click the video track to split at that point. Track labels distinguish Video, Zoom, and Masks.
