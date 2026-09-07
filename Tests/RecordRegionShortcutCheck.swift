@@ -47,6 +47,6 @@ struct RecordRegionShortcutCheck {
         let data = try JSONEncoder().encode(rebound)
         let decoded = try JSONDecoder().decode(ShortcutService.Shortcut.self, from: data)
         assert(decoded == rebound)
-        print("RecordRegionShortcutCheck: отдельная команда, безопасные значения по умолчанию и переназначение проверены")
+        print("RecordRegionShortcutCheck: separate action, safe defaults, and rebinding verified")
     }
 }
