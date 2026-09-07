@@ -1313,6 +1313,8 @@ private struct StudioTimelineEditor: View {
             }
             .onChange(of: proxy.size.width, initial: true) { _, width in
                 viewportWidth = max(width, 1)
+                viewport.updateZoom(viewport.visibleSeconds, origin: viewport.position,
+                                    duration: model.duration, viewportWidth: Double(viewportWidth))
                 syncScroll()
             }
         }
@@ -1334,7 +1336,10 @@ private struct StudioTimelineEditor: View {
         .frame(height: StudioTimelineMetrics.lanesHeight(showsMaskLane: model.showsMaskLane))
         .onChange(of: model.duration, initial: true) { old, duration in
             if old == 0 || old == duration { viewport.fit(duration: duration) }
-            else { viewport.updateZoom(viewport.visibleSeconds, origin: viewport.position, duration: duration) }
+            else {
+                viewport.updateZoom(viewport.visibleSeconds, origin: viewport.position,
+                                    duration: duration, viewportWidth: Double(viewportWidth))
+            }
             syncScroll()
         }
         .onChange(of: model.currentTime) { _, time in followPlayhead(to: time) }
@@ -1483,7 +1488,7 @@ private struct StudioTimelineEditor: View {
     // Cap stores the left edge and visible span in seconds. All inputs use this transform.
     private func updateZoom(_ seconds: Double, origin: Double) {
         model.timelineThumbnails.deferSampling()
-        viewport.updateZoom(seconds, origin: origin, duration: model.duration)
+        viewport.updateZoom(seconds, origin: origin, duration: model.duration, viewportWidth: Double(viewportWidth))
         syncScroll()
     }
 
@@ -1504,23 +1509,29 @@ private struct StudioTimelineEditor: View {
     private var zoomControls: some View {
         HStack(spacing: 4) {
             timelineButton("Zoom Out (⌘−)", systemImage: "minus.magnifyingglass") {
-                updateZoom(viewport.visibleSeconds * 1.1, origin: model.currentTime)
+                updateZoom(viewport.visibleSeconds * 1.6, origin: buttonZoomAnchor)
             }
             .keyboardShortcut("-", modifiers: .command)
             .disabled(viewport.visibleSeconds >= RecordingTimelineViewport.zoomOutLimit(duration: model.duration))
 
             timelineButton("Zoom In (⌘+)", systemImage: "plus.magnifyingglass") {
-                updateZoom(viewport.visibleSeconds / 1.1, origin: model.currentTime)
+                updateZoom(viewport.visibleSeconds / 1.6, origin: buttonZoomAnchor)
             }
             .keyboardShortcut("=", modifiers: .command)
-            .disabled(viewport.visibleSeconds <= 3)
+            .disabled(model.duration <= 0 || viewport.visibleSeconds <=
+                      RecordingTimelineViewport.zoomInLimit(duration: model.duration, viewportWidth: Double(viewportWidth)))
 
             Slider(value: Binding(
-                get: { 1 - viewport.visibleSeconds / RecordingTimelineViewport.zoomOutLimit(duration: model.duration) },
-                set: { updateZoom((1 - $0) * RecordingTimelineViewport.zoomOutLimit(duration: model.duration), origin: model.currentTime) }
+                get: { viewport.zoomProgress(duration: model.duration, viewportWidth: Double(viewportWidth)) },
+                set: {
+                    model.timelineThumbnails.deferSampling()
+                    viewport.updateZoomProgress($0, origin: buttonZoomAnchor, duration: model.duration,
+                                                viewportWidth: Double(viewportWidth))
+                    syncScroll()
+                }
             ), in: 0...1)
             .frame(width: 96)
-            .disabled(model.duration <= 3)
+            .disabled(model.duration <= 0)
             .accessibilityLabel("Timeline zoom")
             .accessibilityValue("\(viewport.visibleSeconds.formatted(.number.precision(.fractionLength(1)))) seconds visible")
             .help("\(viewport.visibleSeconds.formatted(.number.precision(.fractionLength(1)))) seconds visible — pinch or ⌘-scroll to zoom")
@@ -1532,17 +1543,58 @@ private struct StudioTimelineEditor: View {
             .buttonStyle(EditorButtonStyle())
             .keyboardShortcut("0", modifiers: .command)
             .help("Fit timeline (⌘0)")
-            Spacer(minLength: 0)
         }
     }
 
+    private var buttonZoomAnchor: Double {
+        let end = viewport.position + viewport.visibleSeconds
+        return (viewport.position...end).contains(model.currentTime)
+            ? model.currentTime : viewport.position + viewport.visibleSeconds / 2
+    }
+
     private var transport: some View {
-        ZStack {
+        HStack(spacing: 12) {
             zoomControls
+            Spacer(minLength: 12)
+            HStack(spacing: 10) {
+                Text(studioPreciseTimecode(model.displayTime))
+                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(.primary.opacity(0.9))
 
+                HStack(spacing: 2) {
+                    timelineButton("Back to Start", systemImage: "backward.end.fill") {
+                        model.pause()
+                        model.seek(to: 0)
+                    }
+
+                    Button {
+                        model.togglePlayback()
+                    } label: {
+                        Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.primary.opacity(0.85))
+                            .frame(width: 30, height: 30)
+                            .background(Circle().fill(Color.primary.opacity(0.07)))
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut(.space, modifiers: [])
+                    .help(model.isPlaying ? "Pause" : "Play")
+                    .accessibilityLabel(model.isPlaying ? "Pause" : "Play")
+                    .disabled(!model.isLoaded)
+
+                    timelineButton("Skip to End", systemImage: "forward.end.fill") {
+                        model.pause()
+                        model.seek(to: model.duration)
+                    }
+                }
+
+                Text(studioPreciseTimecode(model.duration))
+                    .font(.system(size: 12, weight: .medium).monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 12)
             HStack(spacing: 2) {
-                Spacer(minLength: 0)
-
                 Toggle(isOn: $isSplitting) {
                     Label("Split", systemImage: "scissors").labelStyle(.iconOnly)
                 }
@@ -1591,44 +1643,6 @@ private struct StudioTimelineEditor: View {
                 .disabled(RecordingTimelineViewport.newZoomRange(at: model.currentTime,
                     secondsPerPoint: scale.secondsPerPoint, duration: model.duration,
                     occupied: model.zoomTimelineBlocks.map { $0.editorStart...$0.editorEnd }) == nil)
-            }
-
-            HStack(spacing: 10) {
-                Text(studioPreciseTimecode(model.displayTime))
-                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(.primary.opacity(0.9))
-
-                HStack(spacing: 2) {
-                    timelineButton("Back to Start", systemImage: "backward.end.fill") {
-                        model.pause()
-                        model.seek(to: 0)
-                    }
-
-                    Button {
-                        model.togglePlayback()
-                    } label: {
-                        Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(.primary.opacity(0.85))
-                            .frame(width: 30, height: 30)
-                            .background(Circle().fill(Color.primary.opacity(0.07)))
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .keyboardShortcut(.space, modifiers: [])
-                    .help(model.isPlaying ? "Pause" : "Play")
-                    .accessibilityLabel(model.isPlaying ? "Pause" : "Play")
-                    .disabled(!model.isLoaded)
-
-                    timelineButton("Skip to End", systemImage: "forward.end.fill") {
-                        model.pause()
-                        model.seek(to: model.duration)
-                    }
-                }
-
-                Text(studioPreciseTimecode(model.duration))
-                    .font(.system(size: 12, weight: .medium).monospacedDigit())
-                    .foregroundStyle(.secondary)
             }
         }
         .frame(height: 32)
@@ -1909,7 +1923,8 @@ private struct StudioTimelineRuler: View {
             guard duration > 0.2, pointsPerSecond > 0, size.width > 60 else { return }
 
             let visibleSeconds = Double(size.width / pointsPerSecond)
-            let step = [0.5, 1, 2.5, 5, 10, 30].first { visibleSeconds / $0 <= 20 } ?? 30
+            let step = [0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300, 600, 1800, 3600]
+                .first { visibleSeconds / $0 <= 20 } ?? ceil(visibleSeconds / 20)
             let startTime = max(0, Double(scrollX / pointsPerSecond))
             let endTime = min(duration, Double((scrollX + size.width) / pointsPerSecond))
             let endpointLabel = Self.label(for: duration, step: step)
@@ -1995,7 +2010,8 @@ private struct StudioTimelineRuler: View {
     }
 
     private static func label(for time: Double, step: Double) -> String {
-        step < 1 ? studioPreciseTimecode(time) : studioTimecode(time)
+        if step < 0.1 { return String(format: "%.2fs", time) }
+        return step < 1 ? studioPreciseTimecode(time) : studioTimecode(time)
     }
 }
 
@@ -2809,18 +2825,18 @@ private struct StudioInspector: View {
         HStack(spacing: 8) {
             Button { model.beginVideoCrop() } label: {
                 Label("Crop", systemImage: "crop")
-                    .foregroundStyle(Color(nsColor: .labelColor))
+                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
             }
             .help("Crop the recording on the canvas")
             Button { model.beginMaskEditing() } label: {
                 Label("Censor", systemImage: "eye.slash")
-                    .foregroundStyle(Color(nsColor: .labelColor))
+                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
             }
             .help("Blur or pixelate part of the recording")
         }
-        .buttonStyle(.glass)
+        .buttonStyle(.glassProminent)
         .controlSize(.large)
         .disabled(!model.isLoaded)
         .padding(.horizontal, 12)

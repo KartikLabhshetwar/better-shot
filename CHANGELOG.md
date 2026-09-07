@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Crop and Censor use white labels on brand-colored glass buttons, fixing their low contrast in light mode.
+- Timeline zoom works on short recordings again. Zoom buttons use the earlier 1.6× steps, the slider reaches both limits, Fit shows the full recording, and playback controls no longer overlap the zoom controls. The native 100,000-point lane-width cap is retained.
 - Video inspector tabs now use native per-segment tooltips, including explanations for unavailable camera, cursor, keystroke, and caption controls.
 - Adding a zoom to an imported recording enables zoom playback so the new segment can be edited and previewed immediately.
 
@@ -17,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Branded video editor**: Replaced the system-blue editor accent with the landing page's violet (`#7C3AED`), including native inspector tabs and timeline feedback.
 - **Glass editor controls**: Native Liquid Glass groups the inspector navigation and playback controls, with material-backed effect cards and a solid fallback for reduced transparency.
 - **Consistent video effects**: Background, camera, cursor, keystrokes, captions, audio, and zoom use matching expandable cards. Effect amounts have visible sliders and editable values; padding, rounded corners, and shadow gain toggles that remember their amounts and quick presets. Crop and Censor are available directly in the inspector.
-- **Cap timeline interactions**: Timeline navigation now uses Cap's seconds-visible transform, 10% zoom steps, playhead/pointer anchoring, matching ruler intervals, and a minimap with draggable zoom handles. Pinch and modifier-scroll work across every track.
+- **Cap timeline interactions**: Timeline navigation uses Cap's seconds-visible transform, playhead/pointer anchoring, adaptive ruler intervals, and a minimap with draggable zoom handles. Pinch and modifier-scroll work across every track.
 - **Cap zoom workflow**: Hover over blank Zoom-track space to preview a segment, click to add it, or drag to set its duration. Blocks show Auto/Manual mode and amount; moving and resizing stop at neighboring blocks, and double-clicking an edge extends it to the next boundary. The inspector adds zoom amount presets and grouped amount edits for undo.
 - **Split tool**: Press S or select the scissors tool, then click the video track to split at that point. Track labels distinguish Video, Zoom, and Masks.
 

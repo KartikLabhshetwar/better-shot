@@ -20,9 +20,26 @@ struct RecordingTimelineInteractionCheck {
         viewport.updateZoom(.nan, origin: 0, duration: 120)
         assert(viewport == valid)
         viewport.fit(duration: 3600)
-        assert(viewport.visibleSeconds == 600, "Long recordings open at Cap's ten-minute overview")
+        assert(viewport.visibleSeconds == 3600, "Fit must show the entire recording")
+        viewport.updateZoom(0, origin: 1800, duration: 3600, viewportWidth: 1000)
+        assert(viewport.visibleSeconds == 36, "Long recordings must retain the native lane-width cap")
+        assert(3600 / viewport.visibleSeconds * 1000 <= RecordingTimelineViewport.maximumContentWidth)
         viewport.fit(duration: 2)
-        assert(viewport.visibleSeconds == 3 && viewport.position == 0)
+        assert(viewport.visibleSeconds == 2 && viewport.position == 0)
+        viewport.updateZoom(2 / 1.6, origin: 1, duration: 2, viewportWidth: 1000)
+        assert(viewport.visibleSeconds == 1.25 && viewport.position == 0.375,
+               "A short clip must zoom in and keep its midpoint anchored")
+        viewport.updateZoom(viewport.visibleSeconds * 1.6, origin: 1, duration: 2, viewportWidth: 1000)
+        assert(viewport.visibleSeconds == 2 && viewport.position == 0, "Zoom out must return to Fit")
+        viewport.updateZoomProgress(1, origin: 1, duration: 2, viewportWidth: 1000)
+        assert(viewport.visibleSeconds == 0.125 && viewport.zoomProgress(duration: 2, viewportWidth: 1000) == 1)
+        viewport.updateZoomProgress(0.5, origin: 1, duration: 2, viewportWidth: 1000)
+        assert(viewport.visibleSeconds == 0.5 && viewport.zoomProgress(duration: 2, viewportWidth: 1000) == 0.5)
+        viewport.updateZoomProgress(0, origin: 1, duration: 2, viewportWidth: 1000)
+        assert(viewport.visibleSeconds == 2 && viewport.position == 0, "Both slider endpoints must be reachable")
+        viewport.fit(duration: 0.25)
+        viewport.updateZoom(0, origin: 0, duration: 0.25, viewportWidth: 1000)
+        assert(viewport.visibleSeconds == 0.25 / 16, "Subsecond clips must also zoom")
 
         let occupied = [2.0...4.0, 7.0...9.0]
         func range(_ at: Double, end: Double? = nil, scale: Double = 0.01) -> ClosedRange<Double>? {

@@ -6,19 +6,43 @@ nonisolated struct RecordingTimelineViewport: Equatable {
     private(set) var visibleSeconds: Double = 3
     private(set) var position: Double = 0
 
-    static func zoomOutLimit(duration: Double) -> Double { max(3, min(max(0, duration), 600)) }
+    static let maximumContentWidth: Double = 100_000
+
+    static func zoomOutLimit(duration: Double) -> Double { max(1.0 / 60, duration) }
+
+    static func zoomInLimit(duration: Double, viewportWidth: Double) -> Double {
+        let fitted = zoomOutLimit(duration: duration)
+        // Short recordings still get 16× magnification. Keep the earlier native lane-width cap.
+        return min(fitted, max(min(3, fitted / 16), fitted * max(viewportWidth, 1) / maximumContentWidth))
+    }
 
     mutating func fit(duration: Double) {
         visibleSeconds = Self.zoomOutLimit(duration: duration)
         position = 0
     }
 
-    mutating func updateZoom(_ seconds: Double, origin: Double, duration: Double) {
+    mutating func updateZoom(_ seconds: Double, origin: Double, duration: Double, viewportWidth: Double = 1) {
         guard seconds.isFinite, origin.isFinite, duration.isFinite else { return }
-        let next = min(max(seconds, 3), Self.zoomOutLimit(duration: duration))
+        let next = min(max(seconds, Self.zoomInLimit(duration: duration, viewportWidth: viewportWidth)),
+                       Self.zoomOutLimit(duration: duration))
         let fraction = min(max((origin - position) / visibleSeconds, 0), 1)
         visibleSeconds = next
         setPosition(origin - next * fraction, duration: duration)
+    }
+
+    func zoomProgress(duration: Double, viewportWidth: Double) -> Double {
+        let maximum = Self.zoomOutLimit(duration: duration)
+        let minimum = Self.zoomInLimit(duration: duration, viewportWidth: viewportWidth)
+        guard maximum > minimum else { return 0 }
+        return min(max(log(maximum / visibleSeconds) / log(maximum / minimum), 0), 1)
+    }
+
+    mutating func updateZoomProgress(_ progress: Double, origin: Double, duration: Double, viewportWidth: Double) {
+        guard progress.isFinite else { return }
+        let maximum = Self.zoomOutLimit(duration: duration)
+        let minimum = Self.zoomInLimit(duration: duration, viewportWidth: viewportWidth)
+        let seconds = maximum * pow(minimum / maximum, min(max(progress, 0), 1))
+        updateZoom(seconds, origin: origin, duration: duration, viewportWidth: viewportWidth)
     }
 
     mutating func setPosition(_ seconds: Double, duration: Double) {
