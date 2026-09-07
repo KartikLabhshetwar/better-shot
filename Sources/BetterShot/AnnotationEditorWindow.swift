@@ -714,7 +714,11 @@ struct AnnotationEditorWindow: View {
         }
 
         if updatingExport, let exportURL {
-            try ScreenshotFileActions.replaceExistingExport(from: resultURL, at: exportURL)
+            let compressionQuality = BetterShotPreferences.compressionQuality
+            try await Task.detached(priority: .userInitiated) {
+                try ScreenshotFileActions.replaceExistingExport(
+                    from: resultURL, at: exportURL, compressionQuality: compressionQuality)
+            }.value
         }
         model.markSaved()
         return resultURL
