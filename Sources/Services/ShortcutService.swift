@@ -31,6 +31,7 @@ final class ShortcutService {
         static let defaultOCR = Shortcut(keyCode: UInt32(kVK_ANSI_O), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultColorPicker = Shortcut(keyCode: UInt32(kVK_ANSI_C), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultRecording = Shortcut(keyCode: UInt32(kVK_ANSI_2), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
+        static let defaultRecordingArea = Shortcut(keyCode: UInt32(kVK_ANSI_2), modifiers: UInt32(cmdKey | shiftKey | optionKey), enabled: false)
     }
 
     enum Action: UInt32, CaseIterable {
@@ -40,6 +41,7 @@ final class ShortcutService {
         case ocr = 4
         case colorPicker = 5
         case recording = 6
+        case recordingArea = 7
     }
 
     // MARK: - Registration (CGEvent tap — intercepts system shortcuts)
@@ -84,6 +86,7 @@ final class ShortcutService {
             (.ocr, service.loadShortcut(for: .ocr) ?? .defaultOCR),
             (.colorPicker, service.loadShortcut(for: .colorPicker) ?? .defaultColorPicker),
             (.recording, service.loadShortcut(for: .recording) ?? .defaultRecording),
+            (.recordingArea, service.loadShortcut(for: .recordingArea) ?? .defaultRecordingArea),
         ]
     }
 
@@ -163,6 +166,8 @@ final class ShortcutService {
                     if action == .recording {
                         guard !ScreenRecordingManager.shared.isActive else { return }
                         RecordingBarPresenter.shared.togglePicker()
+                    } else if action == .recordingArea {
+                        await RecordingCaptureEntry.recordAreaOnActiveDisplay()
                     } else {
                         await CaptureOrchestrator.shared.performCapture(action, on: mouseScreen)
                     }
@@ -183,6 +188,7 @@ extension ShortcutService.Action {
         case .ocr: .defaultOCR
         case .colorPicker: .defaultColorPicker
         case .recording: .defaultRecording
+        case .recordingArea: .defaultRecordingArea
         case .window: nil
         }
     }

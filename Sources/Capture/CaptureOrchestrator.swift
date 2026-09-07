@@ -55,7 +55,7 @@ final class CaptureOrchestrator {
             await performOCR()
         case .colorPicker:
             await performColorPick()
-        case .recording:
+        case .recording, .recordingArea:
             break
         }
     }

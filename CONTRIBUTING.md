@@ -136,6 +136,10 @@ on the screen where the action originated, not the primary display.
 
 ### Recording flow
 
+Settings > Shortcuts > **Record Region** starts area selection directly on the
+display containing the pointer. Its suggested shortcut is ⌥⇧⌘2, disabled by
+default and rebindable. It uses the normal recording countdown and capture inputs.
+
 ```
 User presses ⌘⇧2 → RecordingPickerBar (screen / window / area / screenshot actions)
   → RecordingCaptureEntry.recordFullscreen / recordWindow / recordArea

@@ -871,6 +871,7 @@ struct ShortcutSettingsTab: View {
         ("OCR", "Read the text out of any region", .ocr),
         ("Pick Color", "Sample a color from anywhere on screen", .colorPicker),
         ("Record Screen", "Open the recording bar", .recording),
+        ("Record Region", "Select an area and start recording directly", .recordingArea),
     ]
 
     var body: some View {
