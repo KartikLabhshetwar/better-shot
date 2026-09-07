@@ -100,6 +100,7 @@ final class PreviewOverlay {
                 defer { savingItems.remove(url) }
                 do {
                     _ = try await RecordingDeliverable.saveToDefaultLocation(for: url)
+                    guard items.contains(url) else { return }
                     remove(url)
                     ToastWindow.shared.show(message: "Recording saved!", on: screen)
                 } catch {
