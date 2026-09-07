@@ -274,11 +274,11 @@ private func checkAnnotationExport(image: CGImage, source: URL, directory: URL) 
     do {
         try ScreenshotFileActions.replaceExistingExport(
             from: directory.appendingPathComponent("missing.png"), at: output)
-        preconditionFailure("Ожидалась ошибка чтения исходника")
+        preconditionFailure("Expected reading the source to fail")
     } catch {}
     precondition((try? Data(contentsOf: output)) == savedData)
     precondition(history.records.count == 1)
-    print("PASS сохранение аннотаций обновляет связанный экспорт и сохраняет исходник при ошибке")
+    print("PASS annotation saves update the associated export and preserve the source and previous export on failure")
 }
 
 /// Exercises production persistence in an isolated directory; never alters the user's captures.
