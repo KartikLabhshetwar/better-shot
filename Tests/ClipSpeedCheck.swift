@@ -26,6 +26,6 @@ struct ClipSpeedCheck {
             assert((0.25...8).contains(normalized.segments[0].speed))
             assert(normalized.duration.isFinite)
         }
-        print("ClipSpeedCheck: дробные скорости, замедление и сохранение таймлайна проверены")
+        print("ClipSpeedCheck: fractional speeds, slow motion, and timeline preservation verified")
     }
 }

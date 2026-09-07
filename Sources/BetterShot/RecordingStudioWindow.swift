@@ -2609,6 +2609,7 @@ private enum StudioTranscriptTab: CaseIterable, Identifiable {
 
 private struct StudioInspector: View {
     @Bindable var model: RecordingStudioModel
+    @State private var clipSpeedDraft: (id: UUID, speed: Double)?
     @State private var selectedTab: StudioInspectorTab = .background
     @State private var wallpaperStore = AnnotationWallpaperStore.shared
     @State private var stylePresetStore = RecordingStudioStylePresetStore.shared
@@ -3185,19 +3186,28 @@ private struct StudioInspector: View {
     // MARK: Selected clip
 
     private func selectedClipControls(for clip: RecordingClipSegment) -> some View {
-        VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
+        let speed = clipSpeedDraft.flatMap { $0.id == clip.id ? $0.speed : nil } ?? clip.speed
+        return VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
             InspectorSlider(
                 "Speed",
                 value: Binding(
-                    get: { CGFloat(clip.speed) },
-                    set: { model.setClipSpeed(Double($0), forClipID: clip.id) }
+                    get: { CGFloat(speed) },
+                    set: { clipSpeedDraft = (clip.id, Double($0)) }
                 ),
                 range: CGFloat(RecordingClipSegment.minimumSpeed)...CGFloat(RecordingClipSegment.maximumSpeed),
-                format: .magnification(fractionDigits: 2)
+                format: .magnification(fractionDigits: 2),
+                onEditingChanged: { editing in
+                    if editing {
+                        clipSpeedDraft = (clip.id, clip.speed)
+                    } else if let draft = clipSpeedDraft, draft.id == clip.id {
+                        clipSpeedDraft = nil
+                        model.setClipSpeed(draft.speed, forClipID: draft.id)
+                    }
+                }
             )
 
-            if clip.speed != 1 {
-                Text("Plays this clip at \(clip.speed.formatted(.number.precision(.fractionLength(0...2))))× speed. Audio stays in sync.")
+            if speed != 1 {
+                Text("Plays this clip at \(speed.formatted(.number.precision(.fractionLength(0...2))))× speed. Audio stays in sync.")
                     .font(.inspectorLabel)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
