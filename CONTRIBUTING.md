@@ -186,6 +186,13 @@ both call `AnnoShapeDrawing.draw(document, in:target:)`, so there is one drawing
 implementation to keep correct. `AnnotationRenderer` wraps that with the
 background, mockup effects, and watermark for the flattened image.
 
+**Save** (⌘S, including Save in the close prompt) commits editable annotations to
+history and updates the capture's associated export in place. If Export was used
+in this editor session, Save updates that chosen destination instead. Replacement
+is atomic and keeps the destination format. The untouched capture and editable
+base stay separate; images without an associated export remain history-only
+until the user chooses Export. Copy and Upload do not update the saved export.
+
 ### Recording studio
 
 `RecordingStudioModel` owns a `RecordingEditDocument` (clips, speed, transitions,

@@ -30,6 +30,7 @@ struct ExportIntegration {
         CGImageDestinationAddImage(destination, image, nil)
         precondition(CGImageDestinationFinalize(destination))
         try await checkCaptureStorage(image: image, source: source, directory: directory)
+        try checkAnnotationExport(image: image, source: source, directory: directory)
         let exported = directory.appendingPathComponent("export.png")
         let start = Date()
         try AnnotationRenderer.render(
@@ -249,6 +250,35 @@ struct ExportIntegration {
         await writer.finishWriting()
         precondition(writer.status == .completed)
     }
+}
+
+@MainActor
+private func checkAnnotationExport(image: CGImage, source: URL, directory: URL) throws {
+    let history = HistoryStore(storageDirectory: directory.appendingPathComponent("annotation-history"))
+    let record = history.importCapture(from: source, deleteSource: false)!
+    let raw = history.urlForRecord(record)
+    let rawData = try Data(contentsOf: raw)
+    precondition(history.annotationExportURL(for: raw) == nil)
+    let output = directory.appendingPathComponent("annotation-export.png")
+    try FileManager.default.copyItem(at: source, to: output)
+    precondition(history.setBeautifiedPath(output.path, for: record.id))
+    precondition(history.annotationExportURL(for: raw) == output)
+    precondition(history.annotationExportURL(for: output) == output)
+    precondition(history.annotationExportURL(for: source) == nil)
+    let edited = CaptureOrchestrator.saveImage(
+        image.cropping(to: CGRect(x: 0, y: 0, width: 32, height: 32))!, in: directory.path)!
+    try ScreenshotFileActions.replaceExistingExport(from: edited, at: history.annotationExportURL(for: raw)!)
+    let savedData = try Data(contentsOf: output)
+    precondition(savedData != rawData)
+    precondition((try? Data(contentsOf: raw)) == rawData)
+    do {
+        try ScreenshotFileActions.replaceExistingExport(
+            from: directory.appendingPathComponent("missing.png"), at: output)
+        preconditionFailure("Ожидалась ошибка чтения исходника")
+    } catch {}
+    precondition((try? Data(contentsOf: output)) == savedData)
+    precondition(history.records.count == 1)
+    print("PASS сохранение аннотаций обновляет связанный экспорт и сохраняет исходник при ошибке")
 }
 
 /// Exercises production persistence in an isolated directory; never alters the user's captures.

@@ -120,6 +120,14 @@ final class HistoryStore {
 
     // MARK: - Access
 
+    func annotationExportURL(for url: URL) -> URL? {
+        guard let record = record(matching: url), record.kind == .screenshot,
+              let path = record.beautifiedPath else { return nil }
+        let exportURL = URL(fileURLWithPath: path).standardizedFileURL
+        guard exportURL != urlForRecord(record).standardizedFileURL else { return nil }
+        return exportURL
+    }
+
     func urlForRecord(_ record: CaptureRecord) -> URL {
         if let sourcePath = record.sourcePath {
             return URL(fileURLWithPath: sourcePath)
