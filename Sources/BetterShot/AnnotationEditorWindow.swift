@@ -330,7 +330,7 @@ struct AnnotationEditorWindow: View {
                     .labelStyle(.titleAndIcon)
             }
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.bordered)
         .disabled(model.previewImage == nil || model.imageSize == .zero || isExporting || isSaving || isCopying || uploadPhase.isUploading)
         .accessibilityLabel(isExporting ? "Exporting image" : "Export image")
         .help("Save the finished image to your Mac")
@@ -372,7 +372,7 @@ struct AnnotationEditorWindow: View {
             Text("Crop").padding(.horizontal, 8)
         }
         .keyboardShortcut(.defaultAction)
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.bordered)
     }
 
     private var aspectBinding: Binding<CropAspectRatio> {

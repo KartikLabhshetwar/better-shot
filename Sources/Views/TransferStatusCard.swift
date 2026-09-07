@@ -87,7 +87,7 @@ struct TransferStatusCard: View {
 
     private func workingRow(stage: TransferStage, progress: Double?) -> some View {
         HStack(spacing: 12) {
-            iconTile(systemName: stage.icon, tint: .accentColor)
+            iconTile(systemName: stage.icon, tint: Color(nsColor: .darkGray))
 
             VStack(alignment: .leading, spacing: 7) {
                 HStack(alignment: .firstTextBaseline) {
@@ -160,8 +160,7 @@ struct TransferStatusCard: View {
 
                 prominentButton(
                     didCopy ? "Copied" : "Copy",
-                    icon: didCopy ? "checkmark" : "doc.on.doc",
-                    tint: didCopy ? .green : .accentColor
+                    icon: didCopy ? "checkmark" : "doc.on.doc"
                 ) {
                     copy(url)
                 }
@@ -212,7 +211,7 @@ struct TransferStatusCard: View {
             Spacer(minLength: 8)
 
             if canRetry {
-                prominentButton("Retry", icon: "arrow.clockwise", tint: .accentColor, action: onRetry)
+                prominentButton("Retry", icon: "arrow.clockwise", action: onRetry)
             }
 
             circleButton(help: "Dismiss", action: onDismiss)
@@ -228,7 +227,7 @@ struct TransferStatusCard: View {
             .frame(width: 34, height: 34)
             .background(
                 RoundedRectangle(cornerRadius: 10.5, style: .continuous)
-                    .fill(tint.gradient)
+                    .fill(tint)
             )
             .contentTransition(.symbolEffect(.replace))
             .animation(RecordingMotion.showHideSpring, value: systemName)
@@ -265,7 +264,6 @@ struct TransferStatusCard: View {
     private func prominentButton(
         _ title: String,
         icon: String,
-        tint: Color,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -276,12 +274,12 @@ struct TransferStatusCard: View {
                 Text(title)
                     .font(.system(size: 12, weight: .semibold))
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(.primary)
             .frame(height: 30)
             .padding(.horizontal, 12)
             .background(
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(tint.gradient)
+                    .fill(Color.primary.opacity(0.12))
             )
         }
         .buttonStyle(TransferPressStyle(scale: 0.97))
@@ -311,11 +309,11 @@ private struct TransferProgressBar: View {
 
                 if let progress {
                     Capsule()
-                        .fill(Color.accentColor.gradient)
+                        .fill(Color.secondary)
                         .frame(width: max(6, proxy.size.width * min(max(progress, 0), 1)))
                 } else if RecordingMotion.reduceMotion {
                     Capsule()
-                        .fill(Color.accentColor.gradient)
+                        .fill(Color.secondary)
                         .frame(width: proxy.size.width * 0.35)
                 } else {
                     TimelineView(.animation) { context in
@@ -323,7 +321,7 @@ private struct TransferProgressBar: View {
                             .truncatingRemainder(dividingBy: 1.4) / 1.4
                         let eased = cycle * cycle * (3 - 2 * cycle)
                         Capsule()
-                            .fill(Color.accentColor.gradient)
+                            .fill(Color.secondary)
                             .frame(width: proxy.size.width * 0.35)
                             .offset(x: proxy.size.width * 1.35 * eased - proxy.size.width * 0.35)
                     }

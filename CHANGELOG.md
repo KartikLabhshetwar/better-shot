@@ -9,13 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Zoom segments resize down to their time-based minimum independently of timeline magnification. Wider edge handles resize separately from the block body’s move gesture, and interrupted edits close their undo group.
+
 - Recent screenshots and recordings reopen their preview after menu tracking ends and remain visible until acted on. Video previews use cached project posters when available, and loading/failed thumbnails show a clickable card instead of an invisible overlay.
 - Test builds stop immediately on compiler errors on macOS’s bundled Make, preventing checks from running against stale application objects.
 
 - Automated editor/export tests no longer open the user's R2 Keychain, avoiding repeated password prompts from freshly rebuilt test executables. `make test` runs the checks without certificate signing; no passwords are stored in scripts.
 - Crop and Censor use native glass buttons with adaptive labels, remaining legible in light mode and inactive windows.
 - Timeline zoom works on short recordings again. Zoom buttons use the earlier 1.6× steps, the slider reaches both limits, Fit shows the full recording, and playback controls no longer overlap the zoom controls. The native 100,000-point lane-width cap is retained.
-- Inspector navigation uses a compact capsule of native icon tabs with a neutral selection highlight, matching the reference editor. The current section title remains visible below the tabs; hover tooltips are no longer required. Unavailable effects remain disabled and a disappearing effect returns to Background.
+- Inspector navigation uses four compact native icon tabs—Background, Camera, Effects, and Zoom & Clips. Effects groups audio, cursor, keystrokes, and captions. The capsule uses a neutral selection highlight, matching the reference editor. The current section title remains visible below the tabs; hover tooltips are no longer required. Unavailable effects remain disabled and a disappearing effect returns to Background.
 - Image/video effect and zoom sliders use the existing label-in-track scrubber and exact value field. Removed the duplicate horizontal sliders; zoom amount, framing, target, and enable edits participate in undo.
 - Captures and temporary image edits use full UUID filenames. Completed images are moved into place without overwriting another capture, and failed writes clean up staging files.
 - Failed history imports no longer reuse the previous screenshot. Failed staging/rendering preserves the original preview, deleted captures cannot return after a delayed render, and captures queued during last-region capture are processed.
@@ -24,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Branded editors**: Replaced the system-blue editor accent with the landing page's violet (`#7C3AED`), including image controls, settings, and timeline feedback.
+- **Neutral macOS controls**: Editors and Settings use adaptive grey accents, neutral selection fills, and native bordered action buttons. Removed purple timeline blocks and decorative gradients from sharing/transfer controls; selection and press feedback remain distinct in light and dark mode.
 - **Glass editor controls**: Native Liquid Glass groups the inspector navigation and playback controls, with material-backed effect cards and a solid fallback for reduced transparency.
 - **Consistent video effects**: Background, camera, cursor, keystrokes, captions, audio, and zoom use matching expandable cards. Effect amounts share a single scrubber and editable value; padding, rounded corners, and shadow gain toggles that remember their amounts and quick presets. Crop and Censor are available directly in the inspector.
 - **Cap timeline interactions**: Timeline navigation uses Cap's seconds-visible transform, playhead/pointer anchoring, adaptive ruler intervals, and a minimap with draggable zoom handles. Pinch and modifier-scroll work across every track.
@@ -34,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cap-style image editor**: A compact tool strip, contextual annotation controls, and native popovers for background, padding, rounding, shadow, and border leave more room for the image. Advanced effects remain available from Effects.
 - **Visible image zoom controls**: Zoom out, a continuous scrubber, zoom in, percentage presets, and Fit are available together on the canvas. The existing zoom bounds and pan behavior are preserved.
 - **Cap-style video editor**: The preview and effect inspector sit in separate bordered panels above a full-width timeline. Background, camera, audio, cursor, keystrokes, captions, and zoom/clip controls use the existing SwiftUI components; timeline selections reveal their controls automatically.
-- Existing GPU rendering, playback, recording, and export optimizations are preserved. Settings uses the shared editor accent and default-look scrubbers; history wording now points to Recent Captures.
+- Existing GPU rendering, playback, recording, and export optimizations are preserved. Settings uses the shared neutral editor accent and default-look scrubbers; history wording now points to Recent Captures.
 
 ### Removed
 

@@ -6,6 +6,14 @@ import SwiftUI
 /// AVPlayer layers and window toolbars require live UI testing and are not captured here.
 @MainActor
 func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
+    for appearanceName in [NSAppearance.Name.aqua, .darkAqua] {
+        NSAppearance(named: appearanceName)!.performAsCurrentDrawingAppearance {
+            let neutral = StudioChrome.accentNSColor.usingColorSpace(.deviceRGB)!
+            precondition(abs(neutral.redComponent - neutral.greenComponent) < 0.001
+                         && abs(neutral.greenComponent - neutral.blueComponent) < 0.001,
+                         "Editor chrome must remain neutral in both appearances")
+        }
+    }
     let imageModel = AnnotationEditorModel()
     imageModel.previewImage = NSImage(contentsOf: imageURL)!
     imageModel.imageSize = CGSize(width: 1920, height: 1080)
@@ -57,7 +65,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         return view.subviews.lazy.compactMap { inspectorSegments(in: $0) }.first
     }
     let tabs = inspectorSegments(in: tabHost)!
-    precondition(tabs.segmentCount == StudioInspectorTab.allCases.count)
+    precondition(tabs.segmentCount == 4 && StudioInspectorTab.allCases.count == 4)
     for (index, tab) in StudioInspectorTab.allCases.enumerated() {
         precondition(tabs.image(forSegment: index)?.accessibilityDescription == tab.title)
         precondition(tabs.toolTip(forSegment: index) == nil)
@@ -69,7 +77,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     precondition(selectedTab == .background, "Unavailable inspectors cannot become selected")
     tabs.selectedSegment = 2
     tabs.sendAction(tabs.action!, to: tabs.target)
-    precondition(selectedTab == .audio, "Native segment selection must reach SwiftUI")
+    precondition(selectedTab == .effects, "Native segment selection must reach SwiftUI")
     let clipControl = RecordingClipTimelineControl(frame: NSRect(x: 0, y: 0, width: 600, height: 52))
     clipControl.update(timeline: videoModel.clipTimeline, sourceDuration: videoModel.sourceDuration,
                        thumbnails: videoModel.timelineThumbnails, selectedClipID: nil, playheadTime: 0)

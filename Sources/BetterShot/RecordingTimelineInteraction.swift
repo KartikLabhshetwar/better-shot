@@ -73,9 +73,10 @@ nonisolated struct RecordingTimelineViewport: Equatable {
     }
 
     static func resizing(_ range: ClosedRange<Double>, leading: Bool, by delta: Double,
-                         within bounds: ClosedRange<Double>, secondsPerPoint: Double) -> ClosedRange<Double> {
+                         within bounds: ClosedRange<Double>, minimumDuration: Double) -> ClosedRange<Double> {
+        guard delta.isFinite, minimumDuration.isFinite, minimumDuration > 0 else { return range }
         let available = leading ? range.upperBound - bounds.lowerBound : bounds.upperBound - range.lowerBound
-        let minimum = min(max(1, 40 * secondsPerPoint), available)
+        let minimum = min(minimumDuration, available)
         if leading {
             let start = min(max(range.lowerBound + delta, bounds.lowerBound), range.upperBound - minimum)
             return start...range.upperBound

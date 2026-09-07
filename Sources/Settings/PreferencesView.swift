@@ -1052,16 +1052,16 @@ final class ShortcutRecorderNSView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 4, yRadius: 4)
-        NSColor.controlAccentColor.withAlphaComponent(0.15).setFill()
+        StudioChrome.accentNSColor.withAlphaComponent(0.15).setFill()
         path.fill()
-        NSColor.controlAccentColor.setStroke()
+        StudioChrome.accentNSColor.setStroke()
         path.lineWidth = 1.5
         path.stroke()
 
         let text = "Press shortcut..." as NSString
         let attrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 11, weight: .medium),
-            .foregroundColor: NSColor.controlAccentColor,
+            .foregroundColor: StudioChrome.accentNSColor,
         ]
         let size = text.size(withAttributes: attrs)
         let point = NSPoint(

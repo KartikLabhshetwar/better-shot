@@ -56,9 +56,14 @@ struct RecordingTimelineInteractionCheck {
         assert(range(12) == nil)
         assert(RecordingTimelineViewport.moving(4...6, by: 8, within: 2...10) == 8...10)
         assert(RecordingTimelineViewport.moving(4...6, by: -8, within: 2...10) == 2...4)
-        assert(RecordingTimelineViewport.resizing(4...6, leading: true, by: -8, within: 2...10, secondsPerPoint: 0.01) == 2...6)
-        assert(RecordingTimelineViewport.resizing(4...6, leading: false, by: -8, within: 2...10, secondsPerPoint: 0.01) == 4...5)
-        assert(RecordingTimelineViewport.resizing(0...0.5, leading: true, by: 1, within: 0...2, secondsPerPoint: 0.01) == 0...0.5)
+        assert(RecordingTimelineViewport.resizing(4...6, leading: true, by: -8, within: 2...10, minimumDuration: 0.5) == 2...6)
+        assert(RecordingTimelineViewport.resizing(4...6, leading: false, by: -8, within: 2...10, minimumDuration: 0.5) == 4...4.5)
+        assert(RecordingTimelineViewport.resizing(0...0.5, leading: true, by: 1, within: 0...2, minimumDuration: 0.5) == 0...0.5)
+        assert(RecordingTimelineViewport.resizing(4...6, leading: true, by: 0.25, within: 2...10, minimumDuration: 0.5) == 4.25...6)
+        assert(RecordingTimelineViewport.resizing(4...6, leading: false, by: 1.25, within: 2...7, minimumDuration: 0.5) == 4...7)
+        assert(RecordingTimelineViewport.resizing(4...6, leading: false, by: 0, within: 2...10, minimumDuration: 0.5) == 4...6,
+               "Grabbing an edge must not change its length")
+        assert(RecordingTimelineViewport.resizing(4...6, leading: false, by: .nan, within: 2...10, minimumDuration: 0.5) == 4...6)
         print("RecordingTimelineInteractionCheck: anchored zoom, minimap edges, bounds, and zoom insertion passed")
     }
 }

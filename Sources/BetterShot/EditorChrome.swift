@@ -1,9 +1,9 @@
 import AppKit
 import SwiftUI
 
-/// Matches bettershot-landing/app/globals.css --color-brand. Shared by editors and settings.
+/// Native neutral chrome shared by editors and settings.
 enum StudioChrome {
-    static let accentNSColor = NSColor(annoHex: "#7c3aed")
+    static let accentNSColor = NSColor.secondaryLabelColor
     static let accent = Color(nsColor: accentNSColor)
 }
 
@@ -36,10 +36,9 @@ struct EditorButtonStyle: ButtonStyle {
             .font(.system(size: 12, weight: .medium))
             .padding(.horizontal, 10)
             .frame(minHeight: 32)
-            .foregroundStyle(selected ? Color.accentColor : Color.primary)
+            .foregroundStyle(Color.primary)
             .background(
-                selected ? Color.accentColor.opacity(0.12)
-                    : configuration.isPressed ? Color.primary.opacity(0.08) : .clear,
+                Color.primary.opacity(configuration.isPressed ? 0.20 : selected ? 0.12 : 0),
                 in: RoundedRectangle(cornerRadius: 6)
             )
             .contentShape(RoundedRectangle(cornerRadius: 6))

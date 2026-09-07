@@ -149,16 +149,13 @@ struct StudioEffectToggleState {
 }
 
 enum StudioInspectorTab: String, CaseIterable, Identifiable {
-    case background, camera, audio, cursor, keyboard, captions, zoom
+    case background, camera, effects, zoom
     var id: Self { self }
     var title: String {
         switch self {
         case .background: "Background"
         case .camera: "Camera"
-        case .audio: "Audio"
-        case .cursor: "Cursor"
-        case .keyboard: "Keystrokes"
-        case .captions: "Captions"
+        case .effects: "Effects"
         case .zoom: "Zoom & Clips"
         }
     }
@@ -166,10 +163,7 @@ enum StudioInspectorTab: String, CaseIterable, Identifiable {
         switch self {
         case .background: "photo"
         case .camera: "web.camera"
-        case .audio: "speaker.wave.2"
-        case .cursor: "cursorarrow"
-        case .keyboard: "keyboard"
-        case .captions: "captions.bubble"
+        case .effects: "slider.horizontal.3"
         case .zoom: "plus.magnifyingglass"
         }
     }

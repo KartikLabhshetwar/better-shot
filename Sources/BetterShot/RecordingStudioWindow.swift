@@ -218,7 +218,7 @@ struct RecordingStudioContent: View {
             Text("Crop").padding(.horizontal, 8)
         }
         .keyboardShortcut(.defaultAction)
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.bordered)
     }
 
     private var cropAspectBinding: Binding<CropAspectRatio> {
@@ -267,7 +267,7 @@ struct RecordingStudioContent: View {
             Text("Done").padding(.horizontal, 8)
         }
         .keyboardShortcut(.defaultAction)
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.bordered)
     }
 
     private var maskEffectBinding: Binding<RecordingMaskSegment.Effect> {
@@ -360,7 +360,7 @@ struct RecordingStudioContent: View {
             Label("Export", systemImage: "arrow.down.circle")
                 .labelStyle(.titleAndIcon)
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.bordered)
         .disabled(!model.isLoaded || model.shareState.isBusy || model.exportState.isExporting)
         .help("Save the finished video to your Mac")
     }
@@ -2207,7 +2207,6 @@ private struct StudioZoomCueBlock: View {
         return AnyView(
             HStack(spacing: 0) {
                 resizeHandle(edge: .leading)
-                Spacer(minLength: 0)
                 VStack(spacing: 3) {
                     if width >= 130 {
                         Text(cue.anchorMode == .pinnedAnchor ? "Manual Zoom" : "Automatic Zoom")
@@ -2221,7 +2220,9 @@ private struct StudioZoomCueBlock: View {
                 }
                 .foregroundStyle(.white)
                 .lineLimit(1)
-                Spacer(minLength: 0)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .gesture(moveGesture)
                 resizeHandle(edge: .trailing)
             }
             .frame(width: width, height: StudioZoomLaneMetrics.blockHeight)
@@ -2230,7 +2231,7 @@ private struct StudioZoomCueBlock: View {
                     cornerRadius: StudioZoomLaneMetrics.blockCornerRadius,
                     style: .continuous
                 )
-                    .fill(Color.accentColor.opacity(isSelected ? 0.95 : 0.72))
+                    .fill(Color(nsColor: .darkGray).opacity(isSelected ? 1 : 0.85))
             )
             .overlay {
                 if isSelected {
@@ -2240,39 +2241,16 @@ private struct StudioZoomCueBlock: View {
                     )
                         .stroke(Color.white.opacity(0.8), lineWidth: 1.5)
                         .padding(-StudioZoomLaneMetrics.selectionRingPadding)
+                        .allowsHitTesting(false)
                 }
             }
             .offset(x: x, y: StudioZoomLaneMetrics.blockInset)
-            .gesture(
-                // Global coordinates: the block moves under the pointer while
-                // dragging, so a local-space translation would chase its own
-                // updates and jitter.
-                DragGesture(coordinateSpace: .global)
-                    .onChanged { value in
-                        if dragBase == nil {
-                            dragBase = DragBase(
-                                cue: cue,
-                                editorStart: block.editorStart,
-                                editorEnd: block.editorEnd
-                            )
-                            model.beginZoomCueEdit()
-                            model.selectZoomCue(id: cue.id)
-                        }
-                        guard let dragBase else { return }
-                        let delta = Double(value.translation.width) * scale.secondsPerPoint
-                        var moved = dragBase.cue
-                        let range = RecordingTimelineViewport.moving(
-                            dragBase.editorStart...dragBase.editorEnd, by: delta,
-                            within: neighborRange)
-                        moved.start = model.sourceTime(atEditorTime: range.lowerBound)
-                        moved.end = model.sourceTime(atEditorTime: range.upperBound)
-                        model.updateZoomCue(moved)
-                    }
-                    .onEnded { _ in
-                        dragBase = nil
-                        model.endZoomCueEdit(actionName: "Move Zoom")
-                    }
-            )
+            .onDisappear {
+                if dragBase != nil {
+                    dragBase = nil
+                    model.endZoomCueEdit()
+                }
+            }
             .onTapGesture {
                 model.selectZoomCue(id: cue.id)
                 model.pause()
@@ -2290,6 +2268,35 @@ private struct StudioZoomCueBlock: View {
             }
         )
     }
+
+    private var moveGesture: some Gesture {
+        DragGesture(minimumDistance: 2, coordinateSpace: .global)
+            .onChanged { value in
+                if dragBase == nil {
+                    dragBase = DragBase(
+                        cue: block.cue,
+                        editorStart: block.editorStart,
+                        editorEnd: block.editorEnd
+                    )
+                    model.beginZoomCueEdit()
+                    model.selectZoomCue(id: block.cue.id)
+                }
+                guard let dragBase else { return }
+                let delta = Double(value.translation.width) * scale.secondsPerPoint
+                var moved = dragBase.cue
+                let range = RecordingTimelineViewport.moving(
+                    dragBase.editorStart...dragBase.editorEnd, by: delta,
+                    within: neighborRange)
+                moved.start = model.sourceTime(atEditorTime: range.lowerBound)
+                moved.end = model.sourceTime(atEditorTime: range.upperBound)
+                model.updateZoomCue(moved)
+            }
+            .onEnded { _ in
+                dragBase = nil
+                model.endZoomCueEdit(actionName: "Move Zoom")
+            }
+    }
+
 
     private var neighborRange: ClosedRange<Double> {
         let others = model.zoomTimelineBlocks.filter { $0.cue.id != block.cue.id }
@@ -2317,19 +2324,21 @@ private struct StudioZoomCueBlock: View {
     private func resizeHandle(edge: HorizontalEdge) -> some View {
         Rectangle()
             .fill(Color.white.opacity(0.001))
-            .frame(width: 10, height: StudioZoomLaneMetrics.blockHeight)
+            .frame(width: min(14, max(1, CGFloat(block.editorEnd - block.editorStart) * scale.pointsPerSecond / 2)),
+                   height: StudioZoomLaneMetrics.blockHeight)
             .overlay(alignment: .center) {
                 Capsule()
                     .fill(Color.white.opacity(isSelected ? 0.9 : 0.45))
                     .frame(width: 2.5, height: 12)
             }
             .contentShape(Rectangle())
+            .pointerStyle(.columnResize)
             .onTapGesture(count: 2) { fill(edge: edge) }
             .help("Drag to resize. Double-click to extend to the next zoom or recording edge.")
             .gesture(
                 // Global coordinates - the handle itself moves while resizing,
                 // so local-space translations feed back into the drag and jitter.
-                DragGesture(coordinateSpace: .global)
+                DragGesture(minimumDistance: 2, coordinateSpace: .global)
                     .onChanged { value in
                         if dragBase == nil {
                             dragBase = DragBase(
@@ -2345,7 +2354,7 @@ private struct StudioZoomCueBlock: View {
                         var resized = dragBase.cue
                         let range = RecordingTimelineViewport.resizing(
                             dragBase.editorStart...dragBase.editorEnd, leading: edge == .leading,
-                            by: delta, within: neighborRange, secondsPerPoint: scale.secondsPerPoint)
+                            by: delta, within: neighborRange, minimumDuration: ZoomCue.minimumDuration)
                         resized.start = model.sourceTime(atEditorTime: range.lowerBound)
                         resized.end = model.sourceTime(atEditorTime: range.upperBound)
                         model.updateZoomCue(resized)
@@ -2448,7 +2457,7 @@ private struct StudioMaskBlock: View {
                     cornerRadius: StudioZoomLaneMetrics.blockCornerRadius,
                     style: .continuous
                 )
-                    .fill(Color.purple.opacity(isSelected ? 0.95 : 0.72))
+                    .fill(Color(nsColor: .darkGray).opacity(isSelected ? 1 : 0.85))
             )
             .overlay {
                 if isSelected {
@@ -2458,6 +2467,7 @@ private struct StudioMaskBlock: View {
                     )
                         .stroke(Color.white.opacity(0.8), lineWidth: 1.5)
                         .padding(-StudioZoomLaneMetrics.selectionRingPadding)
+                        .allowsHitTesting(false)
                 }
             }
             .offset(x: x, y: StudioZoomLaneMetrics.blockInset)
@@ -2695,7 +2705,7 @@ private struct StudioInspector: View {
 
                     }
 
-                    if selectedTab == .cursor {
+                    if selectedTab == .effects && model.pointerIsSynthesized {
                         StudioEffectSection(
                             title: "Cursor",
                             systemImage: "cursorarrow",
@@ -2712,7 +2722,7 @@ private struct StudioInspector: View {
                         }
                     }
 
-                    if selectedTab == .keyboard {
+                    if selectedTab == .effects && model.hasKeystrokes {
                         StudioEffectSection(
                             title: "Keystrokes",
                             systemImage: "keyboard",
@@ -2728,7 +2738,7 @@ private struct StudioInspector: View {
                         }
                     }
 
-                    if selectedTab == .captions {
+                    if selectedTab == .effects && (model.canTranscribe || model.hasSubtitles) {
                         StudioEffectSection(
                             title: "Transcription",
                             systemImage: "captions.bubble",
@@ -2782,7 +2792,7 @@ private struct StudioInspector: View {
                         }
                     }
 
-                    if selectedTab == .audio {
+                    if selectedTab == .effects {
                         StudioEffectSection(
                             title: "Audio",
                             systemImage: "speaker.wave.2",
@@ -2878,9 +2888,6 @@ private struct StudioInspector: View {
     private func isAvailable(_ tab: StudioInspectorTab) -> Bool {
         switch tab {
         case .camera: model.hasCameraVideo
-        case .cursor: model.pointerIsSynthesized
-        case .keyboard: model.hasKeystrokes
-        case .captions: model.canTranscribe || model.hasSubtitles
         default: true
         }
     }

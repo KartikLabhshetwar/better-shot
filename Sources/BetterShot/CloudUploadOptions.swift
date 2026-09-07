@@ -39,7 +39,7 @@ struct CloudUploadOptionsPopover: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 28, height: 28)
-                    .background(Circle().fill(Color.accentColor.gradient))
+                    .background(Circle().fill(Color(nsColor: .darkGray)))
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Share to Cloud")
@@ -70,7 +70,7 @@ struct CloudUploadOptionsPopover: View {
                 } label: {
                     Label("Share", systemImage: "arrow.up.circle.fill")
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .keyboardShortcut(.defaultAction)
             }
         }
