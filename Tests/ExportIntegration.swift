@@ -86,6 +86,7 @@ struct ExportIntegration {
 
         let movie = directory.appendingPathComponent("source.mov")
         try await makeMovie(at: movie, image: image)
+        try await checkEditorUI(imageURL: source, movieURL: movie)
         let clips = RecordingClipTimeline.full(sourceDuration: 2)
         let viewport = ViewportTimeline.build(
             cues: [

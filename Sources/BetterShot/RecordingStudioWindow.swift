@@ -40,46 +40,52 @@ struct RecordingStudioWindow: View {
     }
 }
 
-private struct RecordingStudioContent: View {
+struct RecordingStudioContent: View {
     @Bindable var model: RecordingStudioModel
     @State private var isInspectorPresented = true
     @State private var closeGuard = EditorCloseGuard()
 
     var body: some View {
-        VStack(spacing: 0) {
-            if let loadError = model.loadError {
-                ContentUnavailableView(
-                    "Couldn't open recording",
-                    systemImage: "exclamationmark.triangle",
-                    description: Text(loadError)
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                StudioCanvas(model: model)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(AnnotationEditorWorkspaceBackground())
-                    .overlay(alignment: .bottom) {
-                        if let transferStatus {
-                            TransferStatusCard(
-                                status: transferStatus,
-                                onCancel: cancelTransfer,
-                                onRetry: retryTransfer,
-                                onDismiss: dismissTransfer
-                            )
-                            .padding(.bottom, 18)
-                            .transition(transferCardTransition)
-                        }
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Group {
+                    if let loadError = model.loadError {
+                        ContentUnavailableView(
+                            "Couldn't open recording", systemImage: "exclamationmark.triangle",
+                            description: Text(loadError)
+                        )
+                    } else {
+                        StudioCanvas(model: model)
+                            .background(AnnotationEditorWorkspaceBackground())
+                            .overlay(alignment: .bottom) {
+                                if let transferStatus {
+                                    TransferStatusCard(status: transferStatus,
+                                        onCancel: cancelTransfer, onRetry: retryTransfer,
+                                        onDismiss: dismissTransfer)
+                                        .padding(.bottom, 18)
+                                }
+                            }
                     }
-                    .animation(RecordingMotion.showHideSpring, value: transferStatus)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .editorPanel()
 
+                if isInspectorPresented {
+                    StudioInspector(model: model)
+                        .frame(width: 360)
+                        .editorPanel()
+                }
+            }
+
+            if model.loadError == nil {
                 StudioTimelineEditor(model: model)
+                    .editorPanel()
             }
         }
-        .frame(minWidth: 980, minHeight: 720)
+        .padding(8)
+        .background(EditorChrome.workspace)
+        .frame(minWidth: 1100, minHeight: 720)
         .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
-        .inspector(isPresented: $isInspectorPresented) {
-            StudioInspector(model: model)
-        }
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
                 Button {
@@ -141,6 +147,7 @@ private struct RecordingStudioContent: View {
                         Image(systemName: "sidebar.right")
                     }
                     .help(isInspectorPresented ? "Hide Inspector" : "Show Inspector")
+                    .accessibilityLabel("Toggle video inspector")
                 }
             }
         }
@@ -352,7 +359,7 @@ private struct RecordingStudioContent: View {
             Label("Export", systemImage: "arrow.down.circle")
                 .labelStyle(.titleAndIcon)
         }
-        .tint(.accentColor)
+        .buttonStyle(.borderedProminent)
         .disabled(!model.isLoaded || model.shareState.isBusy || model.exportState.isExporting)
         .help("Save the finished video to your Mac")
     }
@@ -1510,6 +1517,14 @@ private struct StudioTimelineEditor: View {
             .keyboardShortcut("-", modifiers: .command)
             .disabled(zoom <= 1.0001)
 
+            Slider(value: Binding(
+                get: { zoom },
+                set: { applyZoom(factor: $0 / zoom, anchorTime: buttonZoomAnchor) }
+            ), in: 1...max(scale.maxZoom, 1.001))
+            .frame(width: 88)
+            .disabled(scale.maxZoom <= 1)
+            .accessibilityLabel("Timeline zoom")
+
             timelineButton("Zoom In", systemImage: "plus.magnifyingglass") {
                 applyZoom(factor: Self.zoomStep, anchorTime: buttonZoomAnchor)
             }
@@ -1596,6 +1611,7 @@ private struct StudioTimelineEditor: View {
                     .buttonStyle(.plain)
                     .keyboardShortcut(.space, modifiers: [])
                     .help(model.isPlaying ? "Pause" : "Play")
+                    .accessibilityLabel(model.isPlaying ? "Pause" : "Play")
                     .disabled(!model.isLoaded)
 
                     timelineButton("Skip to End", systemImage: "forward.end.fill") {
@@ -1637,6 +1653,7 @@ private struct StudioTimelineEditor: View {
         }
         .buttonStyle(TransportIconButtonStyle())
         .help(help)
+        .accessibilityLabel(help)
     }
 }
 
@@ -2615,12 +2632,40 @@ private enum StudioTranscriptTab: CaseIterable, Identifiable {
     }
 }
 
+private enum StudioInspectorTab: String, CaseIterable, Identifiable {
+    case background, camera, audio, cursor, keyboard, captions, zoom
+    var id: Self { self }
+    var title: String {
+        switch self {
+        case .background: "Background"
+        case .camera: "Camera"
+        case .audio: "Audio"
+        case .cursor: "Cursor"
+        case .keyboard: "Keystrokes"
+        case .captions: "Captions"
+        case .zoom: "Zoom & Clips"
+        }
+    }
+    var systemImage: String {
+        switch self {
+        case .background: "photo"
+        case .camera: "web.camera"
+        case .audio: "speaker.wave.2"
+        case .cursor: "cursorarrow"
+        case .keyboard: "keyboard"
+        case .captions: "captions.bubble"
+        case .zoom: "plus.magnifyingglass"
+        }
+    }
+}
+
 private struct StudioInspector: View {
     @Bindable var model: RecordingStudioModel
+    @State private var selectedTab: StudioInspectorTab = .background
     @State private var wallpaperStore = AnnotationWallpaperStore.shared
     @State private var stylePresetStore = RecordingStudioStylePresetStore.shared
     @State private var expandedSections: Set<StudioInspectorSection> = [
-        .background, .layout, .motion
+        .background, .layout, .motion, .cursor, .keystrokes, .transcription, .camera, .audio
     ]
     @State private var transcriptTab: StudioTranscriptTab = .captions
     @Environment(\.colorScheme) private var colorScheme
@@ -2628,205 +2673,252 @@ private struct StudioInspector: View {
     private let swatchColumns = [GridItem(.adaptive(minimum: 30, maximum: 44), spacing: 6)]
 
     var body: some View {
-        ScrollView(.vertical) {
-            VStack(alignment: .leading, spacing: 0) {
-                InspectorDisclosureSection(
-                    title: "Background",
-                    isExpanded: expansionBinding(for: .background),
-                    accessory: {
-                        if model.style.background != .none {
-                            InspectorClearButton(help: "Remove background") {
-                                model.style.background = .none
-                            }
-                        }
-                    }
-                ) {
-                    backgroundControls
-                }
-
-                InspectorDisclosureSection(
-                    title: "Layout",
-                    isExpanded: expansionBinding(for: .layout),
-                    accessory: {
-                        if !usesDefaultLayout {
-                            InspectorClearButton(help: "Reset layout") {
-                                model.style.padding = 0.06
-                                model.style.cornerRadius = 0.02
-                                model.style.shadow = 0.45
-                            }
-                        }
-                    }
-                ) {
-                    layoutControls
-                }
-
-                // Selection editing surfaces here (between Layout and Zoom &
-                // Clicks) whenever a zoom or clip is selected on the timeline.
-                if let selected = model.selectedCue {
-                    InspectorSection(
-                        title: "Selected Zoom",
-                        accessory: {
-                            Toggle(
-                                "Use this zoom",
-                                isOn: Binding(
-                                    get: { selected.isEnabled },
-                                    set: { isEnabled in
-                                        var updated = selected
-                                        updated.isEnabled = isEnabled
-                                        model.updateZoomCue(updated)
+        VStack(spacing: 0) {
+            inspectorHeader
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 0) {
+                    if selectedTab == .background {
+                        InspectorDisclosureSection(
+                            title: "Background",
+                            isExpanded: expansionBinding(for: .background),
+                            accessory: {
+                                if model.style.background != .none {
+                                    InspectorClearButton(help: "Remove background") {
+                                        model.style.background = .none
                                     }
-                                )
-                            )
-                            .labelsHidden()
-                            .toggleStyle(.switch)
-                            .controlSize(.mini)
-                            .help("Use this zoom")
-                        }
-                    ) {
-                        selectedZoomControls(for: selected)
-                    }
-                    InspectorSectionDivider()
-                } else if let selectedClip = model.selectedClip {
-                    InspectorSection("Selected Clip") {
-                        selectedClipControls(for: selectedClip)
-                    }
-                    InspectorSectionDivider()
-                }
-
-                InspectorDisclosureSection(
-                    title: "Zoom & Clicks",
-                    isExpanded: expansionBinding(for: .motion),
-                    accessory: {
-                        Toggle("Enable zooms", isOn: $model.zoomEnabled)
-                            .labelsHidden()
-                            .toggleStyle(.switch)
-                            .controlSize(.mini)
-                    }
-                ) {
-                    zoomControls
-                }
-
-                if model.pointerIsSynthesized {
-                    InspectorDisclosureSection(
-                        title: "Cursor",
-                        isExpanded: expansionBinding(for: .cursor),
-                        accessory: {
-                            if model.style.cursorScale != RecordingStudioStyle.defaultCursorScale {
-                                InspectorClearButton(help: "Reset cursor size") {
-                                    model.style.cursorScale = RecordingStudioStyle.defaultCursorScale
                                 }
                             }
+                        ) {
+                            backgroundControls
                         }
-                    ) {
-                        cursorControls
-                    }
-                }
 
-                if model.hasKeystrokes {
-                    InspectorDisclosureSection(
-                        title: "Keystrokes",
-                        isExpanded: expansionBinding(for: .keystrokes),
-                        accessory: {
-                            Toggle("Show keystrokes", isOn: $model.showsKeystrokes)
-                                .labelsHidden()
-                                .toggleStyle(.switch)
-                                .controlSize(.mini)
-                        }
-                    ) {
-                        keystrokeControls
-                    }
-                }
-
-                if model.canTranscribe || model.hasSubtitles {
-                    InspectorDisclosureSection(
-                        title: "Transcription",
-                        isExpanded: expansionBinding(for: .transcription),
-                        accessory: {
-                            if model.hasSubtitles {
-                                HStack(spacing: 2) {
-                                    if model.transcriptionState.isTranscribing {
-                                        ProgressView()
-                                            .controlSize(.mini)
-                                            .frame(width: 18, height: 18)
-                                    } else if model.canTranscribe {
-                                        StudioInspectorIconButton(
-                                            systemName: "arrow.clockwise",
-                                            help: "Transcribe again"
-                                        ) {
-                                            model.transcribe()
-                                        }
+                        InspectorDisclosureSection(
+                            title: "Layout",
+                            isExpanded: expansionBinding(for: .layout),
+                            accessory: {
+                                if !usesDefaultLayout {
+                                    InspectorClearButton(help: "Reset layout") {
+                                        model.style.padding = 0.06
+                                        model.style.cornerRadius = 0.02
+                                        model.style.shadow = 0.45
                                     }
-
-                                    InspectorClearButton(help: "Remove subtitles") {
-                                        model.removeTranscription()
-                                    }
-
-                                    Toggle("Show subtitles", isOn: $model.showsSubtitles)
-                                        .labelsHidden()
-                                        .toggleStyle(.switch)
-                                        .controlSize(.mini)
-                                        .padding(.leading, 4)
                                 }
                             }
+                        ) {
+                            layoutControls
                         }
-                    ) {
-                        transcriptionControls
-                    }
-                }
 
-                if model.hasCameraVideo {
-                    InspectorDisclosureSection(
-                        title: "Camera",
-                        isExpanded: expansionBinding(for: .camera),
-                        accessory: {
-                            Toggle("Show camera", isOn: $model.style.camera.isVisible)
-                                .labelsHidden()
-                                .toggleStyle(.switch)
-                                .controlSize(.mini)
-                        }
-                    ) {
-                        cameraControls
                     }
-                }
 
-                InspectorDisclosureSection(
-                    title: "Audio",
-                    isExpanded: expansionBinding(for: .audio),
-                    accessory: {
-                        if model.replacementAudio != nil {
-                            InspectorClearButton(
-                                help: model.hasRecordedAudio
-                                    ? "Use the recorded audio again"
-                                    : "Remove this audio"
+                    if selectedTab == .zoom {
+                        // Timeline selections reveal their existing controls in the Zoom tab.
+                        if let selected = model.selectedCue {
+                            InspectorSection(
+                                title: "Selected Zoom",
+                                accessory: {
+                                    Toggle(
+                                        "Use this zoom",
+                                        isOn: Binding(
+                                            get: { selected.isEnabled },
+                                            set: { isEnabled in
+                                                var updated = selected
+                                                updated.isEnabled = isEnabled
+                                                model.updateZoomCue(updated)
+                                            }
+                                        )
+                                    )
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                                    .controlSize(.mini)
+                                    .help("Use this zoom")
+                                }
                             ) {
-                                model.removeReplacementAudio()
+                                selectedZoomControls(for: selected)
                             }
+                            InspectorSectionDivider()
+                        } else if let selectedClip = model.selectedClip {
+                            InspectorSection("Selected Clip") {
+                                selectedClipControls(for: selectedClip)
+                            }
+                            InspectorSectionDivider()
+                        }
+
+                        InspectorDisclosureSection(
+                            title: "Zoom & Clicks",
+                            isExpanded: expansionBinding(for: .motion),
+                            accessory: {
+                                Toggle("Enable zooms", isOn: $model.zoomEnabled)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                                    .controlSize(.mini)
+                            }
+                        ) {
+                            zoomControls
+                        }
+
+                    }
+
+                    if selectedTab == .cursor {
+                        InspectorDisclosureSection(
+                            title: "Cursor",
+                            isExpanded: expansionBinding(for: .cursor),
+                            accessory: {
+                                if model.style.cursorScale != RecordingStudioStyle.defaultCursorScale {
+                                    InspectorClearButton(help: "Reset cursor size") {
+                                        model.style.cursorScale = RecordingStudioStyle.defaultCursorScale
+                                    }
+                                }
+                            }
+                        ) {
+                            cursorControls
                         }
                     }
-                ) {
-                    audioControls
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-            .padding(.bottom, PreviewPeekTab.pillHeight * 1.1)
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            VStack(spacing: 0) {
-                RecordingStudioStylePresetBar(model: model, presetStore: stylePresetStore)
 
-                Rectangle()
-                    .fill(Color(nsColor: .separatorColor).opacity(0.45))
-                    .frame(height: 0.5)
+                    if selectedTab == .keyboard {
+                        InspectorDisclosureSection(
+                            title: "Keystrokes",
+                            isExpanded: expansionBinding(for: .keystrokes),
+                            accessory: {
+                                Toggle("Show keystrokes", isOn: $model.showsKeystrokes)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                                    .controlSize(.mini)
+                            }
+                        ) {
+                            keystrokeControls
+                        }
+                    }
+
+                    if selectedTab == .captions {
+                        InspectorDisclosureSection(
+                            title: "Transcription",
+                            isExpanded: expansionBinding(for: .transcription),
+                            accessory: {
+                                if model.hasSubtitles {
+                                    HStack(spacing: 2) {
+                                        if model.transcriptionState.isTranscribing {
+                                            ProgressView()
+                                                .controlSize(.mini)
+                                                .frame(width: 18, height: 18)
+                                        } else if model.canTranscribe {
+                                            StudioInspectorIconButton(
+                                                systemName: "arrow.clockwise",
+                                                help: "Transcribe again"
+                                            ) {
+                                                model.transcribe()
+                                            }
+                                        }
+
+                                        InspectorClearButton(help: "Remove subtitles") {
+                                            model.removeTranscription()
+                                        }
+
+                                        Toggle("Show subtitles", isOn: $model.showsSubtitles)
+                                            .labelsHidden()
+                                            .toggleStyle(.switch)
+                                            .controlSize(.mini)
+                                            .padding(.leading, 4)
+                                    }
+                                }
+                            }
+                        ) {
+                            transcriptionControls
+                        }
+                    }
+
+                    if selectedTab == .camera {
+                        InspectorDisclosureSection(
+                            title: "Camera",
+                            isExpanded: expansionBinding(for: .camera),
+                            accessory: {
+                                Toggle("Show camera", isOn: $model.style.camera.isVisible)
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                                    .controlSize(.mini)
+                            }
+                        ) {
+                            cameraControls
+                        }
+                    }
+
+                    if selectedTab == .audio {
+                        InspectorDisclosureSection(
+                            title: "Audio",
+                            isExpanded: expansionBinding(for: .audio),
+                            accessory: {
+                                if model.replacementAudio != nil {
+                                    InspectorClearButton(
+                                        help: model.hasRecordedAudio
+                                            ? "Use the recorded audio again"
+                                            : "Remove this audio"
+                                    ) {
+                                        model.removeReplacementAudio()
+                                    }
+                                }
+                            }
+                        ) {
+                            audioControls
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .padding(.bottom, PreviewPeekTab.pillHeight * 1.1)
             }
-            .background(sidebarBackground)
+            .scrollContentBackground(.hidden)
+            .scrollEdgeEffectSoftIfAvailable()
         }
-        .scrollContentBackground(.hidden)
-        .scrollEdgeEffectSoftIfAvailable()
         .background(sidebarBackground)
-        .inspectorColumnWidth(min: 260, ideal: 280, max: 440)
         .frame(minWidth: 260, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task {
             await wallpaperStore.reload()
+        }
+        .onChange(of: model.selectedCueID) { _, cue in
+            if cue != nil { selectedTab = .zoom }
+        }
+        .onChange(of: model.selectedClipID) { _, clip in
+            if clip != nil { selectedTab = .zoom }
+        }
+    }
+
+    private var inspectorHeader: some View {
+        VStack(spacing: 0) {
+            Picker("Video inspector", selection: $selectedTab) {
+                ForEach(StudioInspectorTab.allCases) { tab in
+                    Label(tab.title, systemImage: tab.systemImage)
+                        .labelStyle(.iconOnly)
+                        .help(tab.title)
+                        .tag(tab)
+                        .disabled(!isAvailable(tab))
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .controlSize(.large)
+            .padding(12)
+            Divider()
+            HStack {
+                Text(selectedTab.title).font(.headline)
+                Spacer()
+            }
+            .padding(16)
+            if selectedTab == .background {
+                RecordingStudioStylePresetBar(model: model, presetStore: stylePresetStore)
+            }
+
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor).opacity(0.45))
+                .frame(height: 0.5)
+        }
+        .background(sidebarBackground)
+    }
+
+    private func isAvailable(_ tab: StudioInspectorTab) -> Bool {
+        switch tab {
+        case .camera: model.hasCameraVideo
+        case .cursor: model.pointerIsSynthesized
+        case .keyboard: model.hasKeystrokes
+        case .captions: model.canTranscribe || model.hasSubtitles
+        default: true
         }
     }
 

@@ -51,15 +51,6 @@ struct AnnotationEditorInspector: View {
     var body: some View {
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: 0) {
-                InspectorSection("Tools") {
-                    AnnotationInspectorToolGrid(selectedTool: model.selectedTool) { tool in
-                        onEditorAction()
-                        model.selectTool(tool)
-                    }
-                }
-
-                InspectorSectionDivider()
-
                 InspectorSection("Smart Redaction") {
                     HStack(spacing: 8) {
                         SmartRedactionButton(
@@ -93,55 +84,6 @@ struct AnnotationEditorInspector: View {
                         Text(message)
                             .font(.inspectorLabel)
                             .foregroundStyle(.secondary)
-                    }
-                }
-
-                if model.hasInspectorStyleControls {
-                    InspectorSectionDivider()
-
-                    InspectorSection("Style") {
-                        if model.selectionCount > 1 {
-                            Text("\(model.selectionCount) annotations selected")
-                                .font(.inspectorLabel)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        if model.isTextStyleAvailable {
-                            AnnotationTextStyleControls(model: model)
-                        } else {
-                            if model.isColorStyleAvailable {
-                                InspectorRow("Color") {
-                                    AnnotationSwatchStrip(selectedSwatch: model.selectedSwatch) { swatch in
-                                        onEditorAction()
-                                        model.setSwatch(swatch)
-                                    }
-                                }
-                            }
-
-                            if model.isStrokeStyleAvailable {
-                                InspectorRow("Stroke") {
-                                    AnnotationStrokePicker(strokeWidth: model.strokeWidth) { strokeWidth in
-                                        onEditorAction()
-                                        model.setStrokeWidth(strokeWidth)
-                                    }
-                                }
-                            }
-
-                            if model.isRedactionStyleAvailable {
-                                InspectorSlider(
-                                    "Strength",
-                                    value: Binding(
-                                        get: { model.redactionDensity },
-                                        set: {
-                                            onEditorAction()
-                                            model.setRedactionDensity($0)
-                                        }
-                                    ),
-                                    range: 0.15...1,
-                                    format: .percent()
-                                )
-                            }
-                        }
                     }
                 }
 
@@ -401,87 +343,5 @@ private struct SmartRedactionButton: View {
         .disabled(isRunning)
         .opacity(isRunning ? 0.5 : 1)
         .onHover { isHovering = $0 }
-    }
-}
-
-// MARK: - Tools
-
-private struct AnnotationInspectorToolGrid: View {
-    let selectedTool: AnnotationTool
-    let onSelect: (AnnotationTool) -> Void
-
-    private let columns: [GridItem] = Array(
-        repeating: GridItem(.flexible(), spacing: 4), count: 6
-    )
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        let shape = RoundedRectangle(
-            cornerRadius: InspectorMetrics.sliderRadius,
-            style: .continuous
-        )
-
-        LazyVGrid(columns: columns, spacing: 4) {
-            ForEach(AnnotationTool.allCases) { tool in
-                AnnotationToolCell(
-                    tool: tool,
-                    isSelected: selectedTool == tool,
-                    action: { onSelect(tool) }
-                )
-            }
-        }
-        .frame(maxWidth: 280)
-        .frame(maxWidth: .infinity)
-        .padding(InspectorMetrics.controlInset)
-        .background(shape.fill(InspectorControlPalette.trackFill(for: colorScheme)))
-        .overlay(shape.stroke(InspectorControlPalette.border, lineWidth: 0.5))
-        .clipShape(shape)
-    }
-}
-
-private struct AnnotationToolCell: View {
-    let tool: AnnotationTool
-    let isSelected: Bool
-    let action: () -> Void
-
-    @State private var isHovering = false
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        Button(action: action) {
-            ZStack {
-                Color.clear
-
-                Image(systemName: tool.systemImage)
-                    .font(.system(size: 13, weight: .medium))
-            }
-            .aspectRatio(1, contentMode: .fit)
-            .contentShape(RoundedRectangle(cornerRadius: InspectorMetrics.tileRadius, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .focusEffectDisabled()
-        .foregroundStyle(isSelected ? InspectorControlPalette.selectedForeground : Color.secondary)
-        .background {
-            RoundedRectangle(cornerRadius: InspectorMetrics.tileRadius, style: .continuous)
-                .fill(background)
-                .overlay {
-                    if isSelected {
-                        RoundedRectangle(cornerRadius: InspectorMetrics.tileRadius, style: .continuous)
-                            .stroke(InspectorControlPalette.border, lineWidth: 0.5)
-                    }
-                }
-        }
-        .help(tool.helpText)
-        .onHover { isHovering = $0 }
-        .accessibilityLabel(tool.title)
-        .accessibilityHint(tool.helpText)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-
-    private var background: Color {
-        if isSelected {
-            return InspectorControlPalette.selectionFill(for: colorScheme)
-        }
-        return isHovering ? InspectorControlPalette.hoverFill : .clear
     }
 }

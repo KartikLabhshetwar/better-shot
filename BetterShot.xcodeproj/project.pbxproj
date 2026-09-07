@@ -157,6 +157,7 @@
 		CB270F6BDD39E72E8CEE4F5D /* ScreenRecordingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21453FFFE9FF2E1860B1BB7E /* ScreenRecordingManager.swift */; };
 		CB322FB7D761116FFC2AA698 /* Shapes2d.swift in Sources */ = {isa = PBXBuildFile; fileRef = 748342A3B1322ED390C11DB4 /* Shapes2d.swift */; };
 		CC94C27448BB07B81990A8DF /* RecordingRecoveryCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0A1865851DAC294E77669CA /* RecordingRecoveryCoordinator.swift */; };
+		CE1AC7D23DD3C75A916B3BFF /* EditorChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79187CE18696A103378D33E6 /* EditorChrome.swift */; };
 		CFE6DCC81F16975D9C5571D1 /* AnnotationBackgroundInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 061AE6D677E2E3AB437A6738 /* AnnotationBackgroundInspector.swift */; };
 		D1027BECFA02E786BF762444 /* ArrowTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674519179B33EE7750D1D543 /* ArrowTypes.swift */; };
 		D27CCDE7BAF033771F9277B4 /* ArrowShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 458342AE76A103B886AA98AC /* ArrowShared.swift */; };
@@ -289,6 +290,7 @@
 		7768BE2B53992147285FACBF /* AnnotationEditorChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationEditorChrome.swift; sourceTree = "<group>"; };
 		7846895DF5BEB0C9BC144710 /* StrokeOutline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrokeOutline.swift; sourceTree = "<group>"; };
 		78E7B35573A11F2C3D1CD1F8 /* VideoCompressionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoCompressionModels.swift; sourceTree = "<group>"; };
+		79187CE18696A103378D33E6 /* EditorChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorChrome.swift; sourceTree = "<group>"; };
 		7CF3030FEFF60A9E00ACF22C /* StrokeOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrokeOptions.swift; sourceTree = "<group>"; };
 		7DB9ADF51148B7B593827415 /* CountdownOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountdownOverlay.swift; sourceTree = "<group>"; };
 		826D967E7F5D2962EFE34A29 /* AnnotationEditorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationEditorModel.swift; sourceTree = "<group>"; };
@@ -536,6 +538,7 @@
 				92F59F62D19FF9B83F50E2D1 /* CloudUploadOptions.swift */,
 				EC98709615BCFD7C3C15600A /* CurvedArrow.swift */,
 				A5A64AC810FA18E292562224 /* Document.swift */,
+				79187CE18696A103378D33E6 /* EditorChrome.swift */,
 				CA1C53D4E064EC5B6570D913 /* EditorCloseGuard.swift */,
 				41B1FFF560349A356C312F34 /* FailureAlert.swift */,
 				DAB3C2075FF2BEF2BC2650CB /* Geometry2d.swift */,
@@ -839,6 +842,7 @@
 				F1BD9BB54CFB037D8A39EDF0 /* CurvedArrow.swift in Sources */,
 				42417A5044EED4E149F8DDBD /* DeckStaging.swift in Sources */,
 				8CB7F60BBDE66AA3DB038DF5 /* Document.swift in Sources */,
+				CE1AC7D23DD3C75A916B3BFF /* EditorChrome.swift in Sources */,
 				FCF6D15042D5341FE0B8F8CC /* EditorCloseGuard.swift in Sources */,
 				328ADEC511F4BFC1C5DBE414 /* EscapeKey.swift in Sources */,
 				D8AE5ACE0841050A49E7B483 /* FailureAlert.swift in Sources */,

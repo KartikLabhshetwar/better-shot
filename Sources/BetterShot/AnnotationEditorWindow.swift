@@ -24,10 +24,10 @@ private enum AnnotationUploadPhase: Equatable {
 struct AnnotationEditorWindow: View {
     @Binding var url: URL?
 
-    @State private var model = AnnotationEditorModel()
+    @State private var model: AnnotationEditorModel
     @State private var wallpaperStore = AnnotationWallpaperStore.shared
     @State private var backgroundPresetStore = AnnotationBackgroundPresetStore.shared
-    @State private var isInspectorPresented = true
+    @State private var isInspectorPresented = false
     @State private var isSaving = false
     @State private var isExporting = false
     @State private var saveFlash = false
@@ -39,10 +39,22 @@ struct AnnotationEditorWindow: View {
     @FocusState private var focusedField: AnnotationEditorFocusedField?
     @Environment(\.dismiss) private var dismissWindow
 
+    init(url: Binding<URL?>, model: AnnotationEditorModel? = nil) {
+        _url = url
+        _model = State(initialValue: model ?? AnnotationEditorModel())
+    }
+
     var body: some View {
-        mainContent
+        VStack(spacing: 0) {
+            imageTools
+            if model.hasInspectorStyleControls && !model.isCropping {
+                annotationStyleBar
+            }
+            Divider()
+            mainContent
+        }
             .editorFullScreenByDefault()
-            .navigationTitle("BetterShot Annotate")
+            .navigationTitle(url?.deletingPathExtension().lastPathComponent ?? "Image Editor")
             .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
             .toolbar {
                 ToolbarItemGroup(placement: .navigation) {
@@ -110,10 +122,10 @@ struct AnnotationEditorWindow: View {
                 onRedo: model.redo,
                 onSelectAll: model.selectAllAnnotations,
                 onSelectTool: model.selectTool,
-                onZoomIn: { withAnimation(.canvasZoom) { model.zoomIn() } },
-                onZoomOut: { withAnimation(.canvasZoom) { model.zoomOut() } },
-                onFitCanvas: { withAnimation(.canvasZoom) { model.fitCanvas() } },
-                onActualSize: { withAnimation(.canvasZoom) { model.setZoomPercent(100) } },
+                onZoomIn: model.zoomIn,
+                onZoomOut: model.zoomOut,
+                onFitCanvas: model.fitCanvas,
+                onActualSize: { model.setZoomPercent(100) },
                 onToggleCrop: { withAnimation(.snappy(duration: 0.2)) { model.toggleCropping() } },
                 onApplyCrop: { withAnimation(.snappy(duration: 0.2)) { model.applyCrop() } },
                 onCancelCrop: { withAnimation(.snappy(duration: 0.2)) { model.cancelCrop() } },
@@ -132,26 +144,137 @@ struct AnnotationEditorWindow: View {
             }
     }
 
+    private var imageTools: some View {
+        HStack(spacing: 4) {
+            Menu {
+                Picker("Aspect Ratio", selection: $model.backgroundSettings.aspectRatio) {
+                    ForEach(AnnotationBackgroundAspectRatio.allCases) { ratio in
+                        Text(ratio.title).tag(ratio)
+                    }
+                }
+            } label: {
+                Label(model.backgroundSettings.aspectRatio.title, systemImage: "aspectratio")
+            }
+            .fixedSize()
+            .frame(width: 110)
+
+            Button(action: enterCrop) {
+                Label("Crop", systemImage: "crop").labelStyle(.iconOnly)
+            }
+            .help("Crop Image")
+            Divider().frame(height: 24)
+
+            ForEach(AnnotationTool.allCases) { tool in
+                Button {
+                    clearInspectorFocus()
+                    model.selectTool(tool)
+                } label: {
+                    Label(tool.title, systemImage: tool.systemImage).labelStyle(.iconOnly)
+                }
+                .buttonStyle(EditorButtonStyle(selected: model.selectedTool == tool))
+                .accessibilityAddTraits(model.selectedTool == tool ? .isSelected : [])
+                .help(tool.helpText)
+            }
+
+            Divider().frame(height: 24)
+            EditorPopover(title: "Background", systemImage: "photo") {
+                AnnotationBackgroundPresetBar(model: model, presetStore: backgroundPresetStore,
+                                             onEditorAction: clearInspectorFocus)
+                AnnotationBackgroundInspector(settings: $model.backgroundSettings,
+                    wallpaperStore: wallpaperStore, onEditorAction: clearInspectorFocus,
+                    onPickWallpaper: pickCustomWallpaper)
+            }
+            EditorPopover(title: "Padding", systemImage: "rectangle.inset.filled") {
+                InspectorSlider("Padding", value: $model.backgroundSettings.padding,
+                                range: 0.04...0.45, format: .percent())
+            }
+            EditorPopover(title: "Rounding", systemImage: "app") {
+                InspectorSlider("Corners", value: $model.backgroundSettings.cornerRadius,
+                                range: 0...0.12, format: .percent())
+            }
+            EditorPopover(title: "Shadow", systemImage: "square.on.square") {
+                InspectorSlider("Shadow", value: $model.backgroundSettings.shadow,
+                                range: 0...1, format: .percent())
+                Picker("Style", selection: $model.backgroundSettings.shadowStyle) {
+                    ForEach(AnnotationShadowStyle.allCases) { style in
+                        Text(style.title).tag(style)
+                    }
+                }
+            }
+            EditorPopover(title: "Border", systemImage: "rectangle") {
+                Toggle("Enable border", isOn: $model.backgroundSettings.border.isEnabled)
+                AnnotationScreenshotBorderInspector(settings: $model.backgroundSettings.border,
+                                                     onEditorAction: clearInspectorFocus)
+                    .disabled(!model.backgroundSettings.border.isEnabled)
+            }
+            Spacer(minLength: 0)
+            Button {
+                clearInspectorFocus()
+                isInspectorPresented.toggle()
+            } label: {
+                Label("Effects", systemImage: "slider.horizontal.3")
+            }
+            .help("Smart redaction, camera, blur, and watermark")
+        }
+        .buttonStyle(EditorButtonStyle())
+        .padding(.horizontal, 16)
+        .frame(height: 56)
+        .background(EditorChrome.panel)
+        .disabled(model.previewImage == nil || model.isCropping)
+    }
+
+    private var annotationStyleBar: some View {
+        HStack(spacing: 16) {
+            Text(model.inspectedTool?.title ?? "Selection")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+            if model.isColorStyleAvailable {
+                AnnotationSwatchStrip(selectedSwatch: model.selectedSwatch) { swatch in
+                    clearInspectorFocus()
+                    model.setSwatch(swatch)
+                }
+                .fixedSize()
+            }
+            if model.isStrokeStyleAvailable {
+                AnnotationStrokePicker(strokeWidth: model.strokeWidth) { width in
+                    clearInspectorFocus()
+                    model.setStrokeWidth(width)
+                }
+                    .frame(width: 140)
+            }
+            if model.isTextStyleAvailable {
+                EditorPopover(title: "Text Style", systemImage: "textformat") {
+                    AnnotationTextStyleControls(model: model)
+                }
+            }
+            if model.isRedactionStyleAvailable {
+                InspectorSlider("Strength", value: Binding(
+                    get: { model.redactionDensity },
+                    set: {
+                        clearInspectorFocus()
+                        model.setRedactionDensity($0)
+                    }
+                ), range: 0.15...1, format: .percent())
+                .frame(width: 220)
+            }
+            Spacer()
+            Button { model.deleteSelectedAnnotation() } label: {
+                Label("Delete Selection", systemImage: "trash").labelStyle(.iconOnly)
+            }
+            .buttonStyle(EditorButtonStyle())
+            .disabled(model.selectionCount == 0)
+            .help("Delete selected annotation (⌫)")
+        }
+        .padding(.horizontal, 20)
+        .frame(height: 44)
+        .background(EditorChrome.panel)
+    }
+
     // MARK: Toolbar actions
 
     /// The standard trailing actions shown when not cropping.
     @ViewBuilder
     private var editingActions: some View {
-        Button(action: enterCrop) {
-            Label("Crop", systemImage: "crop")
-                .labelStyle(.titleAndIcon)
-        }
-        .help("Crop the screenshot")
-        .disabled(model.previewImage == nil || model.imageSize == .zero)
-
-        Button {
-            model.deleteSelectedAnnotation()
-        } label: {
-            Label("Delete", systemImage: "trash")
-        }
-        .disabled(model.selectionCount == 0)
-        .help("Delete selected annotation (⌫)")
-
         Button(action: saveEdits) {
             if isSaving {
                 ProgressView().controlSize(.small)
@@ -205,18 +328,12 @@ struct AnnotationEditorWindow: View {
                     .labelStyle(.titleAndIcon)
             }
         }
-        .tint(.accentColor)
+        .buttonStyle(.borderedProminent)
         .disabled(model.previewImage == nil || model.imageSize == .zero || isExporting || isSaving || isCopying || uploadPhase.isUploading)
         .accessibilityLabel(isExporting ? "Exporting image" : "Export image")
         .help("Save the finished image to your Mac")
 
-        Button {
-            clearInspectorFocus()
-            isInspectorPresented.toggle()
-        } label: {
-            Image(systemName: "sidebar.right")
-        }
-        .help(isInspectorPresented ? "Hide Inspector" : "Show Inspector")
+
     }
 
     /// The crop controls that replace the trailing actions while cropping.
@@ -303,7 +420,7 @@ struct AnnotationEditorWindow: View {
                     .controlSize(.large)
             }
         }
-        .frame(minWidth: 760, minHeight: 580)
+        .frame(minWidth: 980, minHeight: 580)
         .clipped()
         .overlay(alignment: .bottomLeading) {
             if model.previewImage != nil, model.imageSize != .zero {

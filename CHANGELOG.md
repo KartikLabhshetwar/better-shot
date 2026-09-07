@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Cap-style image editor**: A compact tool strip, contextual annotation controls, and native popovers for background, padding, rounding, shadow, and border leave more room for the image. Advanced effects remain available from Effects.
+- **Visible image zoom controls**: Zoom out, a continuous slider, zoom in, percentage presets, and Fit are available together on the canvas. The existing zoom bounds and pan behavior are preserved.
+- **Cap-style video editor**: The preview and tabbed inspector sit in separate bordered panels above a full-width timeline. Background, camera, audio, cursor, keystrokes, captions, and zoom/clip controls use the existing SwiftUI components; timeline selections reveal their controls automatically.
+- **Timeline zoom slider**: The slider uses the existing anchored zoom and scrolling implementation alongside zoom-in, zoom-out, and Fit controls.
+- Rendering, GPU caches, playback, recording, and export pipelines are unchanged. Menu bar styling and capture actions are unchanged.
+
 ### Removed
 
 - Removed the Media Gallery and restored the Recording Projects browser. Existing captures, shared links, and project files are preserved; recent captures remain available from the menu bar.

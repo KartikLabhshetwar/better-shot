@@ -5,50 +5,55 @@
 
 import SwiftUI
 
-extension Animation {
-    /// Animation used for discrete zoom changes (menu, shortcuts, zoom in/out).
-    static var canvasZoom: Animation { .smooth(duration: 0.24) }
-}
-
 struct AnnotationZoomControl: View {
     @Bindable var model: AnnotationEditorModel
 
-    private func zoom(_ change: () -> Void) {
-        withAnimation(.canvasZoom, change)
-    }
-
     var body: some View {
-        Menu {
-            Button("Zoom In") { zoom { model.zoomIn() } }
-                .keyboardShortcut("+", modifiers: .command)
-            Button("Zoom Out") { zoom { model.zoomOut() } }
-                .keyboardShortcut("-", modifiers: .command)
+        HStack(spacing: 4) {
+            Button { model.zoomOut() } label: {
+                Label("Zoom Out", systemImage: "minus.magnifyingglass").labelStyle(.iconOnly)
+            }
+            .disabled(model.zoomPercent <= AnnotationEditorModel.minZoomPercent)
+            .help("Zoom Out (⌘−)")
 
-            Divider()
+            Slider(
+                value: Binding(
+                    get: { Double(model.zoomPercent) },
+                    set: { model.setZoomPercent(Int($0.rounded())) }
+                ),
+                in: Double(AnnotationEditorModel.minZoomPercent)...Double(AnnotationEditorModel.maxZoomPercent)
+            )
+            .frame(width: 96)
+            .accessibilityLabel("Canvas zoom")
+            .accessibilityValue("\(model.zoomPercent) percent")
 
-            Button("Fit Canvas") { zoom { model.fitCanvas() } }
-                .keyboardShortcut("1", modifiers: .command)
+            Button { model.zoomIn() } label: {
+                Label("Zoom In", systemImage: "plus.magnifyingglass").labelStyle(.iconOnly)
+            }
+            .disabled(model.zoomPercent >= AnnotationEditorModel.maxZoomPercent)
+            .help("Zoom In (⌘+)")
 
-            Divider()
+            Menu {
+                Button("Fit Canvas", action: model.fitCanvas)
+                Divider()
+                ForEach([25, 50, 100, 200, 400], id: \.self) { percent in
+                    Button("\(percent)%") { model.setZoomPercent(percent) }
+                }
+            } label: {
+                Text("\(model.zoomPercent)%").monospacedDigit().frame(minWidth: 44)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .accessibilityLabel("Zoom percentage")
 
-            Button("50%") { zoom { model.setZoomPercent(50) } }
-            Button("100%") { zoom { model.setZoomPercent(100) } }
-                .keyboardShortcut("0", modifiers: .command)
-            Button("200%") { zoom { model.setZoomPercent(200) } }
-        } label: {
-            Text("\(model.zoomPercent)%")
-                .font(.system(size: 12, weight: .medium))
-                .monospacedDigit()
-                .frame(minWidth: 38)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .contentShape(Capsule())
-                .glassEffect(.regular.interactive())
+            Divider().frame(height: 20)
+            Button("Fit", action: model.fitCanvas)
+                .help("Fit Canvas (⌘1)")
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help("Zoom")
+        .buttonStyle(EditorButtonStyle())
+        .padding(4)
+        .background(EditorChrome.panel, in: RoundedRectangle(cornerRadius: 8))
+        .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(EditorChrome.border) }
     }
 }
 
@@ -113,7 +118,7 @@ struct LowResolutionPreviewNotice: View {
 
 struct AnnotationEditorWorkspaceBackground: View {
     var body: some View {
-        Color(nsColor: .windowBackgroundColor)
+        EditorChrome.workspace
             .ignoresSafeArea()
     }
 }
