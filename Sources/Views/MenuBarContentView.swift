@@ -212,10 +212,7 @@ struct MenuBarContentView: View {
         } else {
             for record in recentScreenshots.prefix(8) {
                 screenshotItems.append(TrayMenuItem(title: record.filename, icon: "photo") { [record] in
-                    let screen = originScreen
-                    dismissPopover()
-                    let url = HistoryStore.shared.displayURLForRecord(record)
-                    PreviewOverlay.shared.show(url: url, on: screen)
+                    openRecentCapture(record)
                 })
             }
         }
@@ -227,16 +224,28 @@ struct MenuBarContentView: View {
         } else {
             for record in recentRecordings.prefix(8) {
                 recordingItems.append(TrayMenuItem(title: record.filename, icon: "video") { [record] in
-                    let screen = originScreen
-                    dismissPopover()
-                    let url = HistoryStore.shared.displayURLForRecord(record)
-                    PreviewOverlay.shared.show(url: url, on: screen)
+                    openRecentCapture(record)
                 })
             }
         }
         items.append(TrayMenuItem(title: "Recordings", icon: "video.circle", action: {}, submenu: recordingItems))
 
         return items
+    }
+
+    private func openRecentCapture(_ record: CaptureRecord) {
+        let screen = originScreen
+        let url = HistoryStore.shared.displayURLForRecord(record)
+        dismissPopover()
+        // Present once native menu tracking has ended. Explicitly reopened
+        // captures stay visible until acted on, regardless of the capture timer.
+        DispatchQueue.main.async {
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                ToastWindow.shared.show(title: "Capture unavailable", message: "This file has been moved or deleted.", systemIcon: "exclamationmark.triangle", on: screen)
+                return
+            }
+            PreviewOverlay.shared.show(url: url, on: screen, automaticallyDismiss: false)
+        }
     }
 
     private func openSettings() {

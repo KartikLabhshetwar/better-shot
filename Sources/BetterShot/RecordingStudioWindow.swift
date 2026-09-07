@@ -2852,9 +2852,10 @@ private struct StudioInspector: View {
             GlassEffectContainer(spacing: 8) {
                 VStack(spacing: 0) {
                     StudioInspectorTabs(selection: $selectedTab, isAvailable: isAvailable)
-                        .frame(height: 36)
-                        .padding(8)
-                        .studioGlass()
+                        .frame(height: 32)
+                        .padding(4)
+                        .background(Color.primary.opacity(0.055), in: Capsule())
+                        .clipShape(Capsule())
                         .padding(12)
                     effectActions
                 }

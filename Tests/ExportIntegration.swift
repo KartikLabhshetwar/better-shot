@@ -90,6 +90,20 @@ struct ExportIntegration {
 
         let movie = directory.appendingPathComponent("source.mov")
         try await makeMovie(at: movie, image: image)
+        precondition(HistoryStore.decodeThumbnail(.init(url: movie, kind: .recording)) != nil,
+                     "Standalone recordings must produce preview thumbnails")
+        let previewSession = RecordingSession(directoryURL: directory.appendingPathComponent("Preview.bettershotrec"))
+        try FileManager.default.createDirectory(at: previewSession.directoryURL, withIntermediateDirectories: true)
+        try Data().write(to: previewSession.screenURL)
+        let poster = CGImageDestinationCreateWithURL(previewSession.posterURL as CFURL, UTType.jpeg.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(poster, image, nil)
+        precondition(CGImageDestinationFinalize(poster))
+        precondition(HistoryStore.decodeThumbnail(.init(url: previewSession.screenURL, kind: .recording)) != nil,
+                     "A recording poster must remain available when video decoding fails")
+        try FileManager.default.removeItem(at: previewSession.posterURL)
+        precondition(HistoryStore.decodeThumbnail(.init(url: previewSession.screenURL, kind: .recording)) == nil,
+                     "An unreadable movie must return a failure for the visible fallback card")
+        print("PASS recording thumbnails, cached posters, and unreadable-video fallback")
         try await checkEditorUI(imageURL: source, movieURL: movie)
         let clips = RecordingClipTimeline.full(sourceDuration: 2)
         let viewport = ViewportTimeline.build(

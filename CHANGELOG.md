@@ -9,10 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Recent screenshots and recordings reopen their preview after menu tracking ends and remain visible until acted on. Video previews use cached project posters when available, and loading/failed thumbnails show a clickable card instead of an invisible overlay.
+- Test builds stop immediately on compiler errors on macOS’s bundled Make, preventing checks from running against stale application objects.
+
 - Automated editor/export tests no longer open the user's R2 Keychain, avoiding repeated password prompts from freshly rebuilt test executables. `make test` runs the checks without certificate signing; no passwords are stored in scripts.
 - Crop and Censor use native glass buttons with adaptive labels, remaining legible in light mode and inactive windows.
 - Timeline zoom works on short recordings again. Zoom buttons use the earlier 1.6× steps, the slider reaches both limits, Fit shows the full recording, and playback controls no longer overlap the zoom controls. The native 100,000-point lane-width cap is retained.
-- Inspector navigation now shows effect names in a native menu instead of relying on icon-only tabs and hover tooltips. Unavailable effects remain disabled and a disappearing effect returns to Background.
+- Inspector navigation uses a compact capsule of native icon tabs with a neutral selection highlight, matching the reference editor. The current section title remains visible below the tabs; hover tooltips are no longer required. Unavailable effects remain disabled and a disappearing effect returns to Background.
 - Image/video effect and zoom sliders use the existing label-in-track scrubber and exact value field. Removed the duplicate horizontal sliders; zoom amount, framing, target, and enable edits participate in undo.
 - Captures and temporary image edits use full UUID filenames. Completed images are moved into place without overwriting another capture, and failed writes clean up staging files.
 - Failed history imports no longer reuse the previous screenshot. Failed staging/rendering preserves the original preview, deleted captures cannot return after a delayed render, and captures queued during last-region capture are processed.

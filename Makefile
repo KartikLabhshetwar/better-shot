@@ -2,8 +2,8 @@
 #
 # Recipes pipe xcodebuild into tail/grep. A shell pipeline reports the LAST
 # command's status, so without pipefail a failed build exits 0 and looks green.
-SHELL := /bin/bash
-.SHELLFLAGS := -o pipefail -c
+# macOS ships Make 3.81, which ignores .SHELLFLAGS. Put pipefail on the shell itself.
+SHELL := /bin/bash -o pipefail
 
 # Usage:
 #   make build        — Debug build

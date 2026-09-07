@@ -1,45 +1,74 @@
 import AppKit
 import SwiftUI
 
-// Visible names make every inspector discoverable without hover-only tooltips.
-// AppKit owns menu navigation, focus, and accessibility.
-struct StudioInspectorTabs: NSViewRepresentable {
+struct StudioInspectorTabs: View {
+    @Binding var selection: StudioInspectorTab
+    let isAvailable: (StudioInspectorTab) -> Bool
+
+    var body: some View {
+        GeometryReader { geometry in
+            let segmentWidth = geometry.size.width / CGFloat(StudioInspectorTab.allCases.count)
+            Capsule()
+                .fill(Color.primary.opacity(0.16))
+                .frame(width: segmentWidth, height: 28)
+                .offset(x: CGFloat(StudioInspectorTab.allCases.firstIndex(of: selection) ?? 0) * segmentWidth,
+                        y: (geometry.size.height - 28) / 2)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            StudioInspectorSegments(selection: $selection, isAvailable: isAvailable)
+        }
+    }
+}
+
+// Native segments retain keyboard navigation and accessibility. The section title
+// below the bar names the active inspector without relying on hover tooltips.
+private struct StudioInspectorSegments: NSViewRepresentable {
     @Binding var selection: StudioInspectorTab
     let isAvailable: (StudioInspectorTab) -> Bool
 
     func makeCoordinator() -> Coordinator { Coordinator(selection: $selection) }
 
-    func makeNSView(context: Context) -> NSPopUpButton {
-        let control = NSPopUpButton(frame: .zero, pullsDown: false)
+    func makeNSView(context: Context) -> NSSegmentedControl {
+        let control = NSSegmentedControl()
+        control.segmentCount = StudioInspectorTab.allCases.count
+        control.trackingMode = .selectOne
+        control.segmentStyle = .rounded
+        control.cell?.isBordered = false
         control.controlSize = .large
-        control.bezelStyle = .rounded
-        control.autoenablesItems = false
-        for tab in StudioInspectorTab.allCases {
-            control.addItem(withTitle: tab.title)
-            control.lastItem?.image = NSImage(systemSymbolName: tab.systemImage,
-                                              accessibilityDescription: nil)
-        }
+        control.selectedSegmentBezelColor = .controlBackgroundColor
         control.target = context.coordinator
         control.action = #selector(Coordinator.select(_:))
         control.setAccessibilityLabel("Video inspector")
         return control
     }
 
-    func updateNSView(_ control: NSPopUpButton, context: Context) {
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView control: NSSegmentedControl, context: Context) -> CGSize? {
+        let width = proposal.width ?? 294
+        for index in StudioInspectorTab.allCases.indices {
+            control.setWidth(width / CGFloat(StudioInspectorTab.allCases.count), forSegment: index)
+        }
+        return CGSize(width: width, height: 32)
+    }
+
+    func updateNSView(_ control: NSSegmentedControl, context: Context) {
         context.coordinator.selection = $selection
         for (index, tab) in StudioInspectorTab.allCases.enumerated() {
-            control.item(at: index)?.isEnabled = isAvailable(tab)
+            let symbol = NSImage(systemSymbolName: tab.systemImage,
+                                 accessibilityDescription: tab.title)?
+                .withSymbolConfiguration(.init(pointSize: 15, weight: .medium))
+            control.setImage(symbol, forSegment: index)
+            control.setEnabled(isAvailable(tab), forSegment: index)
         }
-        control.selectItem(at: StudioInspectorTab.allCases.firstIndex(of: selection) ?? 0)
+        control.selectedSegment = StudioInspectorTab.allCases.firstIndex(of: selection) ?? 0
     }
 
     final class Coordinator: NSObject {
         var selection: Binding<StudioInspectorTab>
         init(selection: Binding<StudioInspectorTab>) { self.selection = selection }
-        @objc func select(_ sender: NSPopUpButton) {
-            guard StudioInspectorTab.allCases.indices.contains(sender.indexOfSelectedItem),
-                  sender.selectedItem?.isEnabled == true else { return }
-            selection.wrappedValue = StudioInspectorTab.allCases[sender.indexOfSelectedItem]
+        @objc func select(_ sender: NSSegmentedControl) {
+            guard StudioInspectorTab.allCases.indices.contains(sender.selectedSegment),
+                  sender.isEnabled(forSegment: sender.selectedSegment) else { return }
+            selection.wrappedValue = StudioInspectorTab.allCases[sender.selectedSegment]
         }
     }
 }

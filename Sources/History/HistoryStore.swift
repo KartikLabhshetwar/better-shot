@@ -171,6 +171,14 @@ final class HistoryStore {
 
     nonisolated static func decodeThumbnail(_ source: ThumbnailSource, maxSize: CGFloat = 120) -> NSImage? {
         if source.kind == .recording {
+            let directory = source.url.deletingLastPathComponent()
+            if RecordingSession.isSessionDirectory(directory),
+               FileManager.default.fileExists(atPath: directory.appendingPathComponent(RecordingSession.posterFileName).path),
+               let poster = decodeThumbnail(ThumbnailSource(
+                    url: directory.appendingPathComponent(RecordingSession.posterFileName),
+                    kind: .screenshot), maxSize: maxSize) {
+                return poster
+            }
             return videoThumbnail(url: source.url, maxSize: maxSize)
         }
 

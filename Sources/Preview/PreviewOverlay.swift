@@ -30,7 +30,7 @@ final class PreviewOverlay {
 
     private init() {}
 
-    func show(url: URL, on screen: NSScreen? = nil) {
+    func show(url: URL, on screen: NSScreen? = nil, automaticallyDismiss: Bool = true) {
         cancelScheduledDismiss(for: url)
         items.removeAll { $0 == url }
         items.append(url)
@@ -45,9 +45,9 @@ final class PreviewOverlay {
         }
 
         positionPanel()
-        panel?.orderFront(nil)
+        panel?.orderFrontRegardless()
 
-        scheduleDismiss(for: url)
+        if automaticallyDismiss { scheduleDismiss(for: url) }
     }
 
     func remove(_ url: URL) {
@@ -218,6 +218,7 @@ struct PreviewCardView: View {
     let url: URL
     @State private var isHovered = false
     @State private var thumbnail: NSImage?
+    @State private var isLoadingThumbnail = true
 
     // Read fresh each time a card is shown rather than cached: `dismiss()`
     // always nils the panel and `show()` always rebuilds it, so a size change
@@ -278,13 +279,30 @@ struct PreviewCardView: View {
                     return NSItemProvider(object: image)
                 }
             } else {
-                Color.clear.frame(width: cardSize.width, height: cardSize.height)
+                Button {
+                    overlay.openAnnotateEditor(for: url)
+                } label: {
+                    VStack(spacing: 8) {
+                        if isLoadingThumbnail {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: isVideo ? "play.rectangle" : "photo")
+                                .font(.title2)
+                        }
+                        Text(isLoadingThumbnail ? "Loading preview…" : "Open \(isVideo ? "recording" : "image")")
+                            .font(.caption)
+                    }
+                    .frame(width: cardSize.width, height: cardSize.height)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isVideo ? "Open recording editor" : "Open image editor")
             }
         }
-        .onAppear(perform: loadThumbnail)
+        .task(id: url) { await loadThumbnail() }
     }
 
-    private func loadThumbnail() {
+    private func loadThumbnail() async {
         // Both kinds go through the history store's decoder: it samples a bounded
         // thumbnail rather than the full bitmap, and it is nonisolated, so the
         // decode runs off the main actor instead of on the tick that just
@@ -294,10 +312,14 @@ struct PreviewCardView: View {
             kind: Self.isVideo(url) ? .recording : .screenshot
         )
         let sampleSize = max(cardSize.width, cardSize.height) * 2 // retina headroom at the current card size
-        Task.detached(priority: .userInitiated) {
-            let image = HistoryStore.decodeThumbnail(source, maxSize: sampleSize)
-            await MainActor.run { thumbnail = image }
+        isLoadingThumbnail = true
+        let task = Task.detached(priority: .userInitiated) {
+            HistoryStore.decodeThumbnail(source, maxSize: sampleSize)
         }
+        let image = await task.value
+        guard !Task.isCancelled else { return }
+        thumbnail = image
+        isLoadingThumbnail = false
     }
 
     @ViewBuilder
