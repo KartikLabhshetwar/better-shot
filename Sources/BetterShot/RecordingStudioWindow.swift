@@ -3190,14 +3190,14 @@ private struct StudioInspector: View {
                 "Speed",
                 value: Binding(
                     get: { CGFloat(clip.speed) },
-                    set: { model.setClipSpeed(Double($0.rounded()), forClipID: clip.id) }
+                    set: { model.setClipSpeed(Double($0), forClipID: clip.id) }
                 ),
                 range: CGFloat(RecordingClipSegment.minimumSpeed)...CGFloat(RecordingClipSegment.maximumSpeed),
-                format: .magnification(fractionDigits: 0)
+                format: .magnification(fractionDigits: 2)
             )
 
             if clip.speed != 1 {
-                Text("Plays this clip \(Int(clip.speed))× faster. Audio speeds up with it.")
+                Text("Plays this clip at \(clip.speed.formatted(.number.precision(.fractionLength(0...2))))× speed. Audio stays in sync.")
                     .font(.inspectorLabel)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

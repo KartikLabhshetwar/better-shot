@@ -11,13 +11,13 @@ import Foundation
 
 nonisolated struct RecordingClipSegment: Identifiable, Codable, Equatable, Sendable {
     static let minimumDuration: TimeInterval = 0.12
-    static let minimumSpeed: Double = 1
+    static let minimumSpeed: Double = 0.25
     static let maximumSpeed: Double = 8
 
     var id: UUID
     var sourceStart: TimeInterval
     var sourceEnd: TimeInterval
-    /// Playback speed multiplier applied only to this clip (1...8). Baked
+    /// Playback speed multiplier applied only to this clip (0.25...8). Baked
     /// into the composition via `AVMutableComposition.scaleTimeRange`, so
     /// video and audio speed up together and stay in sync.
     var speed: Double

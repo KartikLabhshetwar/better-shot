@@ -341,7 +341,7 @@ nonisolated struct PointerTimeline: Sendable {
             if sourceTime >= segment.sourceStart,
                sourceTime < segment.sourceEnd {
                 return editorStart
-                    + (sourceTime - segment.sourceStart) / max(segment.speed, 1)
+                    + (sourceTime - segment.sourceStart) / max(segment.speed, RecordingClipSegment.minimumSpeed)
             }
             editorStart += segment.editorDuration
         }
