@@ -1,44 +1,45 @@
 import AppKit
 import SwiftUI
 
-// NSSegmentedControl owns keyboard navigation and exposes native per-segment tooltips.
+// Visible names make every inspector discoverable without hover-only tooltips.
+// AppKit owns menu navigation, focus, and accessibility.
 struct StudioInspectorTabs: NSViewRepresentable {
     @Binding var selection: StudioInspectorTab
     let isAvailable: (StudioInspectorTab) -> Bool
 
     func makeCoordinator() -> Coordinator { Coordinator(selection: $selection) }
 
-    func makeNSView(context: Context) -> NSSegmentedControl {
-        let control = NSSegmentedControl()
-        control.segmentCount = StudioInspectorTab.allCases.count
-        control.trackingMode = .selectOne
-        control.segmentStyle = .rounded
+    func makeNSView(context: Context) -> NSPopUpButton {
+        let control = NSPopUpButton(frame: .zero, pullsDown: false)
         control.controlSize = .large
-        control.selectedSegmentBezelColor = StudioChrome.accentNSColor
+        control.bezelStyle = .rounded
+        control.autoenablesItems = false
+        for tab in StudioInspectorTab.allCases {
+            control.addItem(withTitle: tab.title)
+            control.lastItem?.image = NSImage(systemSymbolName: tab.systemImage,
+                                              accessibilityDescription: nil)
+        }
         control.target = context.coordinator
         control.action = #selector(Coordinator.select(_:))
         control.setAccessibilityLabel("Video inspector")
         return control
     }
 
-    func updateNSView(_ control: NSSegmentedControl, context: Context) {
+    func updateNSView(_ control: NSPopUpButton, context: Context) {
         context.coordinator.selection = $selection
         for (index, tab) in StudioInspectorTab.allCases.enumerated() {
-            control.setImage(NSImage(systemSymbolName: tab.systemImage,
-                                     accessibilityDescription: tab.title), forSegment: index)
-            control.setWidth(44, forSegment: index)
-            control.setEnabled(isAvailable(tab), forSegment: index)
-            control.setToolTip(isAvailable(tab) ? tab.title : tab.unavailableHelp, forSegment: index)
+            control.item(at: index)?.isEnabled = isAvailable(tab)
         }
-        control.selectedSegment = StudioInspectorTab.allCases.firstIndex(of: selection) ?? 0
+        control.selectItem(at: StudioInspectorTab.allCases.firstIndex(of: selection) ?? 0)
     }
 
     final class Coordinator: NSObject {
         var selection: Binding<StudioInspectorTab>
         init(selection: Binding<StudioInspectorTab>) { self.selection = selection }
-        @objc func select(_ sender: NSSegmentedControl) {
-            guard StudioInspectorTab.allCases.indices.contains(sender.selectedSegment) else { return }
-            selection.wrappedValue = StudioInspectorTab.allCases[sender.selectedSegment]
+        @objc func select(_ sender: NSPopUpButton) {
+            guard StudioInspectorTab.allCases.indices.contains(sender.indexOfSelectedItem),
+                  sender.selectedItem?.isEnabled == true else { return }
+            selection.wrappedValue = StudioInspectorTab.allCases[sender.indexOfSelectedItem]
         }
     }
 }
@@ -95,7 +96,7 @@ struct StudioAmountEffect: View {
             .controlSize(.mini)
             .help("Enable \(title.lowercased())")
         } content: {
-            StudioEffectSlider("Amount", value: $value, range: range, format: .percent())
+            InspectorSlider("Amount", value: $value, range: range, format: .percent())
             HStack(spacing: 4) {
                 ForEach(presets, id: \.self) { amount in
                     Button(InspectorValueFormat.percent().displayString(for: amount)) {
@@ -115,30 +116,6 @@ struct StudioEffectToggleState {
         if enabled { return previousAmount ?? defaultValue }
         if current > 0 { previousAmount = current }
         return 0
-    }
-}
-
-/// Keep the existing editable numeric field and add a visible native slider below it.
-struct StudioEffectSlider: View {
-    let title: String
-    @Binding var value: CGFloat
-    let range: ClosedRange<CGFloat>
-    let format: InspectorValueFormat
-
-    init(_ title: String, value: Binding<CGFloat>, range: ClosedRange<CGFloat>, format: InspectorValueFormat) {
-        self.title = title
-        self._value = value
-        self.range = range
-        self.format = format
-    }
-
-    var body: some View {
-        VStack(spacing: 6) {
-            InspectorSlider(title, value: $value, range: range, format: format)
-            Slider(value: $value, in: range)
-                .accessibilityLabel(title)
-                .accessibilityValue(format.displayString(for: value))
-        }
     }
 }
 
@@ -165,15 +142,6 @@ enum StudioInspectorTab: String, CaseIterable, Identifiable {
         case .keyboard: "keyboard"
         case .captions: "captions.bubble"
         case .zoom: "plus.magnifyingglass"
-        }
-    }
-    var unavailableHelp: String {
-        switch self {
-        case .camera: "Camera — this recording has no camera track"
-        case .cursor: "Cursor — this recording has no captured cursor"
-        case .keyboard: "Keystrokes — this recording has no captured keystrokes"
-        case .captions: "Captions — no speech track is available"
-        default: title
         }
     }
 }

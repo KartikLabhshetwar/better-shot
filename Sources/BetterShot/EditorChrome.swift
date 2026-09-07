@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Matches bettershot-landing/app/globals.css --color-brand. Scoped to the video editor.
+/// Matches bettershot-landing/app/globals.css --color-brand. Shared by editors and settings.
 enum StudioChrome {
     static let accentNSColor = NSColor(annoHex: "#7c3aed")
     static let accent = Color(nsColor: accentNSColor)

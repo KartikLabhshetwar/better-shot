@@ -150,8 +150,7 @@ final class ScreenCapture {
 
     private func makeTempPath() -> String {
         let dir = NSTemporaryDirectory()
-        let stamp = Int(Date().timeIntervalSince1970 * 1000)
-        return "\(dir)bettershot_\(stamp).png"
+        return "\(dir)bettershot_\(UUID().uuidString).png"
     }
 
     private func runScreencapture(_ arguments: [String]) async -> Bool {

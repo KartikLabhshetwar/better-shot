@@ -29,6 +29,7 @@ struct ExportIntegration {
             source as CFURL, UTType.png.identifier as CFString, 1, nil)!
         CGImageDestinationAddImage(destination, image, nil)
         precondition(CGImageDestinationFinalize(destination))
+        try await checkCaptureStorage(image: image, source: source, directory: directory)
         let exported = directory.appendingPathComponent("export.png")
         let start = Date()
         try AnnotationRenderer.render(
@@ -234,4 +235,61 @@ struct ExportIntegration {
         await writer.finishWriting()
         precondition(writer.status == .completed)
     }
+}
+
+/// Exercises production persistence in an isolated directory; never alters the user's captures.
+@MainActor
+private func checkCaptureStorage(image: CGImage, source: URL, directory: URL) async throws {
+    let history = HistoryStore(storageDirectory: directory.appendingPathComponent("history"))
+    let first = history.importCapture(from: source, deleteSource: false)!
+    let second = history.importCapture(from: source, deleteSource: false)!
+    precondition(first.filename != second.filename)
+    precondition(history.importCapture(from: directory.appendingPathComponent("missing.png")) == nil)
+    precondition(history.records.count == 2, "A failed import must not insert a capture")
+    let childDirectory = directory.appendingPathComponent("project")
+    let siblingDirectory = directory.appendingPathComponent("project-copy")
+    for folder in [childDirectory, siblingDirectory] {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let url = folder.appendingPathComponent("image.png")
+        try FileManager.default.copyItem(at: source, to: url)
+        history.referenceCapture(at: url)
+    }
+    let siblingURL = siblingDirectory.appendingPathComponent("image.png")
+    let sibling = history.referenceCapture(at: siblingURL)!
+    let alias = siblingDirectory.appendingPathComponent("../project-copy/image.png")
+    precondition(history.referenceCapture(at: alias)?.id == sibling.id,
+                 "Equivalent paths must not create duplicate history entries")
+    history.removeRecords(underDirectory: childDirectory)
+    precondition(history.records.contains { $0.id == sibling.id },
+                 "Removing project must not remove project-copy")
+    precondition(FileManager.default.fileExists(atPath: siblingURL.path))
+    history.deleteRecord(first)
+    precondition(!history.setBeautifiedPath(source.path, for: first.id),
+                 "Late rendering must not revive a deleted capture")
+    let reloaded = HistoryStore(storageDirectory: directory.appendingPathComponent("history"))
+    precondition(reloaded.records.map(\.id) == history.records.map(\.id))
+
+    let smallImage = image.cropping(to: CGRect(x: 0, y: 0, width: 32, height: 32))!
+    let outputs = try await withThrowingTaskGroup(of: URL.self) { group in
+        for _ in 0..<24 {
+            group.addTask {
+                guard let output = CaptureOrchestrator.saveImage(smallImage, in: directory.path) else {
+                    throw CocoaError(.fileWriteUnknown)
+                }
+                return output
+            }
+        }
+        var urls: [URL] = []
+        for try await url in group { urls.append(url) }
+        return urls
+    }
+    precondition(Set(outputs).count == 24, "Concurrent saves need unique destinations")
+    for output in outputs {
+        let imageSource = CGImageSourceCreateWithURL(output as CFURL, nil)!
+        precondition(CGImageSourceCreateImageAtIndex(imageSource, 0, nil)?.width == 32)
+    }
+    precondition(CaptureOrchestrator.saveImage(smallImage, in: directory.appendingPathComponent("missing").path) == nil)
+    let leftovers = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+    precondition(!leftovers.contains { $0.hasPrefix(".bettershot_") }, "Staging files must be cleaned up")
+    print("PASS capture collisions, failed saves/imports, deleted capture guard, path identity, and history persistence")
 }

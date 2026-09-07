@@ -11,6 +11,7 @@ import SwiftUI
 struct RecordingZoomFocusPad: View {
     @Binding var position: CGPoint
     let magnification: Double
+    var onEditingChanged: (Bool) -> Void = { _ in }
 
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var isDragging = false
@@ -77,7 +78,10 @@ struct RecordingZoomFocusPad: View {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
-                        isDragging = true
+                        if !isDragging {
+                            isDragging = true
+                            onEditingChanged(true)
+                        }
                         position = CGPoint(
                             x: normalized(value.location.x / max(sourceSize.width, 1)),
                             y: normalized(value.location.y / max(sourceSize.height, 1))
@@ -85,14 +89,17 @@ struct RecordingZoomFocusPad: View {
                     }
                     .onEnded { _ in
                         isDragging = false
+                        onEditingChanged(false)
                     }
             )
             .simultaneousGesture(
                 TapGesture(count: 2)
                     .onEnded {
+                        onEditingChanged(true)
                         withAnimation(accessibilityReduceMotion ? nil : .snappy(duration: 0.18)) {
                             position = CGPoint(x: 0.5, y: 0.5)
                         }
+                        onEditingChanged(false)
                     }
             )
             .onHover { isHovering = $0 }
@@ -104,6 +111,12 @@ struct RecordingZoomFocusPad: View {
             .accessibilityHint("Drag to move the target. Double-click to center.")
         }
         .frame(height: 118)
+        .onDisappear {
+            if isDragging {
+                isDragging = false
+                onEditingChanged(false)
+            }
+        }
         .help("Drag to position the fixed camera target. The outline shows the visible area. Double-click to center.")
     }
 

@@ -16,16 +16,12 @@ struct AnnotationZoomControl: View {
             .disabled(model.zoomPercent <= AnnotationEditorModel.minZoomPercent)
             .help("Zoom Out (⌘−)")
 
-            Slider(
-                value: Binding(
-                    get: { Double(model.zoomPercent) },
-                    set: { model.setZoomPercent(Int($0.rounded())) }
-                ),
-                in: Double(AnnotationEditorModel.minZoomPercent)...Double(AnnotationEditorModel.maxZoomPercent)
-            )
-            .frame(width: 96)
-            .accessibilityLabel("Canvas zoom")
-            .accessibilityValue("\(model.zoomPercent) percent")
+            InspectorSlider("Zoom", value: Binding(
+                get: { CGFloat(model.zoomPercent) / 100 },
+                set: { model.setZoomPercent(Int(($0 * 100).rounded())) }
+            ), range: CGFloat(AnnotationEditorModel.minZoomPercent) / 100...CGFloat(AnnotationEditorModel.maxZoomPercent) / 100,
+               format: .percent())
+            .frame(width: 170)
 
             Button { model.zoomIn() } label: {
                 Label("Zoom In", systemImage: "plus.magnifyingglass").labelStyle(.iconOnly)
@@ -40,11 +36,11 @@ struct AnnotationZoomControl: View {
                     Button("\(percent)%") { model.setZoomPercent(percent) }
                 }
             } label: {
-                Text("\(model.zoomPercent)%").monospacedDigit().frame(minWidth: 44)
+                Text("Presets")
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
-            .accessibilityLabel("Zoom percentage")
+            .accessibilityLabel("Zoom presets")
 
             Divider().frame(height: 20)
             Button("Fit", action: model.fitCanvas)

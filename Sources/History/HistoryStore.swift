@@ -12,26 +12,22 @@ final class HistoryStore {
     private let storageDir: URL
     private let manifestURL: URL
 
-    private init() {
+    init(storageDirectory: URL? = nil) {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        storageDir = appSupport.appendingPathComponent("BetterShot", isDirectory: true)
+        storageDir = storageDirectory ?? appSupport.appendingPathComponent("BetterShot", isDirectory: true)
         manifestURL = storageDir.appendingPathComponent("history.json")
 
         try? FileManager.default.createDirectory(at: storageDir, withIntermediateDirectories: true)
         loadRecords()
-        pruneOrphanedBases()
+        if storageDirectory == nil { pruneOrphanedBases() }
     }
 
     // MARK: - Import
 
     func importCapture(from tempURL: URL, deleteSource: Bool = true, kind: CaptureKind = .screenshot) -> CaptureRecord? {
         let ext = tempURL.pathExtension.isEmpty ? "png" : tempURL.pathExtension
-        var filename = "bettershot_\(Int(Date().timeIntervalSince1970 * 1000)).\(ext)"
-        var destURL = storageDir.appendingPathComponent(filename)
-        if FileManager.default.fileExists(atPath: destURL.path) {
-            filename = "bettershot_\(Int(Date().timeIntervalSince1970 * 1000))_\(UUID().uuidString.prefix(6)).\(ext)"
-            destURL = storageDir.appendingPathComponent(filename)
-        }
+        let filename = "bettershot_\(UUID().uuidString).\(ext)"
+        let destURL = storageDir.appendingPathComponent(filename)
 
         do {
             try FileManager.default.copyItem(at: tempURL, to: destURL)
@@ -59,8 +55,9 @@ final class HistoryStore {
     /// Adds a capture that already lives in its final location, without copying it into Application Support.
     @discardableResult
     func referenceCapture(at url: URL, kind: CaptureKind = .screenshot, filename: String? = nil) -> CaptureRecord? {
+        let url = url.standardizedFileURL
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-        if let existing = records.first(where: { $0.sourcePath == url.path }) {
+        if let existing = records.first(where: { $0.sourcePath.map { URL(fileURLWithPath: $0).standardizedFileURL.path } == url.path }) {
             return existing
         }
 
@@ -110,13 +107,15 @@ final class HistoryStore {
 
     // MARK: - Update
 
-    func setBeautifiedPath(_ path: String, for recordID: UUID) {
-        guard let index = records.firstIndex(where: { $0.id == recordID }) else { return }
+    @discardableResult
+    func setBeautifiedPath(_ path: String, for recordID: UUID) -> Bool {
+        guard let index = records.firstIndex(where: { $0.id == recordID }) else { return false }
         if let superseded = records[index].beautifiedPath, superseded != path {
             try? FileManager.default.removeItem(atPath: superseded)
         }
         records[index].beautifiedPath = path
         saveRecords()
+        return true
     }
 
     // MARK: - Access
@@ -231,28 +230,13 @@ final class HistoryStore {
     /// Drops records that live inside a deleted recording package, without
     /// touching files: the package owner has already removed them.
     func removeRecords(underDirectory directoryURL: URL) {
-        let prefix = directoryURL.standardizedFileURL.path
+        let prefix = directoryURL.standardizedFileURL.path + "/"
         let survivors = records.filter { record in
             guard let sourcePath = record.sourcePath else { return true }
             return !URL(fileURLWithPath: sourcePath).standardizedFileURL.path.hasPrefix(prefix)
         }
         guard survivors.count != records.count else { return }
         records = survivors
-        saveRecords()
-    }
-
-    func deleteAllRecords() {
-        for record in records {
-            let url = urlForRecord(record)
-            try? FileManager.default.removeItem(at: url)
-            if let beautifiedPath = record.beautifiedPath {
-                let beautifiedURL = URL(fileURLWithPath: beautifiedPath)
-                try? FileManager.default.removeItem(at: beautifiedURL)
-                let baseURL = CaptureOrchestrator.baseImageURL(for: beautifiedURL)
-                try? FileManager.default.removeItem(at: baseURL)
-            }
-        }
-        records.removeAll()
         saveRecords()
     }
 

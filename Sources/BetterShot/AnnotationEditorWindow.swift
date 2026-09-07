@@ -53,6 +53,8 @@ struct AnnotationEditorWindow: View {
             Divider()
             mainContent
         }
+            .tint(StudioChrome.accent)
+            .accentColor(StudioChrome.accent)
             .editorFullScreenByDefault()
             .navigationTitle(url?.deletingPathExtension().lastPathComponent ?? "Image Editor")
             .toolbarBackgroundVisibility(.visible, for: .windowToolbar)

@@ -22,6 +22,10 @@ final class CaptureOrchestrator {
         captureInProgress = true
         captureScreen = screen
         await executeCapture(action)
+        await finishCaptures()
+    }
+
+    private func finishCaptures() async {
         while let (next, nextScreen) = pendingCaptures.first {
             pendingCaptures.removeFirst()
             captureScreen = nextScreen
@@ -36,8 +40,7 @@ final class CaptureOrchestrator {
         captureInProgress = true
         captureScreen = screen
         await captureAndProcess { try await ScreenCapture.shared.captureLastRegion() }
-        captureScreen = nil
-        captureInProgress = false
+        await finishCaptures()
     }
 
     private func executeCapture(_ action: ShortcutService.Action) async {
@@ -75,14 +78,16 @@ final class CaptureOrchestrator {
                 return
             }
 
-            let record = HistoryStore.shared.importCapture(from: url)
-            if let record {
-                lastCaptureURL = HistoryStore.shared.urlForRecord(record)
+            guard let record = HistoryStore.shared.importCapture(from: url) else {
+                // Keep this capture available even when the history directory is unwritable.
+                lastCaptureURL = url
+                PreviewOverlay.shared.show(url: url, on: captureScreen)
+                ToastWindow.shared.show(title: "Couldn’t save capture", message: "The screenshot is still available in the preview.", systemIcon: "exclamationmark.triangle", on: captureScreen)
+                return
             }
-
-            guard let capturedURL = lastCaptureURL else { return }
-
-            await galleryApplyAndSave(capturedURL, recordID: record?.id)
+            let capturedURL = HistoryStore.shared.urlForRecord(record)
+            lastCaptureURL = capturedURL
+            await applyAndSave(capturedURL, recordID: record.id)
         } catch {
             print("Capture failed: \(error.localizedDescription)")
         }
@@ -134,29 +139,45 @@ final class CaptureOrchestrator {
         }.value
 
         guard let stagedURL else {
-            try? FileManager.default.removeItem(at: url)
+            lastCaptureURL = url
+            PreviewOverlay.shared.show(url: url, on: captureScreen)
+            ToastWindow.shared.show(title: "Couldn’t prepare capture", message: "The original screenshot is still available in the preview.", systemIcon: "exclamationmark.triangle", on: captureScreen)
             return
         }
 
-        try? FileManager.default.moveItem(at: url, to: DeckStaging.rawURL(for: stagedURL))
+        do {
+            try FileManager.default.moveItem(at: url, to: DeckStaging.rawURL(for: stagedURL))
+        } catch {
+            // Preserve the original if staging its editable source fails.
+            try? FileManager.default.removeItem(at: stagedURL)
+            lastCaptureURL = url
+            PreviewOverlay.shared.show(url: url, on: captureScreen)
+            return
+        }
         lastCaptureURL = stagedURL
         PreviewOverlay.shared.show(url: stagedURL, on: captureScreen)
     }
 
-    private func galleryApplyAndSave(_ url: URL, recordID: UUID? = nil) async {
+    private func applyAndSave(_ url: URL, recordID: UUID) async {
         let config = AppPreferences.defaultBeautifierConfig
+        let saveDirectory = AppPreferences.saveDirectory
 
-        let (didRender, savedURL) = await Task.detached { () -> (Bool, URL?) in
+        let savedURL = await Task.detached { () -> URL? in
             guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
                   let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil),
-                  let rendered = BeautifierRenderer.render(image: cgImage, config: config) else { return (false, nil) }
-            return (true, Self.saveImage(rendered, in: AppPreferences.saveDirectory))
+                  let rendered = BeautifierRenderer.render(image: cgImage, config: config) else { return nil }
+            return Self.saveImage(rendered, in: saveDirectory)
         }.value
 
-        guard didRender else { return }
-
-        if let savedURL, let recordID {
+        // A deleted capture must not reappear after a delayed render, even if saving failed.
+        guard HistoryStore.shared.records.contains(where: { $0.id == recordID }) else {
+            if let savedURL { try? FileManager.default.removeItem(at: savedURL) }
+            return
+        }
+        if let savedURL {
             HistoryStore.shared.setBeautifiedPath(savedURL.path, for: recordID)
+        } else {
+            ToastWindow.shared.show(title: "Couldn’t save the edited image", message: "The original screenshot is still available in the preview.", systemIcon: "exclamationmark.triangle", on: captureScreen)
         }
 
         if AppPreferences.copyAfterSave, let savedURL {
@@ -181,27 +202,34 @@ final class CaptureOrchestrator {
         }
     }
 
-    private nonisolated static func saveImage(_ cgImage: CGImage, in dir: String) -> URL? {
-        let stamp = Int(Date().timeIntervalSince1970 * 1000)
-        let ext = AppPreferences.exportFormat.fileExtension
-        let path = "\(dir)/bettershot_\(stamp).\(ext)"
-        let url = URL(fileURLWithPath: path)
+    nonisolated static func saveImage(_ cgImage: CGImage, in dir: String) -> URL? {
+        let format = AppPreferences.exportFormat
+        let directory = URL(fileURLWithPath: dir, isDirectory: true)
+        let url = directory.appendingPathComponent("bettershot_\(UUID().uuidString).\(format.fileExtension)")
+        let stagingURL = directory.appendingPathComponent(".\(url.lastPathComponent)")
+        defer { try? FileManager.default.removeItem(at: stagingURL) }
 
         guard let destination = CGImageDestinationCreateWithURL(
-            url as CFURL,
-            AppPreferences.exportFormat.utType as CFString,
+            stagingURL as CFURL,
+            format.utType as CFString,
             1, nil
         ) else { return nil }
 
         var options: [CFString: Any] = [:]
-        if AppPreferences.exportFormat == .jpeg {
+        if format == .jpeg {
             options[kCGImageDestinationLossyCompressionQuality] = AppPreferences.exportQuality
         }
 
         CGImageDestinationAddImage(destination, cgImage, options as CFDictionary)
 
         guard CGImageDestinationFinalize(destination) else { return nil }
-        return url
+        do {
+            // Rename only a complete image; moveItem refuses to overwrite an existing file.
+            try FileManager.default.moveItem(at: stagingURL, to: url)
+            return url
+        } catch {
+            return nil
+        }
     }
 
     /// Legacy home of duplicated raw copies. Nothing writes here any more; kept so old captures still resolve.

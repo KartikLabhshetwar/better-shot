@@ -10,28 +10,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Automated editor/export tests no longer open the user's R2 Keychain, avoiding repeated password prompts from freshly rebuilt test executables. `make test` runs the checks without certificate signing; no passwords are stored in scripts.
-- Crop and Censor use white labels on brand-colored glass buttons, fixing their low contrast in light mode.
+- Crop and Censor use native glass buttons with adaptive labels, remaining legible in light mode and inactive windows.
 - Timeline zoom works on short recordings again. Zoom buttons use the earlier 1.6× steps, the slider reaches both limits, Fit shows the full recording, and playback controls no longer overlap the zoom controls. The native 100,000-point lane-width cap is retained.
-- Video inspector tabs now use native per-segment tooltips, including explanations for unavailable camera, cursor, keystroke, and caption controls.
+- Inspector navigation now shows effect names in a native menu instead of relying on icon-only tabs and hover tooltips. Unavailable effects remain disabled and a disappearing effect returns to Background.
+- Image/video effect and zoom sliders use the existing label-in-track scrubber and exact value field. Removed the duplicate horizontal sliders; zoom amount, framing, target, and enable edits participate in undo.
+- Captures and temporary image edits use full UUID filenames. Completed images are moved into place without overwriting another capture, and failed writes clean up staging files.
+- Failed history imports no longer reuse the previous screenshot. Failed staging/rendering preserves the original preview, deleted captures cannot return after a delayed render, and captures queued during last-region capture are processed.
+- History recognizes equivalent file paths and keeps similarly named sibling folders separate when removing project entries.
 - Adding a zoom to an imported recording enables zoom playback so the new segment can be edited and previewed immediately.
 
 ### Changed
 
-- **Branded video editor**: Replaced the system-blue editor accent with the landing page's violet (`#7C3AED`), including native inspector tabs and timeline feedback.
+- **Branded editors**: Replaced the system-blue editor accent with the landing page's violet (`#7C3AED`), including image controls, settings, and timeline feedback.
 - **Glass editor controls**: Native Liquid Glass groups the inspector navigation and playback controls, with material-backed effect cards and a solid fallback for reduced transparency.
-- **Consistent video effects**: Background, camera, cursor, keystrokes, captions, audio, and zoom use matching expandable cards. Effect amounts have visible sliders and editable values; padding, rounded corners, and shadow gain toggles that remember their amounts and quick presets. Crop and Censor are available directly in the inspector.
+- **Consistent video effects**: Background, camera, cursor, keystrokes, captions, audio, and zoom use matching expandable cards. Effect amounts share a single scrubber and editable value; padding, rounded corners, and shadow gain toggles that remember their amounts and quick presets. Crop and Censor are available directly in the inspector.
 - **Cap timeline interactions**: Timeline navigation uses Cap's seconds-visible transform, playhead/pointer anchoring, adaptive ruler intervals, and a minimap with draggable zoom handles. Pinch and modifier-scroll work across every track.
 - **Cap zoom workflow**: Hover over blank Zoom-track space to preview a segment, click to add it, or drag to set its duration. Blocks show Auto/Manual mode and amount; moving and resizing stop at neighboring blocks, and double-clicking an edge extends it to the next boundary. The inspector adds zoom amount presets and grouped amount edits for undo.
 - **Split tool**: Press S or select the scissors tool, then click the video track to split at that point. Track labels distinguish Video, Zoom, and Masks.
 
 - **Cap-style image editor**: A compact tool strip, contextual annotation controls, and native popovers for background, padding, rounding, shadow, and border leave more room for the image. Advanced effects remain available from Effects.
-- **Visible image zoom controls**: Zoom out, a continuous slider, zoom in, percentage presets, and Fit are available together on the canvas. The existing zoom bounds and pan behavior are preserved.
-- **Cap-style video editor**: The preview and tabbed inspector sit in separate bordered panels above a full-width timeline. Background, camera, audio, cursor, keystrokes, captions, and zoom/clip controls use the existing SwiftUI components; timeline selections reveal their controls automatically.
-- Rendering, GPU caches, playback, recording, and export pipelines are unchanged. Menu bar styling and capture actions are unchanged.
+- **Visible image zoom controls**: Zoom out, a continuous scrubber, zoom in, percentage presets, and Fit are available together on the canvas. The existing zoom bounds and pan behavior are preserved.
+- **Cap-style video editor**: The preview and effect inspector sit in separate bordered panels above a full-width timeline. Background, camera, audio, cursor, keystrokes, captions, and zoom/clip controls use the existing SwiftUI components; timeline selections reveal their controls automatically.
+- Existing GPU rendering, playback, recording, and export optimizations are preserved. Settings uses the shared editor accent and default-look scrubbers; history wording now points to Recent Captures.
 
 ### Removed
 
-- Removed the Media Gallery and restored the Recording Projects browser. Existing captures, shared links, and project files are preserved; recent captures remain available from the menu bar.
+- Removed the Media Gallery and redundant Recording Projects browser. Screenshots and recordings share the Recent Captures dropdown; existing captures, shared links, and editable project files are preserved.
+- Removed immediate bulk-delete actions from the recent-capture menu to prevent accidental file deletion.
 
 ## [0.4.4] - 2026-09-06
 

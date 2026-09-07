@@ -58,6 +58,8 @@ struct PreferencesView: View {
                 .navigationTitle(selection.title)
         }
         .navigationSplitViewStyle(.balanced)
+        .tint(StudioChrome.accent)
+        .accentColor(StudioChrome.accent)
         .frame(minWidth: 780, minHeight: 620)
     }
 
@@ -189,15 +191,9 @@ struct GeneralSettingsTab: View {
 
                 DefaultBackgroundPicker(selectedStyle: $defaultConfig.style)
 
-                defaultSlider(label: "Padding", value: $defaultConfig.padding, range: 0.0...0.45) {
-                    "\(Int($0 * 100))%"
-                }
-                defaultSlider(label: "Corner Radius", value: $defaultConfig.cornerRadius, range: 0.0...0.12) {
-                    "\(Int($0 * 1000))"
-                }
-                defaultSlider(label: "Shadow", value: $defaultConfig.shadowStrength, range: 0.0...1.0) {
-                    "\(Int($0 * 100))%"
-                }
+                InspectorSlider("Padding", value: $defaultConfig.padding, range: 0...0.45, format: .percent())
+                InspectorSlider("Corner Radius", value: $defaultConfig.cornerRadius, range: 0...0.12, format: .percent(fractionDigits: 1))
+                InspectorSlider("Shadow", value: $defaultConfig.shadowStrength, range: 0...1, format: .percent())
 
                 Button("Reset Default Look") {
                     defaultConfig = .default
@@ -229,9 +225,9 @@ struct GeneralSettingsTab: View {
                     HistoryStore.shared.trimToRetentionLimit()
                 }
             } header: {
-                Text("History")
+                Text("Recent Captures")
             } footer: {
-                Text("Older entries leave the Library along with the copies BetterShot keeps in Application Support. The files in your save folder are never touched.")
+                Text("Screenshots and recordings appear together in the menu bar’s Recent Captures menu. Older entries and their internal raw copies are removed at this limit; saved files and editable recording projects are preserved.")
             }
 
             Section {
@@ -276,18 +272,6 @@ struct GeneralSettingsTab: View {
         editorFullScreen = true
         defaultConfig = .default
         AppPreferences.defaultBeautifierConfig = .default
-    }
-
-    private func defaultSlider(label: String, value: Binding<CGFloat>, range: ClosedRange<CGFloat>, format: @escaping (CGFloat) -> String) -> some View {
-        LabeledContent(label) {
-            HStack(spacing: 12) {
-                Slider(value: value, in: range)
-                Text(format(value.wrappedValue))
-                    .font(.system(.callout, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 44, alignment: .trailing)
-            }
-        }
     }
 
     private func backgroundLabel(for style: BackgroundStyle) -> String {
@@ -722,7 +706,7 @@ struct CaptureSettingsTab: View {
                 }
                 Toggle(isOn: $keepInDeckUntilSaved) {
                     Text("Keep screenshots in the deck until saved")
-                    Text("Nothing reaches your save folder or the Library until you save, copy, drag, pin or annotate a card. Cards stay up until you act on them, and clearing the deck deletes what is left.")
+                    Text("Nothing reaches your save folder or Recent Captures until you save, copy, drag, pin or annotate a card. Cards stay up until you act on them, and clearing the deck deletes what is left.")
                 }
                 .disabled(openEditorAfterCapture)
             } header: {

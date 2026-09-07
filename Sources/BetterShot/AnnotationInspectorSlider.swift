@@ -145,6 +145,7 @@ struct InspectorSlider: View {
     @Binding var value: CGFloat
     let range: ClosedRange<CGFloat>
     let format: InspectorValueFormat
+    var onEditingChanged: (Bool) -> Void
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.isEnabled) private var isEnabled
@@ -165,12 +166,14 @@ struct InspectorSlider: View {
         _ title: String,
         value: Binding<CGFloat>,
         range: ClosedRange<CGFloat>,
-        format: InspectorValueFormat
+        format: InspectorValueFormat,
+        onEditingChanged: @escaping (Bool) -> Void = { _ in }
     ) {
         self.title = title
         self._value = value
         self.range = range
         self.format = format
+        self.onEditingChanged = onEditingChanged
     }
 
     var body: some View {
@@ -186,8 +189,10 @@ struct InspectorSlider: View {
         .frame(maxWidth: .infinity)
         .onAppear(perform: syncDraftText)
         .onDisappear {
-            if focusedPart == .value {
-                commitDraftText()
+            // A disappearing control must not commit a stale draft into a new selection.
+            if isDragging {
+                isDragging = false
+                onEditingChanged(false)
             }
         }
         .onChange(of: value) { _, _ in
@@ -241,11 +246,15 @@ struct InspectorSlider: View {
                         commitDraftText()
                     }
                     focusedPart = .track
-                    isDragging = true
+                    if !isDragging {
+                        isDragging = true
+                        onEditingChanged(true)
+                    }
                     updateValue(for: drag.location.x, width: width)
                 }
                 .onEnded { _ in
                     isDragging = false
+                    onEditingChanged(false)
                 }
         )
         .onHover { isTrackHovering = $0 }
@@ -411,7 +420,9 @@ struct InspectorSlider: View {
         // so existing preset/document precision is never silently quantized.
         let clampedValue = min(max(proposedValue, range.lowerBound), range.upperBound)
         guard clampedValue != value else { return }
+        if !isDragging { onEditingChanged(true) }
         value = clampedValue
+        if !isDragging { onEditingChanged(false) }
     }
 
     private func syncDraftText() {

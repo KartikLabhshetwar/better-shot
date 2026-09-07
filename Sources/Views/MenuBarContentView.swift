@@ -145,11 +145,6 @@ struct MenuBarContentView: View {
                 }
             }
 
-            TrayGridButton(title: "Recording Projects", icon: "film.stack") {
-                MenuBarPopoverController.shared.closePopover()
-                RecordingProjectsWindowController.show()
-            }
-
             TrayGridMenu(title: "Recent Captures", icon: "clock.arrow.circlepath", menuItems: recentMenuItems())
                 .frame(height: 32)
         }
@@ -208,7 +203,7 @@ struct MenuBarContentView: View {
         }
     }
 
-    private func recentMenuItems() -> [TrayMenuItem] {
+    func recentMenuItems() -> [TrayMenuItem] {
         var items: [TrayMenuItem] = []
 
         var screenshotItems: [TrayMenuItem] = []
@@ -223,12 +218,6 @@ struct MenuBarContentView: View {
                     PreviewOverlay.shared.show(url: url, on: screen)
                 })
             }
-            screenshotItems.append(.separator())
-            screenshotItems.append(TrayMenuItem(title: "Clear Screenshots", icon: "trash", action: {
-                HistoryStore.shared.records
-                    .filter { $0.kind == .screenshot }
-                    .forEach { HistoryStore.shared.deleteRecord($0) }
-            }, isDestructive: true))
         }
         items.append(TrayMenuItem(title: "Screenshots", icon: "photo.on.rectangle", action: {}, submenu: screenshotItems))
 
@@ -244,12 +233,6 @@ struct MenuBarContentView: View {
                     PreviewOverlay.shared.show(url: url, on: screen)
                 })
             }
-            recordingItems.append(.separator())
-            recordingItems.append(TrayMenuItem(title: "Clear Recordings", icon: "trash", action: {
-                HistoryStore.shared.records
-                    .filter { $0.kind == .recording }
-                    .forEach { HistoryStore.shared.deleteRecord($0) }
-            }, isDestructive: true))
         }
         items.append(TrayMenuItem(title: "Recordings", icon: "video.circle", action: {}, submenu: recordingItems))
 
@@ -400,6 +383,7 @@ final class TrayGridMenuButton: NSView {
 
     override func mouseDown(with event: NSEvent) {
         let menu = NSMenu()
+        menu.autoenablesItems = false
         for item in menuItems {
             if item.isSeparator {
                 menu.addItem(.separator())
@@ -411,6 +395,7 @@ final class TrayGridMenuButton: NSView {
                     parentItem.image = img
                 }
                 let sub = NSMenu()
+                sub.autoenablesItems = false
                 for subItem in submenuItems {
                     if subItem.isSeparator {
                         sub.addItem(.separator())

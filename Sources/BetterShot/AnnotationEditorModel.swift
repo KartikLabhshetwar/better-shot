@@ -790,7 +790,7 @@ extension AnnotationEditorModel {
 
         let fileExtension = url.pathExtension.isEmpty ? "png" : url.pathExtension
         let destinationURL = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("BetterShot_CropSnapshot_\(UUID().uuidString.prefix(8))")
+            .appendingPathComponent("BetterShot_CropSnapshot_\(UUID().uuidString)")
             .appendingPathExtension(fileExtension)
 
         do {

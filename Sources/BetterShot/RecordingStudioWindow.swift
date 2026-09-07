@@ -246,11 +246,10 @@ struct RecordingStudioContent: View {
         .pickerStyle(.segmented)
         .disabled(model.selectedMask == nil)
 
-        Slider(
-            value: maskAmountBinding,
-            in: RecordingMaskSegment.minimumAmount...RecordingMaskSegment.maximumAmount
-        )
-        .frame(width: 110)
+        InspectorSlider("Strength", value: maskAmountBinding,
+            range: CGFloat(RecordingMaskSegment.minimumAmount)...CGFloat(RecordingMaskSegment.maximumAmount),
+            format: .integer)
+        .frame(width: 190)
         .disabled(model.selectedMask == nil)
         .help("Effect strength")
 
@@ -278,10 +277,10 @@ struct RecordingStudioContent: View {
         )
     }
 
-    private var maskAmountBinding: Binding<Double> {
+    private var maskAmountBinding: Binding<CGFloat> {
         Binding(
-            get: { model.selectedMask?.amount ?? RecordingMaskSegment.defaultAmount },
-            set: { model.setSelectedMaskAmount($0) }
+            get: { CGFloat(model.selectedMask?.amount ?? RecordingMaskSegment.defaultAmount) },
+            set: { model.setSelectedMaskAmount(Double($0)) }
         )
     }
 
@@ -1521,16 +1520,16 @@ private struct StudioTimelineEditor: View {
             .disabled(model.duration <= 0 || viewport.visibleSeconds <=
                       RecordingTimelineViewport.zoomInLimit(duration: model.duration, viewportWidth: Double(viewportWidth)))
 
-            Slider(value: Binding(
-                get: { viewport.zoomProgress(duration: model.duration, viewportWidth: Double(viewportWidth)) },
+            InspectorSlider("Detail", value: Binding(
+                get: { CGFloat(viewport.zoomProgress(duration: model.duration, viewportWidth: Double(viewportWidth))) },
                 set: {
                     model.timelineThumbnails.deferSampling()
-                    viewport.updateZoomProgress($0, origin: buttonZoomAnchor, duration: model.duration,
+                    viewport.updateZoomProgress(Double($0), origin: buttonZoomAnchor, duration: model.duration,
                                                 viewportWidth: Double(viewportWidth))
                     syncScroll()
                 }
-            ), in: 0...1)
-            .frame(width: 96)
+            ), range: 0...1, format: .percent())
+            .frame(width: 170)
             .disabled(model.duration <= 0)
             .accessibilityLabel("Timeline zoom")
             .accessibilityValue("\(viewport.visibleSeconds.formatted(.number.precision(.fractionLength(1)))) seconds visible")
@@ -2655,9 +2654,11 @@ private struct StudioInspector: View {
                                         isOn: Binding(
                                             get: { selected.isEnabled },
                                             set: { isEnabled in
+                                                model.beginZoomCueEdit()
                                                 var updated = selected
                                                 updated.isEnabled = isEnabled
                                                 model.updateZoomCue(updated)
+                                                model.endZoomCueEdit(actionName: "Toggle Zoom")
                                             }
                                         )
                                     )
@@ -2668,6 +2669,7 @@ private struct StudioInspector: View {
                                 }
                             ) {
                                 selectedZoomControls(for: selected)
+                                    .id(selected.id)
                             }
                             .studioEffectCard()
                         } else if let selectedClip = model.selectedClip {
@@ -2813,6 +2815,9 @@ private struct StudioInspector: View {
         .task {
             await wallpaperStore.reload()
         }
+        .onChange(of: isAvailable(selectedTab)) { _, available in
+            if !available { selectedTab = .background }
+        }
         .onChange(of: model.selectedCueID, initial: true) { _, cue in
             if cue != nil { selectedTab = .zoom }
         }
@@ -2825,18 +2830,18 @@ private struct StudioInspector: View {
         HStack(spacing: 8) {
             Button { model.beginVideoCrop() } label: {
                 Label("Crop", systemImage: "crop")
-                    .foregroundStyle(.white)
+                    .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
                     .frame(maxWidth: .infinity)
             }
             .help("Crop the recording on the canvas")
             Button { model.beginMaskEditing() } label: {
                 Label("Censor", systemImage: "eye.slash")
-                    .foregroundStyle(.white)
+                    .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
                     .frame(maxWidth: .infinity)
             }
             .help("Blur or pixelate part of the recording")
         }
-        .buttonStyle(.glassProminent)
+        .buttonStyle(.glass)
         .controlSize(.large)
         .disabled(!model.isLoaded)
         .padding(.horizontal, 12)
@@ -3067,24 +3072,17 @@ private struct StudioInspector: View {
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("Zoom Amount").font(.inspectorLabel)
-                    Spacer()
-                    Text(selected.zoom.formatted(.number.precision(.fractionLength(1))) + "×")
-                        .font(.inspectorNumeric)
-                }
-                Slider(value: Binding(
-                    get: { selected.zoom },
+                InspectorSlider("Zoom Amount", value: Binding(
+                    get: { CGFloat(selected.zoom) },
                     set: { amount in
                         var updated = selected
-                        updated.zoom = amount
+                        updated.zoom = Double(amount)
                         model.updateZoomCue(updated)
                     }
-                ), in: 1...4, step: 0.1, onEditingChanged: { editing in
+                ), range: 1...4, format: .magnification(fractionDigits: 1), onEditingChanged: { editing in
                     if editing { model.beginZoomCueEdit() }
                     else { model.endZoomCueEdit(actionName: "Change Zoom Amount") }
                 })
-                .accessibilityLabel("Zoom Amount")
                 HStack(spacing: 4) {
                     ForEach([1.0, 1.5, 2.0, 3.0, 4.0], id: \.self) { amount in
                         Button(amount.formatted() + "×") {
@@ -3121,18 +3119,24 @@ private struct StudioInspector: View {
                                 model.updateZoomCue(updated)
                             }
                         ),
-                        magnification: selected.zoom
+                        magnification: selected.zoom,
+                        onEditingChanged: { editing in
+                            if editing { model.beginZoomCueEdit() }
+                            else { model.endZoomCueEdit(actionName: "Move Zoom Target") }
+                        }
                     )
                 }
 
                 inspectorAction("Set Target to Pointer", systemImage: "scope") {
                     guard let pointer = model.pointerLocation(at: model.currentTime) else { return }
+                    model.beginZoomCueEdit()
                     var updated = selected
                     updated.pinnedPoint = pointer
                     model.updateZoomCue(updated)
+                    model.endZoomCueEdit(actionName: "Move Zoom Target")
                 }
             } else {
-                StudioEffectSlider(
+                InspectorSlider(
                     "Edge in Frame",
                     value: Binding(
                         get: { CGFloat(selected.boundsBias) },
@@ -3143,7 +3147,11 @@ private struct StudioInspector: View {
                         }
                     ),
                     range: 0...1,
-                    format: .percent()
+                    format: .percent(),
+                    onEditingChanged: { editing in
+                        if editing { model.beginZoomCueEdit() }
+                        else { model.endZoomCueEdit(actionName: "Change Zoom Framing") }
+                    }
                 )
             }
 
@@ -3170,7 +3178,7 @@ private struct StudioInspector: View {
 
     private func selectedClipControls(for clip: RecordingClipSegment) -> some View {
         VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
-            StudioEffectSlider(
+            InspectorSlider(
                 "Speed",
                 value: Binding(
                     get: { CGFloat(clip.speed) },
@@ -3193,7 +3201,7 @@ private struct StudioInspector: View {
 
     private var cursorControls: some View {
         VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
-            StudioEffectSlider(
+            InspectorSlider(
                 "Size",
                 value: $model.style.cursorScale,
                 range: 1...4,
@@ -3316,7 +3324,7 @@ private struct StudioInspector: View {
         let verticalRange = SubtitleBarStyle.verticalRange
         let fontScaleRange = SubtitleBarStyle.fontScaleRange
         return VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
-            StudioEffectSlider(
+            InspectorSlider(
                 "Position",
                 value: Binding(
                     get: { CGFloat(model.subtitleStyle.verticalPosition) },
@@ -3326,7 +3334,7 @@ private struct StudioInspector: View {
                 format: .percent()
             )
 
-            StudioEffectSlider(
+            InspectorSlider(
                 "Text Size",
                 value: Binding(
                     get: { CGFloat(model.subtitleStyle.fontScale) },
@@ -3447,13 +3455,13 @@ private struct StudioInspector: View {
 
     private var cameraControls: some View {
         VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
-            StudioEffectSlider(
+            InspectorSlider(
                 "Size",
                 value: $model.style.camera.size,
                 range: 0.12...0.45,
                 format: .percent()
             )
-            StudioEffectSlider(
+            InspectorSlider(
                 "Rounding",
                 value: $model.style.camera.roundness,
                 range: 0.05...0.5,

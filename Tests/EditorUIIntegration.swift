@@ -52,21 +52,23 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         isAvailable: { $0 != .camera }))
     tabHost.frame = NSRect(x: 0, y: 0, width: 336, height: 48)
     tabHost.layoutSubtreeIfNeeded()
-    func segmentedControl(in view: NSView) -> NSSegmentedControl? {
-        if let control = view as? NSSegmentedControl { return control }
-        return view.subviews.lazy.compactMap { segmentedControl(in: $0) }.first
+    func inspectorPicker(in view: NSView) -> NSPopUpButton? {
+        if let control = view as? NSPopUpButton { return control }
+        return view.subviews.lazy.compactMap { inspectorPicker(in: $0) }.first
     }
-    let tabs = segmentedControl(in: tabHost)!
-    precondition(tabs.selectedSegmentBezelColor == StudioChrome.accentNSColor,
-                 "Inspector selection must use the landing page brand color")
+    let tabs = inspectorPicker(in: tabHost)!
     for (index, tab) in StudioInspectorTab.allCases.enumerated() {
-        precondition(tabs.toolTip(forSegment: index)?.contains(tab.title) == true,
-                     "Every inspector segment needs a native tooltip")
+        precondition(tabs.item(at: index)?.title == tab.title,
+                     "Every inspector needs a visible name, without a tooltip")
     }
-    precondition(!tabs.isEnabled(forSegment: 1))
-    tabs.selectedSegment = 2
+    precondition(tabs.toolTip == nil && !tabs.autoenablesItems)
+    precondition(tabs.item(at: 1)?.isEnabled == false)
+    tabs.selectItem(at: 1)
     tabs.sendAction(tabs.action!, to: tabs.target)
-    precondition(selectedTab == .audio, "Native segment selection must reach SwiftUI")
+    precondition(selectedTab == .background, "Unavailable inspectors cannot become selected")
+    tabs.selectItem(at: 2)
+    tabs.sendAction(tabs.action!, to: tabs.target)
+    precondition(selectedTab == .audio, "Native menu selection must reach SwiftUI")
     let clipControl = RecordingClipTimelineControl(frame: NSRect(x: 0, y: 0, width: 600, height: 52))
     clipControl.update(timeline: videoModel.clipTimeline, sourceDuration: videoModel.sourceDuration,
                        thumbnails: videoModel.timelineThumbnails, selectedClipID: nil, playheadTime: 0)
@@ -82,7 +84,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         clickCount: 1, pressure: 1)!)
     precondition(abs((splitTime ?? -1) - videoModel.duration / 2) < 0.01, "The split tool cuts at the click")
     clipControl.toggleSplitRequested = nil
-    print("PASS native per-segment tooltips, tab selection, split tool, zoom editing, and undo/redo")
+    print("PASS visible inspector names, unavailable tabs, selection, split tool, zoom editing, and undo/redo")
     let output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         .appendingPathComponent(".build/editor-snapshots")
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
@@ -113,6 +115,11 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         try snapshot(RecordingStudioContent(model: videoModel), scheme: scheme, width: 1100,
                      to: output.appendingPathComponent("video-effects-\(name).png"))
     }
+    let recentMenu = MenuBarContentView(dismissPopover: {}).recentMenuItems()
+    precondition(recentMenu.map(\.title) == ["Screenshots", "Recordings"])
+    precondition(recentMenu.flatMap { $0.submenu ?? [] }.allSatisfy { !$0.isDestructive },
+                 "Recent capture navigation must not delete files")
+    print("PASS combined recent menu without bulk deletion")
     print("PASS editor zoom bounds, fit, and light/dark view snapshots: \(output.path)")
 }
 
