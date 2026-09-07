@@ -5,6 +5,14 @@ import Security
 enum R2KeychainAccessCheck {
     @MainActor
     static func main() {
+        precondition(ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] == "1",
+                     "Run through scripts/run-checks.sh to keep the real Keychain isolated")
+        let store = R2CredentialStore.shared
+        precondition(store.keychainAccess == .empty && store.accessKeyID.isEmpty && store.secretAccessKey.isEmpty)
+        store.accessKeyID = "test-only-key"
+        precondition(store.keychainAccess == .blocked(errSecInteractionNotAllowed), "Tests cannot write to the Keychain")
+        store.forgetStoredKeys()
+        precondition(store.accessKeyID.isEmpty && store.keychainAccess == .empty)
         precondition(
             R2CredentialStore.access(of: [errSecSuccess, errSecSuccess]) == .stored,
             "two readable keys are stored"

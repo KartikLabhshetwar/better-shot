@@ -13,6 +13,7 @@ SHELL := /bin/bash
 #   make clean        — Remove build artifacts
 #   make lint         — Swift compiler warnings check
 #   make test-build   — Full clean + release build to verify everything compiles
+#   make test         — Build and run all checks without signing or Keychain access
 #   make version      — Print current version
 #   make ship         — Signed release: build, sign, notarize, DMG (both architectures)
 
@@ -28,7 +29,7 @@ BUILD_NUM   := $(shell python3 -c "import json; print(json.load(open('version.js
 DMG_NAME     = BetterShot-$(VERSION).dmg
 DMG_DIR      = release
 
-.PHONY: generate build release run dmg clean lint test-build version ship help
+.PHONY: generate build release run dmg clean lint test test-build version ship help
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -92,6 +93,13 @@ lint: ## Check for compiler warnings
 		-configuration $(CONFIG_DEBUG) \
 		-derivedDataPath $(DERIVED_DIR) \
 		build 2>&1 | grep -E "warning:|error:" || echo "No warnings."
+
+test: generate ## Build and run regression/editor/export checks without Keychain prompts
+	@xcodebuild -project $(PROJECT) -scheme $(SCHEME) \
+		-configuration $(CONFIG_DEBUG) -derivedDataPath $(DERIVED_DIR) \
+		CODE_SIGNING_ALLOWED=NO ENABLE_TESTABILITY=YES build 2>&1 | tail -3
+	@bash scripts/run-checks.sh
+	@bash Tests/run-exports.sh
 
 test-build: clean release ## Full clean + release build
 	@echo "==> Test build passed."

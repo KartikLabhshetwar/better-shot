@@ -32,6 +32,9 @@ build-x86_64/
 
 # Local scripts
 scripts/
+!/scripts/
+/scripts/*
+!/scripts/run-checks.sh
 
 # Claude Code
 CLAUDE.md

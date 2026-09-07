@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Automated editor/export tests no longer open the user's R2 Keychain, avoiding repeated password prompts from freshly rebuilt test executables. `make test` runs the checks without certificate signing; no passwords are stored in scripts.
 - Crop and Censor use white labels on brand-colored glass buttons, fixing their low contrast in light mode.
 - Timeline zoom works on short recordings again. Zoom buttons use the earlier 1.6× steps, the slider reaches both limits, Fit shows the full recording, and playback controls no longer overlap the zoom controls. The native 100,000-point lane-width cap is retained.
 - Video inspector tabs now use native per-segment tooltips, including explanations for unavailable camera, cursor, keystroke, and caption controls.

@@ -34,6 +34,14 @@ fail at the signing step on any machine without that certificate. Two ways aroun
 
 Don't commit the resulting `project.yml` or `project.pbxproj` signing changes.
 
+### Automated tests
+
+Run `make test` to build and run the regression, editor snapshot, and export checks.
+This build skips certificate signing. The test scripts set `BETTERSHOT_TESTING=1`
+for their executables, which prevents R2 Keychain reads, writes, and deletions.
+No login password or signing-key unlock is needed. Normal app launches and signed
+releases keep their existing Keychain behavior; test cloud sharing in the app.
+
 ### Permissions
 
 On first launch, grant both:
@@ -263,6 +271,7 @@ cover into the file instead, so they compile without AppKit.
 | `make dmg` | Unsigned DMG for local testing |
 | `make clean` | Remove build artifacts |
 | `make lint` | Check for compiler warnings |
+| `make test` | Unsigned debug build plus regression, editor, and export checks; no real Keychain access |
 | `make test-build` | Full clean plus release build |
 | `make version` | Print the current version |
 | `make ship` | Signed, notarized release DMGs (maintainer only) |

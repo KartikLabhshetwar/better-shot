@@ -23,6 +23,8 @@ final class R2CredentialStore {
 
     private let defaults = UserDefaults.standard
     private static let keychainService = "com.bettershot.app.r2"
+    // Editor snapshots run in a freshly linked executable, which must never open the user's keys.
+    private static let isRunningTests = ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] == "1"
 
     private enum Keys {
         static let accountID = "bs_r2_accountID"
@@ -152,6 +154,7 @@ final class R2CredentialStore {
     }
 
     private static func setKeychainItem(key: String, value: String) -> KeychainAccess {
+        guard !isRunningTests else { return .blocked(errSecInteractionNotAllowed) }
         let data = Data(value.utf8)
 
         let query: [String: Any] = [
@@ -168,6 +171,7 @@ final class R2CredentialStore {
     }
 
     private static func deleteKeychainItem(key: String) {
+        guard !isRunningTests else { return }
         SecItemDelete([
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
@@ -176,6 +180,7 @@ final class R2CredentialStore {
     }
 
     private static func getKeychainItem(key: String) -> (value: String?, status: OSStatus) {
+        guard !isRunningTests else { return (nil, errSecItemNotFound) }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key,
