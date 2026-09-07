@@ -205,6 +205,25 @@ Preferences are split across two enums: `AppPreferences` (`bs_` keys, the
 capture pipeline and history) and `BetterShotPreferences` (editor, preview,
 recording devices, teleprompter). Add to whichever the feature already reads from.
 
+### URL automation
+
+Raycast, Shortcuts, Alfred, and scripts can open `bettershot://` URLs. For example,
+`open 'bettershot://capture/region'` launches BetterShot if needed and starts the
+normal region-capture flow. Available routes:
+
+- `bettershot://capture/region`
+- `bettershot://capture/fullscreen`
+- `bettershot://capture/window`
+- `bettershot://record` (opens the recording picker; does not toggle it off)
+- `bettershot://ocr`
+- `bettershot://color-picker`
+- `bettershot://settings`
+
+Actions use the display containing the pointer and preserve capture preferences,
+timers, output locations, and permission checks. Startup URLs wait for app
+initialization. Unknown routes, credentials, ports, queries, and fragments are
+ignored. Recording requests are ignored while a recording is active.
+
 ### Menu bar
 
 `MenuBarPopoverController` creates a custom `NSPanel` (not `MenuBarExtra`) for

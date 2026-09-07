@@ -4,6 +4,8 @@ import UserNotifications
 @MainActor
 final class BetterShotDelegate: NSObject, NSApplicationDelegate {
     private var permissionPollTimer: Timer?
+    private var didFinishLaunching = false
+    private var pendingURLActions: [CaptureURLAction] = []
 
     /// The notification delegate has to be in place before launch finishes,
     /// or the system handles clicks on export notifications itself and never
@@ -34,6 +36,41 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
         } else {
             ShortcutService.requestAccessibilityPermission()
             startPermissionPolling()
+        }
+        didFinishLaunching = true
+        performPendingURLActions()
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        pendingURLActions.append(contentsOf: urls.compactMap(CaptureURLAction.init(url:)))
+        if didFinishLaunching { performPendingURLActions() }
+    }
+
+    private func performPendingURLActions() {
+        let actions = pendingURLActions
+        pendingURLActions.removeAll()
+        guard !actions.isEmpty else { return }
+        let screen = ActiveDisplayResolver.activeScreen(preferPointer: true)
+        Task {
+            for action in actions {
+                switch action {
+                case .region:
+                    await CaptureOrchestrator.shared.performCapture(.region, on: screen)
+                case .fullscreen:
+                    await CaptureOrchestrator.shared.performCapture(.fullscreen, on: screen)
+                case .window:
+                    await CaptureOrchestrator.shared.performCapture(.window, on: screen)
+                case .ocr:
+                    await CaptureOrchestrator.shared.performCapture(.ocr, on: screen)
+                case .colorPicker:
+                    await CaptureOrchestrator.shared.performCapture(.colorPicker, on: screen)
+                case .recording:
+                    guard !ScreenRecordingManager.shared.isActive else { continue }
+                    RecordingBarPresenter.shared.showPicker(on: screen.flatMap { ActiveDisplayResolver.displayID(for: $0) })
+                case .settings:
+                    SettingsWindowController.shared.open(on: screen)
+                }
+            }
         }
     }
 

@@ -50,14 +50,14 @@ final class RecordingBarPresenter {
         }
     }
 
-    func showPicker() {
+    func showPicker(on displayID: CGDirectDisplayID? = nil) {
         let panel = panel ?? makePanel()
         PreviewWindowCaptureExclusion.shared.register(window: panel)
         Task {
             await RecordingSourceCatalog.shared.refresh()
         }
         mode = .picker
-        position(panel, displayID: ActiveDisplayResolver.activeDisplayID(preferPointer: false))
+        position(panel, displayID: displayID ?? ActiveDisplayResolver.activeDisplayID(preferPointer: false))
         panel.orderFrontRegardless()
         // The picker is driven from the keyboard too (Esc, A for the last
         // region), and key events only reach the panel while BetterShot is
