@@ -16,6 +16,6 @@ struct CaptureURLActionCheck {
         ] {
             assert(CaptureURLAction(url: URL(string: value)!) == nil, value)
         }
-        print("CaptureURLActionCheck: команды URL и отклонение некорректных адресов проверены")
+        print("CaptureURLActionCheck: URL routes and malformed URL rejection verified")
     }
 }
