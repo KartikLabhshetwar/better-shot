@@ -51,7 +51,7 @@ final class RecordingProjectsWindowController: NSWindowController, NSWindowDeleg
     private func configureWindow() {
         guard let window else { return }
 
-        window.title = "Media Gallery"
+        window.title = "Recording Projects"
         window.titleVisibility = .visible
         window.toolbarStyle = .unified
         window.animationBehavior = .none
@@ -61,7 +61,7 @@ final class RecordingProjectsWindowController: NSWindowController, NSWindowDeleg
         window.center()
         window.delegate = self
 
-        window.contentViewController = NSHostingController(rootView: MediaGalleryView())
+        window.contentViewController = NSHostingController(rootView: RecordingProjectsView())
         PreviewWindowCaptureExclusion.shared.register(window: window)
     }
 

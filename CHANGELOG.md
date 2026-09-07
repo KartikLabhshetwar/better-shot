@@ -5,6 +5,12 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+
+- Removed the Media Gallery and restored the Recording Projects browser. Existing captures, shared links, and project files are preserved; recent captures remain available from the menu bar.
+
 ## [0.4.4] - 2026-09-06
 
 Faster image and video exports, a dedicated media gallery, and more reliable

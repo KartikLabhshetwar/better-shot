@@ -145,7 +145,7 @@ struct MenuBarContentView: View {
                 }
             }
 
-            TrayGridButton(title: "Media Gallery", icon: "square.grid.2x2") {
+            TrayGridButton(title: "Recording Projects", icon: "film.stack") {
                 MenuBarPopoverController.shared.closePopover()
                 RecordingProjectsWindowController.show()
             }
