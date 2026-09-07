@@ -377,7 +377,6 @@ struct PreviewCardView: View {
                         } else {
                             try ScreenshotFileActions.copyImageToClipboard(from: url)
                         }
-                        DeckStaging.promote(url)
                         overlay.remove(url)
                     } catch {
                         // Reading the file can fail if the capture moved or was deleted

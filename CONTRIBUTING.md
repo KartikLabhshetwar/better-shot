@@ -129,7 +129,8 @@ User presses ⌘⇧4 (or picks Region on the bar)
 
 With **Keep screenshots in the deck until saved** on, the capture is staged in
 `DeckStaging` instead of history and only promoted to the save folder when the
-user saves, copies, drags, pins, or opens it.
+user saves, drags, pins, or opens it. Copy only writes to the clipboard and
+discards the unsaved card; it does not add the capture to the save folder or Library.
 
 All windows (editors, settings, preview deck, toasts, pinned screenshots) open
 on the screen where the action originated, not the primary display.
