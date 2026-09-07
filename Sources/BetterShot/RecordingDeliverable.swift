@@ -14,6 +14,20 @@ import Foundation
 
 @MainActor
 enum RecordingDeliverable {
+    private static var saveTasks: [URL: Task<URL, Error>] = [:]
+
+    static func saveToDefaultLocation(for mediaURL: URL) async throws -> URL {
+        let key = (session(for: mediaURL)?.directoryURL ?? mediaURL).standardizedFileURL
+        if let task = saveTasks[key] { return try await task.value }
+        let task = Task {
+            let deliverable = try await resolve(for: mediaURL)
+            return try await VideoFileActions.saveToDefaultLocation(from: deliverable)
+        }
+        saveTasks[key] = task
+        defer { saveTasks.removeValue(forKey: key) }
+        return try await task.value
+    }
+
     /// The session a recording media URL belongs to, if any. Bare movies
     /// opened from disk have none and are already their own deliverable.
     static func session(for mediaURL: URL) -> RecordingSession? {

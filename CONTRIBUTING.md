@@ -151,6 +151,13 @@ User presses ⌘⇧2 → RecordingPickerBar (screen / window / area / screenshot
 
 ### Storage
 
+The recording preview card's **Save** and **Save All** render a flattened video
+with its cursor, camera, and current edits into the configured save folder.
+The card stays available if saving fails. Settings > Recording > **Save recordings
+to the save folder** enables the same export after stopping; it is off by default
+so stopping a long recording need not start an export. The recording project and
+source tracks remain in Application Support in either mode.
+
 Everything lives under `~/Library/Application Support/BetterShot/`:
 
 - Screenshots keep their untouched original there (`CaptureRecord.filename`);

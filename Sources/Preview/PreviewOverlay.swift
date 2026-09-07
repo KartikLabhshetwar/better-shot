@@ -12,6 +12,7 @@ final class PreviewOverlay {
     private static let clearAllHeight: CGFloat = 26
 
     private(set) var items: [URL] = []
+    private(set) var savingItems: Set<URL> = []
     private var panel: NSPanel?
     private var dismissTasks: [URL: Task<Void, Never>] = [:]
     private var targetScreen: NSScreen?
@@ -80,13 +81,32 @@ final class PreviewOverlay {
     }
 
     func saveAll() {
-        let staged = items.filter(DeckStaging.isStaged)
-        staged.forEach { DeckStaging.promote($0) }
-        clearAll()
-        showSavedToast(count: staged.count)
+        items.forEach(save)
     }
 
     func save(_ url: URL) {
+        guard !savingItems.contains(url) else { return }
+        if Self.isVideo(url) {
+            savingItems.insert(url)
+            cancelScheduledDismiss(for: url)
+            let screen = targetScreen
+            Task {
+                defer { savingItems.remove(url) }
+                do {
+                    _ = try await RecordingDeliverable.saveToDefaultLocation(for: url)
+                    remove(url)
+                    ToastWindow.shared.show(message: "Recording saved!", on: screen)
+                } catch {
+                    ToastWindow.shared.show(
+                        title: "Save Failed",
+                        message: error.localizedDescription,
+                        systemIcon: "exclamationmark.triangle",
+                        on: screen
+                    )
+                }
+            }
+            return
+        }
         if DeckStaging.isStaged(url) {
             DeckStaging.promote(url)
             showSavedToast(count: 1)
@@ -94,7 +114,12 @@ final class PreviewOverlay {
         remove(url)
     }
 
-    var hasStagedItems: Bool { items.contains(where: DeckStaging.isStaged) }
+    var hasSavableItems: Bool { items.contains { DeckStaging.isStaged($0) || Self.isVideo($0) } }
+
+    static func isVideo(_ url: URL) -> Bool {
+        let ext = url.pathExtension.lowercased()
+        return ext == "mov" || ext == "mp4"
+    }
 
     private func showSavedToast(count: Int) {
         guard count > 0 else { return }
@@ -185,7 +210,7 @@ struct PreviewDeckView: View {
         VStack(alignment: pinnedLeft ? .leading : .trailing, spacing: 10) {
             if overlay.items.count > 1 {
                 HStack(spacing: 6) {
-                    if overlay.hasStagedItems {
+                    if overlay.hasSavableItems {
                         deckButton("Save All") { overlay.saveAll() }
                     }
                     deckButton("Clear All") { overlay.clearAll() }
@@ -226,12 +251,7 @@ struct PreviewCardView: View {
     private var cardSize: CGSize { AppPreferences.overlayCardSize.thumbnailSize }
     private var controlScale: CGFloat { AppPreferences.overlayCardSize.controlScale }
 
-    private var isVideo: Bool { Self.isVideo(url) }
-
-    private static func isVideo(_ url: URL) -> Bool {
-        let ext = url.pathExtension.lowercased()
-        return ext == "mov" || ext == "mp4"
-    }
+    private var isVideo: Bool { PreviewOverlay.isVideo(url) }
 
     var body: some View {
         Group {
@@ -300,6 +320,16 @@ struct PreviewCardView: View {
             }
         }
         .task(id: url) { await loadThumbnail() }
+        .disabled(overlay.savingItems.contains(url))
+        .allowsHitTesting(!overlay.savingItems.contains(url))
+        .overlay {
+            if overlay.savingItems.contains(url) {
+                ProgressView("Saving…")
+                    .controlSize(.small)
+                    .padding(8)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+            }
+        }
     }
 
     private func loadThumbnail() async {
@@ -309,7 +339,7 @@ struct PreviewCardView: View {
         // finished rendering the capture.
         let source = HistoryStore.ThumbnailSource(
             url: url,
-            kind: Self.isVideo(url) ? .recording : .screenshot
+            kind: PreviewOverlay.isVideo(url) ? .recording : .screenshot
         )
         let sampleSize = max(cardSize.width, cardSize.height) * 2 // retina headroom at the current card size
         isLoadingThumbnail = true
@@ -372,7 +402,7 @@ struct PreviewCardView: View {
                 pillButton("Copy") {
                     // Copy the capture itself, not the card's thumbnail.
                     do {
-                        if Self.isVideo(url) {
+                        if PreviewOverlay.isVideo(url) {
                             try VideoFileActions.copyToClipboard(from: url)
                         } else {
                             try ScreenshotFileActions.copyImageToClipboard(from: url)

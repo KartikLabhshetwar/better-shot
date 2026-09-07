@@ -40,7 +40,8 @@ struct BetterShotApp: App {
             openWindow(id: "VIDEO_EDITOR", value: directoryURL)
         }
 
-        ScreenRecordingManager.shared.onFinishRecording = { session, _ in
+        ScreenRecordingManager.shared.onFinishRecording = { session, displayID in
+            let saveToFolder = AfterCaptureActions.isEnabled(.save, for: .recording)
             Task { @MainActor in
                 let historyURL = await ScreenshotHistoryStore.shared.importRecordingSession(session)
                 RecordingProjectStore.shared.reload()
@@ -48,6 +49,19 @@ struct BetterShotApp: App {
                     PreviewPanelPresenter.shared.onEditVideo?(historyURL)
                 } else {
                     PreviewOverlay.shared.show(url: historyURL)
+                }
+                if saveToFolder {
+                    do {
+                        _ = try await RecordingDeliverable.saveToDefaultLocation(for: historyURL)
+                        ToastWindow.shared.show(message: "Recording saved!", on: ActiveDisplayResolver.screen(for: displayID))
+                    } catch {
+                        ToastWindow.shared.show(
+                            title: "Couldn't save recording",
+                            message: error.localizedDescription,
+                            systemIcon: "exclamationmark.triangle",
+                            on: ActiveDisplayResolver.screen(for: displayID)
+                        )
+                    }
                 }
             }
         }
