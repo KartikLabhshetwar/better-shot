@@ -27,6 +27,60 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     await videoModel.load()
     defer { videoModel.teardown() }
     precondition(videoModel.isLoaded, "Snapshot recording must load")
+    let originalCues = videoModel.zoomCues
+    videoModel.addZoomCue(fromEditorTime: 0.25, toEditorTime: 1.25)
+    precondition(videoModel.zoomEnabled, "Adding a zoom must enable playback of zooms")
+    let cue = videoModel.selectedCue!
+    precondition(videoModel.zoomTimelineBlocks.count == 1)
+    videoModel.beginZoomCueEdit()
+    var edited = cue
+    edited.zoom = 2
+    videoModel.updateZoomCue(edited)
+    videoModel.endZoomCueEdit(actionName: "Edit Zoom")
+    precondition(videoModel.selectedCue?.zoom == 2)
+    videoModel.undo()
+    // The synchronous harness groups creation and editing into one input event.
+    precondition(videoModel.zoomCues == originalCues)
+    precondition(!videoModel.zoomEnabled, "Undo must restore the imported video's disabled zoom state")
+    videoModel.redo()
+    precondition(videoModel.zoomCues.first?.zoom == 2)
+    precondition(videoModel.zoomEnabled, "Redo must restore zoom playback")
+
+    var selectedTab = StudioInspectorTab.background
+    let tabHost = NSHostingView(rootView: StudioInspectorTabs(
+        selection: Binding(get: { selectedTab }, set: { selectedTab = $0 }),
+        isAvailable: { $0 != .camera }))
+    tabHost.frame = NSRect(x: 0, y: 0, width: 336, height: 48)
+    tabHost.layoutSubtreeIfNeeded()
+    func segmentedControl(in view: NSView) -> NSSegmentedControl? {
+        if let control = view as? NSSegmentedControl { return control }
+        return view.subviews.lazy.compactMap { segmentedControl(in: $0) }.first
+    }
+    let tabs = segmentedControl(in: tabHost)!
+    for (index, tab) in StudioInspectorTab.allCases.enumerated() {
+        precondition(tabs.toolTip(forSegment: index)?.contains(tab.title) == true,
+                     "Every inspector segment needs a native tooltip")
+    }
+    precondition(!tabs.isEnabled(forSegment: 1))
+    tabs.selectedSegment = 2
+    tabs.sendAction(tabs.action!, to: tabs.target)
+    precondition(selectedTab == .audio, "Native segment selection must reach SwiftUI")
+    let clipControl = RecordingClipTimelineControl(frame: NSRect(x: 0, y: 0, width: 600, height: 52))
+    clipControl.update(timeline: videoModel.clipTimeline, sourceDuration: videoModel.sourceDuration,
+                       thumbnails: videoModel.timelineThumbnails, selectedClipID: nil, playheadTime: 0)
+    var splitTime: Double?
+    clipControl.splitRequested = { splitTime = $0 }
+    clipControl.toggleSplitRequested = { clipControl.isSplitting.toggle() }
+    clipControl.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+        timestamp: 0, windowNumber: 0, context: nil, characters: "s", charactersIgnoringModifiers: "s",
+        isARepeat: false, keyCode: 1)!)
+    precondition(clipControl.isSplitting && splitTime == nil, "S activates the tool without making a cut")
+    clipControl.mouseDown(with: NSEvent.mouseEvent(with: .leftMouseDown, location: CGPoint(x: 300, y: 26),
+        modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0,
+        clickCount: 1, pressure: 1)!)
+    precondition(abs((splitTime ?? -1) - videoModel.duration / 2) < 0.01, "The split tool cuts at the click")
+    clipControl.toggleSplitRequested = nil
+    print("PASS native per-segment tooltips, tab selection, split tool, zoom editing, and undo/redo")
     let output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         .appendingPathComponent(".build/editor-snapshots")
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)

@@ -863,13 +863,16 @@ final class RecordingStudioModel {
         scheduleProjectSave()
     }
 
-    private func applyZoomCues(_ cues: [ZoomCue], actionName: String) {
+    private func applyZoomCues(_ cues: [ZoomCue], actionName: String, enabled: Bool? = nil) {
         let sorted = cues.sorted { $0.start < $1.start }
-        guard sorted != zoomCues else { return }
+        let nextEnabled = enabled ?? zoomEnabled
+        guard sorted != zoomCues || nextEnabled != zoomEnabled else { return }
         let previous = zoomCues
+        let previousEnabled = zoomEnabled
         registerUndo(actionName) { target in
-            target.applyZoomCues(previous, actionName: actionName)
+            target.applyZoomCues(previous, actionName: actionName, enabled: previousEnabled)
         }
+        if nextEnabled != zoomEnabled { zoomEnabled = nextEnabled }
         replaceZoomCues(sorted)
     }
 
@@ -896,9 +899,15 @@ final class RecordingStudioModel {
     }
 
     func addZoomCue(at time: TimeInterval) {
-        let sourceTime = clipTimeline.sourceTime(at: time)
-        let start = min(max(0, sourceTime), max(0, sourceDuration - 1))
-        insertZoomCue(start: start, end: min(sourceDuration, start + 3))
+        if let block = zoomTimelineBlocks.first(where: { $0.editorStart <= time && time < $0.editorEnd }) {
+            selectZoomCue(id: block.cue.id)
+            return
+        }
+        guard let range = RecordingTimelineViewport.newZoomRange(
+            at: time, secondsPerPoint: 0, duration: duration,
+            occupied: zoomTimelineBlocks.map { $0.editorStart...$0.editorEnd }
+        ) else { return }
+        addZoomCue(fromEditorTime: range.lowerBound, toEditorTime: range.upperBound)
     }
 
     /// Room a cue has to grow or slide into before it would run into a
@@ -964,7 +973,7 @@ final class RecordingStudioModel {
         )
         var cues = zoomCues
         cues.append(cue)
-        applyZoomCues(cues, actionName: "Add Zoom")
+        applyZoomCues(cues, actionName: "Add Zoom", enabled: true)
         selectedCueID = cue.id
         selectedClipID = nil
     }

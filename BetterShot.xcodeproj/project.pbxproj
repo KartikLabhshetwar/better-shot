@@ -33,6 +33,7 @@
 		1CBDB240923B9F176D454CEA /* Backgrounds in Resources */ = {isa = PBXBuildFile; fileRef = A9FD147E96AE29FF1E11357F /* Backgrounds */; };
 		1E0F95693AA2459C49581D13 /* AnnotationBackgroundLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA193D0606AD96AC7616D674 /* AnnotationBackgroundLayout.swift */; };
 		2078A2D59AF49AA8FFFA17F6 /* RecordingPointerCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90CA54A40E5A6984C83C5A48 /* RecordingPointerCapture.swift */; };
+		227FECD8859B296DDF883302 /* RecordingTimelineInteraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61A297BFF717906F55E245D9 /* RecordingTimelineInteraction.swift */; };
 		22A715BD1710983E2CC63729 /* AnnotationEditorTextStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4900E0D3D8AFFE3A81D6BD48 /* AnnotationEditorTextStyle.swift */; };
 		22B67C1138B0E54209F95F9F /* TeleprompterController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9057BF1DF6A0DDEBD5E4B3D2 /* TeleprompterController.swift */; };
 		24A92D5E02A892E928CE1D5B /* ColorGrade.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADD96168EC491E4A46366640 /* ColorGrade.swift */; };
@@ -116,6 +117,7 @@
 		8FF6824457BF68764EE69EB0 /* PreviewWindowPlacement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55DC1D6B2DD5C4F2C81BAB96 /* PreviewWindowPlacement.swift */; };
 		9085E7EFE9BCC5606CA22DEF /* AnnotationCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = 756F1005B44AD1F541E04CFF /* AnnotationCanvas.swift */; };
 		918CF31A69D7A8EB445F4164 /* CaptureRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5558B01BB764A6621835508 /* CaptureRecord.swift */; };
+		9454ECB25AF9B03FCD92505D /* RecordingTimelineInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6353D473E35901B731FD85B2 /* RecordingTimelineInput.swift */; };
 		95BF5ABBDFFA409D4DF830C2 /* RecordingTimelineThumbnails.swift in Sources */ = {isa = PBXBuildFile; fileRef = 538F755422768325F4665A48 /* RecordingTimelineThumbnails.swift */; };
 		9CCDA4CD97D49C7943835A49 /* RecordingProjectsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBB78D69A971DAF784B26C94 /* RecordingProjectsWindowController.swift */; };
 		9E706EC495738239096A37E8 /* StrokeOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CF3030FEFF60A9E00ACF22C /* StrokeOptions.swift */; };
@@ -144,6 +146,7 @@
 		BACCC6CAD5B08E0987F79EE4 /* ScreenshotFileNaming.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EC83F060B8C618716847D95 /* ScreenshotFileNaming.swift */; };
 		BC6170740B05997D27830D0B /* RecordingKeystrokeCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8944EFA56AE64C38C83ED9E1 /* RecordingKeystrokeCapture.swift */; };
 		BC811FEA82E635D6292A80FD /* MenuBarContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE87F338892DCBFEA8FD7BDA /* MenuBarContentView.swift */; };
+		BC91FECA9CA43F0585BE1836 /* StudioInspectorTabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C6D5B9A6634007DC09C4A81 /* StudioInspectorTabs.swift */; };
 		BCBAEB221B1C4CDEF4C96424 /* ViewModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BF1FA787AC739460BAB2EB2 /* ViewModifiers.swift */; };
 		BCFE4A22239F0F1F256911EC /* AnnotationDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9AE3D9E0B57D78980112DD4 /* AnnotationDocument.swift */; };
 		BE1AED402560581F1097F014 /* AnnotationKeyboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 885F73431C6FEAD7062AA6FE /* AnnotationKeyboard.swift */; };
@@ -272,8 +275,10 @@
 		5BADFC6B5CCEDC123DF696D8 /* AppUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdater.swift; sourceTree = "<group>"; };
 		5C57F353C924B2EAE57C53C0 /* RecordingBarPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingBarPresenter.swift; sourceTree = "<group>"; };
 		5D7E69E0EAA9CE007DACC8EE /* RecordingZoomFocusPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingZoomFocusPad.swift; sourceTree = "<group>"; };
+		61A297BFF717906F55E245D9 /* RecordingTimelineInteraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingTimelineInteraction.swift; sourceTree = "<group>"; };
 		624270E3E0F68E35ED9C7FC1 /* ScreenshotCompressionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCompressionService.swift; sourceTree = "<group>"; };
 		62D7B4E7C441E328018B7A02 /* RecordingMotionSpring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingMotionSpring.swift; sourceTree = "<group>"; };
+		6353D473E35901B731FD85B2 /* RecordingTimelineInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingTimelineInput.swift; sourceTree = "<group>"; };
 		642868DA29695992EB9C1C30 /* PerCornerRadii.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerCornerRadii.swift; sourceTree = "<group>"; };
 		674519179B33EE7750D1D543 /* ArrowTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArrowTypes.swift; sourceTree = "<group>"; };
 		679F127F74BFC991CCDCA27B /* R2CredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = R2CredentialStore.swift; sourceTree = "<group>"; };
@@ -291,6 +296,7 @@
 		7846895DF5BEB0C9BC144710 /* StrokeOutline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrokeOutline.swift; sourceTree = "<group>"; };
 		78E7B35573A11F2C3D1CD1F8 /* VideoCompressionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoCompressionModels.swift; sourceTree = "<group>"; };
 		79187CE18696A103378D33E6 /* EditorChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorChrome.swift; sourceTree = "<group>"; };
+		7C6D5B9A6634007DC09C4A81 /* StudioInspectorTabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioInspectorTabs.swift; sourceTree = "<group>"; };
 		7CF3030FEFF60A9E00ACF22C /* StrokeOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrokeOptions.swift; sourceTree = "<group>"; };
 		7DB9ADF51148B7B593827415 /* CountdownOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountdownOverlay.swift; sourceTree = "<group>"; };
 		826D967E7F5D2962EFE34A29 /* AnnotationEditorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationEditorModel.swift; sourceTree = "<group>"; };
@@ -591,6 +597,8 @@
 				6E5AC4EF4D8337A9A20E3A6D /* RecordingStudioStylePresetBar.swift */,
 				E1F111988702AFBAF2496331 /* RecordingStudioStylePresetStore.swift */,
 				4B6E1DB23A94D5FDB76C1577 /* RecordingStudioWindow.swift */,
+				6353D473E35901B731FD85B2 /* RecordingTimelineInput.swift */,
+				61A297BFF717906F55E245D9 /* RecordingTimelineInteraction.swift */,
 				538F755422768325F4665A48 /* RecordingTimelineThumbnails.swift */,
 				4CCD4CBE6C2F68F14298572D /* RecordingTranscriptEditing.swift */,
 				CEC5745BD6B7DD30BD91DEA0 /* RecordingTranscription.swift */,
@@ -612,6 +620,7 @@
 				7CF3030FEFF60A9E00ACF22C /* StrokeOptions.swift */,
 				7846895DF5BEB0C9BC144710 /* StrokeOutline.swift */,
 				410344F0A319E6A7189199E3 /* StrokePipeline.swift */,
+				7C6D5B9A6634007DC09C4A81 /* StudioInspectorTabs.swift */,
 				97939ED1B8AE58C014C685E7 /* TeleprompterComposerPresenter.swift */,
 				9057BF1DF6A0DDEBD5E4B3D2 /* TeleprompterController.swift */,
 				3A5FFC877AB3AB6B64894072 /* TeleprompterOverlayPresenter.swift */,
@@ -907,6 +916,8 @@
 				526695E1B09D246846527089 /* RecordingStudioStylePresetBar.swift in Sources */,
 				4C60427E131EEFD8D35939F8 /* RecordingStudioStylePresetStore.swift in Sources */,
 				0D140B6B419AF8A893C0B34B /* RecordingStudioWindow.swift in Sources */,
+				9454ECB25AF9B03FCD92505D /* RecordingTimelineInput.swift in Sources */,
+				227FECD8859B296DDF883302 /* RecordingTimelineInteraction.swift in Sources */,
 				95BF5ABBDFFA409D4DF830C2 /* RecordingTimelineThumbnails.swift in Sources */,
 				ADDDE18D5DA47F866E3C15C2 /* RecordingTranscriptEditing.swift in Sources */,
 				B6A1C17303643E0C512127E3 /* RecordingTranscription.swift in Sources */,
@@ -937,6 +948,7 @@
 				9E706EC495738239096A37E8 /* StrokeOptions.swift in Sources */,
 				8C76612CC356391B94F0AD36 /* StrokeOutline.swift in Sources */,
 				554AA519F1C974A2177C3728 /* StrokePipeline.swift in Sources */,
+				BC91FECA9CA43F0585BE1836 /* StudioInspectorTabs.swift in Sources */,
 				A4257639A3A503D1E17454A6 /* TeleprompterComposerPresenter.swift in Sources */,
 				22B67C1138B0E54209F95F9F /* TeleprompterController.swift in Sources */,
 				3EB30B21F2F488EC0524A801 /* TeleprompterOverlayPresenter.swift in Sources */,

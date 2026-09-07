@@ -27,6 +27,8 @@ struct RecordingClipTimelineView: NSViewRepresentable {
     /// anchor is the time under the pointer, which the caller keeps pinned to
     /// its current screen position while the scale changes.
     let onZoom: (Double, TimeInterval) -> Void
+    var isSplitting = false
+    var onToggleSplit: () -> Void = {}
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -58,6 +60,8 @@ struct RecordingClipTimelineView: NSViewRepresentable {
             onTrim: onTrim,
             onZoom: onZoom
         )
+        nsView.isSplitting = isSplitting
+        nsView.toggleSplitRequested = onToggleSplit
         nsView.update(
             timeline: timeline,
             sourceDuration: sourceDuration,
@@ -148,6 +152,8 @@ struct RecordingClipTimelineView: NSViewRepresentable {
 }
 
 final class RecordingClipTimelineControl: NSView {
+    var isSplitting = false
+    var toggleSplitRequested: (() -> Void)?
     var selectionDidChange: ((UUID) -> Void)?
     var playheadDidChange: ((TimeInterval) -> Void)?
     var hoverTimeDidChange: ((TimeInterval?) -> Void)?
@@ -285,7 +291,7 @@ final class RecordingClipTimelineControl: NSView {
     }
 
     override func cursorUpdate(with event: NSEvent) {
-        if hoveredEdge != nil {
+        if hoveredEdge != nil && !isSplitting {
             NSCursor.resizeLeftRight.set()
         } else {
             NSCursor.crosshair.set()
@@ -298,6 +304,12 @@ final class RecordingClipTimelineControl: NSView {
         let point = convert(event.locationInWindow, from: nil)
         guard timelineRect.contains(point) else { return }
         let time = editorTime(forX: point.x)
+        if isSplitting {
+            if let split = splitTime(near: time, allowSnap: !event.modifierFlags.contains(.option)) {
+                splitRequested?(split)
+            }
+            return
+        }
         guard let location = timeline.location(at: time) else { return }
         let edgeHit = edgeHit(at: point)
         let targetClipID = edgeHit?.clipID ?? location.segmentID
@@ -440,11 +452,8 @@ final class RecordingClipTimelineControl: NSView {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let characters = event.charactersIgnoringModifiers?.lowercased()
 
-        if modifiers.subtracting(.option).isEmpty, characters == "s",
-           let hoverTime, hoveredClipID != nil {
-            if let time = splitTime(near: hoverTime, allowSnap: !modifiers.contains(.option)) {
-                splitRequested?(time)
-            }
+        if modifiers.isEmpty, characters == "s" {
+            toggleSplitRequested?()
             return
         }
         if modifiers.isEmpty, characters == "c" {
@@ -801,6 +810,7 @@ final class RecordingClipTimelineControl: NSView {
     }
 
     private func drawHoverEdgeHandle() {
+        guard !isSplitting else { return }
         let target: (clipID: UUID, edge: Edge)?
         if case .trim(let clipID, let edge) = dragTarget {
             target = (clipID, edge)

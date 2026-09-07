@@ -7,12 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Video inspector tabs now use native per-segment tooltips, including explanations for unavailable camera, cursor, keystroke, and caption controls.
+- Adding a zoom to an imported recording enables zoom playback so the new segment can be edited and previewed immediately.
+
 ### Changed
+
+- **Cap timeline interactions**: Timeline navigation now uses Cap's seconds-visible transform, 10% zoom steps, playhead/pointer anchoring, matching ruler intervals, and a minimap with draggable zoom handles. Pinch and modifier-scroll work across every track.
+- **Cap zoom workflow**: Hover over blank Zoom-track space to preview a segment, click to add it, or drag to set its duration. Blocks show Auto/Manual mode and amount; moving and resizing stop at neighboring blocks, and double-clicking an edge extends it to the next boundary. The inspector adds zoom amount presets and grouped amount edits for undo.
+- **Split tool**: Press S or select the scissors tool, then click the video track to split at that point. Track labels distinguish Video, Zoom, and Masks.
 
 - **Cap-style image editor**: A compact tool strip, contextual annotation controls, and native popovers for background, padding, rounding, shadow, and border leave more room for the image. Advanced effects remain available from Effects.
 - **Visible image zoom controls**: Zoom out, a continuous slider, zoom in, percentage presets, and Fit are available together on the canvas. The existing zoom bounds and pan behavior are preserved.
 - **Cap-style video editor**: The preview and tabbed inspector sit in separate bordered panels above a full-width timeline. Background, camera, audio, cursor, keystrokes, captions, and zoom/clip controls use the existing SwiftUI components; timeline selections reveal their controls automatically.
-- **Timeline zoom slider**: The slider uses the existing anchored zoom and scrolling implementation alongside zoom-in, zoom-out, and Fit controls.
 - Rendering, GPU caches, playback, recording, and export pipelines are unchanged. Menu bar styling and capture actions are unchanged.
 
 ### Removed
