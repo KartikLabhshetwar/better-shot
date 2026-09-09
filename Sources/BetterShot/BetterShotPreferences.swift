@@ -167,10 +167,10 @@ enum BetterShotPreferences {
     /// Whether the annotation editor displays a downscaled preview of the
     /// screenshot to reduce memory usage. This only affects the on-screen
     /// editing preview - exported images are always rendered at full
-    /// resolution. Defaults to on.
+    /// resolution. Full resolution is the default.
     static var lowResolutionEditorPreview: Bool {
         if UserDefaults.standard.object(forKey: lowResolutionEditorPreviewKey) == nil {
-            return true
+            return false
         }
         return UserDefaults.standard.bool(forKey: lowResolutionEditorPreviewKey)
     }

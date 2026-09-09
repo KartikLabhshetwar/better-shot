@@ -244,184 +244,16 @@ struct AnnotationBackgroundGradient: Identifiable, Equatable, Hashable {
     let startPoint: UnitPoint
     let endPoint: UnitPoint
 
-    static let presets: [AnnotationBackgroundGradient] = [
-        AnnotationBackgroundGradient(
-            id: "aurora",
-            title: "Aurora",
-            colors: [
-                AnnotationBackgroundColor("aurora-a", title: "Aurora A", red: 0.98, green: 0.31, blue: 0.58),
-                AnnotationBackgroundColor("aurora-b", title: "Aurora B", red: 0.40, green: 0.32, blue: 0.95),
-                AnnotationBackgroundColor("aurora-c", title: "Aurora C", red: 0.29, green: 0.84, blue: 0.80)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        ),
-        AnnotationBackgroundGradient(
-            id: "cobalt",
-            title: "Cobalt",
-            colors: [
-                AnnotationBackgroundColor("cobalt-a", title: "Cobalt A", red: 0.04, green: 0.05, blue: 0.50),
-                AnnotationBackgroundColor("cobalt-b", title: "Cobalt B", red: 0.26, green: 0.19, blue: 0.93),
-                AnnotationBackgroundColor("cobalt-c", title: "Cobalt C", red: 0.42, green: 0.67, blue: 0.98)
-            ],
-            startPoint: .top,
-            endPoint: .bottomTrailing
-        ),
-        AnnotationBackgroundGradient(
-            id: "peach",
-            title: "Peach",
-            colors: [
-                AnnotationBackgroundColor("peach-a", title: "Peach A", red: 0.98, green: 0.38, blue: 0.36),
-                AnnotationBackgroundColor("peach-b", title: "Peach B", red: 0.99, green: 0.71, blue: 0.36),
-                AnnotationBackgroundColor("peach-c", title: "Peach C", red: 0.90, green: 0.33, blue: 0.65)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        ),
-        AnnotationBackgroundGradient(
-            id: "glass",
-            title: "Glass",
-            colors: [
-                AnnotationBackgroundColor("glass-a", title: "Glass A", red: 0.87, green: 0.95, blue: 0.94),
-                AnnotationBackgroundColor("glass-b", title: "Glass B", red: 0.46, green: 0.77, blue: 0.86),
-                AnnotationBackgroundColor("glass-c", title: "Glass C", red: 0.25, green: 0.53, blue: 0.93)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        ),
-        AnnotationBackgroundGradient(
-            id: "plasma",
-            title: "Plasma",
-            colors: [
-                AnnotationBackgroundColor("plasma-a", title: "Plasma A", red: 0.08, green: 0.02, blue: 0.22),
-                AnnotationBackgroundColor("plasma-b", title: "Plasma B", red: 0.35, green: 0.12, blue: 0.84),
-                AnnotationBackgroundColor("plasma-c", title: "Plasma C", red: 0.95, green: 0.26, blue: 0.42)
-            ],
-            startPoint: .topTrailing,
-            endPoint: .bottomLeading
-        ),
-        AnnotationBackgroundGradient(
-            id: "mango",
-            title: "Mango",
-            colors: [
-                AnnotationBackgroundColor("mango-a", title: "Mango A", red: 0.99, green: 0.75, blue: 0.20),
-                AnnotationBackgroundColor("mango-b", title: "Mango B", red: 0.96, green: 0.33, blue: 0.21),
-                AnnotationBackgroundColor("mango-c", title: "Mango C", red: 0.67, green: 0.19, blue: 0.89)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        ),
-        AnnotationBackgroundGradient(
-            id: "mist",
-            title: "Mist",
-            colors: [
-                AnnotationBackgroundColor("mist-a", title: "Mist A", red: 0.94, green: 0.94, blue: 0.92),
-                AnnotationBackgroundColor("mist-b", title: "Mist B", red: 0.80, green: 0.88, blue: 0.94),
-                AnnotationBackgroundColor("mist-c", title: "Mist C", red: 0.95, green: 0.76, blue: 0.70)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        ),
-        AnnotationBackgroundGradient(
-            id: "lagoon",
-            title: "Lagoon",
-            colors: [
-                AnnotationBackgroundColor("lagoon-a", title: "Lagoon A", red: 0.08, green: 0.30, blue: 0.54),
-                AnnotationBackgroundColor("lagoon-b", title: "Lagoon B", red: 0.25, green: 0.64, blue: 0.72),
-                AnnotationBackgroundColor("lagoon-c", title: "Lagoon C", red: 0.70, green: 0.92, blue: 0.78)
-            ],
-            startPoint: .bottomLeading,
-            endPoint: .topTrailing
-        ),
-        AnnotationBackgroundGradient(
-            id: "ember",
-            title: "Ember",
-            colors: [
-                AnnotationBackgroundColor("ember-a", title: "Ember A", red: 0.18, green: 0.03, blue: 0.08),
-                AnnotationBackgroundColor("ember-b", title: "Ember B", red: 0.86, green: 0.17, blue: 0.18),
-                AnnotationBackgroundColor("ember-c", title: "Ember C", red: 1.00, green: 0.67, blue: 0.25)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        ),
-        AnnotationBackgroundGradient(
-            id: "violet",
-            title: "Violet",
-            colors: [
-                AnnotationBackgroundColor("violet-a", title: "Violet A", red: 0.24, green: 0.08, blue: 0.51),
-                AnnotationBackgroundColor("violet-b", title: "Violet B", red: 0.59, green: 0.22, blue: 0.94),
-                AnnotationBackgroundColor("violet-c", title: "Violet C", red: 0.96, green: 0.42, blue: 0.74)
-            ],
-            startPoint: .top,
-            endPoint: .bottomTrailing
-        ),
-        AnnotationBackgroundGradient(
-            id: "seaglass",
-            title: "Sea Glass",
-            colors: [
-                AnnotationBackgroundColor("seaglass-a", title: "Sea Glass A", red: 0.43, green: 0.86, blue: 0.75),
-                AnnotationBackgroundColor("seaglass-b", title: "Sea Glass B", red: 0.25, green: 0.62, blue: 0.80),
-                AnnotationBackgroundColor("seaglass-c", title: "Sea Glass C", red: 0.22, green: 0.35, blue: 0.75)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        ),
-        AnnotationBackgroundGradient(
-            id: "citrus",
-            title: "Citrus",
-            colors: [
-                AnnotationBackgroundColor("citrus-a", title: "Citrus A", red: 0.99, green: 0.91, blue: 0.30),
-                AnnotationBackgroundColor("citrus-b", title: "Citrus B", red: 0.44, green: 0.78, blue: 0.29),
-                AnnotationBackgroundColor("citrus-c", title: "Citrus C", red: 0.12, green: 0.58, blue: 0.42)
-            ],
-            startPoint: .topTrailing,
-            endPoint: .bottomLeading
-        ),
-        AnnotationBackgroundGradient(
-            id: "amethyst",
-            title: "Amethyst",
-            colors: [
-                AnnotationBackgroundColor("amethyst-a", title: "Amethyst A", red: 0.10, green: 0.08, blue: 0.28),
-                AnnotationBackgroundColor("amethyst-b", title: "Amethyst B", red: 0.35, green: 0.15, blue: 0.65),
-                AnnotationBackgroundColor("amethyst-c", title: "Amethyst C", red: 0.76, green: 0.39, blue: 0.95)
-            ],
-            startPoint: .bottomLeading,
-            endPoint: .topTrailing
-        ),
-        AnnotationBackgroundGradient(
-            id: "sorbet",
-            title: "Sorbet",
-            colors: [
-                AnnotationBackgroundColor("sorbet-a", title: "Sorbet A", red: 1.00, green: 0.49, blue: 0.51),
-                AnnotationBackgroundColor("sorbet-b", title: "Sorbet B", red: 1.00, green: 0.74, blue: 0.48),
-                AnnotationBackgroundColor("sorbet-c", title: "Sorbet C", red: 0.56, green: 0.78, blue: 0.98)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        ),
-        AnnotationBackgroundGradient(
-            id: "mineral",
-            title: "Mineral",
-            colors: [
-                AnnotationBackgroundColor("mineral-a", title: "Mineral A", red: 0.93, green: 0.96, blue: 0.95),
-                AnnotationBackgroundColor("mineral-b", title: "Mineral B", red: 0.64, green: 0.72, blue: 0.82),
-                AnnotationBackgroundColor("mineral-c", title: "Mineral C", red: 0.33, green: 0.42, blue: 0.55)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        ),
-        AnnotationBackgroundGradient(
-            id: "dawn",
-            title: "Dawn",
-            colors: [
-                AnnotationBackgroundColor("dawn-a", title: "Dawn A", red: 0.98, green: 0.62, blue: 0.77),
-                AnnotationBackgroundColor("dawn-b", title: "Dawn B", red: 0.98, green: 0.82, blue: 0.47),
-                AnnotationBackgroundColor("dawn-c", title: "Dawn C", red: 0.42, green: 0.71, blue: 0.96)
-            ],
-            startPoint: .bottomLeading,
-            endPoint: .topTrailing
-        )
-    ]
+    var preset: GradientPreset? = nil
+
+    static let presets = GradientPreset.presets.map { preset in
+        AnnotationBackgroundGradient(id: preset.id, title: preset.name,
+            colors: preset.stops.enumerated().map { index, stop in
+                AnnotationBackgroundColor("\(preset.id)-\(index)", title: preset.name,
+                    red: stop.red, green: stop.green, blue: stop.blue)
+            }, startPoint: preset.startPoint.unitPoint, endPoint: preset.endPoint.unitPoint, preset: preset)
+    }
+
 }
 
 struct AnnotationCustomWallpaper: Identifiable, Equatable, Hashable {
@@ -686,7 +518,8 @@ extension BeautifierConfig {
                 title: preset.name,
                 colors: colors,
                 startPoint: preset.startPoint.unitPoint,
-                endPoint: preset.endPoint.unitPoint
+                endPoint: preset.endPoint.unitPoint,
+                preset: preset
             ))
         case .wallpaper(let source):
             return .customWallpaper(AnnotationCustomWallpaper(url: URL(fileURLWithPath: source.path)))
@@ -714,5 +547,22 @@ extension BeautifierConfig {
             settings.customWallpaper = wallpaper
         }
         return settings
+    }
+}
+
+
+extension AnnotationBackgroundStyle {
+    var captureBackgroundStyle: BackgroundStyle {
+        switch self {
+        case .none: .none
+        case .solid(let color):
+            .solid(SolidColor(id: color.id, name: color.title, red: color.red, green: color.green, blue: color.blue))
+        case .gradient(let gradient):
+            .gradient(gradient.preset ?? GradientPreset(id: gradient.id, name: gradient.title,
+                stops: gradient.colors.map { .init(red: $0.red, green: $0.green, blue: $0.blue) },
+                startPoint: .init(x: gradient.startPoint.x, y: gradient.startPoint.y),
+                endPoint: .init(x: gradient.endPoint.x, y: gradient.endPoint.y)))
+        case .customWallpaper(let wallpaper): .wallpaper(WallpaperSource(path: wallpaper.url.path))
+        }
     }
 }

@@ -30,6 +30,7 @@ final class ShortcutService {
         static let defaultFullscreen = Shortcut(keyCode: UInt32(kVK_ANSI_3), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultOCR = Shortcut(keyCode: UInt32(kVK_ANSI_O), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultColorPicker = Shortcut(keyCode: UInt32(kVK_ANSI_C), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
+        static let defaultRecordingOptions = Shortcut(keyCode: UInt32(kVK_ANSI_5), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultRecording = Shortcut(keyCode: UInt32(kVK_ANSI_2), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
     }
 
@@ -40,6 +41,7 @@ final class ShortcutService {
         case ocr = 4
         case colorPicker = 5
         case recording = 6
+        case recordingOptions = 7
     }
 
     // MARK: - Registration (CGEvent tap — intercepts system shortcuts)
@@ -84,6 +86,7 @@ final class ShortcutService {
             (.ocr, service.loadShortcut(for: .ocr) ?? .defaultOCR),
             (.colorPicker, service.loadShortcut(for: .colorPicker) ?? .defaultColorPicker),
             (.recording, service.loadShortcut(for: .recording) ?? .defaultRecording),
+            (.recordingOptions, service.loadShortcut(for: .recordingOptions) ?? .defaultRecordingOptions),
         ]
     }
 
@@ -177,9 +180,9 @@ final class ShortcutService {
             if keyCode == shortcut.keyCode && carbonMods == shortcut.modifiers {
                 Task { @MainActor in
                     let mouseScreen = ActiveDisplayResolver.activeScreen(preferPointer: true)
-                    if action == .recording {
+                    if action == .recording || action == .recordingOptions {
                         guard !ScreenRecordingManager.shared.isActive else { return }
-                        RecordingBarPresenter.shared.showPicker()
+                        RecordingBarPresenter.shared.showPicker(recordingOptions: action == .recordingOptions)
                     } else {
                         await CaptureOrchestrator.shared.performCapture(action, on: mouseScreen)
                     }
@@ -200,6 +203,7 @@ extension ShortcutService.Action {
         case .ocr: .defaultOCR
         case .colorPicker: .defaultColorPicker
         case .recording: .defaultRecording
+        case .recordingOptions: .defaultRecordingOptions
         case .window: nil
         }
     }

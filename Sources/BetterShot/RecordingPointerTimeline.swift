@@ -12,11 +12,27 @@
 import CoreGraphics
 import Foundation
 
+nonisolated enum RecordingCursorAppearance: String, Codable, CaseIterable, Sendable {
+    case recorded, dark, light, dot
+    var title: String { rawValue.capitalized }
+}
+
+nonisolated struct RecordingCursorOptions: Codable, Equatable, Sendable {
+    var isVisible = true
+    var appearance = RecordingCursorAppearance.recorded
+    var smoothMotion = true
+    var pressEffect = true
+    var rippleEffect = true
+    var hideWhenIdle = false
+}
+
 nonisolated struct PointerPressFrame: Sendable, Equatable {
     /// Exact recorded press coordinate. The smoothed cursor may still be
     /// settling when the click lands, but feedback must mark the real target.
     var location: CGPoint
     var progress: Double
+    var impactEnabled = true
+    var rippleEnabled = true
 }
 
 nonisolated struct PointerFrame: Sendable, Equatable {
@@ -110,7 +126,9 @@ nonisolated struct PointerTimeline: Sendable {
         recordingSizeInPoints: CGSize = CGSize(width: 1_000, height: 1_000),
         fallbackArtwork: PointerArtwork? = nil,
         hideAfterInactivity: TimeInterval? = nil,
-        clipTimeline: RecordingClipTimeline? = nil
+        clipTimeline: RecordingClipTimeline? = nil,
+        options: RecordingCursorOptions = RecordingCursorOptions(),
+        overrideArtwork: PointerArtwork? = nil
     ) -> PointerTimeline {
         guard duration.isFinite, duration > 0 else { return .empty }
         let timelineDuration = clipTimeline?.duration ?? duration
@@ -136,8 +154,13 @@ nonisolated struct PointerTimeline: Sendable {
         guard let firstSample = samples.first else { return .empty }
 
         let pressSamples = samples.filter { $0.kind == .press }
-        let travelSamples = samples.filter {
-            $0.kind == .travel || $0.kind == .drag
+        // Stationary keep-alive samples must not prevent the idle cursor from fading.
+        var travelSamples: [PointerStreamEvent] = []
+        for sample in samples where sample.kind == .travel || sample.kind == .drag {
+            if let previous = travelSamples.last,
+               hypot((sample.x - previous.x) * safeSize.width,
+                     (sample.y - previous.y) * safeSize.height) < 1 { continue }
+            travelSamples.append(sample)
         }
         let intervals = pressIntervals(
             from: samples,
@@ -149,6 +172,8 @@ nonisolated struct PointerTimeline: Sendable {
             artworkByID[artwork.artworkID] = artwork
         }
 
+        if let overrideArtwork { artworkByID[overrideArtwork.artworkID] = overrideArtwork }
+        let idleDelay = options.hideWhenIdle ? (hideAfterInactivity ?? 3) : hideAfterInactivity
         let frameCount = max(2, Int((timelineDuration * stepRate).rounded(.up)) + 1)
         let dt = 1 / stepRate
         var xSpring = DampedSpring(position: firstSample.x)
@@ -160,6 +185,7 @@ nonisolated struct PointerTimeline: Sendable {
         var sampleIndex = -1
         var travelIndex = -1
         var latestPressIndex = -1
+        var lastInteractionTime: TimeInterval = 0
         var pressIntervalIndex = 0
         var currentArtworkID = firstSample.artworkID
         var frames: [PointerFrame] = []
@@ -173,6 +199,7 @@ nonisolated struct PointerTimeline: Sendable {
                 sampleIndex += 1
                 let sample = samples[sampleIndex]
                 currentArtworkID = sample.artworkID
+                if sample.kind == .press || sample.kind == .release { lastInteractionTime = sample.time }
             }
 
             while travelIndex + 1 < travelSamples.count,
@@ -214,8 +241,9 @@ nonisolated struct PointerTimeline: Sendable {
             ySpring.step(toward: target.y, using: motion, dt: dt)
 
             var isHidden = false
-            if let hideAfterInactivity,
-               hideAfterInactivity > 0,
+            if let idleDelay,
+               idleDelay > 0,
+               !isPressed,
                travelIndex >= 0 {
                 let previousTravel = travelSamples[travelIndex]
                 let nextTravel = travelIndex + 1 < travelSamples.count
@@ -224,10 +252,10 @@ nonisolated struct PointerTimeline: Sendable {
                 let willMoveSoon = nextTravel.map {
                     $0.time - time <= revealLeadWindow
                 } ?? false
-                isHidden = time - previousTravel.time > hideAfterInactivity && !willMoveSoon
+                isHidden = time - max(previousTravel.time, lastInteractionTime) > idleDelay && !willMoveSoon
             }
 
-            let targetMagnification = (isPressed ? 0.8 : 1) * (isHidden ? 0.8 : 1)
+            let targetMagnification = (isPressed && options.pressEffect ? 0.8 : 1) * (isHidden ? 0.8 : 1)
             magnificationSpring.step(toward: targetMagnification, using: PointerSpring.settle, dt: dt)
             opacitySpring.step(toward: isHidden ? 0 : 1, using: PointerSpring.settle, dt: dt)
             blurSpring.step(toward: isHidden ? 5 : 0, using: PointerSpring.settle, dt: dt)
@@ -239,7 +267,9 @@ nonisolated struct PointerTimeline: Sendable {
                 press = elapsed <= pulseDuration
                     ? PointerPressFrame(
                         location: event.location,
-                        progress: min(max(elapsed / pulseDuration, 0), 1)
+                        progress: min(max(elapsed / pulseDuration, 0), 1),
+                        impactEnabled: options.pressEffect,
+                        rippleEnabled: options.rippleEffect
                     )
                     : nil
             } else {
@@ -247,13 +277,13 @@ nonisolated struct PointerTimeline: Sendable {
             }
 
             frames.append(PointerFrame(
-                location: CGPoint(x: xSpring.position, y: ySpring.position),
-                artworkID: currentArtworkID,
+                location: options.smoothMotion ? CGPoint(x: xSpring.position, y: ySpring.position) : latest.location,
+                artworkID: overrideArtwork?.artworkID ?? currentArtworkID,
                 magnification: magnificationSpring.position,
                 tiltDegrees: 0,
-                opacity: min(max(opacitySpring.position, 0), 1),
+                opacity: options.isVisible ? min(max(opacitySpring.position, 0), 1) : 0,
                 blurRadius: max(0, blurSpring.position),
-                press: press
+                press: options.isVisible ? press : nil
             ))
         }
 
@@ -263,10 +293,10 @@ nonisolated struct PointerTimeline: Sendable {
             let previous = frames[max(0, index - tiltOffset)].location
             let current = frames[index].location
             let deltaInPoints = (current.x - previous.x) * recordingWidth
-            frames[index].tiltDegrees = min(max(
+            frames[index].tiltDegrees = options.smoothMotion ? min(max(
                 deltaInPoints * tiltGain * tiltWeight,
                 -20
-            ), 20)
+            ), 20) : 0
         }
 
         return PointerTimeline(

@@ -213,6 +213,7 @@ struct GeneralSettingsTab: View {
             }
             .onChange(of: defaultConfig) { _, newValue in
                 AppPreferences.defaultBeautifierConfig = newValue
+                AnnotationBackgroundPresetStore.shared.setActivePreset(id: nil)
             }
 
             Section {
@@ -379,8 +380,8 @@ private struct DefaultBackgroundPicker: View {
         return Button {
             selectedStyle = .gradient(preset)
         } label: {
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(preset.swiftUIGradient)
+            GradientBackgroundView(preset: preset)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
                 .frame(width: 24, height: 24)
                 .overlay(
                     RoundedRectangle(cornerRadius: 4, style: .continuous)
@@ -578,7 +579,7 @@ private struct DefaultConfigPreview: View {
         case .solid(let color):
             Rectangle().fill(color.color)
         case .gradient(let preset):
-            Rectangle().fill(preset.swiftUIGradient)
+            GradientBackgroundView(preset: preset)
         case .wallpaper(let source):
             if let nsImage = ImageCache.shared.image(atPath: source.path) {
                 Image(nsImage: nsImage)
@@ -748,6 +749,11 @@ struct RecordingSettingsTab: View {
     @AppStorage(BetterShotPreferences.recordingTeleprompterEnabledKey) private var teleprompterEnabled: Bool = false
     @AppStorage(AppPreferences.openEditorAfterRecordingKey) private var openEditor = AppPreferences.openEditorAfterRecording
     @State private var isConfirmingReset = false
+    @State private var backgroundConfig: BeautifierConfig = {
+        var config = BeautifierConfig()
+        config.style = RecordingStudioDefaults.preferredBackground.captureBackgroundStyle
+        return config
+    }()
     @State private var exportSettings = RecordingExportPreferences.lastSettings
 
     private var cameras: [AVCaptureDevice] { RecordingDeviceCatalog.cameras() }
@@ -819,6 +825,18 @@ struct RecordingSettingsTab: View {
             }
 
             Section {
+                DefaultConfigPreview(config: backgroundConfig).frame(height: 140)
+                DefaultBackgroundPicker(selectedStyle: $backgroundConfig.style)
+            } header: {
+                Text("Default Video Background")
+            } footer: {
+                Text("Used for new recordings. Changes inside a project do not replace this default.")
+            }
+            .onChange(of: backgroundConfig.style) {
+                RecordingStudioDefaults.preferredBackground = backgroundConfig.annotationStyle
+            }
+
+            Section {
                 Picker("Render speed", selection: $exportSettings.speed) {
                     ForEach(VideoCompressionSpeed.allCases) { Text($0.rawValue).tag($0) }
                 }
@@ -851,6 +869,8 @@ struct RecordingSettingsTab: View {
                 startDelaySeconds = 0
                 teleprompterEnabled = false
                 openEditor = false
+                backgroundConfig.style = RecordingStudioStyle.defaultBackground.captureBackgroundStyle
+                RecordingStudioDefaults.preferredBackground = RecordingStudioStyle.defaultBackground
                 exportSettings = VideoCompressionSettings()
                 RecordingExportPreferences.lastSettings = exportSettings
             }
@@ -870,7 +890,8 @@ struct ShortcutSettingsTab: View {
         ("Capture Screen", "Grab the whole display at once", .fullscreen),
         ("OCR", "Read the text out of any region", .ocr),
         ("Pick Color", "Sample a color from anywhere on screen", .colorPicker),
-        ("Capture & Recording Bar", "Show the shared bar to choose a recording source", .recording),
+        ("Capture & Recording Bar", "Show the shared capture bar", .recording),
+        ("Recording Options", "Open the recording section of the capture bar", .recordingOptions),
     ]
 
     var body: some View {

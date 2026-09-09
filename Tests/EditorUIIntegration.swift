@@ -21,6 +21,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     let shortcuts = ShortcutService.Shortcut.self
     precondition(shortcuts.defaultRegion.keyCode == UInt32(kVK_ANSI_4))
     precondition(shortcuts.defaultRecording.keyCode == UInt32(kVK_ANSI_2))
+    precondition(shortcuts.defaultRecordingOptions.keyCode == UInt32(kVK_ANSI_5))
     for (oldRegionKey, oldRecordingKey, enabled) in [
         (kVK_ANSI_2, kVK_ANSI_5, true),
         (kVK_ANSI_2, kVK_ANSI_5, false),
@@ -70,9 +71,112 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     imageModel.fitCanvas()
     precondition(imageModel.zoomToFit && imageModel.panOffset == .zero)
 
+    for tool in AnnotationTool.allCases where tool != .select {
+        imageModel.selectTool(.select)
+        imageModel.selectTool(tool)
+        precondition(imageModel.selectedTool == tool)
+        imageModel.selectTool(tool)
+        precondition(imageModel.selectedTool == .select, "Second tool click returns to selection")
+    }
+    precondition(GradientPreset.presets.count == 10)
+    precondition(AnnotationBackgroundGradient.presets.map(\.id) == GradientPreset.presets.map(\.id))
+    for gradient in AnnotationBackgroundGradient.presets {
+        let stored = StoredGradient(gradient)
+        let restored = try JSONDecoder().decode(StoredGradient.self, from: JSONEncoder().encode(stored))
+        precondition(restored.backgroundGradient == gradient, "Gradient stops and highlights persist")
+        let preset = gradient.preset!
+        precondition(preset.locations?.count == 3 && preset.highlights?.count == 2)
+    }
+    print("PASS tool deselection and ten shared gradient definitions / saved highlights")
+
+    var cursorStyle = RecordingStudioStyle()
+    cursorStyle.cursor.appearance = .light
+    cursorStyle.cursor.hideWhenIdle = true
+    let cursorData = try JSONEncoder().encode(StoredRecordingStudioStyle(cursorStyle))
+    let restoredStyle = try JSONDecoder().decode(StoredRecordingStudioStyle.self, from: cursorData)
+    precondition(restoredStyle.value.cursor == cursorStyle.cursor, "Cursor settings survive project save and reopen")
+    var legacyStyle = try JSONSerialization.jsonObject(with: cursorData) as! [String: Any]
+    legacyStyle.removeValue(forKey: "cursor")
+    let legacyData = try JSONSerialization.data(withJSONObject: legacyStyle)
+    let legacyCursor = try JSONDecoder().decode(StoredRecordingStudioStyle.self, from: legacyData).value.cursor
+    precondition(legacyCursor == RecordingCursorOptions(), "Older projects retain the recorded cursor and existing motion")
+    for appearance in RecordingCursorAppearance.allCases where appearance != .recorded {
+        let artwork = PointerArtworkCapture.styledArtwork(appearance)!
+        let bitmap = NSBitmapImageRep(data: artwork.imageData)!
+        precondition(bitmap.pixelsWide == 1024 && bitmap.pixelsHigh == 1280,
+                     "Custom cursors must retain enough pixels for enlarged Retina / 4K output")
+        precondition(bitmap.colorAt(x: 0, y: 0)!.alphaComponent == 0, "Cursor background stays transparent")
+        precondition(bitmap.colorAt(x: (appearance == .dot ? 16 : 10) * 32, y: 20 * 32)!.alphaComponent > 0.99,
+                     "Cursor artwork must contain an opaque, visible shape")
+        precondition(artwork.referenceSize.width == 32 && artwork.referenceSize.height == 40)
+        let expectedAnchor = appearance == .dot ? CGPoint(x: 0.5, y: 0.5) : CGPoint(x: 5.0 / 32, y: 0.1)
+        precondition(artwork.normalizedAnchor == expectedAnchor, "High-resolution artwork must preserve its click hotspot")
+        precondition(artwork == PointerArtworkCapture.styledArtwork(appearance), "Cursor artwork is cached")
+    }
+    let multiResolutionCursor = NSImage(size: NSSize(width: 16, height: 20))
+    for scale in [1, 4] {
+        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 16 * scale, pixelsHigh: 20 * scale,
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+        rep.size = multiResolutionCursor.size
+        multiResolutionCursor.addRepresentation(rep)
+    }
+    let captured = PointerArtworkCapture.capture(NSCursor(image: multiResolutionCursor,
+        hotSpot: NSPoint(x: 1, y: 2)), id: "retina-check")!
+    let capturedBitmap = NSBitmapImageRep(data: captured.imageData)!
+    precondition(capturedBitmap.pixelsWide == 64 && capturedBitmap.pixelsHigh == 80,
+                 "Recorded cursors must keep their largest bitmap representation")
+    precondition(captured.referenceSize.width == 16 && captured.anchorPoint.x == 1 && captured.anchorPoint.y == 2)
+    precondition(NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: nil) != nil)
+    print("PASS high-resolution cursor PNGs, transparency, hotspots, Retina capture, and native menu symbol")
+    let stillCapture = PointerCaptureFile(travel: (0...24).map {
+        PointerTravelSample(time: Double($0) / 4, x: 0.5, y: 0.5)
+    })
+    var cursorOptions = RecordingCursorOptions()
+    cursorOptions.hideWhenIdle = true
+    let idlePointer = PointerTimeline.build(capture: stillCapture, duration: 6, options: cursorOptions)
+    precondition(idlePointer.frame(at: 5)!.opacity < 0.01, "Stationary keep-alive samples do not prevent idle hiding")
+    cursorOptions.isVisible = false
+    let hiddenPointer = PointerTimeline.build(capture: stillCapture, duration: 6, options: cursorOptions)
+    precondition(hiddenPointer.frame(at: 0)!.opacity == 0 && hiddenPointer.frame(at: 5)!.press == nil)
+    cursorOptions.isVisible = true
+    cursorOptions.smoothMotion = false
+    cursorOptions.pressEffect = false
+    cursorOptions.rippleEffect = true
+    let clickCapture = PointerCaptureFile(travel: [
+        PointerTravelSample(time: 0, x: 0.1, y: 0.1),
+        PointerTravelSample(time: 0.5, x: 0.8, y: 0.6)
+    ], presses: [PointerPressEvent(time: 0.6, x: 0.8, y: 0.6, button: 0, phase: .down)])
+    let styledArtwork = PointerArtworkCapture.styledArtwork(.light)!
+    let naturalPointer = PointerTimeline.build(capture: clickCapture, duration: 1, options: cursorOptions,
+                                               overrideArtwork: styledArtwork)
+    let clickFrame = naturalPointer.frame(at: 0.65)!
+    precondition(clickFrame.location == CGPoint(x: 0.8, y: 0.6) && clickFrame.tiltDegrees == 0)
+    precondition(clickFrame.artworkID == styledArtwork.artworkID && abs(clickFrame.magnification - 1) < 0.001)
+    precondition(clickFrame.press?.impactEnabled == false && clickFrame.press?.rippleEnabled == true)
+    print("PASS cursor styles, saved/legacy settings, natural motion, separate click effects, and idle visibility")
+
     let videoModel = RecordingStudioModel(url: movieURL)
     await videoModel.load()
     defer { videoModel.teardown() }
+    videoModel.beginVideoCrop()
+    precondition(videoModel.isCroppingVideo)
+    videoModel.beginVideoCrop()
+    precondition(!videoModel.isCroppingVideo && videoModel.cropDraft == videoModel.cropRect)
+    videoModel.toggleMaskTool(.pixelate)
+    precondition(videoModel.isEditingMasks && videoModel.selectedMask?.effect == .pixelate)
+    videoModel.setSelectedMaskCropOnly(false)
+    precondition(videoModel.selectedMask?.rect == RecordingVideoCrop.unit)
+    videoModel.setSelectedMaskCropOnly(true)
+    precondition(abs(videoModel.selectedMask!.rect.width - 0.35) < 0.0001)
+    videoModel.toggleMaskTool(.pixelate)
+    precondition(!videoModel.isEditingMasks)
+    videoModel.toggleMaskTool(.blur)
+    precondition(videoModel.selectedMask?.effect == .blur)
+    videoModel.deleteSelectedMask()
+    videoModel.endMaskEditing()
+    print("PASS video crop toggle, blur / pixelate selection, and Crop Only scope")
+
     precondition(videoModel.isLoaded, "Snapshot recording must load")
     let originalCues = videoModel.zoomCues
     videoModel.addZoomCue(fromEditorTime: 0.25, toEditorTime: 1.25)
@@ -145,6 +249,30 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     let output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         .appendingPathComponent(".build/editor-snapshots")
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+    try snapshot(LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 12) {
+        ForEach(GradientPreset.presets) { preset in
+            VStack {
+                GradientBackgroundView(preset: preset).frame(height: 130).clipShape(RoundedRectangle(cornerRadius: 8))
+                Text(preset.name).font(.caption)
+            }
+        }
+    }.padding(), scheme: .light, width: 900, to: output.appendingPathComponent("shared-gradients.png"), height: 360)
+    try snapshot(RecordingSettingsTab(), scheme: .dark, width: 580,
+                 to: output.appendingPathComponent("recording-settings.png"), height: 1100)
+    try snapshot(HStack(spacing: 24) {
+        ForEach([RecordingCursorAppearance.dark, .light, .dot], id: \.self) { appearance in
+            VStack {
+                HStack(spacing: 0) {
+                    ForEach([Color.white, Color.black], id: \.self) { background in
+                        Image(nsImage: NSImage(data: PointerArtworkCapture.styledArtwork(appearance)!.imageData)!)
+                            .resizable().interpolation(.high).scaledToFit()
+                            .padding(12).frame(width: 120, height: 150).background(background)
+                    }
+                }
+                Text(appearance.title)
+            }
+        }
+    }.padding(), scheme: .light, width: 820, to: output.appendingPathComponent("cursor-quality.png"), height: 220)
     var effectToggle = StudioEffectToggleState()
     precondition(effectToggle.amount(enabled: true, current: 0, defaultValue: 0.45) == 0.45)
     precondition(effectToggle.amount(enabled: false, current: 0.75, defaultValue: 0.45) == 0)

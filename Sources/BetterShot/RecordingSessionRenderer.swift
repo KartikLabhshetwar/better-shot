@@ -100,7 +100,9 @@ enum RecordingSessionRenderer {
                 duration: duration,
                 recordingSizeInPoints: recordingPointSize,
                 fallbackArtwork: PointerArtworkCapture.defaultArtwork(),
-                clipTimeline: clipTimeline
+                clipTimeline: clipTimeline,
+                options: style.cursor,
+                overrideArtwork: PointerArtworkCapture.styledArtwork(style.cursor.appearance)
             )
             : nil
 

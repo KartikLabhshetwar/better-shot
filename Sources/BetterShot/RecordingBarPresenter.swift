@@ -31,6 +31,8 @@ final class RecordingBarPresenter {
     /// The panel is deliberately much larger than the bar, so this is what
     /// tells the hosting view which part of itself is real and satellite
     /// windows where to anchor.
+    var showsRecordingOptions = false
+
     var barFrameInPanel: CGRect = .zero
 
     @ObservationIgnored private var panel: NSPanel?
@@ -50,11 +52,12 @@ final class RecordingBarPresenter {
         }
     }
 
-    func showPicker(activate: Bool = true) {
+    func showPicker(activate: Bool = true, recordingOptions: Bool = false) {
         guard !ScreenRecordingManager.shared.isActive else { return }
         let panel = panel ?? makePanel()
         PreviewWindowCaptureExclusion.shared.register(window: panel)
         mode = .picker
+        showsRecordingOptions = recordingOptions
         position(panel, displayID: ActiveDisplayResolver.activeDisplayID(preferPointer: false))
         panel.orderFrontRegardless()
         // The picker is driven from the keyboard too (Esc, A for the last

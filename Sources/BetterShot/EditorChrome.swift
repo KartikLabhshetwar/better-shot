@@ -40,12 +40,13 @@ enum EditorChrome {
 
 struct EditorButtonStyle: ButtonStyle {
     var selected = false
+    var horizontalPadding: CGFloat = 10
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 12, weight: .medium))
-            .padding(.horizontal, 10)
+            .padding(.horizontal, horizontalPadding)
             .frame(minHeight: 32)
             .foregroundStyle(selected ? Color.white : Color.primary)
             .background(

@@ -16,19 +16,21 @@ enum RegionSelectionOutcome {
 @MainActor
 final class RegionSelectionOverlay {
 
+    private var allowsWindowSelection = true
     private var overlayWindows: [NSWindow] = []
     private var selectionViews: [SelectionView] = []
     private var continuation: CheckedContinuation<RegionSelectionOutcome, Never>?
 
-    func selectRegion() async -> RegionSelectionOutcome {
-        await withCheckedContinuation { cont in
+    func selectRegion(allowsWindowSelection: Bool = true) async -> RegionSelectionOutcome {
+        self.allowsWindowSelection = allowsWindowSelection
+        return await withCheckedContinuation { cont in
             self.continuation = cont
             showOverlays()
         }
     }
 
     private func showOverlays() {
-        let crosshair = CrosshairCursor.shared.makeCursor()
+        let crosshair = NSCursor.crosshair
 
         for screen in NSScreen.screens {
             let window = OverlayWindow(
@@ -52,7 +54,7 @@ final class RegionSelectionOverlay {
             } onCancel: { [weak self] in
                 self?.finish(.cancelled)
             } onWindow: { [weak self] in
-                self?.finish(.window)
+                if self?.allowsWindowSelection == true { self?.finish(.window) }
             }
 
             overlayView.onBeginSelection = { [weak self, weak overlayView] in
@@ -94,66 +96,6 @@ final class RegionSelectionOverlay {
         }
         overlayWindows.removeAll()
         selectionViews.removeAll()
-    }
-}
-
-// MARK: - Custom Crosshair "+" Cursor (matches macOS screenshot tool)
-
-@MainActor
-final class CrosshairCursor {
-    static let shared = CrosshairCursor()
-
-    func makeCursor() -> NSCursor {
-        let size: CGFloat = 40
-        let center = size / 2
-        let lineLength: CGFloat = 16
-        let gap: CGFloat = 4
-
-        let image = NSImage(size: NSSize(width: size, height: size))
-        image.lockFocus()
-
-        NSGraphicsContext.current?.shouldAntialias = true
-
-        let shadow = NSShadow()
-        shadow.shadowColor = NSColor.black.withAlphaComponent(0.5)
-        shadow.shadowOffset = NSSize(width: 0, height: -0.5)
-        shadow.shadowBlurRadius = 1.5
-        shadow.set()
-
-        NSColor.white.setStroke()
-        let path = NSBezierPath()
-        path.lineWidth = 1.5
-        path.lineCapStyle = .round
-
-        // Horizontal line (left segment)
-        path.move(to: NSPoint(x: center - lineLength, y: center))
-        path.line(to: NSPoint(x: center - gap, y: center))
-        // Horizontal line (right segment)
-        path.move(to: NSPoint(x: center + gap, y: center))
-        path.line(to: NSPoint(x: center + lineLength, y: center))
-        // Vertical line (bottom segment)
-        path.move(to: NSPoint(x: center, y: center - lineLength))
-        path.line(to: NSPoint(x: center, y: center - gap))
-        // Vertical line (top segment)
-        path.move(to: NSPoint(x: center, y: center + gap))
-        path.line(to: NSPoint(x: center, y: center + lineLength))
-
-        path.stroke()
-
-        // Draw center "+" cross
-        let plusPath = NSBezierPath()
-        plusPath.lineWidth = 1.5
-        plusPath.lineCapStyle = .round
-        let plusSize: CGFloat = 2.5
-        plusPath.move(to: NSPoint(x: center - plusSize, y: center))
-        plusPath.line(to: NSPoint(x: center + plusSize, y: center))
-        plusPath.move(to: NSPoint(x: center, y: center - plusSize))
-        plusPath.line(to: NSPoint(x: center, y: center + plusSize))
-        plusPath.stroke()
-
-        image.unlockFocus()
-
-        return NSCursor(image: image, hotSpot: NSPoint(x: center, y: center))
     }
 }
 
@@ -325,7 +267,7 @@ private final class SelectionView: NSView {
             dot.stroke()
         }
 
-        drawLabel("\(pixelSize(rect))  ·  drag to adjust  ·  ↩ to capture  ·  esc", below: rect)
+        drawLabel("\(pixelSize(rect))  ·  drag to adjust  ·  ↩ to confirm  ·  esc", below: rect)
     }
 
     private func pixelSize(_ rect: CGRect) -> String {

@@ -25,10 +25,12 @@ enum BeautifierRenderer {
             }
         }
 
+        canvasW = ceil(canvasW)
+        canvasH = ceil(canvasH)
         let totalHPad = canvasW - imgW
         let totalVPad = canvasH - imgH
-        let imgX = config.alignment.xFactor * totalHPad
-        let imgY = (1 - config.alignment.yFactor) * totalVPad
+        let imgX = (config.alignment.xFactor * totalHPad).rounded()
+        let imgY = ((1 - config.alignment.yFactor) * totalVPad).rounded()
 
         let baseRadius = config.cornerRadius * shortEdge
         let m = config.alignment.cornerMultipliers
@@ -64,6 +66,7 @@ enum BeautifierRenderer {
         let clipPath = radii.path(in: imageRect)
         ctx.addPath(clipPath)
         ctx.clip()
+        ctx.interpolationQuality = .none
         ctx.draw(image, in: imageRect)
         ctx.restoreGState()
 
@@ -87,20 +90,7 @@ enum BeautifierRenderer {
             ctx.fill(rect)
 
         case .gradient(let preset):
-            guard let gradient = preset.cgGradient(in: colorSpace) else { return }
-            let start = CGPoint(
-                x: rect.origin.x + preset.startPoint.x * rect.width,
-                y: rect.origin.y + (1 - preset.startPoint.y) * rect.height
-            )
-            let end = CGPoint(
-                x: rect.origin.x + preset.endPoint.x * rect.width,
-                y: rect.origin.y + (1 - preset.endPoint.y) * rect.height
-            )
-            ctx.drawLinearGradient(
-                gradient,
-                start: start, end: end,
-                options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
-            )
+            preset.draw(in: ctx, rect: rect)
 
         case .wallpaper(let source):
             guard let wallpaperImage = loadImage(at: source.path) else { return }

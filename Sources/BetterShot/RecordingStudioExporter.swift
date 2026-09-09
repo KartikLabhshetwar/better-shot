@@ -898,7 +898,7 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
                 red: accent.red,
                 green: accent.green,
                 blue: accent.blue,
-                alpha: effect.impactOpacity
+                alpha: press.impactEnabled ? effect.impactOpacity : 0
             ))
             context.fillEllipse(in: CGRect(
                 x: pressTip.x - effect.impactRadius,
@@ -910,7 +910,7 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
                 red: accent.red,
                 green: accent.green,
                 blue: accent.blue,
-                alpha: effect.rippleOpacity
+                alpha: press.rippleEnabled ? effect.rippleOpacity : 0
             ))
             context.setLineWidth(effect.rippleLineWidth)
             context.strokeEllipse(in: CGRect(
@@ -1248,6 +1248,9 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
             ) ?? CGColor(gray: 0, alpha: 1))
             context.fill(canvasRect)
         case .gradient(let gradient):
+            if let preset = gradient.preset {
+                preset.draw(in: context, rect: canvasRect)
+            } else {
             let cgColors = gradient.colors.map { color in
                 CGColor(
                     colorSpace: colorSpace,
@@ -1272,6 +1275,7 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
                     .drawsBeforeStartLocation,
                     .drawsAfterEndLocation
                 ])
+            }
             }
         case .customWallpaper(let wallpaper):
             if let source = CGImageSourceCreateWithURL(wallpaper.url as CFURL, nil),

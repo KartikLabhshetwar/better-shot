@@ -12,6 +12,13 @@ All pending changes are included in this unreleased 0.5.0 update.
 
 ### Added
 
+- **Shared soft gradients**: Ten backgrounds—Blush, Peach, Mint, Powder Blue, Butter, Lilac, Sage, Coral, Aqua, and Mauve—replace the previous preset palettes in both editors and Settings, with matching stops and highlights in previews and exports. Recording Settings offers an independent default background.
+- **Recording shortcut**: `⌘⇧5` opens the Recording section; `⌘⇧2` retains the shared capture bar and `⌘⇧4` uses native macOS region capture.
+- **Direct redaction tools**: Blur and Pixelate are visible in both editors. Video effects offer Crop Only or Full Frame coverage.
+
+- **Cursor styles**: A dedicated Cursor tab offers Recorded, Dark, Light, and Dot artwork, Natural or Smooth motion, separate press and ripple effects, cursor visibility, and hiding after inactivity. Cursor choices persist with the project and render in previews, exports, and shared videos.
+- **Native icons**: Editors, settings, menus, capture controls, recording controls, and sharing feedback use Apple SF Symbols. The menu bar uses a native camera symbol.
+
 - **Screenshot deck**: Keep up to five captures in a floating stack, each with its own dismiss timer and Copy, Delete, Pin, Edit, and drag-out actions. Clear All dismisses the deck ([#76](https://github.com/KartikLabhshetwar/better-shot/issues/76)).
 - **Save captures when ready**: The new Capture setting keeps screenshots in the deck until saved. Cards stay visible; Save, Copy, dragging out, Pin, or Edit saves the capture, and Save All saves the deck. Dismissing an unsaved card deletes it; leftovers are cleaned up on the next launch ([#76](https://github.com/KartikLabhshetwar/better-shot/issues/76)).
 - **One capture and recording bar**: The floating bar opens at launch with Area, Fullscreen, Window, OCR, Color, Timer, and Recording controls. Recording options include display, window, or area, plus camera, microphone, system audio, and teleprompter (#122).
@@ -32,6 +39,12 @@ All pending changes are included in this unreleased 0.5.0 update.
 - **Settings**: Capture and recording options have inline explanations, sharing fields remain editable, and image/video editor preferences remain independent.
 
 ### Fixed
+
+- **Cursor clarity**: Custom cursors render from a high-resolution vector master with transparent PNG output and unchanged click hotspots. Captured system cursors retain their highest-resolution image representation.
+
+- **Sharp screenshots**: Full-resolution editor previews are now the default, and screenshot framing places source pixels at integer coordinates to avoid softening text.
+- **Tool toggles**: Clicking an active image tool returns to selection. Clicking video Crop again cancels its draft; Blur and Pixelate also toggle out of editing.
+- **Recording area selection**: Replaced the separate nonactivating selector with the adjustable AppKit region control, system crosshair, explicit confirmation, and selection on the actual chosen display.
 
 - **System appearance**: Removed the legacy setting that forced light mode, so System appearance follows macOS and responds to live theme changes ([#120](https://github.com/KartikLabhshetwar/better-shot/issues/120)). Preview-card pill text also stays readable in dark mode ([#121](https://github.com/KartikLabhshetwar/better-shot/issues/121)).
 - **Reliable preview actions**: Failed Copy operations show an error and keep the card open, including missing recordings ([#119](https://github.com/KartikLabhshetwar/better-shot/pull/119), thanks [@zergzorg](https://github.com/zergzorg)). Deleting an edited screenshot or recording removes its full history record and associated files. Pinned recordings play in a muted floating panel, and pinned screenshot close buttons stay visible when hovered.

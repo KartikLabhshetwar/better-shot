@@ -49,7 +49,7 @@ extension SolidColor {
     ]
 }
 
-// MARK: - Gradient Presets (16 three-stop linear gradients)
+// MARK: - Shared gradient presets
 
 struct GradientPreset: Codable, Equatable, Hashable, Identifiable {
     let id: String
@@ -57,6 +57,15 @@ struct GradientPreset: Codable, Equatable, Hashable, Identifiable {
     let stops: [GradientStop]
     let startPoint: UnitPoint2D
     let endPoint: UnitPoint2D
+    var locations: [CGFloat]? = nil
+    var highlights: [Highlight]? = nil
+
+    struct Highlight: Codable, Equatable, Hashable {
+        let x: CGFloat
+        let y: CGFloat
+        let opacity: CGFloat
+        let extent: CGFloat
+    }
 
     struct GradientStop: Codable, Equatable, Hashable {
         let red: Double
@@ -75,89 +84,127 @@ struct GradientPreset: Codable, Equatable, Hashable, Identifiable {
 }
 
 extension GradientPreset {
-    var swiftUIGradient: LinearGradient {
-        LinearGradient(
-            colors: stops.map { Color(red: $0.red, green: $0.green, blue: $0.blue) },
-            startPoint: startPoint.unitPoint,
-            endPoint: endPoint.unitPoint
-        )
-    }
-
-    func cgGradient(in colorSpace: CGColorSpace) -> CGGradient? {
-        var components: [CGFloat] = []
-        for stop in stops {
-            components.append(contentsOf: [CGFloat(stop.red), CGFloat(stop.green), CGFloat(stop.blue), 1.0])
+    /// The same vector drawing is used by swatches, the canvas, and exports.
+    func draw(in context: CGContext, rect: CGRect, topLeftOrigin: Bool = false) {
+        guard let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB),
+            colors: stops.map { CGColor(srgbRed: $0.red, green: $0.green, blue: $0.blue, alpha: 1) } as CFArray,
+            locations: locations) else { return }
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: rect.minX + x * rect.width,
+                    y: rect.minY + (topLeftOrigin ? y : 1 - y) * rect.height)
         }
-        return CGGradient(
-            colorSpace: colorSpace,
-            colorComponents: components,
-            locations: nil,
-            count: stops.count
-        )
+        context.saveGState()
+        context.clip(to: rect)
+        context.drawLinearGradient(gradient, start: point(startPoint.x, startPoint.y),
+                                   end: point(endPoint.x, endPoint.y),
+                                   options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+        // CSS paints the first radial layer on top of the second.
+        for highlight in (highlights ?? []).reversed() {
+            let center = point(highlight.x, highlight.y)
+            let rx = max(highlight.x, 1 - highlight.x) * rect.width * sqrt(2)
+            let ry = max(highlight.y, 1 - highlight.y) * rect.height * sqrt(2)
+            guard rx > 0, ry > 0,
+                  let radial = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB),
+                    colors: [CGColor(gray: 1, alpha: highlight.opacity), CGColor(gray: 1, alpha: 0)] as CFArray,
+                    locations: [0, 1]) else { continue }
+            context.saveGState()
+            context.translateBy(x: center.x, y: center.y)
+            context.scaleBy(x: rx, y: ry)
+            context.drawRadialGradient(radial, startCenter: .zero, startRadius: 0,
+                                       endCenter: .zero, endRadius: highlight.extent, options: [])
+            context.restoreGState()
+        }
+        context.restoreGState()
     }
 
     static let presets: [GradientPreset] = {
-        let tl = UnitPoint2D(x: 0, y: 0)
-        let t  = UnitPoint2D(x: 0.5, y: 0)
-        let tr = UnitPoint2D(x: 1, y: 0)
-        let bl = UnitPoint2D(x: 0, y: 1)
-        let br = UnitPoint2D(x: 1, y: 1)
-
-        func s(_ r: Double, _ g: Double, _ b: Double) -> GradientStop {
-            GradientStop(red: r, green: g, blue: b)
+        func color(_ hex: UInt32) -> GradientStop {
+            GradientStop(red: Double((hex >> 16) & 255) / 255,
+                         green: Double((hex >> 8) & 255) / 255, blue: Double(hex & 255) / 255)
         }
-
         return [
-            GradientPreset(id: "dawn-fire", name: "Dawn Fire",
-                stops: [s(0.98, 0.31, 0.58), s(0.40, 0.32, 0.95), s(0.29, 0.84, 0.80)],
-                startPoint: tl, endPoint: br),
-            GradientPreset(id: "deep-ocean", name: "Deep Ocean",
-                stops: [s(0.04, 0.05, 0.50), s(0.26, 0.19, 0.93), s(0.42, 0.67, 0.98)],
-                startPoint: t, endPoint: br),
-            GradientPreset(id: "coral-bloom", name: "Coral Bloom",
-                stops: [s(0.98, 0.38, 0.36), s(0.99, 0.71, 0.36), s(0.90, 0.33, 0.65)],
-                startPoint: tl, endPoint: br),
-            GradientPreset(id: "arctic-lens", name: "Arctic Lens",
-                stops: [s(0.87, 0.95, 0.94), s(0.46, 0.77, 0.86), s(0.25, 0.53, 0.93)],
-                startPoint: tl, endPoint: br),
-            GradientPreset(id: "neon-pulse", name: "Neon Pulse",
-                stops: [s(0.08, 0.02, 0.22), s(0.35, 0.12, 0.84), s(0.95, 0.26, 0.42)],
-                startPoint: tr, endPoint: bl),
-            GradientPreset(id: "ripe-mango", name: "Ripe Mango",
-                stops: [s(0.99, 0.75, 0.20), s(0.96, 0.33, 0.21), s(0.67, 0.19, 0.89)],
-                startPoint: tl, endPoint: br),
-            GradientPreset(id: "soft-linen", name: "Soft Linen",
-                stops: [s(0.94, 0.94, 0.92), s(0.80, 0.88, 0.94), s(0.95, 0.76, 0.70)],
-                startPoint: tl, endPoint: br),
-            GradientPreset(id: "tidal-pool", name: "Tidal Pool",
-                stops: [s(0.08, 0.30, 0.54), s(0.25, 0.64, 0.72), s(0.70, 0.92, 0.78)],
-                startPoint: bl, endPoint: tr),
-            GradientPreset(id: "forge", name: "Forge",
-                stops: [s(0.18, 0.03, 0.08), s(0.86, 0.17, 0.18), s(1.00, 0.67, 0.25)],
-                startPoint: tl, endPoint: br),
-            GradientPreset(id: "twilight", name: "Twilight",
-                stops: [s(0.24, 0.08, 0.51), s(0.59, 0.22, 0.94), s(0.96, 0.42, 0.74)],
-                startPoint: t, endPoint: br),
-            GradientPreset(id: "lagoon", name: "Lagoon",
-                stops: [s(0.43, 0.86, 0.75), s(0.25, 0.62, 0.80), s(0.22, 0.35, 0.75)],
-                startPoint: tl, endPoint: br),
-            GradientPreset(id: "orchard", name: "Orchard",
-                stops: [s(0.99, 0.91, 0.30), s(0.44, 0.78, 0.29), s(0.12, 0.58, 0.42)],
-                startPoint: tr, endPoint: bl),
-            GradientPreset(id: "gemstone", name: "Gemstone",
-                stops: [s(0.10, 0.08, 0.28), s(0.35, 0.15, 0.65), s(0.76, 0.39, 0.95)],
-                startPoint: bl, endPoint: tr),
-            GradientPreset(id: "sherbet", name: "Sherbet",
-                stops: [s(1.00, 0.49, 0.51), s(1.00, 0.74, 0.48), s(0.56, 0.78, 0.98)],
-                startPoint: tl, endPoint: br),
-            GradientPreset(id: "granite", name: "Granite",
-                stops: [s(0.93, 0.96, 0.95), s(0.64, 0.72, 0.82), s(0.33, 0.42, 0.55)],
-                startPoint: tl, endPoint: br),
-            GradientPreset(id: "sunrise", name: "Sunrise",
-                stops: [s(0.98, 0.62, 0.77), s(0.98, 0.82, 0.47), s(0.42, 0.71, 0.96)],
-                startPoint: bl, endPoint: tr),
+            GradientPreset(id: "soft-blush", name: "Blush / Lavender",
+                stops: [color(0xFAFAFA), color(0xF9E8F3), color(0xE7C8F1)],
+                startPoint: .init(x: 0.5, y: 0), endPoint: .init(x: 0.5, y: 1),
+                locations: [0, 0.48, 1], highlights: [
+                    Highlight(x: 0.18, y: 0.08, opacity: 0.32, extent: 0.35),
+                    Highlight(x: 0.86, y: 0.9, opacity: 0.16, extent: 0.34),
+                ]),
+            GradientPreset(id: "soft-peach", name: "Peach / Apricot",
+                stops: [color(0xFCFAF7), color(0xFBE6D8), color(0xFFB98D)],
+                startPoint: .init(x: 0.5, y: 0), endPoint: .init(x: 0.5, y: 1),
+                locations: [0, 0.5, 1], highlights: [
+                    Highlight(x: 0.82, y: 0.08, opacity: 0.3, extent: 0.34),
+                    Highlight(x: 0.14, y: 0.88, opacity: 0.18, extent: 0.32),
+                ]),
+            GradientPreset(id: "soft-mint", name: "Mint",
+                stops: [color(0xFBFCFA), color(0xE8F8F0), color(0xAEEACD)],
+                startPoint: .init(x: 0.5, y: 0), endPoint: .init(x: 0.5, y: 1),
+                locations: [0, 0.48, 1], highlights: [
+                    Highlight(x: 0.18, y: 0.1, opacity: 0.34, extent: 0.36),
+                    Highlight(x: 0.88, y: 0.86, opacity: 0.2, extent: 0.34),
+                ]),
+            GradientPreset(id: "soft-blue", name: "Powder Blue",
+                stops: [color(0xFBFCFD), color(0xE5F2FD), color(0xA8D7FF)],
+                startPoint: .init(x: 0.5, y: 0), endPoint: .init(x: 0.5, y: 1),
+                locations: [0, 0.5, 1], highlights: [
+                    Highlight(x: 0.16, y: 0.08, opacity: 0.34, extent: 0.35),
+                    Highlight(x: 0.88, y: 0.88, opacity: 0.22, extent: 0.33),
+                ]),
+            GradientPreset(id: "soft-butter", name: "Butter Yellow",
+                stops: [color(0xFDFCF7), color(0xFFF8D6), color(0xFFE677)],
+                startPoint: .init(x: 0.5, y: 0), endPoint: .init(x: 0.5, y: 1),
+                locations: [0, 0.48, 1], highlights: [
+                    Highlight(x: 0.16, y: 0.08, opacity: 0.36, extent: 0.36),
+                    Highlight(x: 0.88, y: 0.86, opacity: 0.22, extent: 0.32),
+                ]),
+            GradientPreset(id: "soft-lilac", name: "Lilac / Periwinkle",
+                stops: [color(0xFCFBFD), color(0xEEEAFE), color(0xAFAEFF)],
+                startPoint: .init(x: 0.5, y: 0), endPoint: .init(x: 0.5, y: 1),
+                locations: [0, 0.44, 1], highlights: [
+                    Highlight(x: 0.18, y: 0.07, opacity: 0.34, extent: 0.36),
+                    Highlight(x: 0.86, y: 0.84, opacity: 0.16, extent: 0.34),
+                ]),
+            GradientPreset(id: "soft-sage", name: "Sage Green",
+                stops: [color(0xFCFBF7), color(0xE8EDE1), color(0x91AD8A)],
+                startPoint: .init(x: 0.5, y: 0), endPoint: .init(x: 0.5, y: 1),
+                locations: [0, 0.42, 1], highlights: [
+                    Highlight(x: 0.16, y: 0.08, opacity: 0.3, extent: 0.36),
+                    Highlight(x: 0.88, y: 0.42, opacity: 0.2, extent: 0.31),
+                ]),
+            GradientPreset(id: "soft-coral", name: "Coral / Rose",
+                stops: [color(0xFCF9F7), color(0xF9D3CD), color(0xFF6F73)],
+                startPoint: .init(x: 0.5, y: 0), endPoint: .init(x: 0.5, y: 1),
+                locations: [0, 0.46, 1], highlights: [
+                    Highlight(x: 0.18, y: 0.07, opacity: 0.3, extent: 0.36),
+                    Highlight(x: 0.82, y: 0.7, opacity: 0.2, extent: 0.31),
+                ]),
+            GradientPreset(id: "soft-aqua", name: "Aqua / Cyan",
+                stops: [color(0xFBFDFD), color(0xDFF9FC), color(0x6FE2ED)],
+                startPoint: .init(x: 0.5, y: 0), endPoint: .init(x: 0.5, y: 1),
+                locations: [0, 0.48, 1], highlights: [
+                    Highlight(x: 0.15, y: 0.08, opacity: 0.34, extent: 0.36),
+                    Highlight(x: 0.88, y: 0.87, opacity: 0.24, extent: 0.34),
+                ]),
+            GradientPreset(id: "soft-mauve", name: "Dusty Mauve",
+                stops: [color(0xFBF8F6), color(0xE8DADB), color(0xB7949F)],
+                startPoint: .init(x: 0.5, y: 0), endPoint: .init(x: 0.5, y: 1),
+                locations: [0, 0.42, 1], highlights: [
+                    Highlight(x: 0.17, y: 0.07, opacity: 0.3, extent: 0.36),
+                    Highlight(x: 0.86, y: 0.38, opacity: 0.18, extent: 0.32),
+                ]),
         ]
     }()
+}
+
+struct GradientBackgroundView: View {
+    let preset: GradientPreset
+    var body: some View {
+        Canvas { context, size in
+            context.withCGContext { preset.draw(in: $0, rect: CGRect(origin: .zero, size: size), topLeftOrigin: true) }
+        }
+        .accessibilityHidden(true)
+    }
 }
 
 // MARK: - Wallpaper Source

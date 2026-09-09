@@ -45,7 +45,7 @@ struct RecordingPickerControls: View {
     @AppStorage(BetterShotPreferences.recordingStartDelaySecondsKey) private var startDelaySeconds = 0
     @AppStorage(BetterShotPreferences.recordingTeleprompterEnabledKey) private var teleprompterEnabled = false
 
-    @State private var showsRecordingOptions = false
+    @Bindable private var presenter = RecordingBarPresenter.shared
 
     private static let timerOptions = [0, 1, 3, 5]
 
@@ -54,13 +54,13 @@ struct RecordingPickerControls: View {
             screenshotGroup
             BarDivider()
             timerMenu
-            Button { showsRecordingOptions.toggle() } label: {
+            Button { presenter.showsRecordingOptions.toggle() } label: {
                 BarActionLabel(id: .recording, title: "Recording options", systemImage: "video",
                                caption: "Recording")
             }
             .buttonStyle(BarButtonStyle())
             .accessibilityLabel("Recording options")
-            .popover(isPresented: $showsRecordingOptions, arrowEdge: .top) {
+            .popover(isPresented: $presenter.showsRecordingOptions, arrowEdge: .top) {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Recording").font(.headline)
                     Text("Choose a source to start recording.")
@@ -166,7 +166,7 @@ struct RecordingPickerControls: View {
     }
 
     private func captureScreenshot(_ action: ShortcutService.Action) {
-        showsRecordingOptions = false
+        presenter.showsRecordingOptions = false
         let screen = ActiveDisplayResolver.activeScreen(preferPointer: true)
         Task { await CaptureOrchestrator.shared.performCapture(action, on: screen) }
     }
@@ -244,15 +244,12 @@ struct RecordingPickerControls: View {
     }
 
     private func startAreaRecording() {
-        showsRecordingOptions = false
-        let displayID = ActiveDisplayResolver.activeDisplayID(preferPointer: false)
-        guard let display = sources.displays.first(where: { $0.displayID == displayID })
-            ?? sources.displays.first else { return }
+        presenter.showsRecordingOptions = false
         // Area is the one source that can't morph: the bar has to get out of
         // the way of the selection overlay, so it leaves and comes back as the
         // session controls.
         RecordingBarPresenter.shared.hide()
-        RecordingCaptureEntry.recordArea(display)
+        RecordingCaptureEntry.recordArea()
     }
 
     /// Leaves the bar on screen: it stays as the picker through any start
@@ -260,7 +257,7 @@ struct RecordingPickerControls: View {
     /// actually begins. The warm camera preview (if any) is left running so it
     /// flows straight into the recording instead of restarting and refading.
     private func startRecording(_ start: () -> Void) {
-        showsRecordingOptions = false
+        presenter.showsRecordingOptions = false
         TeleprompterComposerPresenter.shared.hide()
         start()
     }

@@ -19,11 +19,15 @@ struct AnnotationBackgroundStageFill: View {
             color.color
 
         case .gradient(let gradient):
+            if let preset = gradient.preset {
+                GradientBackgroundView(preset: preset)
+            } else {
             LinearGradient(
                 colors: gradient.colors.map(\.color),
                 startPoint: gradient.startPoint,
                 endPoint: gradient.endPoint
             )
+            }
 
         case .customWallpaper(let wallpaper):
             AnnotationCustomWallpaperPreview(wallpaper: wallpaper, maxPixelSize: 2048)

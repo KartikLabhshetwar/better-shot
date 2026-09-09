@@ -220,7 +220,7 @@ struct BarActionLabel: View {
     var body: some View {
         VStack(spacing: 4) {
             Image(systemName: systemImage)
-                .font(.system(size: caption == nil ? 17 : 20, weight: .regular))
+                .font(.system(size: caption == nil ? 17 : 22, weight: .regular))
             if let caption {
                 Text(caption)
                     .font(.system(size: 11))

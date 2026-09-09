@@ -210,8 +210,7 @@ struct TransferStatusCard: View {
     // MARK: Pieces
 
     private func iconTile(systemName: String, tint: Color) -> some View {
-        Image(systemName: systemName)
-            .font(.system(size: 14, weight: .semibold))
+        Image(systemName: systemName).font(.system(size: 22, weight: .regular))
             .foregroundStyle(tint)
             .frame(width: 28, height: 28)
             .background(

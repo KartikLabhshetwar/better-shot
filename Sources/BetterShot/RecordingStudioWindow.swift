@@ -225,6 +225,17 @@ struct RecordingStudioContent: View {
         .pickerStyle(.segmented)
         .disabled(model.selectedMask == nil)
 
+        Picker("Area", selection: Binding(
+            get: { model.selectedMask.map { !RecordingVideoCrop.isUnit($0.rect) } ?? true },
+            set: { model.setSelectedMaskCropOnly($0) }
+        )) {
+            Text("Crop Only").tag(true)
+            Text("Full Frame").tag(false)
+        }
+        .pickerStyle(.segmented)
+        .disabled(model.selectedMask == nil)
+        .help("Crop Only limits the effect to the rectangle you draw")
+
         InspectorSlider("Strength", value: maskAmountBinding,
             range: CGFloat(RecordingMaskSegment.minimumAmount)...CGFloat(RecordingMaskSegment.maximumAmount),
             format: .integer)
@@ -629,14 +640,14 @@ private struct StudioCursorOverlay: View {
                 Circle()
                     .fill(
                         Color(red: accent.red, green: accent.green, blue: accent.blue)
-                            .opacity(effect.impactOpacity)
+                            .opacity(press.impactEnabled ? effect.impactOpacity : 0)
                     )
                     .frame(width: effect.impactRadius * 2, height: effect.impactRadius * 2)
                     .position(x: pressTip.x, y: pressTip.y)
                 Circle()
                     .stroke(
                         Color(red: accent.red, green: accent.green, blue: accent.blue)
-                            .opacity(effect.rippleOpacity),
+                            .opacity(press.rippleEnabled ? effect.rippleOpacity : 0),
                         lineWidth: effect.rippleLineWidth
                     )
                     .frame(width: effect.rippleRadius * 2, height: effect.rippleRadius * 2)
@@ -656,6 +667,7 @@ private struct StudioCursorOverlay: View {
                 )
                 Image(nsImage: image)
                     .resizable()
+                    .interpolation(.high)
                     .frame(width: size.width, height: size.height)
                     .scaleEffect(
                         CGFloat(pointer.magnification),
@@ -1153,11 +1165,15 @@ private struct StudioBackgroundView: View {
         case .solid(let color):
             color.color
         case .gradient(let gradient):
+            if let preset = gradient.preset {
+                GradientBackgroundView(preset: preset)
+            } else {
             LinearGradient(
                 colors: gradient.colors.map(\.color),
                 startPoint: gradient.startPoint,
                 endPoint: gradient.endPoint
             )
+            }
         case .customWallpaper(let wallpaper):
             AnnotationCustomWallpaperPreview(wallpaper: wallpaper, maxPixelSize: 2048)
         }
@@ -2793,16 +2809,14 @@ private struct StudioInspector: View {
 
                     }
 
-                    if selectedTab == .effects && model.pointerIsSynthesized {
+                    if selectedTab == .cursor {
                         StudioEffectSection(
                             title: "Cursor",
                             systemImage: "cursorarrow",
                             accessory: {
-                                if model.style.cursorScale != RecordingStudioStyle.defaultCursorScale {
-                                    InspectorClearButton(help: "Reset cursor size") {
-                                        model.style.cursorScale = RecordingStudioStyle.defaultCursorScale
-                                    }
-                                }
+                                Toggle("Show cursor", isOn: $model.style.cursor.isVisible)
+                                    .labelsHidden().toggleStyle(.switch).controlSize(.mini)
+                                    .disabled(!model.pointerIsSynthesized)
                             }
                         ) {
                             cursorControls
@@ -2912,13 +2926,18 @@ private struct StudioInspector: View {
                     .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
                     .frame(maxWidth: .infinity)
             }
-            .help("Crop the recording on the canvas")
-            Button { model.beginMaskEditing() } label: {
-                Label("Censor", systemImage: "eye.slash")
-                    .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
-                    .frame(maxWidth: .infinity)
+            .buttonStyle(EditorButtonStyle(selected: model.isCroppingVideo, horizontalPadding: 4))
+            .help("Crop the recording; click again to cancel changes")
+            ForEach([RecordingMaskSegment.Effect.blur, .pixelate], id: \.self) { effect in
+                Button { model.toggleMaskTool(effect) } label: {
+                    Label(effect == .blur ? "Blur" : "Pixelate",
+                                systemImage: effect == .blur ? "drop.fill" : "square.grid.3x3.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(EditorButtonStyle(selected: model.isEditingMasks && model.selectedMask?.effect == effect,
+                                               horizontalPadding: 4))
+                .help("Draw an area to " + (effect == .blur ? "blur" : "pixelate"))
             }
-            .help("Blur or pixelate part of the recording")
         }
         .buttonStyle(EditorButtonStyle())
         .controlSize(.large)
@@ -3255,30 +3274,75 @@ private struct StudioInspector: View {
 
     // MARK: Cursor
 
+    @ViewBuilder
     private var cursorControls: some View {
-        VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
-            InspectorSlider(
-                "Size",
-                value: $model.style.cursorScale,
-                range: 1...4,
-                format: .magnification(fractionDigits: 1)
-            )
-
-            if model.canShowPressEffects {
-                HStack(spacing: 8) {
-                    Text("Click highlights")
-                        .font(.inspectorLabel)
-                        .foregroundStyle(.primary.opacity(0.82))
-
-                    Spacer(minLength: 8)
-
-                    Toggle("Click highlights", isOn: $model.showsClickEffects)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                        .controlSize(.small)
+        if !model.pointerIsSynthesized {
+            Text("Cursor editing needs a recording made with BetterShot. Cursors already in a video cannot be changed.")
+                .font(.inspectorLabel).foregroundStyle(.secondary)
+        } else {
+            VStack(alignment: .leading, spacing: 16) {
+                InspectorSlider("Size", value: $model.style.cursorScale, range: 1...4,
+                                format: .magnification(fractionDigits: 1))
+                VStack(alignment: .leading, spacing: 8) {
+                    InspectorGroupLabel("Style")
+                    HStack(spacing: 6) {
+                        ForEach(RecordingCursorAppearance.allCases, id: \.self) { appearance in
+                            Button { model.style.cursor.appearance = appearance } label: {
+                                VStack(spacing: 4) {
+                                    if let artwork = PointerArtworkCapture.styledArtwork(appearance)
+                                        ?? model.artwork(id: nil),
+                                       let image = StudioCursorImageCache.image(for: artwork) {
+                                        Image(nsImage: image).resizable().scaledToFit().frame(height: 26)
+                                    }
+                                    Text(appearance.title).font(.system(size: 10)).lineLimit(1)
+                                }
+                                .frame(maxWidth: .infinity).padding(.vertical, 6)
+                            }
+                            .buttonStyle(EditorButtonStyle(selected: model.style.cursor.appearance == appearance,
+                                                           horizontalPadding: 4))
+                            .accessibilityLabel("\(appearance.title) cursor")
+                            .accessibilityAddTraits(model.style.cursor.appearance == appearance ? .isSelected : [])
+                        }
+                    }
                 }
+                VStack(alignment: .leading, spacing: 8) {
+                    InspectorGroupLabel("Motion")
+                    Picker("Motion", selection: $model.style.cursor.smoothMotion) {
+                        Text("Natural").tag(false)
+                        Text("Smooth").tag(true)
+                    }
+                    .pickerStyle(.segmented).labelsHidden()
+                }
+                if model.canShowPressEffects {
+                    VStack(alignment: .leading, spacing: 8) {
+                        InspectorGroupLabel("Clicks")
+                        Toggle("Press effect", isOn: cursorEffectBinding(\.pressEffect))
+                        Toggle("Ripple animation", isOn: cursorEffectBinding(\.rippleEffect))
+                    }
+                    .toggleStyle(.checkbox).font(.inspectorLabel)
+                }
+                Toggle("Hide when not moving", isOn: $model.style.cursor.hideWhenIdle)
+                    .toggleStyle(.checkbox).font(.inspectorLabel)
+                    .help("Fade the cursor after three seconds without movement or clicks")
             }
+            .disabled(!model.style.cursor.isVisible)
         }
+    }
+
+    private func cursorEffectBinding(_ keyPath: WritableKeyPath<RecordingCursorOptions, Bool>) -> Binding<Bool> {
+        Binding(
+            get: { model.showsClickEffects && model.style.cursor[keyPath: keyPath] },
+            set: { enabled in
+                var options = model.style.cursor
+                if !model.showsClickEffects {
+                    options.pressEffect = false
+                    options.rippleEffect = false
+                }
+                options[keyPath: keyPath] = enabled
+                model.style.cursor = options
+                model.showsClickEffects = true
+            }
+        )
     }
 
     // MARK: Keystrokes

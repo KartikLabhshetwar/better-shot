@@ -150,11 +150,7 @@ struct AnnotationBackgroundInspector: View {
                         onEditorAction()
                         settings.style = .gradient(gradient)
                     } content: {
-                        Rectangle().fill(LinearGradient(
-                            colors: gradient.colors.map(\.color),
-                            startPoint: gradient.startPoint,
-                            endPoint: gradient.endPoint
-                        ))
+                        AnnotationBackgroundStageFill(style: .gradient(gradient))
                     }
                     .help(gradient.title)
                 }

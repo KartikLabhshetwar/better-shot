@@ -322,8 +322,9 @@ final class AnnotationEditorModel {
     // MARK: - Tools and style
 
     func selectTool(_ tool: AnnotationTool) {
-        selectedTool = tool
-        engine.tool = tool
+        if isCropping { cancelCrop() }
+        selectedTool = selectedTool == tool ? .select : tool
+        engine.tool = selectedTool
         saveAnnotationPreset()
     }
 
@@ -500,8 +501,8 @@ final class AnnotationEditorModel {
         engine.markUndo()
         for shape in renderable { engine.document.add(shape) }
         engine.selectedIds = Set(renderable.map(\.id))
-        selectedTool = tool
-        engine.tool = tool
+        selectedTool = selectedTool == tool ? .select : tool
+        engine.tool = selectedTool
         engine.notifyChanged()
         smartRedactionMessage = "Added \(renderable.count) redaction\(renderable.count == 1 ? "" : "s")."
     }

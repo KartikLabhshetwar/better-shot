@@ -24,6 +24,25 @@ struct ExportIntegration {
         context.setFillColor(CGColor(red: 0.1, green: 0.2, blue: 0.8, alpha: 1))
         context.fill(CGRect(x: 960, y: 0, width: 960, height: 1080))
         let image = context.makeImage()!
+        // A one-pixel stripe image catches subpixel resampling of captured text edges.
+        let sharpContext = CGContext(data: nil, width: 31, height: 31, bitsPerComponent: 8,
+            bytesPerRow: 0, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        for x in 0..<31 {
+            sharpContext.setFillColor(CGColor(gray: x.isMultiple(of: 2) ? 0 : 1, alpha: 1))
+            sharpContext.fill(CGRect(x: x, y: 0, width: 1, height: 31))
+        }
+        var sharpConfig = BeautifierConfig()
+        sharpConfig.cornerRadius = 0
+        sharpConfig.shadowStrength = 0
+        let sharpImage = BeautifierRenderer.render(image: sharpContext.makeImage()!, config: sharpConfig)!
+        precondition(sharpImage.width == 36 && sharpImage.height == 36)
+        let sharpBytes = CFDataGetBytePtr(sharpImage.dataProvider!.data!)!
+        for x in 3..<34 {
+            let offset = 16 * sharpImage.bytesPerRow + x * 4
+            precondition(sharpBytes[offset] == 0 || sharpBytes[offset] == 255,
+                         "Native pixels must not blur into gray during framing")
+        }
+        print("PASS native pixel dimensions and sharp screenshot framing")
         let source = directory.appendingPathComponent("source.png")
         let destination = CGImageDestinationCreateWithURL(
             source as CFURL, UTType.png.identifier as CFString, 1, nil)!
@@ -116,6 +135,13 @@ struct ExportIntegration {
         var style = RecordingStudioStyle()
         style.background = .solid(
             AnnotationBackgroundColor("test", title: "Test", red: 0.1, green: 0.1, blue: 0.1))
+        let pointer = PointerTimeline.build(
+            capture: PointerCaptureFile(travel: [
+                PointerTravelSample(time: 0, x: 0.2, y: 0.3),
+                PointerTravelSample(time: 1, x: 0.7, y: 0.6)
+            ], presses: [PointerPressEvent(time: 1.1, x: 0.7, y: 0.6, button: 0, phase: .down)]),
+            duration: 2, clipTimeline: clips,
+            overrideArtwork: PointerArtworkCapture.styledArtwork(.light))
         let soundtrack = directory.appendingPathComponent("soundtrack.caf")
         let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
         let audio = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 96_000)!
@@ -136,8 +162,9 @@ struct ExportIntegration {
             mask.rect = CGRect(x: 0.425, y: 0.25, width: 0.15, height: 0.5)
             let configuration = RecordingStudioExporter.Configuration(
                 screenURL: movie, cameraURL: withOverlays ? movie : nil,
-                cameraOffset: 0, style: style, viewportTimeline: viewport, pointerTimeline: nil,
-                showsPressEffects: false, keystrokeTimeline: nil, keystrokePlacement: .bottomCenter,
+                cameraOffset: 0, style: style, viewportTimeline: viewport,
+                pointerTimeline: withOverlays ? pointer : nil,
+                showsPressEffects: withOverlays, keystrokeTimeline: nil, keystrokePlacement: .bottomCenter,
                 subtitleTimeline: nil, subtitleStyle: SubtitleBarStyle(),
                 canvasSize: CGSize(width: 1920, height: 1080),
                 clipTimeline: clips, exportSettings: settings,

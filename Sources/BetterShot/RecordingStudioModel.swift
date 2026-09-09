@@ -75,6 +75,7 @@ final class RecordingStudioModel {
 
     var style = RecordingStudioStyle(background: RecordingStudioDefaults.background) {
         didSet {
+            if isLoaded, oldValue.cursor != style.cursor { rebuildPointerTimeline() }
             if isLoaded, oldValue.background != style.background {
                 RecordingStudioDefaults.background = style.background
             }
@@ -1080,7 +1081,9 @@ final class RecordingStudioModel {
             duration: sourceDuration,
             recordingSizeInPoints: recordingPointSize,
             fallbackArtwork: PointerArtworkCapture.defaultArtwork(),
-            clipTimeline: clipTimeline
+            clipTimeline: clipTimeline,
+            options: style.cursor,
+            overrideArtwork: PointerArtworkCapture.styledArtwork(style.cursor.appearance)
         )
     }
 
@@ -1710,7 +1713,13 @@ final class RecordingStudioModel {
     }
 
     func beginVideoCrop() {
-        guard isLoaded, !isCroppingVideo, !isEditingMasks else { return }
+        guard isLoaded else { return }
+        if isCroppingVideo {
+            cropDraft = cropRect
+            cancelVideoCrop()
+            return
+        }
+        if isEditingMasks { endMaskEditing() }
         pause()
         cropDraft = cropRect
         cropAspect = .freeform
@@ -1803,6 +1812,16 @@ final class RecordingStudioModel {
     private var selectedMaskIndex: Int? {
         guard let selectedMaskID else { return nil }
         return maskSegments.firstIndex { $0.id == selectedMaskID }
+    }
+
+    func toggleMaskTool(_ effect: RecordingMaskSegment.Effect) {
+        if isEditingMasks, selectedMask?.effect == effect {
+            endMaskEditing()
+            return
+        }
+        if isCroppingVideo { cancelVideoCrop() }
+        beginMaskEditing()
+        setSelectedMaskEffect(effect)
     }
 
     func beginMaskEditing() {
@@ -1933,6 +1952,12 @@ final class RecordingStudioModel {
     func moveSelectedMask(from start: CGRect, byNormalized delta: CGSize) {
         guard let index = selectedMaskIndex else { return }
         maskSegments[index].rect = CropRectEditor.move(start, by: delta)
+        updatePreviewMaskComposition()
+    }
+
+    func setSelectedMaskCropOnly(_ cropOnly: Bool) {
+        guard let index = selectedMaskIndex else { return }
+        maskSegments[index].rect = cropOnly ? RecordingMaskSegment().rect : RecordingVideoCrop.unit
         updatePreviewMaskComposition()
     }
 

@@ -167,31 +167,23 @@ struct AnnotationEditorWindow: View {
             Button(action: enterCrop) {
                 Label("Crop", systemImage: "crop").labelStyle(.iconOnly)
             }
-            .help("Crop Image")
+            .buttonStyle(EditorButtonStyle(selected: model.isCropping))
+            .help("Crop Image — click again to cancel")
             Divider().frame(height: 24)
 
-            ForEach(AnnotationTool.allCases.filter { !$0.isRedactionTool }) { tool in
+            ForEach(AnnotationTool.allCases) { tool in
                 Button {
                     clearInspectorFocus()
                     model.selectTool(tool)
                 } label: {
                     Label(tool.title, systemImage: tool.systemImage).labelStyle(.iconOnly)
                 }
-                .buttonStyle(EditorButtonStyle(selected: model.selectedTool == tool))
+                .buttonStyle(EditorButtonStyle(selected: model.selectedTool == tool, horizontalPadding: 6))
                 .accessibilityAddTraits(model.selectedTool == tool ? .isSelected : [])
                 .help(tool.helpText)
             }
 
-            EditorPopover(title: "Redact", systemImage: "eye.slash", selected: model.selectedTool.isRedactionTool) {
-                HStack {
-                    ForEach([AnnotationTool.pixelate, .blur]) { tool in
-                        Button("\(tool.title) an area") {
-                            clearInspectorFocus()
-                            model.selectTool(tool)
-                        }
-                    }
-                }
-                Divider()
+            EditorPopover(title: "Smart Redaction", systemImage: "eye.slash") {
                 AnnotationSmartRedactionControls(model: model, onEditorAction: clearInspectorFocus)
             }
 
@@ -397,7 +389,7 @@ struct AnnotationEditorWindow: View {
 
     private func enterCrop() {
         clearInspectorFocus()
-        withAnimation(.snappy(duration: 0.22)) { model.beginCropping() }
+        model.toggleCropping()
     }
 
     private func exitCrop() {

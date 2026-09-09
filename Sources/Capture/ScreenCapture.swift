@@ -33,14 +33,10 @@ final class ScreenCapture {
         isCapturing = true
         defer { isCapturing = false }
 
-        switch await RegionSelectionOverlay().selectRegion() {
-        case .cancelled:
-            return nil
-        case .window:
-            return try await windowShot(includeShadow: false)
-        case .region(let selection):
-            return try await regionShot(selection.pointsRect)
-        }
+        let tempPath = makeTempPath()
+        let success = await runScreencapture(["-i", "-o", "-x", "-t", "png", tempPath])
+        guard success, FileManager.default.fileExists(atPath: tempPath) else { return nil }
+        return URL(fileURLWithPath: tempPath)
     }
 
     /// Captures the remembered rectangle straight away, no selection overlay.

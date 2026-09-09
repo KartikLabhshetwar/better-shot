@@ -286,8 +286,10 @@ struct StoredGradient: Codable, Equatable {
     var startY: Double
     var endX: Double
     var endY: Double
+    var preset: GradientPreset?
 
     init(_ gradient: AnnotationBackgroundGradient) {
+        preset = gradient.preset
         id = gradient.id
         title = gradient.title
         colors = gradient.colors.map(StoredColor.init)
@@ -303,7 +305,8 @@ struct StoredGradient: Codable, Equatable {
             title: title,
             colors: colors.map(\.backgroundColor),
             startPoint: UnitPoint(x: CGFloat(startX), y: CGFloat(startY)),
-            endPoint: UnitPoint(x: CGFloat(endX), y: CGFloat(endY))
+            endPoint: UnitPoint(x: CGFloat(endX), y: CGFloat(endY)),
+            preset: preset
         )
     }
 }

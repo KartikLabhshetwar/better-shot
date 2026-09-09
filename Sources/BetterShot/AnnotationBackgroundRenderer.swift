@@ -291,6 +291,10 @@ nonisolated enum AnnotationBackgroundRenderer {
             context.fill(rect)
 
         case .gradient(let gradient):
+            if let preset = gradient.preset {
+                preset.draw(in: context, rect: rect)
+                return
+            }
             let nsColors = gradient.colors.map(\.nsColor)
             let cgColors = nsColors.map(\.cgColor) as CFArray
             guard let cgGradient = CGGradient(

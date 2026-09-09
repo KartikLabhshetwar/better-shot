@@ -276,6 +276,7 @@ struct StoredRecordingStudioStyle: Codable, Equatable {
     /// Optional so project files saved before cursor scaling decode to the
     /// current default.
     var cursorScale: Double?
+    var cursor: RecordingCursorOptions?
     var cameraIsVisible: Bool
     var cameraCenterX: Double
     var cameraCenterY: Double
@@ -297,6 +298,7 @@ struct StoredRecordingStudioStyle: Codable, Equatable {
         cornerRadius = Double(style.cornerRadius)
         shadow = Double(style.shadow)
         cursorScale = Double(style.cursorScale)
+        cursor = style.cursor
         cameraIsVisible = style.camera.isVisible
         cameraCenterX = Double(style.camera.center.x)
         cameraCenterY = Double(style.camera.center.y)
@@ -323,6 +325,7 @@ struct StoredRecordingStudioStyle: Codable, Equatable {
             cornerRadius: CGFloat(cornerRadius),
             shadow: CGFloat(shadow),
             cursorScale: CGFloat(cursorScale ?? RecordingStudioStyle.defaultCursorScale),
+            cursor: cursor ?? RecordingCursorOptions(),
             camera: RecordingCameraBubbleSettings(
                 isVisible: cameraIsVisible,
                 center: CGPoint(x: cameraCenterX, y: cameraCenterY),
@@ -350,6 +353,7 @@ struct RecordingStudioStyle: Equatable {
     var shadow: CGFloat = 0.45
     /// Synthetic cursor magnification (1 = natural size, up to 4).
     var cursorScale: CGFloat = RecordingStudioStyle.defaultCursorScale
+    var cursor = RecordingCursorOptions()
     var camera = RecordingCameraBubbleSettings()
 }
 
@@ -357,11 +361,22 @@ struct RecordingStudioStyle: Equatable {
 /// one recording to the next. Per-recording project files still win whenever
 /// a video has already been edited.
 enum RecordingStudioDefaults {
+    private static let defaultBackgroundKey = "recordingStudio.defaultBackground.v1"
+
+    static var preferredBackground: AnnotationBackgroundStyle {
+        get { background }
+        set {
+            guard let data = try? JSONEncoder().encode(storedBackgroundStyle(from: newValue)) else { return }
+            UserDefaults.standard.set(data, forKey: defaultBackgroundKey)
+        }
+    }
+
     private static let backgroundKey = "recordingStudio.lastUsedBackground.v1"
 
     static var background: AnnotationBackgroundStyle {
         get {
-            guard let data = UserDefaults.standard.data(forKey: backgroundKey),
+            guard let data = UserDefaults.standard.data(forKey: defaultBackgroundKey)
+                    ?? UserDefaults.standard.data(forKey: backgroundKey),
                   let stored = try? JSONDecoder().decode(StoredBackgroundStyle.self, from: data) else {
                 return RecordingStudioStyle.defaultBackground
             }

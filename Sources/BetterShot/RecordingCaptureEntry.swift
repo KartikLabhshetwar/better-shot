@@ -23,9 +23,8 @@ enum RecordingCaptureEntry {
         }
     }
 
-    static func recordArea(_ display: SCDisplay) {
-        RecordingAreaSelectionPresenter.shared.selectArea(on: display) { rect in
-            guard let rect else { return }
+    static func recordArea() {
+        RecordingAreaSelectionPresenter.shared.selectArea { display, rect in
             Task {
                 await CaptureCountdownPresenter.shared.runIfNeeded(
                     seconds: BetterShotPreferences.recordingStartDelaySeconds,
