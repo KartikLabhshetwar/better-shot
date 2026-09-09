@@ -1520,7 +1520,7 @@ private struct StudioTimelineEditor: View {
             .keyboardShortcut("-", modifiers: .command)
             .disabled(viewport.visibleSeconds >= RecordingTimelineViewport.zoomOutLimit(duration: model.duration))
 
-            Slider(value: Binding(
+            InspectorSlider("Zoom", value: Binding(
                 get: { CGFloat(viewport.zoomProgress(duration: model.duration, viewportWidth: Double(viewportWidth))) },
                 set: {
                     model.timelineThumbnails.deferSampling()
@@ -1528,9 +1528,8 @@ private struct StudioTimelineEditor: View {
                                                 viewportWidth: Double(viewportWidth))
                     syncScroll()
                 }
-            ), in: 0...1)
-            .frame(width: 110)
-            .controlSize(.small)
+            ), range: 0...1, format: .percent())
+            .frame(width: 170)
             .disabled(model.duration <= 0)
             .accessibilityLabel("Timeline zoom")
             .accessibilityValue("\(viewport.visibleSeconds.formatted(.number.precision(.fractionLength(1)))) seconds visible")

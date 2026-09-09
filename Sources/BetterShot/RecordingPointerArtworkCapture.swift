@@ -16,6 +16,11 @@ enum PointerArtworkCapture {
     static func styledArtwork(_ appearance: RecordingCursorAppearance) -> PointerArtwork? {
         guard appearance != .recorded else { return nil }
         if let cached = styledCache[appearance] { return cached }
+        if appearance == .hand {
+            let artwork = capture(NSCursor.pointingHand, id: "bettershot-cursor-hand")
+            if let artwork { styledCache[appearance] = artwork }
+            return artwork
+        }
         let isDot = appearance == .dot
         let size = NSSize(width: 32, height: 40)
         // Keep logical size / hotspot independent of raster resolution. At 32×,

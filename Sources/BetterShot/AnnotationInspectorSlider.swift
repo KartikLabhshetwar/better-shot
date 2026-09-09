@@ -16,6 +16,19 @@ struct InspectorValueFormat {
     let showsPositiveSign: Bool
     let step: CGFloat
     let acceptedSuffixes: [String]
+    var namedValues: [CGFloat: String] = [:]
+
+    static let points = InspectorValueFormat(
+        multiplier: 1, fractionDigits: 0, suffix: " pt", showsPositiveSign: false,
+        step: 4, acceptedSuffixes: ["points", "point", "pt"]
+    )
+
+    static func seconds(never: CGFloat) -> InspectorValueFormat {
+        InspectorValueFormat(
+            multiplier: 1, fractionDigits: 0, suffix: "s", showsPositiveSign: false,
+            step: 1, acceptedSuffixes: ["seconds", "second", "s"], namedValues: [never: "Never"]
+        )
+    }
 
     static let integer = InspectorValueFormat(
         multiplier: 1,
@@ -37,14 +50,15 @@ struct InspectorValueFormat {
 
     static func percent(
         signed: Bool = false,
-        fractionDigits: Int = 0
+        fractionDigits: Int = 0,
+        step: CGFloat? = nil
     ) -> InspectorValueFormat {
         InspectorValueFormat(
             multiplier: 100,
             fractionDigits: fractionDigits,
             suffix: "%",
             showsPositiveSign: signed,
-            step: step(forFractionDigits: fractionDigits) / 100,
+            step: step ?? Self.step(forFractionDigits: fractionDigits) / 100,
             acceptedSuffixes: ["%"]
         )
     }
@@ -83,6 +97,7 @@ struct InspectorValueFormat {
     }
 
     func displayString(for value: CGFloat) -> String {
+        if let name = namedValues[value] { return name }
         let scaledValue = value * multiplier
         let number = formattedNumber(scaledValue)
         let sign = showsPositiveSign && roundedForDisplay(scaledValue) > 0 ? "+" : ""
@@ -94,6 +109,9 @@ struct InspectorValueFormat {
     }
 
     func parse(_ text: String) -> CGFloat? {
+        if let match = namedValues.first(where: {
+            $0.value.caseInsensitiveCompare(text.trimmingCharacters(in: .whitespacesAndNewlines)) == .orderedSame
+        }) { return match.key }
         var numericText = text
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "−", with: "-")
@@ -294,6 +312,7 @@ struct InspectorSlider: View {
 
     private var valueField: some View {
         TextField(title, text: $draftText, selection: $valueSelection)
+            .labelsHidden()
             .textFieldStyle(.plain)
             .font(.inspectorNumeric)
             .foregroundStyle(.primary.opacity(0.82))

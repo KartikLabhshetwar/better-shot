@@ -13,7 +13,7 @@ import CoreGraphics
 import Foundation
 
 nonisolated enum RecordingCursorAppearance: String, Codable, CaseIterable, Sendable {
-    case recorded, dark, light, dot
+    case recorded, dark, light, dot, hand
     var title: String { rawValue.capitalized }
 }
 

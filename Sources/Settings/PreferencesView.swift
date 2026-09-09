@@ -166,15 +166,10 @@ struct GeneralSettingsTab: View {
                 .pickerStyle(.segmented)
 
                 if exportFormatRaw == ExportFormat.jpeg.rawValue {
-                    LabeledContent("Quality") {
-                        HStack(spacing: 12) {
-                            Slider(value: $exportQuality, in: 0.1...1.0, step: 0.05)
-                            Text("\(Int(exportQuality * 100))%")
-                                .font(.system(.callout, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                                .frame(width: 44, alignment: .trailing)
-                        }
-                    }
+                    InspectorSlider("Quality", value: Binding(
+                        get: { CGFloat(exportQuality) },
+                        set: { exportQuality = (Double($0) * 20).rounded() / 20 }
+                    ), range: 0.1...1, format: .percent(step: 0.05))
                 }
             } header: {
                 Text("File Format")
@@ -675,25 +670,18 @@ struct CaptureSettingsTab: View {
                 }
                 .pickerStyle(.segmented)
 
-                LabeledContent("Keep it off the edge by") {
-                    HStack(spacing: 12) {
-                        Slider(value: $overlayEdgeMargin, in: AppPreferences.overlayEdgeMarginRange, step: 4)
-                        Text("\(Int(overlayEdgeMargin))pt")
-                            .font(.system(.callout, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 44, alignment: .trailing)
-                    }
-                }
+                InspectorSlider("Edge Margin", value: Binding(
+                    get: { CGFloat(overlayEdgeMargin) },
+                    set: { overlayEdgeMargin = (Double($0) / 4).rounded() * 4 }
+                ), range: CGFloat(AppPreferences.overlayEdgeMarginRange.lowerBound)...CGFloat(AppPreferences.overlayEdgeMarginRange.upperBound),
+                   format: .points)
 
-                LabeledContent("Hide it after") {
-                    HStack(spacing: 12) {
-                        Slider(value: $overlayDismissDelay, in: AppPreferences.overlayDismissRange, step: 1)
-                        Text(AppPreferences.overlayDismisses(after: overlayDismissDelay) ? "\(Int(overlayDismissDelay))s" : "Never")
-                            .font(.system(.callout, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 44, alignment: .trailing)
-                    }
-                }
+                InspectorSlider("Hide After", value: Binding(
+                    get: { CGFloat(overlayDismissDelay) },
+                    set: { overlayDismissDelay = Double($0.rounded()) }
+                ), range: CGFloat(AppPreferences.overlayDismissRange.lowerBound)...CGFloat(AppPreferences.overlayDismissRange.upperBound),
+                   format: .seconds(never: CGFloat(AppPreferences.overlayDismissNever)))
+                    .help("Choose Never at the end of the track to keep previews visible.")
             } header: {
                 Text("Preview Thumbnail")
             } footer: {

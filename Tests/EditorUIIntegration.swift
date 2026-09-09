@@ -90,7 +90,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     print("PASS tool deselection and ten shared gradient definitions / saved highlights")
 
     var cursorStyle = RecordingStudioStyle()
-    cursorStyle.cursor.appearance = .light
+    cursorStyle.cursor.appearance = .hand
     cursorStyle.cursor.hideWhenIdle = true
     let cursorData = try JSONEncoder().encode(StoredRecordingStudioStyle(cursorStyle))
     let restoredStyle = try JSONDecoder().decode(StoredRecordingStudioStyle.self, from: cursorData)
@@ -100,7 +100,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     let legacyData = try JSONSerialization.data(withJSONObject: legacyStyle)
     let legacyCursor = try JSONDecoder().decode(StoredRecordingStudioStyle.self, from: legacyData).value.cursor
     precondition(legacyCursor == RecordingCursorOptions(), "Older projects retain the recorded cursor and existing motion")
-    for appearance in RecordingCursorAppearance.allCases where appearance != .recorded {
+    for appearance in [RecordingCursorAppearance.dark, .light, .dot] {
         let artwork = PointerArtworkCapture.styledArtwork(appearance)!
         let bitmap = NSBitmapImageRep(data: artwork.imageData)!
         precondition(bitmap.pixelsWide == 1024 && bitmap.pixelsHigh == 1280,
@@ -113,6 +113,18 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         precondition(artwork.normalizedAnchor == expectedAnchor, "High-resolution artwork must preserve its click hotspot")
         precondition(artwork == PointerArtworkCapture.styledArtwork(appearance), "Cursor artwork is cached")
     }
+    let hand = PointerArtworkCapture.styledArtwork(.hand)!
+    let nativeHand = PointerArtworkCapture.capture(NSCursor.pointingHand, id: "bettershot-cursor-hand")!
+    precondition(hand == nativeHand, "Hand uses the actual macOS artwork, full raster, logical size, and hotspot")
+    precondition(hand == PointerArtworkCapture.styledArtwork(.hand), "Native hand artwork is cached")
+    let delayFormat = InspectorValueFormat.seconds(never: CGFloat(AppPreferences.overlayDismissNever))
+    precondition(delayFormat.displayString(for: 5) == "5s")
+    precondition(delayFormat.displayString(for: 16) == "Never")
+    precondition(delayFormat.parse(" never ") == 16 && delayFormat.parse("5s") == 5)
+    precondition(delayFormat.parse("invalid") == nil && delayFormat.parse("NaN") == nil)
+    precondition(InspectorValueFormat.points.parse("24 pt") == 24 && InspectorValueFormat.points.step == 4)
+    precondition(InspectorValueFormat.percent(step: 0.05).step == 0.05)
+    print("PASS native hand capture/cache, cursor project persistence, and settings slider units / Never input")
     let multiResolutionCursor = NSImage(size: NSSize(width: 16, height: 20))
     for scale in [1, 4] {
         let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 16 * scale, pixelsHigh: 20 * scale,
@@ -147,7 +159,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         PointerTravelSample(time: 0, x: 0.1, y: 0.1),
         PointerTravelSample(time: 0.5, x: 0.8, y: 0.6)
     ], presses: [PointerPressEvent(time: 0.6, x: 0.8, y: 0.6, button: 0, phase: .down)])
-    let styledArtwork = PointerArtworkCapture.styledArtwork(.light)!
+    let styledArtwork = PointerArtworkCapture.styledArtwork(.hand)!
     let naturalPointer = PointerTimeline.build(capture: clickCapture, duration: 1, options: cursorOptions,
                                                overrideArtwork: styledArtwork)
     let clickFrame = naturalPointer.frame(at: 0.65)!
@@ -260,7 +272,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     try snapshot(RecordingSettingsTab(), scheme: .dark, width: 580,
                  to: output.appendingPathComponent("recording-settings.png"), height: 1100)
     try snapshot(HStack(spacing: 24) {
-        ForEach([RecordingCursorAppearance.dark, .light, .dot], id: \.self) { appearance in
+        ForEach([RecordingCursorAppearance.dark, .light, .dot, .hand], id: \.self) { appearance in
             VStack {
                 HStack(spacing: 0) {
                     ForEach([Color.white, Color.black], id: \.self) { background in
@@ -272,7 +284,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
                 Text(appearance.title)
             }
         }
-    }.padding(), scheme: .light, width: 820, to: output.appendingPathComponent("cursor-quality.png"), height: 220)
+    }.padding(), scheme: .light, width: 1100, to: output.appendingPathComponent("cursor-quality.png"), height: 220)
     var effectToggle = StudioEffectToggleState()
     precondition(effectToggle.amount(enabled: true, current: 0, defaultValue: 0.45) == 0.45)
     precondition(effectToggle.amount(enabled: false, current: 0.75, defaultValue: 0.45) == 0)
@@ -282,6 +294,17 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     print("PASS effect toggle defaults and previous amount restoration")
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
+        try snapshot(Form {
+            Section {
+                InspectorSlider("Padding", value: .constant(0.15), range: 0...0.45, format: .percent())
+                InspectorSlider("Corner Radius", value: .constant(0.011), range: 0...0.12,
+                                format: .percent(fractionDigits: 1))
+                InspectorSlider("Shadow", value: .constant(0.3), range: 0...1, format: .percent())
+            }
+        }.formStyle(.grouped), scheme: scheme, width: 580,
+                     to: output.appendingPathComponent("settings-sliders-\(name).png"), height: 200)
+        try snapshot(CaptureSettingsTab(), scheme: scheme, width: 580,
+                     to: output.appendingPathComponent("capture-settings-\(name).png"), height: 800)
         for (label, status) in [
             ("upload", TransferStatus.working(stage: .uploading, progress: 0.42)),
             ("render", .working(stage: .rendering, progress: nil)),

@@ -88,13 +88,18 @@ The full requirements live in [AGENTS.md](AGENTS.md). For a UI change, start her
 | Action icons | Native `Label`, `Image(systemName:)`, and AppKit SF Symbols; no third-party icon mapping |
 | Classic frosted editor chrome | `EditorChrome.swift`: `EditorButtonStyle`, `studioGlass`, `studioEffectCard` |
 | Inspector spacing and fields | `AnnotationInspectorStyle.swift`: `InspectorMetrics` and shared inspector components |
-| Amount controls | `AnnotationInspectorSlider.swift`: `InspectorSlider`, label in the track and editable value |
+| Amount controls | `AnnotationInspectorSlider.swift`: `InspectorSlider`, 0.4.0 label-in-track style and right-hand editable value across Settings and both editors |
 | Capture/recording bars | `RecordingBarPresenter`, `RecordingPickerBar`, `RecordingBarChrome`; 64 pt / 38 pt heights |
 | Image editor | `AnnotationEditorWindow` / `AnnotationEditorModel`; one tool row and left inspector |
 | Video inspector | `StudioInspectorTabs` and `RecordingStudioWindow`; left rail, expanded effect cards |
 | Timeline | `RecordingStudioWindow` and timeline models; zoom blocks above filmstrip, scissors/cut badges below |
 | Export/share feedback | `TransferStatusCard`; compact corner card with native progress and short fades |
 | Shared backgrounds | `GradientPreset.presets`, `GradientBackgroundView`, `AnnotationBackgroundStageFill` |
+
+Keep slider field labels hidden inside Forms so the numeric value stays centered
+in its right-hand field. Reuse `InspectorSlider` everywhere, including JPEG quality,
+preview margin/dismissal, and timeline zoom. Preserve steps, units, exact entry,
+and the Never dismissal option.
 
 Keep Blur and Pixelate visible, hide editor scroll indicators without disabling
 scrolling, and preserve tool toggling. Image tools return to Select on a second
@@ -153,7 +158,8 @@ Recording packages contain `screen.mov`, optional `camera.mov`, `input.json`,
 `poster.jpg`, and a flattened deliverable. Keep source movies intact. Changes to
 cursor, crop, masks, zoom, and gradients must survive save/reopen and match exports.
 
-Custom cursors are generated from vector paths into cached transparent PNGs.
+Dark, Light, and Dot cursors are generated from vector paths into cached transparent PNGs.
+Hand uses `NSCursor.pointingHand` through the same highest-resolution capture helper.
 Their logical size and click hotspot are separate from raster dimensions. Keep
 high-resolution representations, contrast outlines, and preview/export agreement.
 Imported footage with its cursor already baked into the pixels cannot be restyled.
