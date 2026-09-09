@@ -1212,7 +1212,7 @@ private struct StudioTimelineEditor: View {
     @Bindable var model: RecordingStudioModel
 
     @State private var viewport = RecordingTimelineViewport()
-    @State private var isSplitting = false
+    @State private var isSplitting = true
     @State private var viewportWidth: CGFloat = 1
     @State private var scrollPosition = ScrollPosition(edge: .leading)
 
@@ -1228,6 +1228,9 @@ private struct StudioTimelineEditor: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
             lanes
+            if !removedRanges.isEmpty {
+                removedFootageMarkers
+            }
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)
@@ -1238,6 +1241,37 @@ private struct StudioTimelineEditor: View {
                 .fill(Color(nsColor: .separatorColor).opacity(0.45))
                 .frame(height: 0.5)
         }
+    }
+
+    private var removedRanges: [RecordingClipTimeline.RemovedRange] {
+        model.clipTimeline.removedRanges(sourceDuration: model.sourceDuration)
+    }
+
+    private var removedFootageMarkers: some View {
+        GeometryReader { proxy in
+            ForEach(removedRanges, id: \.sourceStart) { range in
+                let x = scale.x(for: range.editorTime) - scrollX
+                if x >= 0, x <= proxy.size.width {
+                    let description = "Removed \(studioTimecode(range.sourceStart))–\(studioTimecode(range.sourceEnd)) from the original recording"
+                    Button {
+                        model.pause()
+                        model.seek(to: range.editorTime)
+                    } label: {
+                        Image(systemName: "scissors")
+                            .font(.system(size: 11))
+                            .frame(width: 28, height: 24)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help(description)
+                    .accessibilityLabel(description)
+                    .accessibilityHint("Go to this cut")
+                    .position(x: min(max(x, 14), max(14, proxy.size.width - 14)), y: 12)
+                }
+            }
+        }
+        .frame(height: 24)
     }
 
     private var lanes: some View {
@@ -1518,7 +1552,7 @@ private struct StudioTimelineEditor: View {
             .toggleStyle(.button)
             .buttonStyle(EditorButtonStyle(selected: isSplitting))
             .keyboardShortcut("s", modifiers: [])
-            .help("Split tool (S) — click the video track to cut")
+            .help("Split tool (S) — click to cut; click scissors again to select or trim clips")
             .accessibilityLabel("Split tool")
             Divider().frame(height: 24)
             Text("\(studioTimecode(model.displayTime)) / \(studioTimecode(model.duration))")

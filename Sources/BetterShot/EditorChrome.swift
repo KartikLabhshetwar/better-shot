@@ -10,6 +10,7 @@ enum StudioChrome {
 /// Classic frosted macOS chrome, without Tahoe's Liquid Glass treatment.
 private struct StudioGlassSurface: ViewModifier {
     var cornerRadius: CGFloat
+    var opacity: Double
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     func body(content: Content) -> some View {
@@ -19,6 +20,7 @@ private struct StudioGlassSurface: ViewModifier {
                     EditorChrome.panel
                 } else {
                     VisualEffectBackdrop(material: .sidebar)
+                        .opacity(opacity)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
@@ -89,8 +91,8 @@ struct EditorPopover<Content: View>: View {
 }
 
 extension View {
-    func studioGlass(cornerRadius: CGFloat = 8) -> some View {
-        modifier(StudioGlassSurface(cornerRadius: cornerRadius))
+    func studioGlass(cornerRadius: CGFloat = 8, opacity: Double = 1) -> some View {
+        modifier(StudioGlassSurface(cornerRadius: cornerRadius, opacity: opacity))
     }
 
     func studioEffectCard() -> some View {

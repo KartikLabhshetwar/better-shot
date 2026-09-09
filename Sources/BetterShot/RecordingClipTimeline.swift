@@ -140,6 +140,33 @@ nonisolated struct RecordingClipTimeline: Codable, Equatable, Sendable {
         segments.reduce(0) { $0 + $1.editorDuration }
     }
 
+    struct RemovedRange: Equatable {
+        var sourceStart: TimeInterval
+        var sourceEnd: TimeInterval
+        var editorTime: TimeInterval
+    }
+
+    /// Source gaps collapse to a boundary in the edited timeline, including trims at either end.
+    func removedRanges(sourceDuration: TimeInterval) -> [RemovedRange] {
+        guard sourceDuration.isFinite, sourceDuration > 0 else { return [] }
+        var ranges: [RemovedRange] = []
+        var sourceEnd: TimeInterval = 0
+        var editorTime: TimeInterval = 0
+        for segment in segments {
+            if segment.sourceStart - sourceEnd > 0.000_001 {
+                ranges.append(RemovedRange(sourceStart: sourceEnd, sourceEnd: segment.sourceStart,
+                                           editorTime: editorTime))
+            }
+            sourceEnd = segment.sourceEnd
+            editorTime += segment.editorDuration
+        }
+        if sourceDuration - sourceEnd > 0.000_001 {
+            ranges.append(RemovedRange(sourceStart: sourceEnd, sourceEnd: sourceDuration,
+                                       editorTime: editorTime))
+        }
+        return ranges
+    }
+
     func normalized(to sourceDuration: TimeInterval) -> RecordingClipTimeline {
         let safeDuration = max(0, sourceDuration.isFinite ? sourceDuration : 0)
         var seenIDs = Set<UUID>()

@@ -14,9 +14,9 @@ import SwiftUI
 
 enum BarMetrics {
     /// Capture modes have visible captions; active recording controls stay compact.
-    static let controlSize: CGFloat = 40
-    static let height: CGFloat = 80
-    static let recordingHeight: CGFloat = 52
+    static let controlSize: CGFloat = 36
+    static let height: CGFloat = 64
+    static let recordingHeight: CGFloat = 44
     static let cornerRadius: CGFloat = 16
     static let itemSpacing: CGFloat = 2
     static let horizontalPadding: CGFloat = 6
@@ -218,18 +218,18 @@ struct BarActionLabel: View {
     @State private var frame: CGRect = .zero
 
     var body: some View {
-        VStack(spacing: 7) {
+        VStack(spacing: 4) {
             Image(systemName: systemImage)
-                .font(.system(size: caption == nil ? 17 : 23, weight: .regular))
+                .font(.system(size: caption == nil ? 17 : 20, weight: .regular))
             if let caption {
                 Text(caption)
-                    .font(.system(size: 12))
+                    .font(.system(size: 11))
                     .lineLimit(1)
             }
         }
             .foregroundStyle(tint.opacity(isEnabled ? 1 : 0.3))
-            .frame(width: caption == nil ? BarMetrics.controlSize : 78,
-                   height: caption == nil ? BarMetrics.controlSize : 64)
+            .frame(width: caption == nil ? BarMetrics.controlSize : 72,
+                   height: caption == nil ? BarMetrics.controlSize : 52)
             .background {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(BarMetrics.hoverFill)

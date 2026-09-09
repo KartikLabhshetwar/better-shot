@@ -112,6 +112,22 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     precondition(videoModel.zoomCues.first?.zoom == 2)
     precondition(videoModel.zoomEnabled, "Redo must restore zoom playback")
 
+    let cutTimeline = RecordingClipTimeline(segments: [
+        RecordingClipSegment(sourceStart: 1, sourceEnd: 5, speed: 2),
+        RecordingClipSegment(sourceStart: 7, sourceEnd: 9)
+    ])
+    precondition(cutTimeline.removedRanges(sourceDuration: 10) == [
+        .init(sourceStart: 0, sourceEnd: 1, editorTime: 0),
+        .init(sourceStart: 5, sourceEnd: 7, editorTime: 2),
+        .init(sourceStart: 9, sourceEnd: 10, editorTime: 4)
+    ], "Removed footage markers cover leading, middle, and trailing cuts at edited playback times")
+    precondition(RecordingClipTimeline(segments: [
+        RecordingClipSegment(sourceStart: 0, sourceEnd: 5),
+        RecordingClipSegment(sourceStart: 5, sourceEnd: 10)
+    ]).removedRanges(sourceDuration: 10).isEmpty, "A split alone removes no footage")
+    precondition(cutTimeline.removedRanges(sourceDuration: .nan).isEmpty)
+    print("PASS removed footage marker positions and split-only timeline")
+
     let clipControl = RecordingClipTimelineControl(frame: NSRect(x: 0, y: 0, width: 600, height: 52))
     clipControl.update(timeline: videoModel.clipTimeline, sourceDuration: videoModel.sourceDuration,
                        thumbnails: videoModel.timelineThumbnails, selectedClipID: nil, playheadTime: 0)
@@ -126,6 +142,18 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0,
         clickCount: 1, pressure: 1)!)
     precondition(abs((splitTime ?? -1) - videoModel.duration / 2) < 0.01, "The split tool cuts at the click")
+    precondition(clipControl.isSplitting, "Scissors stays selected after a cut")
+    clipControl.update(timeline: videoModel.clipTimeline, sourceDuration: videoModel.sourceDuration,
+                       thumbnails: videoModel.timelineThumbnails, selectedClipID: nil, playheadTime: 0)
+    clipControl.mouseDown(with: NSEvent.mouseEvent(with: .leftMouseDown, location: CGPoint(x: 450, y: 26),
+        modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 1,
+        clickCount: 1, pressure: 1)!)
+    precondition(clipControl.isSplitting && abs((splitTime ?? -1) - videoModel.duration * 0.75) < 0.01,
+                 "Repeated cuts and timeline updates keep scissors selected")
+    clipControl.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+        timestamp: 0, windowNumber: 0, context: nil, characters: "s", charactersIgnoringModifiers: "s",
+        isARepeat: false, keyCode: 1)!)
+    precondition(!clipControl.isSplitting, "S explicitly deselects scissors")
     clipControl.toggleSplitRequested = nil
     print("PASS split tool, zoom editing, and undo/redo")
     let output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
@@ -140,10 +168,11 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     print("PASS effect toggle defaults and previous amount restoration")
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
-        try snapshot(RecordingSessionControls().studioGlass(cornerRadius: 16),
+        try snapshot(RecordingSessionControls().studioGlass(cornerRadius: BarMetrics.cornerRadius, opacity: 0.78),
                      scheme: scheme, width: 360,
                      to: output.appendingPathComponent("recording-\(name).png"), height: 64)
-        try snapshot(RecordingPickerControls().padding(8).studioGlass(cornerRadius: 16)
+        try snapshot(RecordingPickerControls().padding(.horizontal, BarMetrics.horizontalPadding)
+            .frame(height: BarMetrics.height).studioGlass(cornerRadius: BarMetrics.cornerRadius, opacity: 0.78)
             .background(EditorChrome.workspace), scheme: scheme, width: 760,
                      to: output.appendingPathComponent("capture-\(name).png"), height: 100)
         try snapshot(
@@ -164,6 +193,21 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         try snapshot(RecordingStudioContent(model: videoModel), scheme: scheme, width: 1100,
                      to: output.appendingPathComponent("video-effects-\(name).png"))
     }
+    videoModel.splitClip(at: videoModel.duration / 2)
+    var firstClip = videoModel.clipTimeline.segments[0]
+    firstClip.sourceStart += 0.2
+    videoModel.trimClip(firstClip)
+    var lastClip = videoModel.clipTimeline.segments[1]
+    lastClip.sourceStart += 0.2
+    lastClip.sourceEnd -= 0.2
+    videoModel.trimClip(lastClip)
+    precondition(videoModel.clipTimeline.removedRanges(sourceDuration: videoModel.sourceDuration).count == 3)
+    try snapshot(RecordingStudioContent(model: videoModel), scheme: .dark, width: 1100,
+                 to: output.appendingPathComponent("video-cuts-dark.png"))
+    videoModel.resetClips()
+    precondition(videoModel.clipTimeline.removedRanges(sourceDuration: videoModel.sourceDuration).isEmpty,
+                 "Restoring the original recording clears removed footage markers")
+
     let recentMenu = MenuBarContentView(dismissPopover: {}).recentMenuItems()
     precondition(recentMenu.map(\.title) == ["Screenshots", "Recordings"])
     precondition(recentMenu.flatMap { $0.submenu ?? [] }.allSatisfy { !$0.isDestructive },

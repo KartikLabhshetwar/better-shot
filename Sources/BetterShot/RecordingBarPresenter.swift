@@ -339,7 +339,7 @@ private struct RecordingBarView: View {
         // hides the controls behind the narrowing edge instead of letting
         // them spill past it.
         .clipShape(barShape)
-        .studioGlass(cornerRadius: BarMetrics.cornerRadius)
+        .studioGlass(cornerRadius: BarMetrics.cornerRadius, opacity: 0.78)
         .overlay {
             barShape.strokeBorder(BarMetrics.edge, lineWidth: 0.5)
         }
