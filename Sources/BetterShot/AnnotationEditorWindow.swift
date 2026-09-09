@@ -283,7 +283,7 @@ struct AnnotationEditorWindow: View {
             if isExporting {
                 ProgressView().controlSize(.small)
             } else {
-                Label("Save as…", systemImage: "arrow.down.circle")
+                Label("Export", systemImage: "arrow.down.circle")
                     .labelStyle(.titleAndIcon)
             }
         }

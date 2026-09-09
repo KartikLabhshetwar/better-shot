@@ -39,6 +39,7 @@ All pending changes are included in this unreleased 0.5.0 update.
 
 ### Fixed
 
+- **Image export label**: The image editor now says Export instead of Save as…, matching the video editor.
 - **Cursor clarity**: Custom cursors render from a high-resolution vector master with transparent PNG output and unchanged click hotspots. Captured system cursors retain their highest-resolution image representation.
 - **Sharp screenshots**: Full-resolution editor previews are now the default, and screenshot framing places source pixels at integer coordinates to avoid softening text.
 - **Slider consistency**: Fixed duplicate field labels and clipped values in Settings. JPEG quality, preview margin/dismissal, and timeline zoom now use the same label-in-track scrubber with right-hand value entry, preserving units, increments, and Never dismissal.
