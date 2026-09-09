@@ -46,7 +46,10 @@ The keystroke overlay captures shortcuts and special keys, never plain typing.
 
 `OnboardingState` versions the introduction independently of app releases. New and
 existing users see it once; Skip, the window close button, and completion all mark
-it seen. Version 2 expands the guide to Screenshots, Video, Permissions, and Ready.
+it seen. Version 2 uses Welcome, Permissions, Shortcuts, and First Capture. Keep the setup
+brief: screen access is prominent, other permissions are in an optional disclosure,
+and shortcut labels come from `ShortcutService.effectiveShortcut`. Do not reset
+custom or disabled bindings.
 Reopening from the menu or About does not reset preferences or TipKit. When an
 onboarding request may need a restart, persist only the pending Permissions step,
 never the grant. Explicit dismissal clears it; quitting for permission setup retains
@@ -57,7 +60,7 @@ Keep permissions sourced from macOS, never from onboarding completion state.
 
 `Tests/OnboardingStateCheck.swift` covers presentation and preference preservation.
 The editor integration runner checks sample copies, AV permission-state mapping,
-and the no-TCC testing guard; it renders all four steps at 520 and 680 points in
+and the no-TCC testing guard; it renders all four steps at 520 and 760 points in
 light/dark, plus denied/restricted/restart recovery rows. Manually verify window close,
 Escape/Return/Tab, menu reopening, sample editing, and permission denial/grant on a
 signed app. See [onboarding notes](docs/onboarding.md) for sources and artwork prompts.
@@ -116,7 +119,7 @@ The full requirements live in [AGENTS.md](AGENTS.md). For a UI change, start her
 | Image editor | `AnnotationEditorWindow` / `AnnotationEditorModel`; one tool row and left inspector |
 | Video inspector | `StudioInspectorTabs` and `RecordingStudioWindow`; left rail, expanded effect cards |
 | Timeline | `RecordingStudioWindow` and timeline models; zoom blocks above filmstrip, scissors/cut badges below |
-| Export/share feedback | `TransferStatusCard`; compact corner card with native progress and short fades |
+| Export/share feedback | `TransferStatusCard` in `TransferToast`; separate screen-top panel with native progress |
 | Shared backgrounds | `GradientPreset.presets`, `GradientBackgroundView`, `AnnotationBackgroundStageFill` |
 
 Keep slider field labels hidden inside Forms so the numeric value stays centered
@@ -242,6 +245,10 @@ upload preparation without credentials or network uploads. The synthetic moving
 source is deliberately compressible; report hardware, effect settings, and upload
 preparation separately. These timings do not predict internet transfer speed or
 all real-world footage. Normal `make test` keeps its short fixtures.
+
+The transfer-toast integration check briefly creates native windows to verify
+screen-top placement, preserved keyboard focus, appearance, dismissal, and editor
+close cleanup. Manually check full-screen Spaces and moving between displays.
 
 Editor snapshots appear in `.build/editor-snapshots/`. Check light/dark and narrow
 layouts. Offscreen snapshots do not validate live AVPlayer layers, native window

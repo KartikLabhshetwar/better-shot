@@ -443,19 +443,8 @@ struct AnnotationEditorWindow: View {
                     .background(.bar)
             }
         }
-        .overlay(alignment: .bottomTrailing) {
-            if let transferStatus {
-                TransferStatusCard(
-                    status: transferStatus,
-                    onCancel: cancelUpload,
-                    onRetry: retryUpload,
-                    onDismiss: { uploadPhase = .idle }
-                )
-                .padding(16)
-                .transition(.opacity)
-            }
-        }
-        .animation(RecordingMotion.reduceMotion ? nil : .easeOut(duration: 0.15), value: transferStatus != nil)
+        .background(TransferToast(status: transferStatus, onCancel: cancelUpload,
+                                  onRetry: retryUpload, onDismiss: { uploadPhase = .idle }))
     }
 
     private var transferStatus: TransferStatus? {

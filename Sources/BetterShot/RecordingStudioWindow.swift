@@ -60,16 +60,6 @@ struct RecordingStudioContent: View {
                     } else {
                         StudioCanvas(model: model)
                             .background(AnnotationEditorWorkspaceBackground())
-                            .overlay(alignment: .bottomTrailing) {
-                                if let transferStatus {
-                                    TransferStatusCard(status: transferStatus,
-                                        onCancel: cancelTransfer, onRetry: retryTransfer,
-                                        onDismiss: dismissTransfer)
-                                        .padding(16)
-                                        .transition(.opacity)
-                                }
-                            }
-                            .animation(RecordingMotion.reduceMotion ? nil : .easeOut(duration: 0.15), value: transferStatus != nil)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -81,6 +71,8 @@ struct RecordingStudioContent: View {
             }
         }
         .background(EditorChrome.workspace)
+        .background(TransferToast(status: transferStatus, onCancel: cancelTransfer,
+                                  onRetry: retryTransfer, onDismiss: dismissTransfer))
         .scrollIndicators(.hidden)
         .tint(EditorChrome.accent)
         .accentColor(EditorChrome.accent)
@@ -382,12 +374,6 @@ struct RecordingStudioContent: View {
         case .idle:
             return nil
         }
-    }
-
-    private var transferCardTransition: AnyTransition {
-        RecordingMotion.reduceMotion
-            ? .opacity
-            : AnyTransition.offset(y: 24).combined(with: .opacity)
     }
 
     private func cancelTransfer() {

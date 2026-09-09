@@ -14,7 +14,7 @@ single unreleased 0.5.0 entry until the release is published.
 
 ### Added
 
-- **Complete onboarding**: Four native steps—Screenshots, Video, Permissions, and Ready—explain capture, image annotations and redaction, backgrounds, video controls, timeline editing, cursor effects, export, and optional sharing. New and existing users can skip or reopen the guide from Getting Started or About. The expanded guide also appears for users who saw the earlier brief introduction.
+- **Focused native onboarding**: Welcome, Permissions, Shortcuts, and First Capture replace the long feature tour with a brief, Raycast-inspired setup. A spacious clover welcome, persistent step navigation, optional permission disclosure, current shortcut bindings, and practice edits make the first capture easier. Skip or reopen from Getting Started or About anytime.
 - **Permissions inside onboarding**: Request screen access, Accessibility, Input Monitoring, Microphone, and Camera individually, with a clear explanation of the feature each enables. Screen access is identified as needed for capture; other permissions are optional. Live status, System Settings links, denied/restricted guidance, and Check Permissions Again help resolve setup problems. A permission-related relaunch returns to the Permissions step without resetting preferences.
 - **Practice after setup**: Two generated photos open full-resolution working copies in the image editor from the final step, so practice no longer skips the video and permission walkthrough. An Arrow TipKit hint teaches a first edit. No screen permission is required to edit a sample.
 - **Simpler landing page**: Removed the five old promotional videos and their files, replaced the empty media layout with feature cards, and added first-capture guidance. Shared recording playback is preserved.
@@ -46,6 +46,8 @@ single unreleased 0.5.0 entry until the release is published.
 - **Settings**: Capture and recording options have inline explanations, sharing fields remain editable, and General provides the shared image/video default look.
 
 ### Fixed
+
+- **Export toast placement**: Export and sharing feedback now appears in a separate native panel at the top of the editor’s display, like other toasts, instead of covering the preview’s bottom-right corner. Progress, completion, retry, and file/link actions are preserved.
 
 - **Faster local exports**: Video exports reuse unchanged screen and mask rasters and render the camera shadow once, preserving effects and 60 fps. Repeated image Copy/Save/Export actions reuse a full-resolution lossless PNG when source pixels, edits, and wallpaper contents match. Both caches are bounded and local.
 

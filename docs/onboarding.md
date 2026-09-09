@@ -2,10 +2,15 @@
 
 Updated September 10, 2026 for 0.5.0 release preparation.
 
-1. **Screenshots:** native region/window/display capture, OCR, color sampling, annotations, Blur/Pixelate, backgrounds, Save versus Export, and Copy.
-2. **Video:** display/window/area recording, optional audio/camera and teleprompter, Stop/Pause/Restart/Discard, timeline editing, inspector tabs, cursor effects, local MOV/MP4 export, and optional R2 sharing.
-3. **Permissions:** request Screen & System Audio Recording (needed for capture), Accessibility (global shortcuts), Input Monitoring (precise pointer motion and optional special-key overlays), Microphone, and Camera. Each row explains the feature and offers its own native request and System Settings link. Nothing is requested automatically on entry. Camera/microphone setup reuses RecordingInputAuthorization. Grants never enable recording inputs or key capture in preferences.
-4. **Ready:** report whether screen access is available, return to Permissions if needed, open the capture bar or Recording options, or edit one of the two practice images. Sample editing happens after the walkthrough and creates a durable, unique, full-resolution working copy.
+1. **Welcome:** a centered clover and short introduction to screenshots and recordings. Start Setup begins; Set Up Later opens the shared bar.
+2. **Permissions:** screen access is prominent. A native Optional permissions disclosure contains Accessibility, Input Monitoring, Microphone, and Camera. Existing per-feature request, denial, restriction, and restart recovery controls remain. Nothing is requested automatically; granting access never enables recording inputs or key capture.
+3. **Shortcuts:** the capture-bar binding is prominent, followed by region, fullscreen, and recording-options bindings from ShortcutService. Customized bindings and disabled states are preserved. Review Access opens the optional permission controls when Accessibility is missing or shortcuts need a restart.
+4. **First Capture:** the bundled menu-bar clover shows where to find BetterShot. Short instructions lead to screenshot or recording capture; two practice photos open unique full-resolution copies in the real editor without screen access. Missing screen permission offers an Enable Access route.
+
+The resizable 760 × 680-point window uses centered content, neutral system colors,
+existing frosted chrome, and a persistent footer with Back, accessible step markers,
+Set Up Later, and Return to continue. At 520 × 560 points, content scrolls while the
+footer stays reachable. No animation or new dependency is added.
 
 Onboarding version 2 covers new users, existing users, and users of the previous
 brief guide. Set Up Later, the close button, and completion mark it seen. Permission
@@ -13,13 +18,15 @@ requests that may require relaunch persist a resume flag; quitting then reopenin
 returns to Permissions, including when the guide was reopened manually. Explicit
 dismissal clears the flag. Requests made from Settings do not schedule onboarding.
 Status always comes from macOS: returning to the app, a two-second refresh while
-Permissions/Ready is visible, and Check Permissions Again all recheck the grants.
+Permissions/Shortcuts/First Capture is visible, and Check Again all recheck the grants.
 CoreGraphics preflight APIs cannot distinguish a first request from a denial, so
 those rows say Not enabled and offer a settings route. AVFoundation distinguishes
 not determined, authorized, denied, and restricted. Restricted access is explained
 without prompting. TipKit still teaches Arrow beside its editor control.
 
 ## Sources and decisions
+
+- Inspected the installed Raycast macOS app using Show Onboarding: a centered welcome, focused content, and a persistent bottom progress/action strip. Adapted these patterns to BetterShot’s clover and neutral native chrome. The guide stays optional and avoids Raycast’s decorative motion and longer feature tour.
 
 - [Apple HIG: Onboarding](https://developer.apple.com/design/human-interface-guidelines/onboarding): brief, optional, interactive learning after launch; easy reopening.
 - [Apple HIG: Privacy](https://developer.apple.com/design/human-interface-guidelines/privacy): explicit feature-driven permission requests. No launch-time Accessibility prompt; status comes from macOS.
@@ -47,15 +54,17 @@ Run `make test` with the provided runners (`BETTERSHOT_TESTING=1`).
 OnboardingStateCheck verifies first presentation, existing-user presentation, dismissal,
 preserved preferences, the version-1 upgrade, permission-restart recovery, and downgrade behavior. EditorUIIntegration checks original-byte
 copies, unique working files, write failure, AV permission status mapping, and testing guards.
-It renders sixteen snapshots of the four steps in light/dark at 520/680-point widths,
+It renders sixteen snapshots of the four steps in light/dark at 520/760-point widths,
 plus two sheets of permission recovery states. The flow adds no animations and reuses the existing chrome
 that supports Reduce Transparency; OS accessibility settings need a live check.
 
-Live navigation was checked in an isolated app hosting the production onboarding
-with BETTERSHOT_TESTING=1: Screenshots → Video → Permissions → Ready, Return to
-advance, scrolling to Camera/Microphone/retry controls, and Review Permissions
-returning to the top of setup. The test host cannot request TCC access or read R2
-credentials. Closing the window dismissed the guide.
+The redesigned flow passed `make test`, including all sixteen onboarding snapshots
+and the existing permission, sample-copy, editor, and export checks. Reviewed each
+step in light/dark and compact/default layouts; longer compact content scrolls
+while the footer stays visible. Live navigation remains unverified: automatic
+approval review blocked launching the locally built isolated test host as
+unrecognized software. That host uses BETTERSHOT_TESTING=1 to avoid requesting
+TCC access or reading R2 credentials; launching it requires user approval.
 
 Still required before release: signed-app first launch, Escape/Tab/VoiceOver,
 actual permission grant/denial/revocation and system-triggered relaunch, switching

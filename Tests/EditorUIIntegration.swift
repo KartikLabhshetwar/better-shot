@@ -3,10 +3,11 @@ import Carbon
 import SwiftUI
 @testable import BetterShot
 
-/// Offscreen view snapshots and real model checks; does not drive the user's desktop.
+/// Offscreen snapshots and model checks, plus a brief native transfer-toast lifecycle check.
 /// AVPlayer layers and window toolbars require live UI testing and are not captured here.
 @MainActor
 func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
+    checkTransferToastPresentation(movieURL: movieURL)
     try await checkGeneralEditorDefaults(movieURL: movieURL)
     for appearanceName in [NSAppearance.Name.aqua, .darkAqua] {
         NSAppearance(named: appearanceName)!.performAsCurrentDrawingAppearance {
@@ -305,11 +306,11 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     }
     for scheme in [ColorScheme.light, .dark] {
         for step in OnboardingView.Step.allCases {
-            for width: CGFloat in [520, 680] {
+            for width: CGFloat in [520, 760] {
                 try snapshot(OnboardingView(step: step, resourceBundle: appBundle),
                     scheme: scheme, width: width,
                     to: output.appendingPathComponent("onboarding-\(step)-\(scheme)-\(Int(width)).png"),
-                    height: width == 520 ? 560 : 740)
+                    height: width == 520 ? 560 : 680)
             }
         }
         try snapshot(VStack(spacing: 12) {
@@ -525,4 +526,48 @@ private func snapshot<V: View>(
     hosting.cacheDisplay(in: hosting.bounds, to: bitmap)
     precondition(bitmap.pixelsWide > 0 && bitmap.pixelsHigh > 0)
     try bitmap.representation(using: .png, properties: [:])!.write(to: url)
+}
+
+@MainActor
+private func checkTransferToastPresentation(movieURL: URL) {
+    guard let screen = NSScreen.main else { preconditionFailure("Toast checks require a display") }
+    let owner = NSWindow(contentRect: CGRect(x: screen.visibleFrame.minX + 20,
+        y: screen.visibleFrame.minY + 20, width: 400, height: 240),
+        styleMask: [.titled], backing: .buffered, defer: false)
+    owner.isReleasedWhenClosed = false
+    owner.contentView = NSView(frame: CGRect(x: 0, y: 0, width: 400, height: 240))
+    owner.orderFrontRegardless()
+    defer { owner.close() }
+    let anchor = TransferToastAnchorView(frame: .zero)
+    owner.contentView!.addSubview(anchor)
+    let previousKeyWindow = NSApp.keyWindow
+    anchor.update(card: TransferStatusCard(status: .working(stage: .exporting, progress: 0.2)))
+    guard let toast = NSApp.windows.first(where: {
+        $0.identifier?.rawValue == "BetterShot.TransferToast" && $0.isVisible
+    }) else { preconditionFailure("Transfer feedback must appear in its own native window") }
+    precondition(toast !== owner && toast.parent == nil)
+    precondition(toast.appearance === owner.appearance,
+                 "System appearance must remain automatic when the editor has no override")
+    precondition(abs(toast.frame.midX - screen.visibleFrame.midX) < 1
+                 && abs(toast.frame.maxY - (screen.visibleFrame.maxY - 12)) < 1,
+                 "Transfer toast must use the screen's top-center toast position")
+    precondition(!owner.frame.intersects(toast.frame), "Compact editor must not contain the transfer card")
+    precondition(NSApp.keyWindow === previousKeyWindow, "Showing progress must preserve keyboard focus")
+    anchor.update(card: TransferStatusCard(status: .exported(url: movieURL)))
+    precondition(toast.isVisible, "Completion must update the existing panel")
+    for name in [NSAppearance.Name.aqua, .darkAqua] {
+        owner.appearance = NSAppearance(named: name)
+        anchor.update(card: TransferStatusCard(status: .failed(
+            headline: "Export failed", message: "Retry the export.", canRetry: true)))
+        precondition(toast.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == name)
+    }
+    anchor.update(card: nil)
+    precondition(!toast.isVisible, "Dismissal must remove the floating card")
+    anchor.update(card: TransferStatusCard(status: .working(stage: .exporting, progress: nil)))
+    owner.close()
+    precondition(!NSApp.windows.contains(where: {
+        $0.identifier?.rawValue == "BetterShot.TransferToast" && $0.isVisible
+    }), "Closing the editor must clean up its transfer panel")
+    anchor.removeFromSuperview()
+    print("PASS external transfer toast placement, progress/completion, focus, appearances, dismissal, and close cleanup")
 }

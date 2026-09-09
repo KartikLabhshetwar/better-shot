@@ -303,3 +303,80 @@ private struct TransferPressStyle: ButtonStyle {
             .animation(RecordingMotion.reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
+
+/// Hosts the existing card outside the editor, at the shared screen-toast position.
+struct TransferToast: NSViewRepresentable {
+    let status: TransferStatus?
+    var onCancel: () -> Void = {}
+    var onRetry: () -> Void = {}
+    var onDismiss: () -> Void = {}
+
+    func makeNSView(context: Context) -> TransferToastAnchorView {
+        TransferToastAnchorView(frame: .zero)
+    }
+
+    func updateNSView(_ view: TransferToastAnchorView, context: Context) {
+        view.update(card: status.map {
+            TransferStatusCard(status: $0, onCancel: onCancel, onRetry: onRetry, onDismiss: onDismiss)
+        })
+    }
+
+    static func dismantleNSView(_ view: TransferToastAnchorView, coordinator: ()) {
+        view.update(card: nil)
+        NotificationCenter.default.removeObserver(view)
+    }
+}
+
+@MainActor
+final class TransferToastAnchorView: NSView {
+    private var card: TransferStatusCard?
+    private var panel: NSPanel?
+    private var hostingView: NSHostingView<TransferStatusCard>?
+
+    func update(card: TransferStatusCard?) {
+        self.card = card
+        refresh()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        NotificationCenter.default.removeObserver(self)
+        if let window {
+            for name in [NSWindow.didChangeScreenNotification, NSWindow.didEnterFullScreenNotification,
+                         NSWindow.didExitFullScreenNotification] {
+                NotificationCenter.default.addObserver(self, selector: #selector(refresh), name: name, object: window)
+            }
+            NotificationCenter.default.addObserver(self, selector: #selector(ownerClosed),
+                name: NSWindow.willCloseNotification, object: window)
+        }
+        refresh()
+    }
+
+    @objc private func ownerClosed() {
+        update(card: nil)
+    }
+
+    @objc private func refresh() {
+        guard let card, let window, window.isVisible, let screen = window.screen else {
+            panel?.orderOut(nil)
+            panel?.contentView = nil
+            hostingView = nil
+            panel = nil
+            return
+        }
+        if let hostingView {
+            hostingView.rootView = card
+        } else {
+            let hostingView = NSHostingView(rootView: card)
+            self.hostingView = hostingView
+            panel = ToastWindow.makePanel(hostingView: hostingView)
+            panel?.identifier = NSUserInterfaceItemIdentifier("BetterShot.TransferToast")
+            panel?.title = "Export and sharing status"
+        }
+        guard let panel else { return }
+        panel.appearance = window.appearance
+        panel.setFrameOrigin(ToastWindow.origin(for: panel.frame.size, in: screen.visibleFrame))
+        // Progress updates must not raise windows or steal keyboard focus.
+        if !panel.isVisible { panel.orderFrontRegardless() }
+    }
+}

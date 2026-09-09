@@ -76,7 +76,9 @@ source of instructions for coding agents; `CLAUDE.md` imports it.
 - Confirm destructive actions using the existing native alerts. Show recoverable
   errors beside the action with a useful retry or next step.
 - Reuse `TransferStatusCard` for export/share progress, completion, and failures.
-  Preserve its compact corner placement, native progress, and Copy/Open/Reveal/Retry actions.
+  Present it through `TransferToast` in a separate panel at the screen-top toast
+  position on the editor's display, outside the editor canvas. Preserve native
+  progress and Copy/Open/Reveal/Retry actions.
 - Do not add animation unless requested. For new interaction feedback, prefer
   opacity or transforms, ease-out, and at most 200 ms. Never animate large blur
   surfaces, make progress dependent on a decorative animation, or add perpetual

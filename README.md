@@ -41,14 +41,14 @@ brew install --cask bettershot
 
 Or download the latest `.dmg` from [Releases](https://github.com/KartikLabhshetwar/better-shot/releases).
 
-The 0.5.0 introduction walks through **Screenshots → Video → Permissions → Ready**.
-Learn image annotations, redaction, and backgrounds; video capture, editing, and
-cursor effects; then set up access before your first capture. The expanded guide
-appears for new and existing users, including people who saw the earlier brief
-introduction. Skip or close it anytime; reopen **Getting Started** in the clover
-menu or Settings > About.
+The 0.5.0 introduction walks through **Welcome → Permissions → Shortcuts → First Capture**.
+A brief native setup introduces screenshots and recordings, explains screen access,
+shows your current shortcut bindings, and leads into a capture or practice edit.
+Skip or close it anytime; reopen **Getting Started** in the clover menu or
+Settings > About. Contextual tips teach editing tools when you use them.
 
-The Permissions step includes individual requests and live macOS status:
+The Permissions step shows screen access first. Expand **Optional permissions**
+for the other features. Each has an individual request and live macOS status:
 
 - **Screen & System Audio Recording:** needed for screenshots and screen recording.
 - **Accessibility:** optional global capture shortcuts; the menu bar works without it.
@@ -95,6 +95,9 @@ separate cursor data; it cannot replace a cursor already baked into imported foo
 Local exports reuse unchanged video frame work and repeated full-resolution PNG
 renders. Effects and 60 fps video are preserved. See the
 [local export measurements](docs/export-performance.md) for workloads and limits.
+
+Export and sharing progress appears in a separate toast at the top of the
+editor’s display, with completion and retry actions outside the editing canvas.
 
 ## Build from source
 

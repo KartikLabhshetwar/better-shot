@@ -20,26 +20,11 @@ final class ToastWindow {
         let hostingView = NSHostingView(rootView: toastView)
         hostingView.setFrameSize(hostingView.fittingSize)
 
-        let panel = NSPanel(
-            contentRect: NSRect(origin: .zero, size: hostingView.fittingSize),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = false
-        panel.level = .floating
-        panel.contentView = hostingView
-        panel.isMovableByWindowBackground = false
-        panel.hidesOnDeactivate = false
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-
+        let panel = Self.makePanel(hostingView: hostingView)
         guard let screen = preferredScreen ?? NSScreen.main ?? NSScreen.screens.first else { return }
-        let screenFrame = screen.visibleFrame
-        let panelSize = panel.frame.size
-        let x = screenFrame.midX - panelSize.width / 2
-        let y = screenFrame.maxY - panelSize.height - 12
+        let origin = Self.origin(for: panel.frame.size, in: screen.visibleFrame)
+        let x = origin.x
+        let y = origin.y
         let slide: CGFloat = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 10
         panel.setFrameOrigin(NSPoint(x: x, y: y + slide))
 
@@ -59,6 +44,28 @@ final class ToastWindow {
             guard !Task.isCancelled else { return }
             dismiss(animated: true)
         }
+    }
+
+    /// Shared native presentation for informational and interactive transfer toasts.
+    static func makePanel(hostingView: NSView) -> NSPanel {
+        let panel = ToastPanel(
+            contentRect: NSRect(origin: .zero, size: hostingView.fittingSize),
+            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = false
+        panel.level = .floating
+        panel.contentView = hostingView
+        panel.isMovableByWindowBackground = false
+        panel.hidesOnDeactivate = false
+        panel.becomesKeyOnlyIfNeeded = true
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        return panel
+    }
+
+    static func origin(for size: CGSize, in visibleFrame: CGRect) -> CGPoint {
+        CGPoint(x: visibleFrame.midX - size.width / 2,
+                y: visibleFrame.maxY - size.height - 12)
     }
 
     func dismiss(animated: Bool) {
@@ -125,4 +132,9 @@ private struct ToastContentView: View {
         .glassSurface(cornerRadius: 14, depth: .raised)
         .accessibilityElement(children: .combine)
     }
+}
+
+private final class ToastPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
 }
