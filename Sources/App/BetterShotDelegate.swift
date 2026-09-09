@@ -1,9 +1,9 @@
 import AppKit
 import UserNotifications
+import TipKit
 
 @MainActor
 final class BetterShotDelegate: NSObject, NSApplicationDelegate {
-    private var permissionPollTimer: Timer?
 
     /// The notification delegate has to be in place before launch finishes,
     /// or the system handles clicks on export notifications itself and never
@@ -13,6 +13,7 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        guard ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] != "1" else { return }
         DeckStaging.purge()
         AppPreferences.migrateEditorPreferences()
         AppPreferences.applyAppearance()
@@ -20,7 +21,19 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
 
         MenuBarPopoverController.shared.setup()
         RecordingRecoveryCoordinator.recoverInterruptedRecordings()
-        RecordingBarPresenter.shared.showPicker(activate: false)
+        do {
+            try Tips.configure([.displayFrequency(.daily)])
+        } catch {
+            print("BetterShot: Contextual tips unavailable: \(error.localizedDescription)")
+        }
+        // Present after launch setup; never put permission prompts in the launch path.
+        DispatchQueue.main.async {
+            if OnboardingState.shouldPresent() {
+                OnboardingWindowController.shared.show()
+            } else {
+                RecordingBarPresenter.shared.showPicker(activate: false)
+            }
+        }
 
         Task {
             await AppUpdater.shared.checkForUpdatesQuietly()
@@ -32,14 +45,10 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
             if !ShortcutService.shared.isRegistered {
                 Self.promptRestart()
             }
-        } else {
-            ShortcutService.requestAccessibilityPermission()
-            startPermissionPolling()
         }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        permissionPollTimer?.invalidate()
         ShortcutService.shared.unregisterAll()
     }
 
@@ -79,19 +88,12 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
-    private func startPermissionPolling() {
-        permissionPollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
-            guard ShortcutService.hasAccessibilityPermission else { return }
-            timer.invalidate()
-
-            DispatchQueue.main.async {
-                self?.permissionPollTimer = nil
-                ShortcutService.shared.registerAll()
-
-                if !ShortcutService.shared.isRegistered {
-                    Self.promptRestart()
-                }
-            }
+    func applicationDidBecomeActive(_ notification: Notification) {
+        guard ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] != "1" else { return }
+        if ShortcutService.hasAccessibilityPermission {
+            if !ShortcutService.shared.isRegistered { ShortcutService.shared.registerAll() }
+        } else {
+            ShortcutService.shared.unregisterAll()
         }
     }
 

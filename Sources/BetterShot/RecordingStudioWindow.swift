@@ -879,7 +879,7 @@ private struct StudioTranscriptEditPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
             ScrollViewReader { proxy in
-                ScrollView(.vertical) {
+                ScrollView(.vertical, showsIndicators: false) {
                     transcriptFlow
                         .padding(8)
                         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -1381,7 +1381,7 @@ private struct StudioTimelineEditor: View {
                     .frame(height: StudioTimelineMetrics.scrollerGutter)
             }
 
-            ScrollView(.horizontal) {
+            ScrollView(.horizontal, showsIndicators: false) {
                 VStack(spacing: StudioTimelineMetrics.rowSpacing) {
                     StudioZoomLane(
                         model: model,
@@ -2731,7 +2731,7 @@ private struct StudioInspector: View {
     private var inspectorContent: some View {
         VStack(spacing: 0) {
             inspectorHeader
-            ScrollView(.vertical) {
+            ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 10) {
                     if selectedTab == .background {
                         StudioEffectSection(
@@ -3256,14 +3256,14 @@ private struct StudioInspector: View {
                 "Speed",
                 value: Binding(
                     get: { CGFloat(clip.speed) },
-                    set: { model.setClipSpeed(Double($0.rounded()), forClipID: clip.id) }
+                    set: { model.setClipSpeed(Double($0), forClipID: clip.id) }
                 ),
                 range: CGFloat(RecordingClipSegment.minimumSpeed)...CGFloat(RecordingClipSegment.maximumSpeed),
-                format: .magnification(fractionDigits: 0)
+                format: .magnification(fractionDigits: 2)
             )
 
             if clip.speed != 1 {
-                Text("Plays this clip \(Int(clip.speed))× faster. Audio speeds up with it.")
+                Text("Video and recorded audio play at \(clip.speed.formatted(.number.precision(.fractionLength(0...2))))× speed.")
                     .font(.inspectorLabel)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -3534,7 +3534,7 @@ private struct StudioInspector: View {
 
     private var subtitleList: some View {
         ScrollViewReader { proxy in
-            ScrollView(.vertical) {
+            ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 0) {
                     let cues = model.subtitleCues
                     ForEach(Array(cues.enumerated()), id: \.element.id) { index, cue in

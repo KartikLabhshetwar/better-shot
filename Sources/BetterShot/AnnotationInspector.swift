@@ -46,7 +46,7 @@ struct AnnotationEditorInspector: View {
     @State private var expandedAdvancedSections: Set<AnnotationInspectorAdvancedSection> = AnnotationInspectorSectionState.loadExpandedSections()
 
     var body: some View {
-        ScrollView(.vertical) {
+        ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 InspectorDisclosureSection(
                     title: "Background",

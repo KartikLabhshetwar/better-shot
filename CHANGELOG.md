@@ -5,13 +5,19 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - Unreleased
+## [0.5.0] - 2026-09-10
 
-A simpler capture bar, clearer editors, and a more flexible screenshot deck.
-All pending changes are included in this unreleased 0.5.0 update.
+A complete introduction to screenshots, video, and permissions; a simpler capture
+bar; clearer editors; and a more flexible screenshot deck.
+Release preparation updated September 10, 2026. All pending work remains in this
+single unreleased 0.5.0 entry until the release is published.
 
 ### Added
 
+- **Complete onboarding**: Four native steps—Screenshots, Video, Permissions, and Ready—explain capture, image annotations and redaction, backgrounds, video controls, timeline editing, cursor effects, export, and optional sharing. New and existing users can skip or reopen the guide from Getting Started or About. The expanded guide also appears for users who saw the earlier brief introduction.
+- **Permissions inside onboarding**: Request screen access, Accessibility, Input Monitoring, Microphone, and Camera individually, with a clear explanation of the feature each enables. Screen access is identified as needed for capture; other permissions are optional. Live status, System Settings links, denied/restricted guidance, and Check Permissions Again help resolve setup problems. A permission-related relaunch returns to the Permissions step without resetting preferences.
+- **Practice after setup**: Two generated photos open full-resolution working copies in the image editor from the final step, so practice no longer skips the video and permission walkthrough. An Arrow TipKit hint teaches a first edit. No screen permission is required to edit a sample.
+- **Simpler landing page**: Removed the five old promotional videos and their files, replaced the empty media layout with feature cards, and added first-capture guidance. Shared recording playback is preserved.
 - **Shared soft gradients**: Ten backgrounds—Blush, Peach, Mint, Powder Blue, Butter, Lilac, Sage, Coral, Aqua, and Mauve—replace the previous preset palettes in both editors and Settings, with matching stops and highlights in previews and exports. Recording Settings offers an independent default background.
 - **Recording shortcut**: `⌘⇧5` opens the Recording section; `⌘⇧2` retains the shared capture bar and `⌘⇧4` uses native macOS region capture.
 - **Direct redaction tools**: Blur and Pixelate are visible in both editors. Video effects offer Crop Only or Full Frame coverage.
@@ -19,13 +25,14 @@ All pending changes are included in this unreleased 0.5.0 update.
 - **Native icons**: Editors, settings, menus, capture controls, recording controls, and sharing feedback use Apple SF Symbols. BetterShot retains its bundled clover app icon and menu-tray icon.
 - **Screenshot deck**: Keep up to five captures in a floating stack, each with its own dismiss timer and Copy, Delete, Pin, Edit, and drag-out actions. Clear All dismisses the deck ([#76](https://github.com/KartikLabhshetwar/better-shot/issues/76)).
 - **Save captures when ready**: The new Capture setting keeps screenshots in the deck until saved. Cards stay visible; Save, Copy, dragging out, Pin, or Edit saves the capture, and Save All saves the deck. Dismissing an unsaved card deletes it; leftovers are cleaned up on the next launch ([#76](https://github.com/KartikLabhshetwar/better-shot/issues/76)).
-- **One capture and recording bar**: The floating bar opens at launch with Area, Fullscreen, Window, OCR, Color, Timer, and Recording controls. Recording options include display, window, or area, plus camera, microphone, system audio, and teleprompter (#122).
+- **One capture and recording bar**: After onboarding, the floating bar opens at launch with Area, Fullscreen, Window, OCR, Color, Timer, and Recording controls. Recording options include display, window, or area, plus camera, microphone, system audio, and teleprompter (#122).
 - **Adjustable recording areas**: Drag or resize the selection, then confirm with Return or a double-click. Escape cancels. The selected display is resolved before capture; an existing BetterShot remembered region can be shown and recaptured from the shared bar.
 - **Preview sizes and spacing**: Choose Small, Medium, or Large thumbnails and an edge margin from 0 to 48 points. Images decode at the appropriate size, and hover controls scale with the cards ([#123](https://github.com/KartikLabhshetwar/better-shot/pull/123), [#124](https://github.com/KartikLabhshetwar/better-shot/pull/124), thanks [@BradleyAllanDavis](https://github.com/BradleyAllanDavis)).
 - **Editor and export preferences**: Image and video editors can open in full screen. Recording settings include render speed, resolution, and codec defaults.
 
 ### Changed
 
+- **Border controls**: A labeled color palette shows all presets and the custom color control in two rows, with the selected color named above. Annotation and text palettes share the same layout. Editor inspectors, timelines, and popovers explicitly hide scrollbars while preserving scrolling.
 - **Contributor guidance**: README, contribution instructions, and shared agent rules now describe the current native UI, capture paths, tool toggles, rendering quality, and validation workflow. Claude Code imports the same rules.
 - **Capture shortcuts**: `⌘⇧4` starts region capture directly; `⌘⇧2` opens the shared capture/recording bar. Existing default bindings migrate, preserving custom shortcuts and disabled states.
 - **Compact classic glass bar**: The capture bar is shorter with smaller labeled controls and a more transparent frosted background. The recording dashboard is now 38 points tall: Stop and the red timer, Pause, Restart, and Discard share one row. Restart and Discard require confirmation; Reduce Transparency remains supported.
@@ -39,6 +46,7 @@ All pending changes are included in this unreleased 0.5.0 update.
 
 ### Fixed
 
+- **Custom clip speeds**: Recording clips accept 0.25×–8× playback rates with two decimal places, including 0.5×, 1.25×, 1.5×, and 2.5×. Fractional timing persists through saving, cuts, playback, and export ([#137](https://github.com/KartikLabhshetwar/better-shot/issues/137)).
 - **Image export label**: The image editor now says Export instead of Save as…, matching the video editor.
 - **Cursor clarity**: Custom cursors render from a high-resolution vector master with transparent PNG output and unchanged click hotspots. Captured system cursors retain their highest-resolution image representation.
 - **Sharp screenshots**: Full-resolution editor previews are now the default, and screenshot framing places source pixels at integer coordinates to avoid softening text.

@@ -24,6 +24,10 @@ struct ExportIntegration {
         context.setFillColor(CGColor(red: 0.1, green: 0.2, blue: 0.8, alpha: 1))
         context.fill(CGRect(x: 960, y: 0, width: 960, height: 1080))
         let image = context.makeImage()!
+        if ProcessInfo.processInfo.environment["BETTERSHOT_BENCHMARK"] == "1" {
+            try await benchmarkExports(image: image, directory: directory)
+            return
+        }
         // A one-pixel stripe image catches subpixel resampling of captured text edges.
         let sharpContext = CGContext(data: nil, width: 31, height: 31, bitsPerComponent: 8,
             bytesPerRow: 0, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
@@ -219,6 +223,39 @@ struct ExportIntegration {
             )
             let cached = try session.installFinalVideo(movingFrom: url, renderedFrom: document)
             precondition(session.freshFinalURL(matching: document) == cached)
+            if withOverlays {
+                for (rate, expectedDuration) in [(0.5, 4.0), (1.25, 1.6), (1.5, 4.0 / 3), (2.5, 0.8)] {
+                    let timeline = RecordingClipTimeline(segments: [
+                        RecordingClipSegment(sourceStart: 0, sourceEnd: 2, speed: rate)
+                    ])
+                    let retimed = try RecordingCompositionBuilder.makeAsset(
+                        from: AVURLAsset(url: cached), timeline: timeline, sourceDuration: 2)
+                    let videoTracks = try await retimed.loadTracks(withMediaType: .video)
+                    let audioTracks = try await retimed.loadTracks(withMediaType: .audio)
+                    let tracks = videoTracks + audioTracks
+                    precondition(tracks.count == 2)
+                    for track in tracks {
+                        let range = try await track.load(.timeRange)
+                        precondition(abs(range.duration.seconds - expectedDuration) < 0.04,
+                                     "Recorded audio and video must share the fractional clip timing")
+                    }
+                    let fractionalExport = try await RecordingStudioExporter().export(.init(
+                        screenURL: cached, cameraURL: nil, cameraOffset: 0, style: style,
+                        viewportTimeline: .identity, pointerTimeline: nil, showsPressEffects: false,
+                        keystrokeTimeline: nil, keystrokePlacement: .bottomCenter,
+                        subtitleTimeline: nil, subtitleStyle: SubtitleBarStyle(),
+                        canvasSize: CGSize(width: 480, height: 270), clipTimeline: timeline,
+                        exportSettings: settings
+                    )) { _ in }
+                    defer { try? FileManager.default.removeItem(at: fractionalExport) }
+                    let fractionalAsset = AVURLAsset(url: fractionalExport)
+                    let duration = try await fractionalAsset.load(.duration).seconds
+                    let audio = try await fractionalAsset.loadTracks(withMediaType: .audio)
+                    precondition(abs(duration - expectedDuration) < 0.04 && audio.count == 1,
+                                 "Export must preserve fractional timing and recorded audio")
+                }
+                print("PASS fractional playback/export timing for recorded video and audio")
+            }
             var changed = document
             changed.exportSettings?.resolution = .p720
             precondition(
@@ -236,7 +273,66 @@ struct ExportIntegration {
         print("PASS camera + audio + crop + mask, cache invalidation, and cancellation")
     }
 
-    @MainActor static func makeMovie(at url: URL, image: CGImage) async throws {
+    /// Opt-in two-minute workload; measures production rendering and upload preparation without R2 access.
+    @MainActor static func benchmarkExports(image: CGImage, directory: URL) async throws {
+        let movie = directory.appendingPathComponent("benchmark.mov")
+        try await makeMovie(at: movie, image: image, duration: 120)
+        let clips = RecordingClipTimeline.full(sourceDuration: 120)
+        let capture = PointerCaptureFile(travel: (0..<240).map {
+            PointerTravelSample(time: Double($0) / 2, x: Double($0 % 10) / 12 + 0.1, y: 0.5)
+        }, presses: (0..<60).map {
+            PointerPressEvent(time: Double($0) * 2, x: 0.5, y: 0.5, button: 0, phase: .down)
+        })
+        let viewport = ViewportTimeline.build(cues: (0..<12).map {
+            ZoomCue(start: Double($0) * 10 + 1, end: Double($0) * 10 + 7, zoom: 2.5)
+        }, capture: capture, clipTimeline: clips)
+        let pointer = PointerTimeline.build(capture: capture, duration: 120, clipTimeline: clips,
+            overrideArtwork: PointerArtworkCapture.styledArtwork(.light))
+        let masks = (0..<4).map { index in
+            var mask = RecordingMaskSegment()
+            mask.rect = CGRect(x: Double(index % 2) * 0.5, y: Double(index / 2) * 0.5, width: 0.3, height: 0.3)
+            mask.effect = index.isMultiple(of: 2) ? .blur : .pixelate
+            mask.amount = 24
+            return mask
+        }
+        let soundtrack = directory.appendingPathComponent("benchmark.caf")
+        let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
+        let audio = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 5_760_000)!
+        audio.frameLength = audio.frameCapacity
+        audio.floatChannelData![0].initialize(repeating: 0, count: Int(audio.frameLength))
+        try AVAudioFile(forWriting: soundtrack, settings: format.settings).write(from: audio)
+        for (label, effects, speed) in [("plain-fast", false, VideoCompressionSpeed.fast),
+                                        ("effects-fast", true, .fast), ("effects-ultrafast", true, .ultrafast)] {
+            var style = RecordingStudioStyle()
+            if !effects { style.background = .none; style.padding = 0; style.cornerRadius = 0; style.shadow = 0 }
+            var settings = VideoCompressionSettings()
+            settings.speed = speed
+            settings.resolution = .p1080
+            settings.container = .mp4
+            let configuration = RecordingStudioExporter.Configuration(
+                screenURL: movie, cameraURL: effects ? movie : nil, cameraOffset: 0,
+                style: style, viewportTimeline: effects ? viewport : .identity,
+                pointerTimeline: effects ? pointer : nil, showsPressEffects: effects,
+                keystrokeTimeline: nil, keystrokePlacement: .bottomCenter,
+                subtitleTimeline: nil, subtitleStyle: SubtitleBarStyle(),
+                canvasSize: CGSize(width: 1920, height: 1080), clipTimeline: clips,
+                exportSettings: settings, audioReplacementURL: soundtrack,
+                crop: effects ? CGRect(x: 0.05, y: 0.05, width: 0.9, height: 0.9) : RecordingVideoCrop.unit,
+                masks: effects ? masks : [])
+            let start = Date()
+            let output = try await RecordingStudioExporter().export(configuration) { _ in }
+            defer { try? FileManager.default.removeItem(at: output) }
+            let renderSeconds = Date().timeIntervalSince(start)
+            let duration = try await AVURLAsset(url: output).load(.duration).seconds
+            precondition(abs(duration - 120) < 0.04)
+            let preparationStart = Date()
+            let upload = await CloudUploader.compressedVideo(at: output, into: directory)
+            let preparationSeconds = Date().timeIntervalSince(preparationStart)
+            print("BENCH \(label): 120s 1080p60; render=\(renderSeconds)s; upload-preparation=\(preparationSeconds)s; render-bytes=\(ShareImageCompressor.byteCount(output)); upload-bytes=\(ShareImageCompressor.byteCount(upload))")
+        }
+    }
+
+    @MainActor static func makeMovie(at url: URL, image: CGImage, duration: Double = 2) async throws {
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
         let input = AVAssetWriterInput(
             mediaType: .video,
@@ -254,7 +350,7 @@ struct ExportIntegration {
         writer.add(input)
         precondition(writer.startWriting())
         writer.startSession(atSourceTime: .zero)
-        for frame in 0..<60 {
+        for frame in 0..<Int(duration * 30) {
             while !input.isReadyForMoreMediaData { try await Task.sleep(for: .milliseconds(1)) }
             var buffer: CVPixelBuffer?
             CVPixelBufferPoolCreatePixelBuffer(nil, adaptor.pixelBufferPool!, &buffer)
@@ -267,6 +363,8 @@ struct ExportIntegration {
                 space: CGColorSpaceCreateDeviceRGB(),
                 bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue)!
             context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+            context.setFillColor(CGColor(gray: 1, alpha: 1))
+            context.fill(CGRect(x: (frame * 13) % image.width, y: image.height / 3, width: 96, height: 96))
             CVPixelBufferUnlockBaseAddress(pixelBuffer, [])
             precondition(
                 adaptor.append(

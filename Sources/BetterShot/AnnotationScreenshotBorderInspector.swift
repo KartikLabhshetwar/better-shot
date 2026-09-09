@@ -11,7 +11,16 @@ struct AnnotationScreenshotBorderInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
-            InspectorRow("Color") {
+            VStack(alignment: .leading, spacing: InspectorMetrics.groupLabelSpacing) {
+                HStack {
+                    Text("Color")
+                        .font(.inspectorLabel)
+                    Spacer()
+                    Text(settings.color.title)
+                        .font(.inspectorValue)
+                }
+                .foregroundStyle(.secondary)
+
                 AnnotationSwatchStrip(selectedSwatch: settings.color) { color in
                     onEditorAction()
                     settings.color = color

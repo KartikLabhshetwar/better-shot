@@ -105,7 +105,7 @@ final class CloudUploader {
     /// actually plays. The cloud copy is always an MP4: when the re-encode
     /// fails or does not get smaller, a passthrough remux still rewraps a
     /// QuickTime master so the share page never serves a `.mov`.
-    nonisolated private static func compressedVideo(at url: URL, into directory: URL) async -> URL {
+    nonisolated static func compressedVideo(at url: URL, into directory: URL) async -> URL {
         let asset = AVURLAsset(url: url)
         let output = directory
             .appendingPathComponent(url.deletingPathExtension().lastPathComponent)

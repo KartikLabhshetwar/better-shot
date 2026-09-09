@@ -190,6 +190,14 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     print("PASS video crop toggle, blur / pixelate selection, and Crop Only scope")
 
     precondition(videoModel.isLoaded, "Snapshot recording must load")
+    let speedClipID = videoModel.clipTimeline.segments[0].id
+    for (rate, expectedDuration) in [(0.5, 4.0), (1.25, 1.6), (1.5, 4.0 / 3), (2.5, 0.8)] {
+        videoModel.setClipSpeed(rate, forClipID: speedClipID)
+        precondition(abs(videoModel.duration - expectedDuration) < 0.000_001)
+        precondition(videoModel.clipTimeline.segments[0].speed == rate)
+    }
+    videoModel.setClipSpeed(1, forClipID: speedClipID)
+    print("PASS custom fractional clip speeds update the editor timeline")
     let originalCues = videoModel.zoomCues
     videoModel.addZoomCue(fromEditorTime: 0.25, toEditorTime: 1.25)
     precondition(videoModel.zoomEnabled, "Adding a zoom must enable playback of zooms")
@@ -261,6 +269,58 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     let output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         .appendingPathComponent(".build/editor-snapshots")
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+    let buildConfiguration = ProcessInfo.processInfo.environment["BETTERSHOT_BUILD_CONFIGURATION"] ?? "Debug"
+    let appBundle = Bundle(url: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        .appendingPathComponent(".build/Build/Products/\(buildConfiguration)/BetterShot.app"))!
+    let practiceDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: practiceDirectory) }
+    for sample in OnboardingSample.allCases {
+        let source = sample.sourceURL(in: appBundle)!
+        let original = try Data(contentsOf: source)
+        let first = try sample.makeWorkingCopy(in: practiceDirectory, bundle: appBundle)
+        let second = try sample.makeWorkingCopy(in: practiceDirectory, bundle: appBundle)
+        precondition(first != second, "Repeated practice preserves earlier edits")
+        let copied = try Data(contentsOf: first)
+        precondition(copied == original, "Practice starts from the full original PNG")
+        try Data("edited".utf8).write(to: first, options: .atomic)
+        let unchanged = try Data(contentsOf: source)
+        precondition(unchanged == original, "Practice never edits bundled artwork")
+        do {
+            _ = try sample.makeWorkingCopy(in: first, bundle: appBundle)
+            preconditionFailure("An unwritable destination must report failure")
+        } catch {}
+    }
+    precondition(OnboardingPermissionStatus.media(.authorized) == .allowed)
+    precondition(OnboardingPermissionStatus.media(.notDetermined) == .notEnabled)
+    precondition(OnboardingPermissionStatus.media(.denied) == .denied)
+    precondition(OnboardingPermissionStatus.media(.restricted) == .restricted)
+    let permissionState = OnboardingPermissions()
+    permissionState.refresh()
+    for permission in OnboardingPermission.allCases {
+        await permissionState.request(permission)
+        precondition(permissionState.status(permission) == .notEnabled && permissionState.attempted.isEmpty,
+                     "The test runner must never request real permissions or persist setup attempts")
+        precondition(permission.settingsURL.scheme == "x-apple.systempreferences")
+    }
+    for scheme in [ColorScheme.light, .dark] {
+        for step in OnboardingView.Step.allCases {
+            for width: CGFloat in [520, 680] {
+                try snapshot(OnboardingView(step: step, resourceBundle: appBundle),
+                    scheme: scheme, width: width,
+                    to: output.appendingPathComponent("onboarding-\(step)-\(scheme)-\(Int(width)).png"),
+                    height: width == 520 ? 560 : 740)
+            }
+        }
+        try snapshot(VStack(spacing: 12) {
+            OnboardingPermissionRow(permission: .screen, status: .notEnabled, attempted: true,
+                request: {}, openSettings: {})
+            OnboardingPermissionRow(permission: .camera, status: .denied, request: {}, openSettings: {})
+            OnboardingPermissionRow(permission: .microphone, status: .restricted, request: {}, openSettings: {})
+            OnboardingPermissionRow(permission: .accessibility, status: .allowed, request: {}, openSettings: {})
+        }.padding(16), scheme: scheme, width: 520,
+            to: output.appendingPathComponent("onboarding-permission-recovery-\(scheme).png"), height: 900)
+    }
+    print("PASS onboarding artwork copies, permission status mapping/testing guard, recovery states, and all four steps in compact/light/dark snapshots")
     try snapshot(LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 12) {
         ForEach(GradientPreset.presets) { preset in
             VStack {
@@ -294,6 +354,10 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     print("PASS effect toggle defaults and previous amount restoration")
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
+        try snapshot(AnnotationScreenshotBorderInspector(
+            settings: .constant(AnnotationScreenshotBorderSettings()), onEditorAction: {}
+        ).padding(InspectorMetrics.horizontalPadding), scheme: scheme, width: 260,
+                     to: output.appendingPathComponent("border-controls-\(name).png"), height: 210)
         try snapshot(Form {
             Section {
                 InspectorSlider("Padding", value: .constant(0.15), range: 0...0.45, format: .percent())
@@ -357,6 +421,16 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     videoModel.resetClips()
     precondition(videoModel.clipTimeline.cutMarkers(sourceDuration: videoModel.sourceDuration).isEmpty,
                  "Restoring the original recording clears removed footage markers")
+    videoModel.selectedCueID = nil
+    videoModel.setClipSpeed(1.25, forClipID: videoModel.clipTimeline.segments[0].id)
+    for scheme in [ColorScheme.light, .dark] {
+        let name = scheme == .light ? "light" : "dark"
+        videoModel.selectedClipID = nil
+        try snapshot(RecordingStudioContent(model: videoModel), scheme: scheme, width: 1100,
+                     to: output.appendingPathComponent("video-fractional-speed-\(name).png"), interact: {
+            videoModel.selectClip(id: videoModel.clipTimeline.segments[0].id)
+        })
+    }
 
     let recentMenu = MenuBarContentView(dismissPopover: {}).recentMenuItems()
     precondition(recentMenu.map(\.title) == ["Screenshots", "Recordings"])
@@ -368,7 +442,8 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
 
 @MainActor
 private func snapshot<V: View>(
-    _ view: V, scheme: ColorScheme, width: CGFloat, to url: URL, height: CGFloat = 800
+    _ view: V, scheme: ColorScheme, width: CGFloat, to url: URL, height: CGFloat = 800,
+    interact: () -> Void = {}
 ) throws {
     let app = NSApplication.shared
     app.appearance = NSAppearance(named: scheme == .light ? .aqua : .darkAqua)
@@ -383,6 +458,8 @@ private func snapshot<V: View>(
     window.appearance = app.appearance
     window.contentView = hosting
     defer { window.contentView = nil; window.close() }
+    hosting.layoutSubtreeIfNeeded()
+    interact()
     hosting.layoutSubtreeIfNeeded()
     window.displayIfNeeded()
     guard let bitmap = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else {

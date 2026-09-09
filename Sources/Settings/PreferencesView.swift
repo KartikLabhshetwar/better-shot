@@ -885,6 +885,9 @@ struct ShortcutSettingsTab: View {
     var body: some View {
         Form {
             Section {
+                ShortcutPermissionView()
+            }
+            Section {
                 ForEach(Self.rows, id: \.action) { row in
                     ShortcutRow(label: row.label, help: row.help, action: row.action)
                 }
@@ -1105,6 +1108,10 @@ struct AboutTab: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
                 header
+
+                section("Getting Started") {
+                    Button("Open Introduction…") { OnboardingWindowController.shared.show() }
+                }
 
                 section("Updates") {
                     updateContent

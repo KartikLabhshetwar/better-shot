@@ -7,6 +7,7 @@
 
 import AppKit
 import SwiftUI
+import TipKit
 import UniformTypeIdentifiers
 
 private enum AnnotationUploadPhase: Equatable {
@@ -175,12 +176,14 @@ struct AnnotationEditorWindow: View {
                 Button {
                     clearInspectorFocus()
                     model.selectTool(tool)
+                    if tool == .arrow { ImageEditingTip().invalidate(reason: .actionPerformed) }
                 } label: {
                     Label(tool.title, systemImage: tool.systemImage).labelStyle(.iconOnly)
                 }
                 .buttonStyle(EditorButtonStyle(selected: model.selectedTool == tool, horizontalPadding: 6))
                 .accessibilityAddTraits(model.selectedTool == tool ? .isSelected : [])
                 .help(tool.helpText)
+                .popoverTip(tool == .arrow && !OnboardingState.shouldPresent() ? ImageEditingTip() : nil, arrowEdge: .bottom)
             }
 
             EditorPopover(title: "Smart Redaction", systemImage: "eye.slash") {

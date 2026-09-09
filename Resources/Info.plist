@@ -23,7 +23,7 @@
     <key>LSUIElement</key>
     <true/>
     <key>NSInputMonitoringUsageDescription</key>
-    <string>BetterShot records the shortcut keys you press during a recording, only when you turn on key capture, so the editor can show them on screen.</string>
+    <string>BetterShot uses input monitoring for precise pointer motion during recordings and, when enabled, shortcut and special-key overlays. Plain typing is never recorded.</string>
     <key>NSCameraUsageDescription</key>
     <string>BetterShot shows your camera in a floating bubble when you turn on the face cam, so your face appears in the recording.</string>
     <key>NSMicrophoneUsageDescription</key>

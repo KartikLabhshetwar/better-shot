@@ -77,7 +77,7 @@ struct EditorPopover<Content: View>: View {
         .help(title)
         .accessibilityLabel(title)
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {
-            ScrollView {
+            ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
                     Text(title).font(.headline)
                     content()

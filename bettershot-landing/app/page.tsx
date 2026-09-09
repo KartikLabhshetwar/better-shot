@@ -84,13 +84,6 @@ const moreFeatures = [
   { title: "No watermark, no account", body: "Every export is clean. No trial, no upsell. BSD 3 Clause licensed and auditable." },
 ]
 
-const featureVideos = [
-  "/feature-1.mp4",
-  "/feature-2.mp4",
-  "/feature-3.mp4",
-  "/feature-4.mp4",
-]
-
 export default async function Home() {
   const [release, downloads] = await Promise.all([getLatestRelease(), getDownloadCount()])
 
@@ -143,21 +136,6 @@ export default async function Home() {
               </div>
             </Reveal>
 
-            <Reveal>
-              <div className="mx-auto mt-12 max-w-[900px]">
-                <div className="overflow-hidden rounded-2xl border border-zinc-200 shadow-xl shadow-zinc-200/50">
-                  <video
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="w-full"
-                  >
-                    <source src="/launch.mp4" type="video/mp4" />
-                  </video>
-                </div>
-              </div>
-            </Reveal>
           </div>
         </section>
 
@@ -185,42 +163,24 @@ export default async function Home() {
               </p>
             </Reveal>
 
-            {features.map((feature, i) => {
-              const reversed = i % 2 === 1
-              return (
-                <Reveal
-                  key={feature.label}
-                  className={`grid items-center gap-12 lg:grid-cols-2 lg:gap-20${i > 0 ? " mt-20 sm:mt-32" : ""}`}
-                >
-                  <div className={reversed ? "order-1 lg:order-2" : ""}>
-                    <p className="mb-3 text-[13px] font-medium uppercase tracking-widest text-zinc-400">
-                      {feature.label}
-                    </p>
-                    <h3 className="text-[28px] leading-tight tracking-tight sm:text-[32px]">
-                      {feature.title}
-                    </h3>
-                    <p className="mt-4 max-w-md text-[16px] leading-relaxed text-zinc-600">{feature.body}</p>
-                    <div className="mt-5 flex flex-wrap gap-1.5">
-                      {feature.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded-full bg-zinc-100 px-3 py-1 text-[12px] font-medium text-zinc-600"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <div className={reversed ? "order-2 lg:order-1" : ""}>
-                    <div className="overflow-hidden rounded-2xl border border-zinc-200">
-                      <video autoPlay loop muted playsInline className="w-full">
-                        <source src={featureVideos[i]} type="video/mp4" />
-                      </video>
-                    </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              {features.map((feature) => (
+                <Reveal key={feature.label} className="rounded-2xl border border-zinc-200 p-6 sm:p-8">
+                  <p className="mb-3 text-[13px] font-medium text-zinc-500">{feature.label}</p>
+                  <h3 className="text-balance text-[26px] leading-tight sm:text-[28px]">
+                    {feature.title}
+                  </h3>
+                  <p className="mt-4 text-[16px] leading-relaxed text-zinc-600">{feature.body}</p>
+                  <div className="mt-5 flex flex-wrap gap-1.5">
+                    {feature.tags.map((tag) => (
+                      <span key={tag} className="rounded-full bg-zinc-100 px-3 py-1 text-[12px] font-medium text-zinc-600">
+                        {tag}
+                      </span>
+                    ))}
                   </div>
                 </Reveal>
-              )
-            })}
+              ))}
+            </div>
           </div>
         </section>
 
@@ -269,6 +229,33 @@ export default async function Home() {
                 </div>
               ))}
             </Reveal>
+          </div>
+        </section>
+
+        <section id="getting-started" className="scroll-mt-20 bg-zinc-50 py-16 sm:py-24">
+          <div className="mx-auto max-w-[1100px] px-6">
+            <h2 className="text-balance text-[28px] sm:text-[32px]">Your first capture, in three steps</h2>
+            <p className="mt-4 max-w-xl text-[16px] leading-relaxed text-zinc-600">
+              Start with the menu bar. Set up the extras when you need them.
+            </p>
+            <ol className="mt-10 grid gap-8 md:grid-cols-3">
+              {[
+                { title: "Open BetterShot", body: "Install the app, then find the clover in your Mac’s menu bar. It’s your way back to captures, recent work, and Settings." },
+                { title: "Choose what to capture", body: "Take a screenshot or open Recording options. Choose a display, window, or area. Include your camera or microphone only when you need them." },
+                { title: "Make your point", body: "Open Edit from the preview. Add an arrow or a note to an image, or refine a recording. Export a file locally; cloud sharing is optional." },
+              ].map((step, index) => (
+                <li key={step.title}>
+                  <span className="text-[14px] font-medium tabular-nums text-zinc-500">0{index + 1}</span>
+                  <h3 className="mt-3 text-[18px] font-semibold">{step.title}</h3>
+                  <p className="mt-2 text-[15px] leading-relaxed text-zinc-600">{step.body}</p>
+                </li>
+              ))}
+            </ol>
+            <p className="mt-10 max-w-2xl text-[14px] leading-relaxed text-zinc-600">
+              Coming in 0.5.0: a guided introduction to screenshots, video editing, and permission
+              setup, plus practice images you can edit without screen access. Reopen it anytime
+              from Getting Started in the menu bar.
+            </p>
           </div>
         </section>
 

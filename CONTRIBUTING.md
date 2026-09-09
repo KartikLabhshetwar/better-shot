@@ -35,9 +35,32 @@ preferences, capture history, or recordings to fix a launch-path issue.
 
 ### Permissions
 
-Grant Screen Recording and Accessibility in System Settings > Privacy & Security.
-Camera, Microphone, and Input Monitoring are requested when their features need
-them. The keystroke overlay captures shortcuts and special keys, never plain typing.
+The onboarding Permissions step can request Screen Recording, Accessibility,
+Input Monitoring, Microphone, and Camera individually after explaining their uses.
+Only screen access is required for capture; the remaining permissions enable
+optional features. Preserve runtime permission checks and the explicit shortcut
+setup in Settings. Do not restore automatic permission prompts during launch.
+The keystroke overlay captures shortcuts and special keys, never plain typing.
+
+### Onboarding
+
+`OnboardingState` versions the introduction independently of app releases. New and
+existing users see it once; Skip, the window close button, and completion all mark
+it seen. Version 2 expands the guide to Screenshots, Video, Permissions, and Ready.
+Reopening from the menu or About does not reset preferences or TipKit. When an
+onboarding request may need a restart, persist only the pending Permissions step,
+never the grant. Explicit dismissal clears it; quitting for permission setup retains
+it so launch can resume there. Keep this flag scoped to onboarding requests.
+`OnboardingSample` copies original PNGs to Application Support/BetterShot/Practice
+before opening the existing editor, without inserting samples into capture history.
+Keep permissions sourced from macOS, never from onboarding completion state.
+
+`Tests/OnboardingStateCheck.swift` covers presentation and preference preservation.
+The editor integration runner checks sample copies, AV permission-state mapping,
+and the no-TCC testing guard; it renders all four steps at 520 and 680 points in
+light/dark, plus denied/restricted/restart recovery rows. Manually verify window close,
+Escape/Return/Tab, menu reopening, sample editing, and permission denial/grant on a
+signed app. See [onboarding notes](docs/onboarding.md) for sources and artwork prompts.
 
 ### Make targets
 
@@ -106,6 +129,9 @@ scrolling, and preserve tool toggling. Image tools return to Select on a second
 click. Video Crop cancels its draft on a second click. Scissors starts off and
 stays on across cuts until explicitly deselected. Crop Only refers to mask
 coverage within the selected rectangle, not an export format or destructive crop.
+
+Reuse `AnnotationSwatchStrip` for image color palettes; its two-row grid keeps all
+presets and the custom color action visible, including in compact inspectors.
 
 ## Capture and recording flows
 
@@ -192,6 +218,22 @@ Debug build with `ENABLE_TESTABILITY=YES`, run `bash Tests/run-exports.sh`.
 For a new nontrivial branch or geometry rule, add a small regression check against
 production code. Use `Tests/NameCheck.sources` for required source files; do not
 copy the implementation into a test that can drift independently.
+
+For the optional two-minute 1080p export benchmark, build optimized, testable
+objects separately so the standalone runner can omit the app entry point:
+
+```bash
+xcodebuild -project BetterShot.xcodeproj -scheme BetterShot -configuration Release \
+  -derivedDataPath .build CODE_SIGNING_ALLOWED=NO ENABLE_TESTABILITY=YES \
+  SWIFT_COMPILATION_MODE=incremental build
+BETTERSHOT_BUILD_CONFIGURATION=Release BETTERSHOT_BENCHMARK=1 bash Tests/run-exports.sh
+```
+
+This compares plain and effect-heavy rendering, then runs the production local
+upload preparation without credentials or network uploads. The synthetic moving
+source is deliberately compressible; report hardware, effect settings, and upload
+preparation separately. These timings do not predict internet transfer speed or
+all real-world footage. Normal `make test` keeps its short fixtures.
 
 Editor snapshots appear in `.build/editor-snapshots/`. Check light/dark and narrow
 layouts. Offscreen snapshots do not validate live AVPlayer layers, native window

@@ -147,6 +147,11 @@ struct MenuBarContentView: View {
 
             TrayGridMenu(title: "Recent Captures", icon: "clock.arrow.circlepath", menuItems: recentMenuItems())
                 .frame(height: 32)
+
+            TrayFullWidthButton(title: "Getting Started", icon: "questionmark.circle") {
+                dismissPopover()
+                OnboardingWindowController.shared.show()
+            }
         }
     }
 
