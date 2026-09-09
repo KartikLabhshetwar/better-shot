@@ -5,7 +5,7 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - 2026-09-10
+## [0.5.0] - Unreleased
 
 A simpler capture bar, clearer editors, and a more flexible screenshot deck.
 All pending changes are included in this unreleased 0.5.0 update.
@@ -15,24 +15,23 @@ All pending changes are included in this unreleased 0.5.0 update.
 - **Shared soft gradients**: Ten backgrounds—Blush, Peach, Mint, Powder Blue, Butter, Lilac, Sage, Coral, Aqua, and Mauve—replace the previous preset palettes in both editors and Settings, with matching stops and highlights in previews and exports. Recording Settings offers an independent default background.
 - **Recording shortcut**: `⌘⇧5` opens the Recording section; `⌘⇧2` retains the shared capture bar and `⌘⇧4` uses native macOS region capture.
 - **Direct redaction tools**: Blur and Pixelate are visible in both editors. Video effects offer Crop Only or Full Frame coverage.
-
 - **Cursor styles**: A dedicated Cursor tab offers Recorded, Dark, Light, and Dot artwork, Natural or Smooth motion, separate press and ripple effects, cursor visibility, and hiding after inactivity. Cursor choices persist with the project and render in previews, exports, and shared videos.
-- **Native icons**: Editors, settings, menus, capture controls, recording controls, and sharing feedback use Apple SF Symbols. The menu bar uses a native camera symbol.
-
+- **Native icons**: Editors, settings, menus, capture controls, recording controls, and sharing feedback use Apple SF Symbols. BetterShot retains its bundled clover app icon and menu-tray icon.
 - **Screenshot deck**: Keep up to five captures in a floating stack, each with its own dismiss timer and Copy, Delete, Pin, Edit, and drag-out actions. Clear All dismisses the deck ([#76](https://github.com/KartikLabhshetwar/better-shot/issues/76)).
 - **Save captures when ready**: The new Capture setting keeps screenshots in the deck until saved. Cards stay visible; Save, Copy, dragging out, Pin, or Edit saves the capture, and Save All saves the deck. Dismissing an unsaved card deletes it; leftovers are cleaned up on the next launch ([#76](https://github.com/KartikLabhshetwar/better-shot/issues/76)).
 - **One capture and recording bar**: The floating bar opens at launch with Area, Fullscreen, Window, OCR, Color, Timer, and Recording controls. Recording options include display, window, or area, plus camera, microphone, system audio, and teleprompter (#122).
-- **Adjust and reuse capture regions**: Resize or move a region before capturing with Return or a double-click. Escape cancels and Space switches to window selection. The last region appears as a dashed outline; click inside it or press A to reuse it, including from the capture bar ([#49](https://github.com/KartikLabhshetwar/better-shot/issues/49), #122).
+- **Adjustable recording areas**: Drag or resize the selection, then confirm with Return or a double-click. Escape cancels. The selected display is resolved before capture; an existing BetterShot remembered region can be shown and recaptured from the shared bar.
 - **Preview sizes and spacing**: Choose Small, Medium, or Large thumbnails and an edge margin from 0 to 48 points. Images decode at the appropriate size, and hover controls scale with the cards ([#123](https://github.com/KartikLabhshetwar/better-shot/pull/123), [#124](https://github.com/KartikLabhshetwar/better-shot/pull/124), thanks [@BradleyAllanDavis](https://github.com/BradleyAllanDavis)).
 - **Editor and export preferences**: Image and video editors can open in full screen. Recording settings include render speed, resolution, and codec defaults.
 
 ### Changed
 
+- **Contributor guidance**: README, contribution instructions, and shared agent rules now describe the current native UI, capture paths, tool toggles, rendering quality, and validation workflow. Claude Code imports the same rules.
 - **Capture shortcuts**: `⌘⇧4` starts region capture directly; `⌘⇧2` opens the shared capture/recording bar. Existing default bindings migrate, preserving custom shortcuts and disabled states.
 - **Compact classic glass bar**: The capture bar is shorter with smaller labeled controls and a more transparent frosted background. The recording dashboard is now 38 points tall: Stop and the red timer, Pause, Restart, and Discard share one row. Restart and Discard require confirmation; Reduce Transparency remains supported.
 - **Simpler left inspectors**: Both editors restore the compact 0.4.0 sliders with labels inside the track and exact value entry. Scrollbars are hidden while scrolling remains available. Video effects use lighter grey cards on a darker sidebar; Effect cards stay expanded without dropdowns. Detailed zoom framing remains under Advanced.
 - **Focused image editor**: Annotation tools, color, and style share one toolbar. Background owns canvas settings; aspect ratio and redaction remain in the toolbar without sidebar duplicates. Zoom, Copy, and cloud sharing sit in the footer, with a cloud upload icon for sharing.
-- **Clearer video editor**: Background, Camera, Effects, and Zoom & Clips group related settings. Crop and Censor live in Effects. Blue zoom segments sit above video thumbnails, with a red playhead, centered playback controls, and timeline zoom on the right.
+- **Clearer video editor**: Background, Cursor, Camera, Effects, and Zoom & Clips group related settings. Crop, Blur, and Pixelate live in Effects. Selected blue and unselected grey zoom segments sit above video thumbnails, with a red playhead, centered playback controls, and timeline zoom on the right.
 - **Persistent scissors tool**: Scissors starts unselected at the left of the timeline. Selecting it enables repeated cuts until explicitly deselected. Click it again or press S to return to selecting and trimming clips. Scissors badges sit directly below each split, with the removed duration shown when footage was deleted or trimmed. Hovering previews the original footage and source range; clicking seeks to the cut. Secondary editing actions remain in the timeline menu.
 - **Recent Captures**: Screenshots and recordings share the existing recent-capture navigation. The interim Media Gallery and Recording Projects browser are removed while captures, share links, and editable projects are preserved.
 - **Export and sharing feedback**: A compact frosted corner card uses native progress, clear Copy/Open/Reveal actions, and short fades that respect Reduce Motion.
@@ -41,11 +40,10 @@ All pending changes are included in this unreleased 0.5.0 update.
 ### Fixed
 
 - **Cursor clarity**: Custom cursors render from a high-resolution vector master with transparent PNG output and unchanged click hotspots. Captured system cursors retain their highest-resolution image representation.
-
 - **Sharp screenshots**: Full-resolution editor previews are now the default, and screenshot framing places source pixels at integer coordinates to avoid softening text.
+- **Menu-tray identity**: Restored the bundled clover in the status item and after drag-target feedback; SF Symbols remain action icons.
 - **Tool toggles**: Clicking an active image tool returns to selection. Clicking video Crop again cancels its draft; Blur and Pixelate also toggle out of editing.
 - **Recording area selection**: Replaced the separate nonactivating selector with the adjustable AppKit region control, system crosshair, explicit confirmation, and selection on the actual chosen display.
-
 - **System appearance**: Removed the legacy setting that forced light mode, so System appearance follows macOS and responds to live theme changes ([#120](https://github.com/KartikLabhshetwar/better-shot/issues/120)). Preview-card pill text also stays readable in dark mode ([#121](https://github.com/KartikLabhshetwar/better-shot/issues/121)).
 - **Reliable preview actions**: Failed Copy operations show an error and keep the card open, including missing recordings ([#119](https://github.com/KartikLabhshetwar/better-shot/pull/119), thanks [@zergzorg](https://github.com/zergzorg)). Deleting an edited screenshot or recording removes its full history record and associated files. Pinned recordings play in a muted floating panel, and pinned screenshot close buttons stay visible when hovered.
 - **Preview placement**: The deck respects Bottom Left placement and the selected edge margin ([#124](https://github.com/KartikLabhshetwar/better-shot/pull/124), thanks [@BradleyAllanDavis](https://github.com/BradleyAllanDavis)).

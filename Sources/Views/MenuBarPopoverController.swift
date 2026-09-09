@@ -21,8 +21,9 @@ final class MenuBarPopoverController: NSObject {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
         if let button = item.button {
-            button.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "BetterShot")
+            button.image = NSImage(named: "MenuBarIcon")
             button.image?.isTemplate = true
+            button.setAccessibilityLabel("BetterShot")
             button.action = #selector(togglePopover(_:))
             button.target = self
         }
@@ -171,7 +172,7 @@ extension MenuBarPopoverController: NSWindowDelegate, NSDraggingDestination {
     private func clearDropTargetHint() {
         guard let button = statusItem?.button else { return }
         button.isHighlighted = false
-        let icon = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "BetterShot")
+        let icon = NSImage(named: "MenuBarIcon")
         icon?.isTemplate = true
         setIcon(icon, on: button, duration: 0.12)
     }

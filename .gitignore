@@ -36,8 +36,6 @@ scripts/
 /scripts/*
 !/scripts/run-checks.sh
 
-# Claude Code
-CLAUDE.md
-
+# Claude Code local worktrees (shared CLAUDE.md is tracked)
 .claude/worktrees/
 .build-release/

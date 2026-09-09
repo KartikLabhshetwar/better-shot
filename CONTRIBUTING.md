@@ -1,298 +1,218 @@
 # Contributing to BetterShot
 
-Thanks for considering contributing. This guide covers everything you need to get started.
+Start with [AGENTS.md](AGENTS.md), which defines the required UI, interaction,
+quality, and persistence rules for contributors and coding agents.
+[CLAUDE.md](CLAUDE.md) imports the same guidance for Claude Code.
 
-## Quick start
+## Build and run
+
+Requirements: macOS 26.0+, Xcode 26+ with its command-line tools selected, and
+[XcodeGen](https://github.com/yonaskolb/XcodeGen).
 
 ```bash
-# 1. Fork and clone
+brew install xcodegen
 git clone https://github.com/YOUR_USERNAME/better-shot.git
 cd better-shot
-
-# 2. Install XcodeGen (one time, the Makefile regenerates the project on every build)
-brew install xcodegen
-
-# 3. Build and run
-make run
+make release
+open .build/Build/Products/Release/BetterShot.app
 ```
 
-> **Alternative**: run `make generate` once, then open `BetterShot.xcodeproj` in Xcode and press `⌘R`.
+`make release` is the unsigned build used by CI and works without the maintainer's
+Developer ID certificate. `make build` and `make run` use the signing settings
+in `project.yml`; on a fork, select your own team or Sign to Run Locally in Xcode.
+Do not commit personal signing changes. Run `make generate` before opening
+`BetterShot.xcodeproj`; it regenerates the project from `project.yml`.
 
-### Requirements
+The project uses a modern Swift toolchain, but the app currently sets
+`SWIFT_VERSION: "5.0"` with main-actor default isolation and approachable
+concurrency. The standalone checks compile in Swift 6 mode. Read the project
+settings rather than assuming the app and check runner use identical modes.
 
-- macOS 26.0+
-- Xcode 26+ (Swift 6 language mode, main-actor default isolation)
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen)
-
-### Code signing on a fork
-
-`project.yml` pins the maintainer's Developer ID team, so `make build` and `make run`
-fail at the signing step on any machine without that certificate. Two ways around it:
-
-- `make release` builds unsigned (this is what CI runs), then `open .build/Build/Products/Release/BetterShot.app`
-- In Xcode, Signing & Capabilities > switch the team to your own or "Sign to Run Locally"
-
-Don't commit the resulting `project.yml` or `project.pbxproj` signing changes.
-
-### Automated tests
-
-Run `make test` to build and run the regression, editor snapshot, and export checks.
-This build skips certificate signing. The test scripts set `BETTERSHOT_TESTING=1`
-for their executables, which prevents R2 Keychain reads, writes, and deletions.
-No login password or signing-key unlock is needed. Normal app launches and signed
-releases keep their existing Keychain behavior; test cloud sharing in the app.
+`make run` stops a running BetterShot process and opens the exact Debug app path
+with `open -n`. Finish or save active work before running it. If Finder still
+opens an older installed copy, check its path and version; do not delete user
+preferences, capture history, or recordings to fix a launch-path issue.
 
 ### Permissions
 
-On first launch, grant both:
-
-1. **Screen Recording**: System Settings > Privacy & Security > Screen Recording
-2. **Accessibility**: System Settings > Privacy & Security > Accessibility
-
-Recording with a camera, microphone, or the keystroke overlay asks for Camera, Microphone, and Input Monitoring on first use.
-
-## Project structure
-
-```
-Sources/
-  App/                   @main App (window scenes) and NSApplicationDelegate
-  Capture/               Screenshot capture, region selection, color picker, countdown, last-region ghost
-  History/               Capture history (JSON in Application Support)
-  Models/                Beautifier backgrounds, CaptureRecord, AppPreferences
-  Preview/               Floating preview deck, pinned screenshots, unsaved-deck staging
-  Services/              Beautifier renderer, global shortcuts, app updater, color grading, silence detection
-  Settings/              Preferences window (sidebar navigation), Sharing tab
-  Sharing/               Cloudflare R2 credentials, SigV4 signing, uploads, share manifest
-  Views/                 Menu bar popover, toasts, glass surfaces, transfer status card
-  BetterShot/            Annotation editor (Anno*/Annotation*), recording studio (Recording*),
-                         screen recording manager, teleprompter, 2D geometry and stroke pipeline
-Resources/
-  Assets.xcassets/       App icon, menu bar icon
-  Backgrounds/           Bundled wallpaper and gradient images
-  Info.plist
-  BetterShot.entitlements
-Tests/                   Standalone swiftc checks, run by scripts/run-checks.sh
-scripts/                 run-checks.sh, release.sh, generate-icons.py
-bettershot-landing/      Website (separate Node project)
-```
-
-`Sources/BetterShot/` is flat and large. File name prefixes are the grouping:
-`Anno*` and `Annotation*` for the screenshot editor, `Recording*` for capture
-and the studio, `Teleprompter*`, and the unprefixed geometry files
-(`Vec`, `Mat`, `GeoPaths`, `StrokeOutline`, `PerfectDash`, ...).
-
-### Key files
-
-| File | What it does |
-|---|---|
-| `App/BetterShotApp.swift` | Declares the Annotate and Recording Editor `WindowGroup`s and wires the AppKit side (preview card, menu bar, recording finish) to `openWindow` |
-| `Capture/CaptureOrchestrator.swift` | Screenshot pipeline: capture > sound > history > beautify > save > preview or editor |
-| `Capture/ScreenCapture.swift` | Region, fullscreen, window capture and OCR |
-| `Capture/RegionSelectionOverlay.swift` | BetterShot's own region picker with resize handles and the last-region ghost |
-| `Services/ShortcutService.swift` | Global keyboard shortcuts via CGEvent tap, user rebinding |
-| `Services/BeautifierRenderer.swift` | Composites background + padding + radius + shadow for the auto-beautified export |
-| `Preview/PreviewOverlay.swift` | Floating deck of capture cards after a screenshot or recording |
-| `History/HistoryStore.swift` | Capture records, retention trimming, beautified path mapping |
-| `BetterShot/AnnotationEditorWindow.swift` | Annotation editor window: canvas, inspector, toolbar, save/copy/upload |
-| `BetterShot/AnnotationEditorModel.swift` | Editor state: tool, selection, undo/redo, crop, interaction entry points |
-| `BetterShot/AnnoEditorInteraction.swift` | Mouse-down/drag/up per tool: creating and editing shapes |
-| `BetterShot/Shape.swift` | `AnnoShape` data model and per-kind props (geo, arrow, text, redaction, ...) |
-| `BetterShot/AnnoShapeDrawing.swift` | The single CoreGraphics drawing path shared by the live canvas and the export |
-| `BetterShot/AnnotationRenderer.swift` | Flattens a document (background, mockup effects, shapes) to an image for save/copy |
-| `BetterShot/AnnotationDocument.swift` | Codable sidecar so an annotated screenshot reopens with its layers intact |
-| `BetterShot/AnnotationBackground.swift` | Background, screenshot border, 3D camera, progressive blur, watermark settings |
-| `BetterShot/ScreenRecordingManager.swift` | ScreenCaptureKit capture of a display, window, or area; audio, camera, pointer, pause/resume |
-| `BetterShot/RecordingSession.swift` | A recording is a `.bettershotrec` folder: screen, camera, pointer sidecar, edit document |
-| `BetterShot/RecordingPickerBar.swift` | The all-in-one floating bar `⌘⇧2` opens (screenshot actions + recording sources) |
-| `BetterShot/RecordingStudioModel.swift` | Studio state: clip timeline, zoom cues, style, transcript, playback, undo/redo |
-| `BetterShot/RecordingStudioWindow.swift` | Studio UI: canvas, inspector, timeline lanes, transport |
-| `BetterShot/RecordingStudioExporter.swift` | Frame-by-frame export of the styled composition to MP4 |
-| `BetterShot/RecordingProjectStore.swift` | Lists, renames, deletes, and opens recording projects |
-| `Settings/PreferencesView.swift` | Settings sidebar: General, Capture, Recording, Shortcuts, Sharing, Screenshots, Recordings, About |
-| `Models/AppPreferences.swift` | `bs_`-prefixed UserDefaults: save folder, export format, overlay, timer, retention, recording defaults |
-| `BetterShot/BetterShotPreferences.swift` | Editor and recording-side UserDefaults, plus `ScreenshotFileActions` (copy, save, replace export) |
-| `Sharing/R2Uploader.swift` | SigV4-signed uploads to the user's Cloudflare R2 bucket |
-
-## How the code works
-
-### Capture flow
-
-```
-User presses ⌘⇧4 (or picks Region on the bar)
-  → ShortcutService (CGEvent tap intercepts the keypress, captures origin screen)
-  → CaptureOrchestrator.performCapture(.region, on: screen)
-  → ScreenCapture.captureRegion() (RegionSelectionOverlay, then screen capture)
-  → HistoryStore.importCapture() (raw original into Application Support)
-  → BeautifierRenderer.render() with the default config, saved to the save folder
-  → PreviewOverlay.show(on: screen)  or  the Annotate window if "open editor after capture" is on
-```
-
-With **Keep screenshots in the deck until saved** on, the capture is staged in
-`DeckStaging` instead of history and only promoted to the save folder when the
-user saves, copies, drags, pins, or opens it.
-
-All windows (editors, settings, preview deck, toasts, pinned screenshots) open
-on the screen where the action originated, not the primary display.
-
-### Recording flow
-
-```
-User presses ⌘⇧2 → RecordingPickerBar (screen / window / area / screenshot actions)
-  → RecordingCaptureEntry.recordFullscreen / recordWindow / recordArea
-  → optional countdown → ScreenRecordingManager.startRecording(source:)
-     (SCStream for the screen, AVCapture for camera and mic, pointer + keystroke sidecars)
-  → RecordingBarPresenter floating status bar (pause, stop, restart, discard)
-  → stop → ScreenRecordingManager.onFinishRecording(session)
-  → ScreenshotHistoryStore.importRecordingSession → RecordingProjectStore.reload
-  → PreviewOverlay.show()  or  the Recording Editor window
-  → RecordingStudioModel edits are autosaved to edit.draft.json
-  → RecordingStudioExporter renders the final MP4 (or share upload)
-```
-
-### Storage
-
-Everything lives under `~/Library/Application Support/BetterShot/`:
-
-- Screenshots keep their untouched original there (`CaptureRecord.filename`);
-  the beautified export goes to the user's save folder (`CaptureRecord.beautifiedPath`).
-  `CaptureOrchestrator.resolveRawSource` maps an export back to its original so
-  the editor reloads unflattened pixels. Re-exporting updates `beautifiedPath`
-  in place instead of creating a second record.
-- Annotated screenshots store an `AnnotationDocument` sidecar so layers survive reopening.
-- Recordings are `Recordings/<name>.bettershotrec/` packages: `screen.mov`,
-  `camera.mov`, `input.json` (pointer and keys), `capture.json`, `edit.json`
-  (explicit save), `edit.draft.json` (autosave), `render.json`, `poster.jpg`,
-  and the flattened deliverable. Sources are never modified; the studio
-  re-renders non-destructively.
-
-History keeps the most recent 100 captures by default (Settings > General,
-up to 500 or unlimited). Trimming deletes only originals BetterShot owns, never
-files in the save folder. `BetterShot/bases/` is a legacy directory; it is read
-for old captures and pruned at launch.
-
-### Annotation editor
-
-```
-AnnotationEditorModel (state, undo/redo, crop)
-  ├── AnnotationInspector*      Right panel: tool style, background, border, camera, effects
-  ├── AnnotationCanvas          Hosts the image, the CALayer canvas, crop and text overlays
-  │     └── AnnoCanvasLayerView  Draws every shape through AnnoShapeDrawing
-  ├── AnnoEditorInteraction     Per-tool mouse handling (create, move, resize, bind arrows)
-  └── AnnotationKeyboard        Single-key tool shortcuts and editing commands
-```
-
-Shapes (`AnnoShape`) live in image pixel coordinates. The canvas and the export
-both call `AnnoShapeDrawing.draw(document, in:target:)`, so there is one drawing
-implementation to keep correct. `AnnotationRenderer` wraps that with the
-background, mockup effects, and watermark for the flattened image.
-
-### Recording studio
-
-`RecordingStudioModel` owns a `RecordingEditDocument` (clips, speed, transitions,
-crop, zoom cues, mask, style, camera bubble, captions). `RecordingStudioWindow`
-renders the preview via `RecordingSessionRenderer` and the timeline lanes;
-`RecordingStudioExporter` replays the same document frame by frame into an
-`AVAssetWriter`. Style presets are stored by `RecordingStudioStylePresetStore`.
-
-### Settings
-
-`SettingsWindowController` hosts `PreferencesView` in an `NSWindow`. The sidebar
-tabs are General, Capture, Recording, Shortcuts, Sharing, Screenshots,
-Recordings, About. Screenshots and Recordings are the two library tabs, each
-with On This Mac and Shared Links scopes.
-
-Preferences are split across two enums: `AppPreferences` (`bs_` keys, the
-capture pipeline and history) and `BetterShotPreferences` (editor, preview,
-recording devices, teleprompter). Add to whichever the feature already reads from.
-
-### Menu bar
-
-`MenuBarPopoverController` creates a custom `NSPanel` (not `MenuBarExtra`) for
-full control over appearance and animation and hosts `MenuBarContentView`.
-
-## Common tasks
-
-### Adding a new annotation tool
-
-1. Add the case, `title`, and `systemImage` to `AnnotationTool` in `BetterShot/AnnotationTool.swift`
-2. Add the shape kind and its props to `BetterShot/Shape.swift` (`AnnoShapeKind`, a `*Props` struct)
-3. Handle creation and editing in `BetterShot/AnnoEditorInteraction.swift`
-4. Draw it in `BetterShot/AnnoShapeDrawing.swift` (this covers both the live canvas and export)
-5. Expose its style controls in `BetterShot/AnnotationInspector.swift`
-6. Add the single-key shortcut in `BetterShot/AnnotationKeyboard.swift`
-7. If the tool has defaults worth remembering, add them to `AnnotationPresetStore`
-
-### Adding a new background type
-
-1. Add the case to `BackgroundStyle` in `Models/BackgroundStyle.swift` (auto-beautify) and `AnnotationBackgroundStyle` in `BetterShot/AnnotationBackground.swift` (editor)
-2. Handle rendering in `BeautifierRenderer.drawBackground` and `AnnotationBackgroundRenderer`
-3. Add the picker UI in `AnnotationBackgroundInspector.swift` and `DefaultBackgroundPicker` in `Settings/PreferencesView.swift`
-4. Make it round-trip through `StoredBackgroundStyle` in `AnnotationDocument.swift`
-
-### Adding a new preference
-
-1. Add the key and accessor to `Models/AppPreferences.swift` or `BetterShot/BetterShotPreferences.swift`
-2. Add the control, with its one-line description, to the matching tab in `Settings/PreferencesView.swift`
-
-### Adding a check
-
-Tests are plain `main.swift`-style programs compiled with `swiftc`, no XCTest.
-Create `Tests/YourThingCheck.swift`, `assert` or `precondition` what matters, and
-print a one-line summary on success. If it needs real source files, list them
-one per line in `Tests/YourThingCheck.sources`. Most checks copy the logic they
-cover into the file instead, so they compile without AppKit.
-
-## Code style
-
-- **Swift 6 strict concurrency**: `SWIFT_DEFAULT_ACTOR_ISOLATION` is `MainActor`; mark background work `nonisolated` or run it in `Task.detached`
-- **`@Observable`** for model classes, `@Bindable` in views
-- **No comments** unless explaining something non-obvious (a hidden constraint, a workaround)
-- **No abstractions for their own sake**: three similar lines is better than a premature helper
-- **System colors**: use `NSColor.controlBackgroundColor`, `.separatorColor`, etc. for native look
-- **No new dependencies**: DockProgress is the only package
-
-## Submitting a pull request
-
-1. Create a branch: `git checkout -b feat/what-it-does` or `fix/what-it-fixes`
-2. Keep changes focused, one feature or fix per PR
-3. Make sure it builds: `make release` (what CI runs on every PR)
-4. Run the checks: `scripts/run-checks.sh`
-5. Test manually in the app
-6. Write a clear PR title and description
+Grant Screen Recording and Accessibility in System Settings > Privacy & Security.
+Camera, Microphone, and Input Monitoring are requested when their features need
+them. The keystroke overlay captures shortcuts and special keys, never plain typing.
 
 ### Make targets
 
-| Command | What it does |
+| Command | Purpose |
 |---|---|
-| `make generate` | Sync version from `version.json` into `project.yml` and regenerate the Xcode project |
-| `make build` | Debug build (needs the maintainer's signing identity) |
-| `make release` | Unsigned release build |
-| `make run` | Debug build and launch |
-| `make dmg` | Unsigned DMG for local testing |
+| `make generate` | Read version/build from `version.json`, update `project.yml`, regenerate Xcode project |
+| `make build` | Debug build using configured signing |
+| `make release` | Unsigned Release build, also used by CI |
+| `make run` | Debug build, stop the old process, launch this checkout's app |
+| `make test` | Unsigned Debug build, standalone checks, editor snapshots, export integration |
+| `make test-build` | Clean and build Release |
+| `make dmg` | Create an unsigned local-test DMG |
 | `make clean` | Remove build artifacts |
-| `make lint` | Check for compiler warnings |
-| `make test` | Unsigned debug build plus regression, editor, and export checks; no real Keychain access |
-| `make test-build` | Full clean plus release build |
-| `make version` | Print the current version |
-| `make ship` | Signed, notarized release DMGs (maintainer only) |
+| `make lint` | Print compiler diagnostics; use a real build/test result as the build gate |
+| `make version` | Print the version from `version.json` |
+| `make ship` | Maintainer's signed/notarized release workflow; not a development check |
 
-### Commit messages
+## Project map
 
-Use short, descriptive messages:
+| Location | Responsibility |
+|---|---|
+| `Sources/App/` | App scenes and AppKit-to-SwiftUI editor presentation |
+| `Sources/Capture/` | Native screenshot capture, adjustable recording region control, OCR, color picker, countdown |
+| `Sources/Preview/` | Capture deck, pinned images, unsaved capture staging |
+| `Sources/History/` | Capture records, retention, raw/export path mapping |
+| `Sources/Models/` | Preferences, capture records, shared gradient definitions |
+| `Sources/Services/` | Shortcuts, screenshot framing, updater, grading, silence detection |
+| `Sources/Settings/` | General, Capture, Recording, Shortcuts, Sharing, About |
+| `Sources/Sharing/` | R2 credentials, request signing, uploads and manifests |
+| `Sources/Views/` | Menu tray/popover, glass surfaces, toasts, transfer feedback |
+| `Sources/BetterShot/` | Image editor, recording capture/studio, renderers, geometry and supporting models |
+| `Resources/Assets.xcassets/` | BetterShot's clover `AppIcon` and template `MenuBarIcon` |
+| `Resources/Backgrounds/` | Bundled background images; new gradient presets are defined in Swift |
+| `Tests/` | Standalone checks and editor/export integration programs |
+| `bettershot-landing/` | Separate Next.js website, with its own dependencies and lockfile |
 
+`Sources/BetterShot/` groups files by prefix: `Anno*`/`Annotation*` for image
+editing, `Recording*` for capture/studio, and `Teleprompter*` for the script overlay.
+Search these existing implementations before adding another helper or component.
+
+## Current UI contract
+
+The full requirements live in [AGENTS.md](AGENTS.md). For a UI change, start here:
+
+| Surface | Existing implementation to reuse |
+|---|---|
+| App/menu-tray identity | Bundled clover assets; `MenuBarPopoverController` restores `MenuBarIcon` after drag feedback |
+| Action icons | Native `Label`, `Image(systemName:)`, and AppKit SF Symbols; no third-party icon mapping |
+| Classic frosted editor chrome | `EditorChrome.swift`: `EditorButtonStyle`, `studioGlass`, `studioEffectCard` |
+| Inspector spacing and fields | `AnnotationInspectorStyle.swift`: `InspectorMetrics` and shared inspector components |
+| Amount controls | `AnnotationInspectorSlider.swift`: `InspectorSlider`, label in the track and editable value |
+| Capture/recording bars | `RecordingBarPresenter`, `RecordingPickerBar`, `RecordingBarChrome`; 64 pt / 38 pt heights |
+| Image editor | `AnnotationEditorWindow` / `AnnotationEditorModel`; one tool row and left inspector |
+| Video inspector | `StudioInspectorTabs` and `RecordingStudioWindow`; left rail, expanded effect cards |
+| Timeline | `RecordingStudioWindow` and timeline models; zoom blocks above filmstrip, scissors/cut badges below |
+| Export/share feedback | `TransferStatusCard`; compact corner card with native progress and short fades |
+| Shared backgrounds | `GradientPreset.presets`, `GradientBackgroundView`, `AnnotationBackgroundStageFill` |
+
+Keep Blur and Pixelate visible, hide editor scroll indicators without disabling
+scrolling, and preserve tool toggling. Image tools return to Select on a second
+click. Video Crop cancels its draft on a second click. Scissors starts off and
+stays on across cuts until explicitly deselected. Crop Only refers to mask
+coverage within the selected rectangle, not an export format or destructive crop.
+
+## Capture and recording flows
+
+### Screenshots
+
+`ShortcutService` → `CaptureOrchestrator` → `ScreenCapture` → history/staging →
+`BeautifierRenderer` → preview deck or image editor.
+
+Region screenshots use `/usr/sbin/screencapture -i` and macOS's selection UI.
+Fullscreen and window captures use the same native command. Source capture is
+PNG; the user's export-format setting controls saved deliverables. Preserve raw
+pixel dimensions and integer placement during framing. Full-resolution editor
+previews are the default; exported content must always come from the full source.
+
+When Keep screenshots in the deck until saved is enabled, `DeckStaging` holds
+captures until Save, Copy, drag, Pin, or Edit promotes them. Preserve failure
+recovery and the raw image so subsequent editing does not flatten twice.
+
+`LastRegionGhostPresenter` can show an existing BetterShot remembered region when
+the bar opens, and A recaptures it. The native screenshot selector does not write
+BetterShot's remembered-region preference; do not document its keyboard behavior
+as if it were `RegionSelectionOverlay`.
+
+### Recordings
+
+`⌘⇧2` opens the shared bar; `⌘⇧5` opens its Recording section. Source selection
+flows through `RecordingCaptureEntry` to `ScreenRecordingManager`, then the
+compact session bar provides Stop, Pause, Restart, and Discard.
+
+Area recordings use `RecordingAreaSelectionPresenter` and the adjustable AppKit
+`RegionSelectionOverlay` with the system crosshair. This is not Apple's system
+recording picker. Keep correct display coordinates, Return/double-click
+confirmation, cancellation, and capture-window exclusion.
+
+The screen, camera, pointer events, and optional keys are kept separately.
+`RecordingStudioModel` drives the live player, viewport/cursor timelines, masks,
+and editing state. `RecordingStudioExporter` renders the composition with
+`AVAssetWriter`; `RecordingSessionRenderer` also renders saved sessions for sharing.
+Export containers include MOV and MP4; shared video is MP4.
+
+### Editing and persistence
+
+Image shapes live in source-image pixel coordinates. `AnnoShapeDrawing` is shared
+by the live canvas and annotation export. `AnnotationRenderer` adds backgrounds
+and effects. Use `ScreenshotHistoryStore.annotationEditorURL` to reopen the
+editable document and untouched base rather than re-editing flattened output.
+
+Recording packages contain `screen.mov`, optional `camera.mov`, `input.json`,
+`capture.json`, explicit `edit.json`, autosaved `edit.draft.json`, `render.json`,
+`poster.jpg`, and a flattened deliverable. Keep source movies intact. Changes to
+cursor, crop, masks, zoom, and gradients must survive save/reopen and match exports.
+
+Custom cursors are generated from vector paths into cached transparent PNGs.
+Their logical size and click hotspot are separate from raster dimensions. Keep
+high-resolution representations, contrast outlines, and preview/export agreement.
+Imported footage with its cursor already baked into the pixels cannot be restyled.
+
+The ten soft gradients share stop positions, colors, and radial highlights through
+`GradientPreset`. `StoredGradient` preserves these in projects. Keep old project
+decoding supported even when the available preset palette changes.
+
+Image defaults are in General > Default Look. Video defaults are in Recording >
+Default Video Background, backed by `RecordingStudioDefaults.preferredBackground`.
+Per-project video edits must not replace an explicitly configured default.
+
+The native Settings sidebar has General, Capture, Recording, Shortcuts, Sharing,
+and About. Recent captures are accessed from the menu; do not reintroduce removed
+Settings library tabs as part of an unrelated change.
+
+## Validation
+
+```bash
+make test
 ```
-feat: add blur strength slider to redaction tools
-fix: window capture failing on secondary monitors
-chore: update dependencies
-```
 
-## Versioning
+This builds without certificate signing, runs `scripts/run-checks.sh`, then
+`Tests/run-exports.sh`. Test executables use `BETTERSHOT_TESTING=1` to prevent real
+R2 Keychain access. Never request a login password or weaken credential storage
+for tests. Test actual cloud sharing separately in the running app.
 
-`version.json` is the single source of truth (`version`, `build`, `minimumOS`).
-`make generate` copies it into `project.yml` and regenerates the Xcode project,
-so never edit `MARKETING_VERSION` or `CURRENT_PROJECT_VERSION` by hand.
-`CHANGELOG.md` documents what changed in each version.
+For a focused iteration, run the relevant standalone check or, after an unsigned
+Debug build with `ENABLE_TESTABILITY=YES`, run `bash Tests/run-exports.sh`.
+For a new nontrivial branch or geometry rule, add a small regression check against
+production code. Use `Tests/NameCheck.sources` for required source files; do not
+copy the implementation into a test that can drift independently.
+
+Editor snapshots appear in `.build/editor-snapshots/`. Check light/dark and narrow
+layouts. Offscreen snapshots do not validate live AVPlayer layers, native window
+toolbars, global shortcuts, capture selection, or permission prompts. For relevant
+changes, manually check these in the app and report remaining gaps honestly.
+
+For website changes, use the existing `pnpm-lock.yaml` and run the relevant
+commands from `bettershot-landing/`, such as `pnpm lint` and `pnpm build`.
+
+## Submitting changes
+
+1. Keep a focused branch and inspect the existing state before editing.
+2. Follow [AGENTS.md](AGENTS.md), preserve user data, and retain native accessibility.
+3. Run the relevant checks; CI currently runs `make release` via `.github/workflows/build.yml`.
+4. For UI changes, include useful screenshots and describe the interaction tested.
+5. Explain the concrete problem, final behavior, validation, and any material limits in the PR.
+6. Update [CHANGELOG.md](CHANGELOG.md) and [README.md](README.md) when behavior changes.
+
+`version.json` is the version source (`version`, `build`, `minimumOS`).
+`make generate` syncs version/build into the project. Current pending changes belong
+under **0.5.0 — Unreleased**; do not create a 0.4.3 release or mark 0.5.0 shipped
+without an explicit release request. Keep historical entries and contributor credit.
+
+Use short, descriptive commit messages, for example `fix: preserve cursor hotspot
+in Retina exports`. Do not commit signing credentials, generated builds, or local
+machine configuration.
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the project's [BSD 3-Clause License](LICENSE).
+Contributions are licensed under the project's [BSD 3-Clause License](LICENSE).

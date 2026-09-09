@@ -12,12 +12,22 @@ share it, and shares go to storage you own.
 
 ## What it does
 
-- **Capture** a region, the full screen, or a single window, plus OCR and an on-screen color picker
-- **Record** any display, window, or region to MP4 with system audio, microphone, and a face cam bubble
-- **Edit** recordings on a multi-clip timeline: cuts, per-clip speed, transitions, crop, cursor-tracked auto-zoom, a restylable cursor, on-device captions, a keyboard overlay, masks, color grading, and a 3D camera
-- **Annotate** screenshots with arrows, shapes, text, numbered badges, blur, and spotlight
-- **Beautify** with backgrounds, padding, corner radius, and shadow, applied automatically if you want
-- **Share** a link from your own Cloudflare R2 bucket; every upload is compressed first and video always ships as MP4
+This describes the current **0.5.0 development version**, which is not released
+yet. See [CHANGELOG.md](CHANGELOG.md) for pending changes and release history.
+
+- **Capture** regions with macOS's native selector, full screens, and windows; extract text with OCR or pick a color.
+- **Record** a display, window, or adjustable region with optional system audio, microphone, camera, and teleprompter.
+- **Edit images** with arrows, shapes, text, numbered markers, highlight, Blur, Pixelate, and crop. Clicking an active tool again returns to Select.
+- **Edit videos** with cuts, speed, transitions, crop, zoom, masks, captions, and camera controls. Blur and Pixelate offer Crop Only or Full Frame coverage.
+- **Style cursors** in BetterShot recordings: Recorded, Dark, Light, or Dot; size, visibility, Natural/Smooth motion, press/ripple effects, and idle hiding. High-resolution artwork preserves the click point in previews and exports.
+- **Frame captures** with padding, corners, shadow, wallpapers, and ten shared soft gradients. Configure separate image and video background defaults in Settings.
+- **Keep a capture deck** of up to five items, with optional save-on-demand, Copy, Pin, Edit, and drag-out actions.
+- **Share** through your own Cloudflare R2 bucket. Image sharing optimizes size; shared videos use MP4. Native progress cards show completion or retry actions.
+
+Both editors use a left inspector, compact controls, and classic frosted chrome.
+Action icons use Apple SF Symbols; BetterShot retains its own clover app and menu-tray
+identity. Full-resolution screenshot previews are the default, and original source
+files remain available for editable projects.
 
 ## Install
 
@@ -42,14 +52,24 @@ screenshot shortcuts.
 | OCR text scan | `⌘⇧O` |
 | Color picker (hex) | `⌘⇧C` |
 
-The all-in-one bar appears at launch. `⌘⇧2` reopens that same bar; `⌘⇧5` opens its Recording section; `⌘⇧4`
-starts region selection directly. The bar contains region, window, screen, OCR,
-color picker, and recording controls. Opening it with the shortcut also shows
-your last region as a dashed ghost; press `A` to capture it again. During region capture the ghost
-stays: `Return`, `A`, or a click inside it captures it, `Space` switches to
-window selection. All of these are re-bindable in
-Settings > Shortcuts. In the editor, every tool carries its
-own single-key shortcut on its button, and `⌘S` saves, `⇧⌘C` copies, `⌘Z` undoes.
+The shared bar appears at launch. `⌘⇧2` reopens it; `⌘⇧5` opens its Recording
+section. `⌘⇧4` starts native screenshot selection directly. Customize these
+bindings in Settings > Shortcuts.
+
+In the image editor, `⌘S` saves the editable image, `⇧⌘C` copies, and `⌘Z` undoes.
+Scissors in the video timeline starts off. Click it or press `S` to enable
+repeated cuts; click again or press `S` to deselect. Cut badges below the filmstrip
+show removed durations where applicable; hover to preview the original footage.
+
+## Editor defaults
+
+- **Images:** Settings > General > Default Look.
+- **Videos:** Settings > Recording > Default Video Background.
+
+Both offer Blush, Peach, Mint, Powder Blue, Butter, Lilac, Sage, Coral, Aqua, and
+Mauve gradients, along with colors and wallpapers. Existing project settings stay
+with their projects. Video cursor restyling requires a BetterShot recording with
+separate cursor data; it cannot replace a cursor already baked into imported footage.
 
 ## Build from source
 
@@ -61,14 +81,18 @@ make release
 open .build/Build/Products/Release/BetterShot.app
 ```
 
-Needs macOS 26, Xcode 26 (Swift 6), and XcodeGen. Native Swift and SwiftUI throughout: no
+Needs macOS 26.0+, Xcode 26+, and XcodeGen. Native Swift and SwiftUI throughout: no
 Electron, no web views, and a single Swift package (DockProgress).
 
 ## Contributing
 
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
 project layout, how the capture and editor flows fit together, and the make
-targets.
+targets. Read [AGENTS.md](AGENTS.md) for the required UI patterns;
+[CLAUDE.md](CLAUDE.md) imports the same rules for Claude Code.
+
+Run `make test` for the unsigned build, regression checks, editor snapshots, and
+export integration tests. See the contributor guide for signing and live UI checks.
 
 ## License
 
