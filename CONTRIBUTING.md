@@ -194,9 +194,11 @@ The ten soft gradients share stop positions, colors, and radial highlights throu
 `GradientPreset`. `StoredGradient` preserves these in projects. Keep old project
 decoding supported even when the available preset palette changes.
 
-Image defaults are in General > Default Look. Video defaults are in Recording >
-Default Video Background, backed by `RecordingStudioDefaults.preferredBackground`.
-Per-project video edits must not replace an explicitly configured default.
+General > Default Look supplies background, padding, corner radius, and shadow
+for new images, recordings, and imported videos. `RecordingStudioDefaults.style`
+maps the same preferences into the video editor. Saved projects retain their own
+settings; project edits never replace General's defaults. Recording retains its
+capture and export options, without a separate background default.
 
 The native Settings sidebar has General, Capture, Recording, Shortcuts, Sharing,
 and About. Recent captures are accessed from the menu; do not reintroduce removed

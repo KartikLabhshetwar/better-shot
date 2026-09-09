@@ -20,7 +20,7 @@ yet. See [CHANGELOG.md](CHANGELOG.md) for pending changes and release history.
 - **Edit images** with arrows, shapes, text, numbered markers, highlight, Blur, Pixelate, and crop. Clicking an active tool again returns to Select.
 - **Edit videos** with cuts, custom clip speeds from 0.25× to 8× (including 1.25×), transitions, crop, zoom, masks, captions, and camera controls. Blur and Pixelate offer Crop Only or Full Frame coverage.
 - **Style cursors** in BetterShot recordings: Recorded, Dark, Light, Dot, or the native macOS Hand; size, visibility, Natural/Smooth motion, press/ripple effects, and idle hiding. High-resolution artwork preserves the click point in previews and exports.
-- **Frame captures** with padding, corners, shadow, wallpapers, and ten shared soft gradients. Configure separate image and video background defaults in Settings.
+- **Frame captures** with padding, corners, shadow, wallpapers, and ten shared soft gradients. Configure the shared image and video look in General settings.
 - **Keep a capture deck** of up to five items, with optional save-on-demand, Copy, Pin, Edit, and drag-out actions.
 - **Share** through your own Cloudflare R2 bucket. Image sharing optimizes size; shared videos use MP4. Native progress cards show completion or retry actions.
 
@@ -83,10 +83,11 @@ show removed durations where applicable; hover to preview the original footage.
 
 ## Editor defaults
 
-- **Images:** Settings > General > Default Look.
-- **Videos:** Settings > Recording > Default Video Background.
+**Images and videos:** Settings > General > Default Look controls background,
+padding, corner radius, and shadow for new edits. The tray's Record button opens
+Recording options, matching `⌘⇧5` (or your customized shortcut).
 
-Both offer Blush, Peach, Mint, Powder Blue, Butter, Lilac, Sage, Coral, Aqua, and
+Choose Blush, Peach, Mint, Powder Blue, Butter, Lilac, Sage, Coral, Aqua, and
 Mauve gradients, along with colors and wallpapers. Existing project settings stay
 with their projects. Video cursor restyling requires a BetterShot recording with
 separate cursor data; it cannot replace a cursor already baked into imported footage.

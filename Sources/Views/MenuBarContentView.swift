@@ -116,9 +116,9 @@ struct MenuBarContentView: View {
                 dismissAndRun(.window)
             }
 
-            TrayGridButton(title: "Record", icon: "record.circle", action: .recording) {
+            TrayGridButton(title: "Record", icon: "record.circle", action: .recordingOptions) {
                 dismissPopover()
-                RecordingBarPresenter.shared.showPicker()
+                RecordingBarPresenter.shared.showPicker(recordingOptions: true)
             }
         }
     }

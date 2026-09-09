@@ -118,9 +118,9 @@ source of instructions for coding agents; `CLAUDE.md` imports it.
 - Reuse the shared gradient drawing, stop positions, and highlights in Settings,
   both editors, and exports. Do not duplicate palettes or flatten them into thumbnails.
 - Preserve old project decoding and stored artwork when replacing available presets.
-- Image defaults live in General > Default Look; video defaults in Recording >
-  Default Video Background. Keep the two independent, and keep project edits from
-  overwriting an explicitly configured video default.
+- General > Default Look supplies background, padding, corner radius, and shadow
+  for new images and videos. Do not add a separate video background default or
+  let project edits overwrite General's defaults. Saved projects retain their look.
 - Preserve raw captures, annotations, source movies, masks, crop, undo/redo, and
   saved share links. Use existing history/project resolvers and atomic writes.
 

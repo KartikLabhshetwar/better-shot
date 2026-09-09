@@ -24,6 +24,10 @@ struct ExportIntegration {
         context.setFillColor(CGColor(red: 0.1, green: 0.2, blue: 0.8, alpha: 1))
         context.fill(CGRect(x: 960, y: 0, width: 960, height: 1080))
         let image = context.makeImage()!
+        if ProcessInfo.processInfo.environment["BETTERSHOT_BENCHMARK_IMAGES"] == "1" {
+            try benchmarkImageExports(image: image, directory: directory)
+            return
+        }
         if ProcessInfo.processInfo.environment["BETTERSHOT_BENCHMARK"] == "1" {
             try await benchmarkExports(image: image, directory: directory)
             return
@@ -52,6 +56,7 @@ struct ExportIntegration {
             source as CFURL, UTType.png.identifier as CFString, 1, nil)!
         CGImageDestinationAddImage(destination, image, nil)
         precondition(CGImageDestinationFinalize(destination))
+        try benchmarkImageExports(image: image, directory: directory)
         try await checkCaptureStorage(image: image, source: source, directory: directory)
         let exported = directory.appendingPathComponent("export.png")
         let start = Date()
@@ -271,6 +276,52 @@ struct ExportIntegration {
             } catch is CancellationError {} catch RecordingStudioExporter.ExportError.cancelled {}
         }
         print("PASS camera + audio + crop + mask, cache invalidation, and cancellation")
+    }
+
+    /// Full-resolution PNG exports through the same path used by Copy, Save, and Export.
+    @MainActor static func benchmarkImageExports(image: CGImage, directory: URL) throws {
+        let source = directory.appendingPathComponent("image-benchmark.png")
+        let destination = CGImageDestinationCreateWithURL(
+            source as CFURL, UTType.png.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(destination, image, nil)
+        precondition(CGImageDestinationFinalize(destination))
+        var background = AnnotationBackgroundSettings()
+        background.progressiveBlur.isEnabled = true
+        let output = directory.appendingPathComponent("image-output.png")
+        var first: Data?
+        for index in 0..<3 {
+            let start = Date()
+            try AnnotationRenderer.render(sourceURL: source, shapes: [],
+                backgroundSettings: background, destinationURL: output, contentType: .png)
+            let seconds = Date().timeIntervalSince(start)
+            let data = try Data(contentsOf: output)
+            if let first { precondition(data == first, "Repeated PNG exports must preserve bytes") }
+            else { first = data }
+            print("BENCH image-\(index): \(image.width)x\(image.height) source; render=\(seconds)s; bytes=\(data.count)")
+        }
+        background.padding += 20
+        try AnnotationRenderer.render(sourceURL: source, shapes: [],
+            backgroundSettings: background, destinationURL: output, contentType: .png)
+        precondition((try? Data(contentsOf: output)) != first, "Changed edits must invalidate image reuse")
+        // Replace the source at the same path; content, not just the path, identifies a render.
+        let replacement = CGImageDestinationCreateWithURL(
+            source as CFURL, UTType.png.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(replacement, image.cropping(to: CGRect(x: 0, y: 0, width: 960, height: 540))!, nil)
+        precondition(CGImageDestinationFinalize(replacement))
+        background.padding -= 20
+        try AnnotationRenderer.render(sourceURL: source, shapes: [],
+            backgroundSettings: background, destinationURL: output, contentType: .png)
+        precondition((try? Data(contentsOf: output)) != first, "Replacing a source must invalidate image reuse")
+        try FileManager.default.removeItem(at: source)
+        let goodOutput = try Data(contentsOf: output)
+        do {
+            try AnnotationRenderer.render(sourceURL: source, shapes: [],
+                backgroundSettings: background, destinationURL: output, contentType: .png)
+            preconditionFailure("A cached export must not hide a missing source")
+        } catch {
+            precondition((try? Data(contentsOf: output)) == goodOutput)
+        }
+        print("PASS image render reuse, edits, source replacement, and missing-source recovery")
     }
 
     /// Opt-in two-minute workload; measures production rendering and upload preparation without R2 access.

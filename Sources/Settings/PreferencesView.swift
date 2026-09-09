@@ -204,7 +204,7 @@ struct GeneralSettingsTab: View {
                         .textCase(.none)
                 }
             } footer: {
-                Text("How every new screenshot is framed. You can still change any of it per screenshot in the editor.")
+                Text("Background, padding, corner radius, and shadow for new screenshots and videos. Saved projects keep their own look.")
             }
             .onChange(of: defaultConfig) { _, newValue in
                 AppPreferences.defaultBeautifierConfig = newValue
@@ -737,11 +737,6 @@ struct RecordingSettingsTab: View {
     @AppStorage(BetterShotPreferences.recordingTeleprompterEnabledKey) private var teleprompterEnabled: Bool = false
     @AppStorage(AppPreferences.openEditorAfterRecordingKey) private var openEditor = AppPreferences.openEditorAfterRecording
     @State private var isConfirmingReset = false
-    @State private var backgroundConfig: BeautifierConfig = {
-        var config = BeautifierConfig()
-        config.style = RecordingStudioDefaults.preferredBackground.captureBackgroundStyle
-        return config
-    }()
     @State private var exportSettings = RecordingExportPreferences.lastSettings
 
     private var cameras: [AVCaptureDevice] { RecordingDeviceCatalog.cameras() }
@@ -813,18 +808,6 @@ struct RecordingSettingsTab: View {
             }
 
             Section {
-                DefaultConfigPreview(config: backgroundConfig).frame(height: 140)
-                DefaultBackgroundPicker(selectedStyle: $backgroundConfig.style)
-            } header: {
-                Text("Default Video Background")
-            } footer: {
-                Text("Used for new recordings. Changes inside a project do not replace this default.")
-            }
-            .onChange(of: backgroundConfig.style) {
-                RecordingStudioDefaults.preferredBackground = backgroundConfig.annotationStyle
-            }
-
-            Section {
                 Picker("Render speed", selection: $exportSettings.speed) {
                     ForEach(VideoCompressionSpeed.allCases) { Text($0.rawValue).tag($0) }
                 }
@@ -857,8 +840,6 @@ struct RecordingSettingsTab: View {
                 startDelaySeconds = 0
                 teleprompterEnabled = false
                 openEditor = false
-                backgroundConfig.style = RecordingStudioStyle.defaultBackground.captureBackgroundStyle
-                RecordingStudioDefaults.preferredBackground = RecordingStudioStyle.defaultBackground
                 exportSettings = VideoCompressionSettings()
                 RecordingExportPreferences.lastSettings = exportSettings
             }

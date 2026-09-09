@@ -73,12 +73,9 @@ final class RecordingStudioModel {
     let screenPlayer = AVPlayer()
     let cameraPlayer = AVPlayer()
 
-    var style = RecordingStudioStyle(background: RecordingStudioDefaults.background) {
+    var style = RecordingStudioDefaults.style {
         didSet {
             if isLoaded, oldValue.cursor != style.cursor { rebuildPointerTimeline() }
-            if isLoaded, oldValue.background != style.background {
-                RecordingStudioDefaults.background = style.background
-            }
             scheduleProjectSave()
         }
     }
@@ -325,30 +322,13 @@ final class RecordingStudioModel {
         exportSettings = RecordingExportPreferences.lastSettings
         if let document {
             applyDocumentSettings(document)
-        } else if session == nil {
-            // Legacy bare movies use the same editor, but open visually
-            // unchanged until the user explicitly adds styling.
-            style = RecordingStudioStyle(
-                background: .none,
-                padding: 0,
-                cornerRadius: 0,
-                shadow: 0,
-                camera: RecordingCameraBubbleSettings(isVisible: false)
-            )
-            zoomEnabled = false
         } else {
-            zoomCues = ZoomCueSynthesizer.cues(from: pointerCapture, duration: sourceDuration)
-            if let defaultPreset = RecordingStudioStylePresetStore.shared.activePreset {
-                style = defaultPreset.value
-                appliedStylePresetID = defaultPreset.id
+            style = RecordingStudioDefaults.style
+            style.camera.isVisible = hasCameraVideo
+            if session == nil {
+                zoomEnabled = false
             } else {
-                let defaultLook = AppPreferences.defaultBeautifierConfig
-                if defaultLook != .default {
-                    style.background = defaultLook.annotationStyle
-                    style.padding = defaultLook.padding
-                    style.cornerRadius = defaultLook.cornerRadius
-                    style.shadow = defaultLook.shadowStrength
-                }
+                zoomCues = ZoomCueSynthesizer.cues(from: pointerCapture, duration: sourceDuration)
             }
         }
 

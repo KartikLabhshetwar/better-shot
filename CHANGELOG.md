@@ -18,7 +18,7 @@ single unreleased 0.5.0 entry until the release is published.
 - **Permissions inside onboarding**: Request screen access, Accessibility, Input Monitoring, Microphone, and Camera individually, with a clear explanation of the feature each enables. Screen access is identified as needed for capture; other permissions are optional. Live status, System Settings links, denied/restricted guidance, and Check Permissions Again help resolve setup problems. A permission-related relaunch returns to the Permissions step without resetting preferences.
 - **Practice after setup**: Two generated photos open full-resolution working copies in the image editor from the final step, so practice no longer skips the video and permission walkthrough. An Arrow TipKit hint teaches a first edit. No screen permission is required to edit a sample.
 - **Simpler landing page**: Removed the five old promotional videos and their files, replaced the empty media layout with feature cards, and added first-capture guidance. Shared recording playback is preserved.
-- **Shared soft gradients**: Ten backgrounds—Blush, Peach, Mint, Powder Blue, Butter, Lilac, Sage, Coral, Aqua, and Mauve—replace the previous preset palettes in both editors and Settings, with matching stops and highlights in previews and exports. Recording Settings offers an independent default background.
+- **Shared soft gradients**: Ten backgrounds—Blush, Peach, Mint, Powder Blue, Butter, Lilac, Sage, Coral, Aqua, and Mauve—replace the previous preset palettes in both editors and Settings, with matching stops and highlights in previews and exports. General > Default Look supplies the shared image and video defaults.
 - **Recording shortcut**: `⌘⇧5` opens the Recording section; `⌘⇧2` retains the shared capture bar and `⌘⇧4` uses native macOS region capture.
 - **Direct redaction tools**: Blur and Pixelate are visible in both editors. Video effects offer Crop Only or Full Frame coverage.
 - **Cursor styles**: A dedicated Cursor tab offers Recorded, Dark, Light, Dot, and native macOS Hand artwork, Natural or Smooth motion, separate press and ripple effects, cursor visibility, and hiding after inactivity. Cursor choices persist with the project and render in previews, exports, and shared videos.
@@ -32,6 +32,7 @@ single unreleased 0.5.0 entry until the release is published.
 
 ### Changed
 
+- **Shared editor defaults**: Removed Recording's separate background section. New images and videos use General > Default Look for background, padding, corner radius, and shadow; saved project looks are preserved. The tray's Record action opens Recording options and displays its `⌘⇧5` shortcut.
 - **Border controls**: A labeled color palette shows all presets and the custom color control in two rows, with the selected color named above. Annotation and text palettes share the same layout. Editor inspectors, timelines, and popovers explicitly hide scrollbars while preserving scrolling.
 - **Contributor guidance**: README, contribution instructions, and shared agent rules now describe the current native UI, capture paths, tool toggles, rendering quality, and validation workflow. Claude Code imports the same rules.
 - **Capture shortcuts**: `⌘⇧4` starts region capture directly; `⌘⇧2` opens the shared capture/recording bar. Existing default bindings migrate, preserving custom shortcuts and disabled states.
@@ -42,7 +43,7 @@ single unreleased 0.5.0 entry until the release is published.
 - **Persistent scissors tool**: Scissors starts unselected at the left of the timeline. Selecting it enables repeated cuts until explicitly deselected. Click it again or press S to return to selecting and trimming clips. Scissors badges sit directly below each split, with the removed duration shown when footage was deleted or trimmed. Hovering previews the original footage and source range; clicking seeks to the cut. Secondary editing actions remain in the timeline menu.
 - **Recent Captures**: Screenshots and recordings share the existing recent-capture navigation. The interim Media Gallery and Recording Projects browser are removed while captures, share links, and editable projects are preserved.
 - **Export and sharing feedback**: A compact frosted corner card uses native progress, clear Copy/Open/Reveal actions, and short fades that respect Reduce Motion.
-- **Settings**: Capture and recording options have inline explanations, sharing fields remain editable, and image/video editor preferences remain independent.
+- **Settings**: Capture and recording options have inline explanations, sharing fields remain editable, and General provides the shared image/video default look.
 
 ### Fixed
 

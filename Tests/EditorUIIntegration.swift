@@ -7,6 +7,7 @@ import SwiftUI
 /// AVPlayer layers and window toolbars require live UI testing and are not captured here.
 @MainActor
 func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
+    try await checkGeneralEditorDefaults(movieURL: movieURL)
     for appearanceName in [NSAppearance.Name.aqua, .darkAqua] {
         NSAppearance(named: appearanceName)!.performAsCurrentDrawingAppearance {
             let neutral = StudioChrome.accentNSColor.usingColorSpace(.deviceRGB)!
@@ -329,8 +330,15 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
             }
         }
     }.padding(), scheme: .light, width: 900, to: output.appendingPathComponent("shared-gradients.png"), height: 360)
-    try snapshot(RecordingSettingsTab(), scheme: .dark, width: 580,
-                 to: output.appendingPathComponent("recording-settings.png"), height: 1100)
+    for scheme in [ColorScheme.light, .dark] {
+        let name = scheme == .light ? "light" : "dark"
+        try snapshot(RecordingSettingsTab(), scheme: scheme, width: 580,
+                     to: output.appendingPathComponent("recording-settings-\(name).png"), height: 1100)
+        try snapshot(GeneralSettingsTab(), scheme: scheme, width: 580,
+                     to: output.appendingPathComponent("general-settings-\(name).png"), height: 1300)
+        try snapshot(MenuBarContentView(dismissPopover: {}), scheme: scheme, width: 296,
+                     to: output.appendingPathComponent("tray-recording-\(name).png"), height: 640)
+    }
     try snapshot(HStack(spacing: 24) {
         ForEach([RecordingCursorAppearance.dark, .light, .dot, .hand], id: \.self) { appearance in
             VStack {
@@ -438,6 +446,55 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
                  "Recent capture navigation must not delete files")
     print("PASS combined recent menu without bulk deletion")
     print("PASS editor zoom bounds, fit, and light/dark view snapshots: \(output.path)")
+}
+
+@MainActor
+private func checkGeneralEditorDefaults(movieURL: URL) async throws {
+    let defaults = UserDefaults.standard
+    let keys = ["bs_defaultBeautifierConfig", "recordingStudio.defaultBackground.v1",
+                "recordingStudio.lastUsedBackground.v1"]
+    let previous = keys.map { defaults.object(forKey: $0) }
+    defer { for (key, value) in zip(keys, previous) { defaults.set(value, forKey: key) } }
+    defaults.set(try JSONEncoder().encode(StoredBackgroundStyle.solid(StoredColor(.black))),
+                 forKey: "recordingStudio.defaultBackground.v1")
+    var custom = BeautifierConfig()
+    custom.style = .gradient(GradientPreset.presets[0])
+    custom.padding = 0.15
+    custom.cornerRadius = 0.04
+    custom.shadowStrength = 0.7
+    for config in [BeautifierConfig.default, custom] {
+        AppPreferences.defaultBeautifierConfig = config
+        let session = RecordingSession(directoryURL: FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + ".bettershotrec"))
+        try FileManager.default.createDirectory(at: session.directoryURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: session.directoryURL) }
+        try FileManager.default.copyItem(at: movieURL, to: session.screenURL)
+        for url in [session.directoryURL, movieURL] {
+            let model = RecordingStudioModel(url: url)
+            await model.load()
+            precondition(model.isLoaded)
+            let imageDefaults = config.annotationBackgroundSettings
+            precondition(model.style.background == imageDefaults.style
+                         && model.style.padding == imageDefaults.padding
+                         && model.style.cornerRadius == imageDefaults.cornerRadius
+                         && model.style.shadow == imageDefaults.shadow,
+                         "New videos and images must share General's default look, including Reset Defaults")
+            model.style.background = .solid(.black)
+            precondition(AppPreferences.defaultBeautifierConfig == config,
+                         "Project edits must not overwrite General defaults")
+            model.teardown()
+        }
+        session.removeDraftDocument()
+        let savedStyle = RecordingStudioStyle(background: .solid(.white), padding: 0.03,
+                                               cornerRadius: 0.01, shadow: 0.2)
+        try session.writeEditDocument(RecordingEditDocument(style: savedStyle, zoomEnabled: false,
+            zoomCues: [], clipTimeline: .full(sourceDuration: 2)))
+        let reopened = RecordingStudioModel(url: session.directoryURL)
+        await reopened.load()
+        precondition(reopened.style == savedStyle, "Saved projects keep their own look")
+        reopened.teardown()
+    }
+    print("PASS General defaults for new recordings/imports, image look parity, reset, and saved project preservation")
 }
 
 @MainActor

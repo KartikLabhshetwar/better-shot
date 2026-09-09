@@ -66,7 +66,7 @@ enum RecordingSessionRenderer {
             )
         ).sanitizedCapture
         let document = editDocument
-        var style = document?.style.value ?? RecordingStudioStyle()
+        var style = document?.style.value ?? RecordingStudioDefaults.style
         // Selecting a camera means the default delivered recording includes
         // it; a saved Studio project that explicitly hid the bubble wins.
         style.camera.isVisible = session.hasCamera && (document?.style.value.camera.isVisible ?? true)

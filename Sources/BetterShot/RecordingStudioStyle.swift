@@ -357,66 +357,16 @@ struct RecordingStudioStyle: Equatable {
     var camera = RecordingCameraBubbleSettings()
 }
 
-/// Cross-video defaults for Studio choices that should follow the user from
-/// one recording to the next. Per-recording project files still win whenever
-/// a video has already been edited.
+/// New videos inherit the same look as screenshots. Saved project styles win on reopen.
 enum RecordingStudioDefaults {
-    private static let defaultBackgroundKey = "recordingStudio.defaultBackground.v1"
-
-    static var preferredBackground: AnnotationBackgroundStyle {
-        get { background }
-        set {
-            guard let data = try? JSONEncoder().encode(storedBackgroundStyle(from: newValue)) else { return }
-            UserDefaults.standard.set(data, forKey: defaultBackgroundKey)
-        }
-    }
-
-    private static let backgroundKey = "recordingStudio.lastUsedBackground.v1"
-
-    static var background: AnnotationBackgroundStyle {
-        get {
-            guard let data = UserDefaults.standard.data(forKey: defaultBackgroundKey)
-                    ?? UserDefaults.standard.data(forKey: backgroundKey),
-                  let stored = try? JSONDecoder().decode(StoredBackgroundStyle.self, from: data) else {
-                return RecordingStudioStyle.defaultBackground
-            }
-            return backgroundStyle(from: stored)
-        }
-        set {
-            let stored = storedBackgroundStyle(from: newValue)
-            guard let data = try? JSONEncoder().encode(stored) else { return }
-            UserDefaults.standard.set(data, forKey: backgroundKey)
-        }
-    }
-
-    private static func storedBackgroundStyle(
-        from style: AnnotationBackgroundStyle
-    ) -> StoredBackgroundStyle {
-        switch style {
-        case .none:
-            .none
-        case .solid(let color):
-            .solid(StoredColor(color))
-        case .gradient(let gradient):
-            .gradient(StoredGradient(gradient))
-        case .customWallpaper(let wallpaper):
-            .customWallpaper(path: wallpaper.url.path)
-        }
-    }
-
-    private static func backgroundStyle(
-        from stored: StoredBackgroundStyle
-    ) -> AnnotationBackgroundStyle {
-        switch stored {
-        case .none:
-            .none
-        case .solid(let color):
-            .solid(color.backgroundColor)
-        case .gradient(let gradient):
-            .gradient(gradient.backgroundGradient)
-        case .customWallpaper(let path):
-            .customWallpaper(AnnotationCustomWallpaper(url: URL(fileURLWithPath: path)))
-        }
+    static var style: RecordingStudioStyle {
+        let config = AppPreferences.defaultBeautifierConfig
+        return RecordingStudioStyle(
+            background: config.annotationStyle,
+            padding: config.padding,
+            cornerRadius: config.cornerRadius,
+            shadow: config.shadowStrength
+        )
     }
 }
 

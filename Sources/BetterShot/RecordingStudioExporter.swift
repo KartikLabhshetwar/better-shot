@@ -613,7 +613,7 @@ nonisolated private final class CameraFrameFeed: @unchecked Sendable {
 
 /// Draws one output frame: cached backdrop, then the zoom-transformed screen
 /// frame clipped to the rounded card, then the camera bubble.
-nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
+nonisolated final class StudioFrameCompositor: @unchecked Sendable {
     private let canvasSize: CGSize
     private let layout: RecordingStudioLayout
     private let viewportTimeline: ViewportTimeline
@@ -629,6 +629,14 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
     private let masks: [RecordingMaskSegment]
     private let renderContext = CIContext(options: [.cacheIntermediates: false])
     private var artworkImageCache: [String: CGImage] = [:]
+    // Retain the buffer: decoder pools may recycle its address after release.
+    // Only source-dependent work is reused; overlays and mask timing still run at 60 fps.
+    private var cachedSource: CVPixelBuffer?
+    private var cachedScreen: CGImage?
+    private var cachedSampleRects: [CGRect] = []
+    private var cachedMasks: [Int: CGImage] = [:]
+    private var cachedMaskBytes = 0
+    private lazy var cameraShadow: CGImage? = makeCameraShadow()
     private let pointerScale: CGFloat
     private let colorSpace: CGColorSpace
     private let backdrop: CGImage?
@@ -733,35 +741,50 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
             context.fill(CGRect(origin: .zero, size: canvasSize))
         }
 
+        if cachedSource !== screenFrame {
+            cachedSource = screenFrame
+            cachedScreen = nil
+            cachedMasks.removeAll(keepingCapacity: true)
+            cachedMaskBytes = 0
+        }
         let sourceImage = CIImage(cvPixelBuffer: screenFrame)
         let shutter = outputFrameInterval
         let sampleCount = blurSampleCount(at: editorTime, shutter: shutter)
-        var averaged: CIImage?
-        for sample in 0..<sampleCount {
+        let sampleRects = (0..<sampleCount).map { sample in
             let sampleTime = editorTime - shutter / 2
                 + shutter * (Double(sample) + 0.5) / Double(sampleCount)
-            let rect = flipped(contentRect(at: sampleTime))
-            let transformed = sourceImage.transformed(by: CGAffineTransform(
-                a: rect.width / sourceImage.extent.width, b: 0,
-                c: 0, d: rect.height / sourceImage.extent.height,
-                tx: rect.minX, ty: rect.minY
-            ))
-            if let previous = averaged {
-                let opacity = CIFilter.colorMatrix()
-                opacity.inputImage = transformed
-                opacity.aVector = CIVector(x: 0, y: 0, z: 0, w: 1 / CGFloat(sample + 1))
-                guard let sampleImage = opacity.outputImage else {
-                    throw RecordingStudioExporter.ExportError.writerFailed(nil)
-                }
-                averaged = sampleImage.composited(over: previous)
-            } else {
-                averaged = transformed
-            }
+            return flipped(contentRect(at: sampleTime))
         }
         let cardRect = flipped(layout.cardRect).integral
-        guard let averaged, let screenImage = renderContext.createCGImage(
-            averaged, from: cardRect, format: .BGRA8, colorSpace: colorSpace
-        ) else {
+        if cachedScreen == nil || cachedSampleRects != sampleRects {
+            var averaged: CIImage?
+            for (sample, rect) in sampleRects.enumerated() {
+                let transformed = sourceImage.transformed(by: CGAffineTransform(
+                    a: rect.width / sourceImage.extent.width, b: 0,
+                    c: 0, d: rect.height / sourceImage.extent.height,
+                    tx: rect.minX, ty: rect.minY
+                ))
+                if let previous = averaged {
+                    let opacity = CIFilter.colorMatrix()
+                    opacity.inputImage = transformed
+                    opacity.aVector = CIVector(x: 0, y: 0, z: 0, w: 1 / CGFloat(sample + 1))
+                    guard let sampleImage = opacity.outputImage else {
+                        throw RecordingStudioExporter.ExportError.writerFailed(nil)
+                    }
+                    averaged = sampleImage.composited(over: previous)
+                } else {
+                    averaged = transformed
+                }
+            }
+            guard let averaged, let image = renderContext.createCGImage(
+                averaged, from: cardRect, format: .BGRA8, colorSpace: colorSpace
+            ) else {
+                throw RecordingStudioExporter.ExportError.writerFailed(nil)
+            }
+            cachedScreen = image
+            cachedSampleRects = sampleRects
+        }
+        guard let screenImage = cachedScreen else {
             throw RecordingStudioExporter.ExportError.writerFailed(nil)
         }
         context.saveGState()
@@ -773,14 +796,24 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
         if !masks.isEmpty {
             context.setAlpha(1)
             let content = contentRect(at: editorTime)
-            for segment in masks {
+            for (index, segment) in masks.enumerated() {
                 guard segment.isActive(at: editorTime) else { continue }
-                guard let region = RecordingMaskRenderer.filteredRegion(
-                    source: sourceImage,
-                    segment: segment
-                ),
-                let regionImage = renderContext.createCGImage(region, from: region.extent) else {
-                    throw RecordingStudioExporter.ExportError.writerFailed(nil)
+                let regionImage: CGImage
+                if let cached = cachedMasks[index] {
+                    regionImage = cached
+                } else {
+                    guard let region = RecordingMaskRenderer.filteredRegion(
+                        source: sourceImage, segment: segment
+                    ), let image = renderContext.createCGImage(region, from: region.extent) else {
+                        throw RecordingStudioExporter.ExportError.writerFailed(nil)
+                    }
+                    regionImage = image
+                    let bytes = image.bytesPerRow * image.height
+                    // Large mask sets still render normally without retaining unbounded rasters.
+                    if cachedMaskBytes + bytes <= 32 * 1024 * 1024 {
+                        cachedMasks[index] = image
+                        cachedMaskBytes += bytes
+                    }
                 }
                 let drawRect = CGRect(
                     x: content.minX + segment.rect.minX * content.width,
@@ -818,20 +851,12 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
                 height: fillSize.height
             )
 
-            // Shadow + hairline border match the live preview's bubble
-            // styling; the bubble sits over moving video, so both must be
-            // drawn per frame rather than baked into the backdrop.
             let minDimension = min(canvasSize.width, canvasSize.height)
-            context.saveGState()
-            context.setShadow(
-                offset: CGSize(width: 0, height: -minDimension * 0.009),
-                blur: minDimension * 0.022,
-                color: CGColor(gray: 0, alpha: 0.35)
-            )
-            context.addPath(roundedPath(for: bubble, radius: layout.bubbleCornerRadius))
-            context.setFillColor(CGColor(gray: 0, alpha: 1))
-            context.fillPath()
-            context.restoreGState()
+            if let cameraShadow {
+                context.draw(cameraShadow, in: CGRect(origin: .zero, size: canvasSize))
+            } else {
+                drawCameraShadow(in: context)
+            }
 
             context.saveGState()
             context.addPath(roundedPath(for: bubble, radius: layout.bubbleCornerRadius))
@@ -850,6 +875,31 @@ nonisolated private final class StudioFrameCompositor: @unchecked Sendable {
         // The subtitle bar lives in canvas space - over the background too,
         // not just the card - and above everything else, camera included.
         drawSubtitleBar(at: sourceTime, in: context)
+    }
+
+    private func makeCameraShadow() -> CGImage? {
+        guard layout.bubbleRect.width > 0,
+              let context = CGContext(
+                data: nil, width: Int(canvasSize.width), height: Int(canvasSize.height),
+                bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+              ) else { return nil }
+        drawCameraShadow(in: context)
+        return context.makeImage()
+    }
+
+    private func drawCameraShadow(in context: CGContext) {
+        let minDimension = min(canvasSize.width, canvasSize.height)
+        context.saveGState()
+        context.setShadow(
+            offset: CGSize(width: 0, height: -minDimension * 0.009),
+            blur: minDimension * 0.022,
+            color: CGColor(gray: 0, alpha: 0.35)
+        )
+        context.addPath(roundedPath(for: layout.bubbleRect, radius: layout.bubbleCornerRadius))
+        context.setFillColor(CGColor(gray: 0, alpha: 1))
+        context.fillPath()
+        context.restoreGState()
     }
 
     /// How many shutter sub-samples this frame needs: one when the camera is
