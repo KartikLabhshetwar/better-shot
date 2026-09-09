@@ -4,10 +4,40 @@
 //
 
 import AppKit
+import CryptoKit
 import ImageIO
 import UniformTypeIdentifiers
 
 enum AnnotationRenderer {
+    // ponytail: one PNG up to 32 MiB; use per-document entries if alternating editors needs reuse.
+    // NSCache is thread-safe and can discard it under memory pressure.
+    nonisolated(unsafe) private static let pngCache: NSCache<NSData, NSData> = {
+        let cache = NSCache<NSData, NSData>()
+        cache.countLimit = 1
+        cache.totalCostLimit = 32 * 1024 * 1024
+        return cache
+    }()
+
+    nonisolated private static func pngCacheKey(
+        sourceURL: URL, shapes: [AnnoShape], background: AnnotationBackgroundSettings
+    ) -> NSData? {
+        // Hash file contents so overwrites with the same path, size, or timestamp
+        // cannot return stale pixels. Missing/unreadable dependencies bypass reuse.
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        guard let source = try? Data(contentsOf: sourceURL, options: .mappedIfSafe),
+              let edits = try? encoder.encode(AnnotationDocument(shapes: shapes, background: background))
+        else { return nil }
+        var digest = SHA256()
+        digest.update(data: source)
+        digest.update(data: edits)
+        if case .customWallpaper(let wallpaper) = background.style {
+            guard let data = try? Data(contentsOf: wallpaper.url, options: .mappedIfSafe) else { return nil }
+            digest.update(data: data)
+        }
+        return Data(digest.finalize()) as NSData
+    }
+
     /// Off-main variants: large exports (full-resolution compose + Core Image
     /// blur) are slow enough to beachball the UI, and the whole render graph
     /// is nonisolated, so hop to a background thread and await the result.
@@ -73,7 +103,11 @@ enum AnnotationRenderer {
             .appendingPathComponent(".BetterShot-\(UUID().uuidString).\(destinationURL.pathExtension)")
         defer { try? FileManager.default.removeItem(at: stagingURL) }
 
-        if shapes.isEmpty, !backgroundSettings.hasRenderableContent,
+        let cacheKey = contentType == .png && (!shapes.isEmpty || backgroundSettings.hasRenderableContent)
+            ? pngCacheKey(sourceURL: sourceURL, shapes: shapes, background: backgroundSettings) : nil
+        if let cacheKey, let data = pngCache.object(forKey: cacheKey) {
+            try Data(referencing: data).write(to: stagingURL)
+        } else if shapes.isEmpty, !backgroundSettings.hasRenderableContent,
            contentType == .png,
            let source = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
            CGImageSourceGetType(source) as String? == UTType.png.identifier {
@@ -136,6 +170,11 @@ enum AnnotationRenderer {
                     throw CocoaError(.fileWriteUnknown)
                 }
             }
+        }
+        if let cacheKey, pngCache.object(forKey: cacheKey) == nil,
+           cacheKey == pngCacheKey(sourceURL: sourceURL, shapes: shapes, background: backgroundSettings),
+           let data = try? Data(contentsOf: stagingURL), data.count <= 32 * 1024 * 1024 {
+            pngCache.setObject(data as NSData, forKey: cacheKey, cost: data.count)
         }
         if FileManager.default.fileExists(atPath: destinationURL.path) {
             _ = try FileManager.default.replaceItemAt(destinationURL, withItemAt: stagingURL)

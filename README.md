@@ -92,6 +92,10 @@ Mauve gradients, along with colors and wallpapers. Existing project settings sta
 with their projects. Video cursor restyling requires a BetterShot recording with
 separate cursor data; it cannot replace a cursor already baked into imported footage.
 
+Local exports reuse unchanged video frame work and repeated full-resolution PNG
+renders. Effects and 60 fps video are preserved. See the
+[local export measurements](docs/export-performance.md) for workloads and limits.
+
 ## Build from source
 
 ```bash

@@ -47,6 +47,8 @@ single unreleased 0.5.0 entry until the release is published.
 
 ### Fixed
 
+- **Faster local exports**: Video exports reuse unchanged screen and mask rasters and render the camera shadow once, preserving effects and 60 fps. Repeated image Copy/Save/Export actions reuse a full-resolution lossless PNG when source pixels, edits, and wallpaper contents match. Both caches are bounded and local.
+
 - **Custom clip speeds**: Recording clips accept 0.25×–8× playback rates with two decimal places, including 0.5×, 1.25×, 1.5×, and 2.5×. Fractional timing persists through saving, cuts, playback, and export ([#137](https://github.com/KartikLabhshetwar/better-shot/issues/137)).
 - **Image export label**: The image editor now says Export instead of Save as…, matching the video editor.
 - **Cursor clarity**: Custom cursors render from a high-resolution vector master with transparent PNG output and unchanged click hotspots. Captured system cursors retain their highest-resolution image representation.

@@ -13,11 +13,11 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
             window.makeKeyAndOrderFront(nil)
             return
         }
-        let view = OnboardingView(step: OnboardingState.shouldResumePermissions() ? .permissions : .images)
+        let view = OnboardingView(step: OnboardingState.shouldResumePermissions() ? .permissions : .welcome)
         let window = NSWindow(contentViewController: NSHostingController(rootView: view))
         window.title = "Welcome to BetterShot"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        window.setContentSize(NSSize(width: 680, height: 740))
+        window.setContentSize(NSSize(width: 760, height: 680))
         window.contentMinSize = NSSize(width: 520, height: 560)
         window.isReleasedWhenClosed = false
         window.delegate = self

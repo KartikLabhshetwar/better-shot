@@ -231,6 +231,12 @@ xcodebuild -project BetterShot.xcodeproj -scheme BetterShot -configuration Relea
 BETTERSHOT_BUILD_CONFIGURATION=Release BETTERSHOT_BENCHMARK=1 bash Tests/run-exports.sh
 ```
 
+For a short image-only benchmark with the same optimized objects, run
+`BETTERSHOT_BUILD_CONFIGURATION=Release BETTERSHOT_BENCHMARK_IMAGES=1 bash Tests/run-exports.sh`.
+It measures fresh and repeated full-resolution PNG exports and checks edit, source,
+and wallpaper invalidation. Normal checks also compare reused video frames with
+fresh compositions across source, zoom, mask timing, pointer, and camera changes.
+
 This compares plain and effect-heavy rendering, then runs the production local
 upload preparation without credentials or network uploads. The synthetic moving
 source is deliberately compressible; report hardware, effect settings, and upload

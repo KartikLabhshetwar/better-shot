@@ -8,6 +8,7 @@ import UniformTypeIdentifiers
 @main
 struct ExportIntegration {
     @MainActor static func main() async throws {
+        setbuf(stdout, nil)
         precondition(ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] == "1",
                      "Run through Tests/run-exports.sh to keep the real Keychain isolated")
         precondition(R2CredentialStore.shared.keychainAccess == .empty)
@@ -133,6 +134,7 @@ struct ExportIntegration {
                      "An unreadable movie must return a failure for the visible fallback card")
         print("PASS recording thumbnails, cached posters, and unreadable-video fallback")
         try await checkEditorUI(imageURL: source, movieURL: movie)
+        try checkFrameReuse(image: image)
         let clips = RecordingClipTimeline.full(sourceDuration: 2)
         let viewport = ViewportTimeline.build(
             cues: [
@@ -278,6 +280,72 @@ struct ExportIntegration {
         print("PASS camera + audio + crop + mask, cache invalidation, and cancellation")
     }
 
+    @MainActor static func checkFrameReuse(image: CGImage) throws {
+        let size = CGSize(width: 320, height: 180)
+        func buffer(image: CGImage? = nil) -> CVPixelBuffer {
+            var result: CVPixelBuffer?
+            precondition(CVPixelBufferCreate(nil, 320, 180, kCVPixelFormatType_32BGRA,
+                nil, &result) == kCVReturnSuccess)
+            let resultBuffer = result!
+            CVPixelBufferLockBaseAddress(resultBuffer, [])
+            let context = CGContext(data: CVPixelBufferGetBaseAddress(resultBuffer),
+                width: 320, height: 180, bitsPerComponent: 8,
+                bytesPerRow: CVPixelBufferGetBytesPerRow(resultBuffer),
+                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)!
+            if let image { context.draw(image, in: CGRect(origin: .zero, size: size)) }
+            CVPixelBufferUnlockBaseAddress(resultBuffer, [])
+            return resultBuffer
+        }
+        func pixels(_ buffer: CVPixelBuffer) -> Data {
+            CVPixelBufferLockBaseAddress(buffer, .readOnly)
+            defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+            var data = Data()
+            for row in 0..<180 {
+                data.append(CVPixelBufferGetBaseAddress(buffer)!.advanced(
+                    by: row * CVPixelBufferGetBytesPerRow(buffer)).assumingMemoryBound(to: UInt8.self), count: 320 * 4)
+            }
+            return data
+        }
+        let source = buffer(image: image)
+        let changedSource = buffer(image: image.cropping(to: CGRect(x: 960, y: 0, width: 960, height: 1080))!)
+        let clips = RecordingClipTimeline.full(sourceDuration: 2)
+        let viewport = ViewportTimeline.build(cues: [ZoomCue(start: 0.4, end: 1.1, zoom: 2)],
+            capture: PointerCaptureFile(), clipTimeline: clips)
+        let pointer = PointerTimeline.build(capture: PointerCaptureFile(travel: [
+            PointerTravelSample(time: 0, x: 0.2, y: 0.5),
+            PointerTravelSample(time: 2, x: 0.8, y: 0.5)
+        ]), duration: 2, clipTimeline: clips,
+            overrideArtwork: PointerArtworkCapture.styledArtwork(.light))
+        var blur = RecordingMaskSegment()
+        blur.rect = CGRect(x: 0.3, y: 0.1, width: 0.4, height: 0.8)
+        blur.start = 0.05; blur.end = 0.9
+        var pixelate = blur
+        pixelate.effect = .pixelate
+        pixelate.start = 0.5; pixelate.end = 1.5
+        // Deliberately shared IDs: distinct array entries still have different effects.
+        func compositor() -> StudioFrameCompositor {
+            StudioFrameCompositor(canvasSize: size, style: RecordingStudioStyle(),
+                viewportTimeline: viewport, pointerTimeline: pointer, showsPressEffects: true,
+                keystrokeTimeline: nil, keystrokePlacement: .bottomCenter,
+                subtitleTimeline: nil, includeBubble: true,
+                crop: CGRect(x: 0.05, y: 0.05, width: 0.9, height: 0.9), masks: [blur, pixelate])
+        }
+        let reused = compositor()
+        for (index, time) in [0.0, 1.0 / 60, 0.06, 0.5, 0.7, 0.91, 1.25, 1.6, 1.7, 1.9].enumerated() {
+            let screen = index < 7 ? source : changedSource
+            let camera = index.isMultiple(of: 2) ? source : changedSource
+            let actual = buffer(), expected = buffer()
+            try reused.render(screenFrame: screen, cameraFrame: camera,
+                editorTime: time, sourceTime: time, into: actual)
+            try compositor().render(screenFrame: screen, cameraFrame: camera,
+                editorTime: time, sourceTime: time, into: expected)
+            precondition(pixels(actual) == pixels(expected),
+                "Reused frames differ from fresh rendering at \(time): source, zoom, mask timing, or overlays went stale")
+        }
+        print("PASS reused/fresh frame pixels across source, zoom, mask timing, pointer, and camera changes")
+    }
+
     /// Full-resolution PNG exports through the same path used by Copy, Save, and Export.
     @MainActor static func benchmarkImageExports(image: CGImage, directory: URL) throws {
         let source = directory.appendingPathComponent("image-benchmark.png")
@@ -299,19 +367,37 @@ struct ExportIntegration {
             else { first = data }
             print("BENCH image-\(index): \(image.width)x\(image.height) source; render=\(seconds)s; bytes=\(data.count)")
         }
-        background.padding += 20
+        background.padding += 0.2
         try AnnotationRenderer.render(sourceURL: source, shapes: [],
             backgroundSettings: background, destinationURL: output, contentType: .png)
-        precondition((try? Data(contentsOf: output)) != first, "Changed edits must invalidate image reuse")
+        let changedEdits = try Data(contentsOf: output)
+        precondition(changedEdits != first, "Changed edits must invalidate image reuse")
         // Replace the source at the same path; content, not just the path, identifies a render.
         let replacement = CGImageDestinationCreateWithURL(
             source as CFURL, UTType.png.identifier as CFString, 1, nil)!
         CGImageDestinationAddImage(replacement, image.cropping(to: CGRect(x: 0, y: 0, width: 960, height: 540))!, nil)
         precondition(CGImageDestinationFinalize(replacement))
-        background.padding -= 20
+        background.padding -= 0.2
         try AnnotationRenderer.render(sourceURL: source, shapes: [],
             backgroundSettings: background, destinationURL: output, contentType: .png)
-        precondition((try? Data(contentsOf: output)) != first, "Replacing a source must invalidate image reuse")
+        let changedSource = try Data(contentsOf: output)
+        precondition(changedSource != first, "Replacing a source must invalidate image reuse")
+        let wallpaper = directory.appendingPathComponent("wallpaper.png")
+        try Data(contentsOf: source).write(to: wallpaper)
+        background.style = .customWallpaper(AnnotationCustomWallpaper(url: wallpaper))
+        try AnnotationRenderer.render(sourceURL: source, shapes: [],
+            backgroundSettings: background, destinationURL: output, contentType: .png)
+        let firstWallpaper = try Data(contentsOf: output)
+        let wallpaperWriter = CGImageDestinationCreateWithURL(
+            wallpaper as CFURL, UTType.png.identifier as CFString, 1, nil)!
+        CGImageDestinationAddImage(wallpaperWriter,
+            image.cropping(to: CGRect(x: 960, y: 0, width: 960, height: 540))!, nil)
+        precondition(CGImageDestinationFinalize(wallpaperWriter))
+        try AnnotationRenderer.render(sourceURL: source, shapes: [],
+            backgroundSettings: background, destinationURL: output, contentType: .png)
+        let changedWallpaper = try Data(contentsOf: output)
+        precondition(changedWallpaper != firstWallpaper,
+                     "Replacing wallpaper contents must invalidate image reuse")
         try FileManager.default.removeItem(at: source)
         let goodOutput = try Data(contentsOf: output)
         do {
@@ -321,7 +407,7 @@ struct ExportIntegration {
         } catch {
             precondition((try? Data(contentsOf: output)) == goodOutput)
         }
-        print("PASS image render reuse, edits, source replacement, and missing-source recovery")
+        print("PASS image render reuse, edits, source/wallpaper replacement, and missing-source recovery")
     }
 
     /// Opt-in two-minute workload; measures production rendering and upload preparation without R2 access.

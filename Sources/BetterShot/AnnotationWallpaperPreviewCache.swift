@@ -51,12 +51,14 @@ actor AnnotationWallpaperPreviewCache {
     }
 
     private static func fileSignature(for url: URL) -> String {
-        guard let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey]) else {
+        // URL resource values can stay cached after an in-place overwrite.
+        // Read current filesystem attributes for both previews and exports.
+        guard let values = try? FileManager.default.attributesOfItem(atPath: url.path) else {
             return "unknown"
         }
 
-        let fileSize = values.fileSize ?? 0
-        let modified = values.contentModificationDate?.timeIntervalSince1970 ?? 0
+        let fileSize = (values[.size] as? NSNumber)?.int64Value ?? 0
+        let modified = (values[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
         return "\(fileSize)-\(modified)"
     }
 
