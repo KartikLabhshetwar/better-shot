@@ -26,11 +26,11 @@ final class ShortcutService {
         var modifiers: UInt32
         var enabled: Bool
 
-        static let defaultRegion = Shortcut(keyCode: UInt32(kVK_ANSI_2), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
+        static let defaultRegion = Shortcut(keyCode: UInt32(kVK_ANSI_4), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultFullscreen = Shortcut(keyCode: UInt32(kVK_ANSI_3), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultOCR = Shortcut(keyCode: UInt32(kVK_ANSI_O), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultColorPicker = Shortcut(keyCode: UInt32(kVK_ANSI_C), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
-        static let defaultRecording = Shortcut(keyCode: UInt32(kVK_ANSI_5), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
+        static let defaultRecording = Shortcut(keyCode: UInt32(kVK_ANSI_2), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
     }
 
     enum Action: UInt32, CaseIterable {
@@ -119,11 +119,11 @@ final class ShortcutService {
 
     /// Move only the old defaults; preserve custom combinations and disabled shortcuts.
     static func migrateCaptureShortcuts(defaults: UserDefaults = .standard) {
-        let migrationKey = "bs_captureShortcuts050Migrated"
+        let migrationKey = "bs_captureShortcuts050Restored"
         guard !defaults.bool(forKey: migrationKey) else { return }
         for (action, oldKey, replacement) in [
-            (Action.region, UInt32(kVK_ANSI_4), Shortcut.defaultRegion),
-            (Action.recording, UInt32(kVK_ANSI_2), Shortcut.defaultRecording)
+            (Action.region, UInt32(kVK_ANSI_2), Shortcut.defaultRegion),
+            (Action.recording, UInt32(kVK_ANSI_5), Shortcut.defaultRecording)
         ] {
             let key = "bs_hotkey_\(action.rawValue)"
             guard let data = defaults.data(forKey: key),

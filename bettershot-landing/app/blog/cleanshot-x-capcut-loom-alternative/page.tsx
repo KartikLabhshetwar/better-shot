@@ -176,7 +176,7 @@ export default async function Article() {
               <P>
                 This is the closest overlap, and the easiest switch. Better Shot binds the same
                 muscle memory: <Code>⌘⇧4</Code> for a region, <Code>⌘⇧3</Code> for the screen,{" "}
-                <Code>⌘⇧5</Code> for a window. After every capture a floating preview appears, and
+                <Code>⌘⇧2</Code> for the capture and recording bar. After every capture a floating preview appears, and
                 you can drag it straight into Figma, Slack, or Finder without saving a file first.
               </P>
               <List

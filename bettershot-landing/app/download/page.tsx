@@ -30,7 +30,7 @@ const steps = [
   {
     index: "02",
     title: "Hit a shortcut",
-    body: "Cmd Shift 4 for a region, Cmd Shift 2 to record. All six keys are remappable in Settings.",
+    body: "Cmd Shift 4 for a region, Cmd Shift 2 for the capture and recording bar. Shortcuts are remappable in Settings.",
   },
   {
     index: "03",

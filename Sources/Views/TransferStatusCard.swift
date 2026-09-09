@@ -31,7 +31,7 @@ struct TransferStatusCard: View {
         Group {
             switch status {
             case .working(let stage, let progress):
-                workingRow(stage: stage, progress: progress)
+                workingRow(stage: stage, progress: progress.flatMap { $0.isFinite ? min(max($0, 0), 1) : nil })
             case .linkReady(let url):
                 linkReadyRows(url: url)
             case .exported(let url):
@@ -41,10 +41,11 @@ struct TransferStatusCard: View {
             }
         }
         .id(caseKey)
-        .transition(contentSwap)
-        .padding(14)
-        .frame(width: 400)
-        .glassSurface(cornerRadius: 18, depth: .raised)
+        .transition(.opacity)
+        .padding(12)
+        .frame(width: 340, height: 88)
+        .studioGlass(cornerRadius: 12)
+        .animation(RecordingMotion.reduceMotion ? nil : .easeOut(duration: 0.15), value: caseKey)
         .onHover { isHovering = $0 }
         .onChange(of: caseKey) { didCopy = false }
         .task(id: "\(caseKey)-\(isHovering)") {
@@ -73,21 +74,11 @@ struct TransferStatusCard: View {
         }
     }
 
-    private var contentSwap: AnyTransition {
-        RecordingMotion.reduceMotion ? .opacity : AnyTransition(.blurReplace)
-    }
-
-    private var stageSwap: AnyTransition {
-        RecordingMotion.reduceMotion
-            ? .opacity
-            : AnyTransition(.push(from: .top)).combined(with: .opacity)
-    }
-
     // MARK: Rows
 
     private func workingRow(stage: TransferStage, progress: Double?) -> some View {
-        HStack(spacing: 12) {
-            iconTile(systemName: stage.icon, tint: Color(nsColor: .darkGray))
+        HStack(spacing: 10) {
+            iconTile(systemName: stage.icon, tint: EditorChrome.accent)
 
             VStack(alignment: .leading, spacing: 7) {
                 HStack(alignment: .firstTextBaseline) {
@@ -95,9 +86,9 @@ struct TransferStatusCard: View {
                         Text(stage.label)
                             .font(.system(size: 13, weight: .semibold))
                             .id(stage.label)
-                            .transition(stageSwap)
+                            .transition(.opacity)
                     }
-                    .animation(RecordingMotion.showHideSpring, value: stage)
+                    .animation(RecordingMotion.reduceMotion ? nil : .easeOut(duration: 0.15), value: stage)
 
                     Spacer(minLength: 8)
 
@@ -105,8 +96,6 @@ struct TransferStatusCard: View {
                         Text("\(Int((progress * 100).rounded()))%")
                             .font(.system(size: 12, weight: .medium).monospacedDigit())
                             .foregroundStyle(.secondary)
-                            .contentTransition(.numericText(value: progress))
-                            .animation(.spring(duration: 0.35, bounce: 0), value: progress)
                     }
                 }
 
@@ -118,9 +107,9 @@ struct TransferStatusCard: View {
     }
 
     private func linkReadyRows(url: URL) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                iconTile(systemName: "checkmark", tint: .green)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                iconTile(systemName: "checkmark.circle", tint: EditorChrome.accent)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Link ready")
@@ -137,12 +126,12 @@ struct TransferStatusCard: View {
 
             HStack(spacing: 8) {
                 Text(url.absoluteString)
-                    .font(.system(size: 11.5, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .textSelection(.enabled)
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 6)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(
                         RoundedRectangle(cornerRadius: 9, style: .continuous)
@@ -169,8 +158,8 @@ struct TransferStatusCard: View {
     }
 
     private func exportedRow(url: URL) -> some View {
-        HStack(spacing: 12) {
-            iconTile(systemName: "checkmark", tint: .green)
+        HStack(spacing: 10) {
+            iconTile(systemName: "checkmark.circle", tint: EditorChrome.accent)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text("Export complete")
@@ -195,7 +184,7 @@ struct TransferStatusCard: View {
     }
 
     private func failedRow(headline: String, message: String, canRetry: Bool) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             iconTile(systemName: "exclamationmark.triangle.fill", tint: .orange)
 
             VStack(alignment: .leading, spacing: 1) {
@@ -223,14 +212,12 @@ struct TransferStatusCard: View {
     private func iconTile(systemName: String, tint: Color) -> some View {
         Image(systemName: systemName)
             .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: 34, height: 34)
+            .foregroundStyle(tint)
+            .frame(width: 28, height: 28)
             .background(
-                RoundedRectangle(cornerRadius: 10.5, style: .continuous)
-                    .fill(tint)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(Color.primary.opacity(0.06))
             )
-            .contentTransition(.symbolEffect(.replace))
-            .animation(RecordingMotion.showHideSpring, value: systemName)
     }
 
     private func circleButton(help: String, action: @escaping () -> Void) -> some View {
@@ -242,7 +229,7 @@ struct TransferStatusCard: View {
                 .background(Circle().fill(Color.primary.opacity(0.06)))
                 .contentShape(Circle())
         }
-        .buttonStyle(TransferPressStyle(scale: 0.88))
+        .buttonStyle(TransferPressStyle())
         .help(help)
         .accessibilityLabel(help)
     }
@@ -251,14 +238,14 @@ struct TransferStatusCard: View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 12, weight: .medium))
-                .frame(height: 30)
-                .padding(.horizontal, 12)
+                .frame(height: 26)
+                .padding(.horizontal, 8)
                 .background(
                     RoundedRectangle(cornerRadius: 9, style: .continuous)
                         .fill(Color.primary.opacity(0.08))
                 )
         }
-        .buttonStyle(TransferPressStyle(scale: 0.97))
+        .buttonStyle(TransferPressStyle())
     }
 
     private func prominentButton(
@@ -270,30 +257,29 @@ struct TransferStatusCard: View {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 11, weight: .semibold))
-                    .contentTransition(.symbolEffect(.replace))
                 Text(title)
                     .font(.system(size: 12, weight: .semibold))
             }
             .foregroundStyle(.primary)
-            .frame(height: 30)
-            .padding(.horizontal, 12)
+            .frame(height: 26)
+            .padding(.horizontal, 8)
             .background(
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(Color.primary.opacity(0.12))
             )
         }
-        .buttonStyle(TransferPressStyle(scale: 0.97))
+        .buttonStyle(TransferPressStyle())
     }
 
     private func copy(_ url: URL) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(url.absoluteString, forType: .string)
-        withAnimation(RecordingMotion.pressRelease) { didCopy = true }
+        didCopy = true
         copyReset?.cancel()
         copyReset = Task {
             try? await Task.sleep(for: .seconds(1.6))
             guard !Task.isCancelled else { return }
-            withAnimation(RecordingMotion.pressRelease) { didCopy = false }
+            didCopy = false
         }
     }
 }
@@ -302,45 +288,19 @@ private struct TransferProgressBar: View {
     let progress: Double?
 
     var body: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color.primary.opacity(0.12))
-
-                if let progress {
-                    Capsule()
-                        .fill(Color.secondary)
-                        .frame(width: max(6, proxy.size.width * min(max(progress, 0), 1)))
-                } else if RecordingMotion.reduceMotion {
-                    Capsule()
-                        .fill(Color.secondary)
-                        .frame(width: proxy.size.width * 0.35)
-                } else {
-                    TimelineView(.animation) { context in
-                        let cycle = context.date.timeIntervalSinceReferenceDate
-                            .truncatingRemainder(dividingBy: 1.4) / 1.4
-                        let eased = cycle * cycle * (3 - 2 * cycle)
-                        Capsule()
-                            .fill(Color.secondary)
-                            .frame(width: proxy.size.width * 0.35)
-                            .offset(x: proxy.size.width * 1.35 * eased - proxy.size.width * 0.35)
-                    }
-                }
-            }
-        }
-        .frame(height: 4)
-        .clipShape(Capsule())
-        .animation(.spring(duration: 0.35, bounce: 0), value: progress)
+        ProgressView(value: progress, total: 1)
+            .progressViewStyle(.linear)
+            .controlSize(.small)
+            .tint(EditorChrome.accent)
+            .accessibilityLabel("Transfer progress")
+            .transaction { $0.animation = nil }
     }
 }
 
 private struct TransferPressStyle: ButtonStyle {
-    let scale: CGFloat
-
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(RecordingMotion.reduceMotion ? 1 : (configuration.isPressed ? scale : 1))
             .opacity(configuration.isPressed ? 0.85 : 1)
-            .animation(RecordingMotion.pressRelease, value: configuration.isPressed)
+            .animation(RecordingMotion.reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }

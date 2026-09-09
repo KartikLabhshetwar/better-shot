@@ -140,28 +140,29 @@ nonisolated struct RecordingClipTimeline: Codable, Equatable, Sendable {
         segments.reduce(0) { $0 + $1.editorDuration }
     }
 
-    struct RemovedRange: Equatable {
+    struct CutMarker: Hashable {
         var sourceStart: TimeInterval
         var sourceEnd: TimeInterval
         var editorTime: TimeInterval
+        var removedDuration: TimeInterval { max(0, sourceEnd - sourceStart) }
     }
 
-    /// Source gaps collapse to a boundary in the edited timeline, including trims at either end.
-    func removedRanges(sourceDuration: TimeInterval) -> [RemovedRange] {
+    /// Every split has a marker; removed source gaps collapse to that edited boundary.
+    func cutMarkers(sourceDuration: TimeInterval) -> [CutMarker] {
         guard sourceDuration.isFinite, sourceDuration > 0 else { return [] }
-        var ranges: [RemovedRange] = []
+        var ranges: [CutMarker] = []
         var sourceEnd: TimeInterval = 0
         var editorTime: TimeInterval = 0
-        for segment in segments {
-            if segment.sourceStart - sourceEnd > 0.000_001 {
-                ranges.append(RemovedRange(sourceStart: sourceEnd, sourceEnd: segment.sourceStart,
+        for (index, segment) in segments.enumerated() {
+            if index > 0 || segment.sourceStart - sourceEnd > 0.000_001 {
+                ranges.append(CutMarker(sourceStart: sourceEnd, sourceEnd: segment.sourceStart,
                                            editorTime: editorTime))
             }
             sourceEnd = segment.sourceEnd
             editorTime += segment.editorDuration
         }
         if sourceDuration - sourceEnd > 0.000_001 {
-            ranges.append(RemovedRange(sourceStart: sourceEnd, sourceEnd: sourceDuration,
+            ranges.append(CutMarker(sourceStart: sourceEnd, sourceEnd: sourceDuration,
                                        editorTime: editorTime))
         }
         return ranges

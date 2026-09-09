@@ -47,13 +47,13 @@ struct RecordingSessionControls: View {
         HStack(spacing: 0) {
             Button { manager.stopRecording() } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "stop.circle").font(.system(size: 20))
+                    Image(systemName: "stop.circle").font(.system(size: 18))
                     Text(manager.formattedElapsedTime)
-                        .font(.system(size: 14, weight: .medium).monospacedDigit())
-                        .frame(minWidth: 48, alignment: .leading)
+                        .font(.system(size: 13, weight: .medium).monospacedDigit())
+                        .frame(minWidth: 42, alignment: .leading)
                 }
                 .foregroundStyle(BarMetrics.recordTint)
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 10)
                 .frame(height: BarMetrics.recordingHeight)
                 .contentShape(Rectangle())
             }
@@ -71,21 +71,21 @@ struct RecordingSessionControls: View {
                 if isPaused { manager.resumeRecording() }
                 else { manager.pauseRecording() }
             }
-            .frame(width: 48)
+            .frame(width: 42)
             .disabled(isSettling)
 
             separator
             BarActionButton(id: .restart, title: "Start over", systemImage: "arrow.counterclockwise") {
                 confirmsRestart = true
             }
-            .frame(width: 48)
+            .frame(width: 42)
             .disabled(isSettling)
 
             separator
             BarActionButton(id: .discard, title: "Discard recording", systemImage: "trash") {
                 confirmsDiscard = true
             }
-            .frame(width: 48)
+            .frame(width: 42)
             .disabled(isSettling)
         }
         .alert("Start a new recording?", isPresented: $confirmsRestart) {

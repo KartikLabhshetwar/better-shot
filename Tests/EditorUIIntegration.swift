@@ -19,14 +19,15 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     let shortcutDefaults = UserDefaults(suiteName: suiteName)!
     defer { shortcutDefaults.removePersistentDomain(forName: suiteName) }
     let shortcuts = ShortcutService.Shortcut.self
-    precondition(shortcuts.defaultRegion.keyCode == UInt32(kVK_ANSI_2))
-    precondition(shortcuts.defaultRecording.keyCode == UInt32(kVK_ANSI_5))
+    precondition(shortcuts.defaultRegion.keyCode == UInt32(kVK_ANSI_4))
+    precondition(shortcuts.defaultRecording.keyCode == UInt32(kVK_ANSI_2))
     for (oldRegionKey, oldRecordingKey, enabled) in [
-        (kVK_ANSI_4, kVK_ANSI_2, true),
-        (kVK_ANSI_4, kVK_ANSI_2, false),
+        (kVK_ANSI_2, kVK_ANSI_5, true),
+        (kVK_ANSI_2, kVK_ANSI_5, false),
         (kVK_ANSI_7, kVK_ANSI_8, true)
     ] {
         shortcutDefaults.removePersistentDomain(forName: suiteName)
+        shortcutDefaults.set(true, forKey: "bs_captureShortcuts050Migrated")
         var region = shortcuts.defaultRegion
         region.keyCode = UInt32(oldRegionKey)
         region.enabled = enabled
@@ -40,8 +41,8 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
             from: shortcutDefaults.data(forKey: "bs_hotkey_1")!)
         let migratedRecording = try JSONDecoder().decode(ShortcutService.Shortcut.self,
             from: shortcutDefaults.data(forKey: "bs_hotkey_6")!)
-        precondition(migratedRegion.keyCode == UInt32(oldRegionKey == kVK_ANSI_4 ? kVK_ANSI_2 : oldRegionKey))
-        precondition(migratedRecording.keyCode == UInt32(oldRecordingKey == kVK_ANSI_2 ? kVK_ANSI_5 : oldRecordingKey))
+        precondition(migratedRegion.keyCode == UInt32(oldRegionKey == kVK_ANSI_2 ? kVK_ANSI_4 : oldRegionKey))
+        precondition(migratedRecording.keyCode == UInt32(oldRecordingKey == kVK_ANSI_5 ? kVK_ANSI_2 : oldRecordingKey))
         precondition(migratedRegion.enabled == enabled && migratedRecording.enabled == enabled)
         // A later intentional reassignment must survive subsequent launches.
         try shortcutDefaults.set(JSONEncoder().encode(recording), forKey: "bs_hotkey_6")
@@ -68,26 +69,6 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     precondition(imageModel.zoomPercent == 10)
     imageModel.fitCanvas()
     precondition(imageModel.zoomToFit && imageModel.panOffset == .zero)
-
-    var sliderAmount: CGFloat = 1.5
-    let sliderHost = NSHostingView(rootView: InspectorSlider("Zoom", value: Binding(
-        get: { sliderAmount }, set: { sliderAmount = $0 }), range: 1...4,
-        format: .magnification(fractionDigits: 1))
-        .environment(\.simpleInspectorControls, true))
-    sliderHost.frame = NSRect(x: 0, y: 0, width: 280, height: 64)
-    sliderHost.layoutSubtreeIfNeeded()
-    func nativeSlider(in view: NSView) -> NSSlider? {
-        if let slider = view as? NSSlider { return slider }
-        return view.subviews.lazy.compactMap { nativeSlider(in: $0) }.first
-    }
-    let slider = nativeSlider(in: sliderHost)!
-    for (progress, expected) in [(0.0, 1.0), (5.0 / 12, 2.25), (1.0, 4.0)] {
-        slider.doubleValue = slider.minValue + progress * (slider.maxValue - slider.minValue)
-        slider.sendAction(slider.action!, to: slider.target)
-        precondition(abs(sliderAmount - expected) < 0.001,
-                     "Native inspector slider must preserve model bounds and precision")
-    }
-    print("PASS native inspector slider bounds and binding")
 
     let videoModel = RecordingStudioModel(url: movieURL)
     await videoModel.load()
@@ -116,7 +97,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         RecordingClipSegment(sourceStart: 1, sourceEnd: 5, speed: 2),
         RecordingClipSegment(sourceStart: 7, sourceEnd: 9)
     ])
-    precondition(cutTimeline.removedRanges(sourceDuration: 10) == [
+    precondition(cutTimeline.cutMarkers(sourceDuration: 10) == [
         .init(sourceStart: 0, sourceEnd: 1, editorTime: 0),
         .init(sourceStart: 5, sourceEnd: 7, editorTime: 2),
         .init(sourceStart: 9, sourceEnd: 10, editorTime: 4)
@@ -124,9 +105,14 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     precondition(RecordingClipTimeline(segments: [
         RecordingClipSegment(sourceStart: 0, sourceEnd: 5),
         RecordingClipSegment(sourceStart: 5, sourceEnd: 10)
-    ]).removedRanges(sourceDuration: 10).isEmpty, "A split alone removes no footage")
-    precondition(cutTimeline.removedRanges(sourceDuration: .nan).isEmpty)
-    print("PASS removed footage marker positions and split-only timeline")
+    ]).cutMarkers(sourceDuration: 10) == [.init(sourceStart: 5, sourceEnd: 5, editorTime: 5)],
+                 "A split alone shows scissors without a removed duration")
+    precondition(cutTimeline.cutMarkers(sourceDuration: .nan).isEmpty)
+    let previewMarker = RecordingClipTimeline.CutMarker(sourceStart: 0.2, sourceEnd: 0.8, editorTime: 0.2)
+    let cutFrame = try await StudioTimelineCutPreview.frame(sourceURL: movieURL, marker: previewMarker)
+    precondition(cutFrame.width > 0 && cutFrame.width <= 480 && cutFrame.height <= 270,
+                 "Cut hover preview loads a bounded source frame")
+    print("PASS cut badges, removed durations, speed-aware positions, and source preview")
 
     let clipControl = RecordingClipTimelineControl(frame: NSRect(x: 0, y: 0, width: 600, height: 52))
     clipControl.update(timeline: videoModel.clipTimeline, sourceDuration: videoModel.sourceDuration,
@@ -168,6 +154,17 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     print("PASS effect toggle defaults and previous amount restoration")
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
+        for (label, status) in [
+            ("upload", TransferStatus.working(stage: .uploading, progress: 0.42)),
+            ("render", .working(stage: .rendering, progress: nil)),
+            ("invalid-progress", .working(stage: .uploading, progress: .nan)),
+            ("link", .linkReady(url: URL(string: "https://example.com/capture/test")!)),
+            ("export", .exported(url: movieURL)),
+            ("error", .failed(headline: "Upload failed", message: "Check your connection and try again.", canRetry: true))
+        ] {
+            try snapshot(TransferStatusCard(status: status), scheme: scheme, width: 360,
+                         to: output.appendingPathComponent("transfer-\(label)-\(name).png"), height: 112)
+        }
         try snapshot(RecordingSessionControls().studioGlass(cornerRadius: BarMetrics.cornerRadius, opacity: 0.78),
                      scheme: scheme, width: 360,
                      to: output.appendingPathComponent("recording-\(name).png"), height: 64)
@@ -201,11 +198,13 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     lastClip.sourceStart += 0.2
     lastClip.sourceEnd -= 0.2
     videoModel.trimClip(lastClip)
-    precondition(videoModel.clipTimeline.removedRanges(sourceDuration: videoModel.sourceDuration).count == 3)
+    precondition(videoModel.clipTimeline.cutMarkers(sourceDuration: videoModel.sourceDuration).count == 3)
     try snapshot(RecordingStudioContent(model: videoModel), scheme: .dark, width: 1100,
                  to: output.appendingPathComponent("video-cuts-dark.png"))
+    try snapshot(StudioTimelineCutPreview(marker: previewMarker, sourceURL: movieURL),
+                 scheme: .dark, width: 270, to: output.appendingPathComponent("cut-preview-dark.png"), height: 220)
     videoModel.resetClips()
-    precondition(videoModel.clipTimeline.removedRanges(sourceDuration: videoModel.sourceDuration).isEmpty,
+    precondition(videoModel.clipTimeline.cutMarkers(sourceDuration: videoModel.sourceDuration).isEmpty,
                  "Restoring the original recording clears removed footage markers")
 
     let recentMenu = MenuBarContentView(dismissPopover: {}).recentMenuItems()

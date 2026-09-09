@@ -29,20 +29,15 @@ struct StudioInspectorTabs: View {
     }
 }
 
-/// A native disclosure keeps keyboard and accessibility behavior consistent across effects.
+/// Keep each effect visible in its existing card without a collapse control.
 struct StudioEffectSection<Content: View, Accessory: View>: View {
     let title: String
     var systemImage = "slider.horizontal.3"
-    @Binding var isExpanded: Bool
     @ViewBuilder var accessory: () -> Accessory
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
-            content()
-                .padding(.top, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        } label: {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Label(title, systemImage: systemImage)
                     .font(.system(size: 12, weight: .medium))
@@ -50,6 +45,8 @@ struct StudioEffectSection<Content: View, Accessory: View>: View {
                 accessory()
             }
             .frame(minHeight: 28)
+            content()
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(12)
         .studioEffectCard()
@@ -63,27 +60,31 @@ struct StudioAmountEffect: View {
     @Binding var value: CGFloat
     let range: ClosedRange<CGFloat>
     let defaultValue: CGFloat
-    @State private var isExpanded = false
     @State private var toggleState = StudioEffectToggleState()
 
     var body: some View {
-        StudioEffectSection(title: title, systemImage: systemImage, isExpanded: $isExpanded) {
-            Toggle(title, isOn: Binding(
-                get: { value > 0 },
-                set: { enabled in
-                    value = toggleState.amount(enabled: enabled, current: value, defaultValue: defaultValue)
-                    if enabled { isExpanded = true }
-                }
-            ))
-            .labelsHidden()
-            .toggleStyle(.switch)
-            .controlSize(.mini)
-            .help("Enable \(title.lowercased())")
-        } content: {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Label(title, systemImage: systemImage)
+                    .font(.system(size: 12, weight: .medium))
+                Spacer(minLength: 4)
+                Toggle(title, isOn: Binding(
+                    get: { value > 0 },
+                    set: { enabled in
+                        value = toggleState.amount(enabled: enabled, current: value, defaultValue: defaultValue)
+                    }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .help("Enable \(title.lowercased())")
+            }
             InspectorSlider("Amount", value: $value, range: range, format: .percent())
-
         }
+        .padding(10)
+        .studioEffectCard()
     }
+
 }
 
 struct StudioEffectToggleState {

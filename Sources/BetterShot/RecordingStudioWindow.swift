@@ -60,14 +60,16 @@ struct RecordingStudioContent: View {
                     } else {
                         StudioCanvas(model: model)
                             .background(AnnotationEditorWorkspaceBackground())
-                            .overlay(alignment: .bottom) {
+                            .overlay(alignment: .bottomTrailing) {
                                 if let transferStatus {
                                     TransferStatusCard(status: transferStatus,
                                         onCancel: cancelTransfer, onRetry: retryTransfer,
                                         onDismiss: dismissTransfer)
-                                        .padding(.bottom, 18)
+                                        .padding(16)
+                                        .transition(.opacity)
                                 }
                             }
+                            .animation(RecordingMotion.reduceMotion ? nil : .easeOut(duration: 0.15), value: transferStatus != nil)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -79,7 +81,7 @@ struct RecordingStudioContent: View {
             }
         }
         .background(EditorChrome.workspace)
-        .environment(\.simpleInspectorControls, true)
+        .scrollIndicators(.hidden)
         .tint(EditorChrome.accent)
         .accentColor(EditorChrome.accent)
         .frame(minWidth: 1100, minHeight: 720)
@@ -1212,7 +1214,7 @@ private struct StudioTimelineEditor: View {
     @Bindable var model: RecordingStudioModel
 
     @State private var viewport = RecordingTimelineViewport()
-    @State private var isSplitting = true
+    @State private var isSplitting = false
     @State private var viewportWidth: CGFloat = 1
     @State private var scrollPosition = ScrollPosition(edge: .leading)
 
@@ -1228,9 +1230,6 @@ private struct StudioTimelineEditor: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
             lanes
-            if !removedRanges.isEmpty {
-                removedFootageMarkers
-            }
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)
@@ -1243,35 +1242,26 @@ private struct StudioTimelineEditor: View {
         }
     }
 
-    private var removedRanges: [RecordingClipTimeline.RemovedRange] {
-        model.clipTimeline.removedRanges(sourceDuration: model.sourceDuration)
+    private var cutMarkers: [RecordingClipTimeline.CutMarker] {
+        model.clipTimeline.cutMarkers(sourceDuration: model.sourceDuration)
     }
 
-    private var removedFootageMarkers: some View {
+    private var cutMarkerLane: some View {
         GeometryReader { proxy in
-            ForEach(removedRanges, id: \.sourceStart) { range in
-                let x = scale.x(for: range.editorTime) - scrollX
+            ForEach(cutMarkers, id: \.sourceStart) { marker in
+                let x = scale.x(for: marker.editorTime) - scrollX
+                let width: CGFloat = marker.removedDuration > 0 ? 64 : 28
                 if x >= 0, x <= proxy.size.width {
-                    let description = "Removed \(studioTimecode(range.sourceStart))–\(studioTimecode(range.sourceEnd)) from the original recording"
-                    Button {
+                    StudioTimelineCutBadge(marker: marker, sourceURL: model.screenURL) {
                         model.pause()
-                        model.seek(to: range.editorTime)
-                    } label: {
-                        Image(systemName: "scissors")
-                            .font(.system(size: 11))
-                            .frame(width: 28, height: 24)
-                            .contentShape(Rectangle())
+                        model.seek(to: marker.editorTime)
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    .help(description)
-                    .accessibilityLabel(description)
-                    .accessibilityHint("Go to this cut")
-                    .position(x: min(max(x, 14), max(14, proxy.size.width - 14)), y: 12)
+                    .frame(width: width)
+                    .position(x: min(max(x, width / 2), max(width / 2, proxy.size.width - width / 2)), y: 14)
                 }
             }
         }
-        .frame(height: 24)
+        .frame(height: StudioTimelineMetrics.cutLaneHeight)
     }
 
     private var lanes: some View {
@@ -1365,6 +1355,8 @@ private struct StudioTimelineEditor: View {
                     .frame(height: StudioTimelineMetrics.zoomLaneHeight)
                 Color.clear
                     .frame(height: StudioTimelineMetrics.clipLaneHeight)
+                Color.clear
+                    .frame(height: StudioTimelineMetrics.cutLaneHeight)
                 if model.showsMaskLane {
                     StudioZoomLaneBackground()
                         .frame(height: StudioTimelineMetrics.maskLaneHeight)
@@ -1391,6 +1383,8 @@ private struct StudioTimelineEditor: View {
                             height: StudioTimelineMetrics.clipLaneHeight
                         )
                         .frame(width: scale.contentWidth, alignment: .leading)
+                    Color.clear
+                        .frame(height: StudioTimelineMetrics.cutLaneHeight)
 
                     if model.showsMaskLane {
                         StudioMaskLane(
@@ -1409,7 +1403,7 @@ private struct StudioTimelineEditor: View {
                 }
             }
             .scrollPosition($scrollPosition)
-            .scrollIndicators(.visible)
+            .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize)
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
                 geometry.contentOffset.x
@@ -1421,6 +1415,11 @@ private struct StudioTimelineEditor: View {
         }
         .frame(height: StudioTimelineMetrics.scrollingLanesHeight(showsMaskLane: model.showsMaskLane))
         .mask(edgeFadeMask(scale: scale))
+        .overlay(alignment: .top) {
+            cutMarkerLane
+                .padding(.top, StudioTimelineMetrics.zoomLaneHeight + StudioTimelineMetrics.clipLaneHeight
+                         + StudioTimelineMetrics.rowSpacing * 2)
+        }
     }
 
     /// Fades scrolled-out lane content at the viewport edges instead of
@@ -1680,11 +1679,110 @@ private struct TransportIconButtonStyle: ButtonStyle {
     }
 }
 
+private struct StudioTimelineCutBadge: View {
+    let marker: RecordingClipTimeline.CutMarker
+    let sourceURL: URL
+    let onSeek: () -> Void
+    @State private var showsPreview = false
+
+    private var durationLabel: String {
+        marker.removedDuration < 0.1 ? "<0.1s"
+            : "\(marker.removedDuration.formatted(.number.precision(.fractionLength(0...1))))s"
+    }
+
+    var body: some View {
+        Button {
+            onSeek()
+            showsPreview = true
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "scissors")
+                if marker.removedDuration > 0 {
+                    Text(durationLabel).monospacedDigit()
+                }
+            }
+            .font(.system(size: 11, weight: .medium))
+            .lineLimit(1)
+            .frame(maxWidth: .infinity)
+            .frame(height: 24)
+            .background(Color.primary.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+            .overlay(alignment: .top) {
+                Rectangle().fill(Color.primary.opacity(0.12))
+                    .frame(width: 6, height: 6).rotationEffect(.degrees(45)).offset(y: -3)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 6).strokeBorder(EditorChrome.border, lineWidth: 0.5)
+            }
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(showsPreview ? .primary : .secondary)
+        .accessibilityLabel(marker.removedDuration > 0 ? "Removed \(durationLabel)" : "Split")
+        .accessibilityHint("Show cut preview and go to this cut")
+        .onHover { showsPreview = $0 }
+        .popover(isPresented: $showsPreview, arrowEdge: .top) {
+            StudioTimelineCutPreview(marker: marker, sourceURL: sourceURL)
+        }
+    }
+}
+
+struct StudioTimelineCutPreview: View {
+    let marker: RecordingClipTimeline.CutMarker
+    let sourceURL: URL
+    @State private var preview: CGImage?
+    @State private var failed = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(marker.removedDuration > 0 ? "Removed footage" : "Split point").font(.headline)
+            Group {
+                if let preview {
+                    Image(decorative: preview, scale: 1).resizable().scaledToFit()
+                } else if failed {
+                    Text("Preview unavailable").font(.caption).foregroundStyle(.secondary)
+                } else {
+                    ProgressView().controlSize(.small)
+                }
+            }
+            .frame(width: 240, height: 135)
+            .background(Color.black.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            Text("Original: \(marker.sourceStart.formatted(.number.precision(.fractionLength(0...2))))s"
+                 + (marker.removedDuration > 0 ? "–\(marker.sourceEnd.formatted(.number.precision(.fractionLength(0...2))))s" : ""))
+                .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .task(id: marker) {
+            preview = nil
+            failed = false
+            do {
+                let frame = try await Self.frame(sourceURL: sourceURL, marker: marker)
+                try Task.checkCancellation()
+                preview = frame
+            } catch {
+                if !Task.isCancelled { failed = true }
+            }
+        }
+    }
+
+    static func frame(sourceURL: URL, marker: RecordingClipTimeline.CutMarker) async throws -> CGImage {
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: sourceURL))
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 480, height: 270)
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        defer { generator.cancelAllCGImageGeneration() }
+        return try await generator.image(at: CMTime(
+            seconds: marker.sourceStart + marker.removedDuration / 2, preferredTimescale: 600
+        )).image
+    }
+}
+
 private enum StudioTimelineMetrics {
     static let rowSpacing: CGFloat = 8
     static let playheadLaneHeight: CGFloat = 14
     static let rulerHeight: CGFloat = 16
     static let clipLaneHeight: CGFloat = 52
+    static let cutLaneHeight: CGFloat = 28
     static let zoomLaneHeight: CGFloat = 36
     static let minimapHeight: CGFloat = 12
     /// Room under the lanes for the horizontal scroller, so it never sits on
@@ -1696,7 +1794,7 @@ private enum StudioTimelineMetrics {
     static let maskLaneHeight = zoomLaneHeight
 
     static func scrollingLanesHeight(showsMaskLane: Bool) -> CGFloat {
-        clipLaneHeight + zoomLaneHeight + scrollerGutter + rowSpacing * 2
+        clipLaneHeight + zoomLaneHeight + cutLaneHeight + scrollerGutter + rowSpacing * 3
             + (showsMaskLane ? maskLaneHeight + rowSpacing : 0)
     }
 
@@ -1914,7 +2012,7 @@ private struct StudioTimelineRuler: View {
 
             let visibleSeconds = Double(size.width / pointsPerSecond)
             let step = [0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 120, 300, 600, 1800, 3600]
-                .first { visibleSeconds / $0 <= 20 } ?? ceil(visibleSeconds / 20)
+                .first { visibleSeconds / $0 <= 10 } ?? ceil(visibleSeconds / 10)
             let startTime = max(0, Double(scrollX / pointsPerSecond))
             let endTime = min(duration, Double((scrollX + size.width) / pointsPerSecond))
             let endpointLabel = Self.label(for: duration, step: step)
@@ -2204,7 +2302,7 @@ private struct StudioZoomCueBlock: View {
                             .font(.system(size: 12, weight: .medium).monospacedDigit())
                     }
                 }
-                .foregroundStyle(.white)
+                .foregroundStyle(isSelected ? Color.white : Color.primary)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(Rectangle())
@@ -2217,7 +2315,7 @@ private struct StudioZoomCueBlock: View {
                     cornerRadius: StudioZoomLaneMetrics.blockCornerRadius,
                     style: .continuous
                 )
-                    .fill(EditorChrome.accent.opacity(isSelected ? 1 : 0.7))
+                    .fill(isSelected ? EditorChrome.accent : Color(nsColor: .secondaryLabelColor).opacity(0.45))
             )
             .overlay {
                 if isSelected {
@@ -2569,16 +2667,6 @@ private extension ZoomAnchorMode {
     }
 }
 
-private enum StudioInspectorSection: Hashable {
-    case background
-    case motion
-    case cursor
-    case keystrokes
-    case transcription
-    case camera
-    case audio
-}
-
 private enum StudioTranscriptTab: CaseIterable, Identifiable {
     case captions
     case edit
@@ -2598,9 +2686,6 @@ private struct StudioInspector: View {
     @State private var selectedTab: StudioInspectorTab = .background
     @State private var wallpaperStore = AnnotationWallpaperStore.shared
     @State private var stylePresetStore = RecordingStudioStylePresetStore.shared
-    @State private var expandedSections: Set<StudioInspectorSection> = [
-        .background, .camera
-    ]
     @State private var transcriptTab: StudioTranscriptTab = .captions
     @Environment(\.colorScheme) private var colorScheme
 
@@ -2612,7 +2697,7 @@ private struct StudioInspector: View {
             Divider()
             inspectorContent
         }
-        .background(.regularMaterial)
+        .background(EditorChrome.workspace)
         .frame(minWidth: 260, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task {
             await wallpaperStore.reload()
@@ -2637,7 +2722,6 @@ private struct StudioInspector: View {
                         StudioEffectSection(
                             title: "Background",
                             systemImage: "photo",
-                            isExpanded: expansionBinding(for: .background),
                             accessory: {
                                 if model.style.background != .none {
                                     InspectorClearButton(help: "Remove background") {
@@ -2697,7 +2781,6 @@ private struct StudioInspector: View {
                         StudioEffectSection(
                             title: "Zoom & Clicks",
                             systemImage: "plus.magnifyingglass",
-                            isExpanded: expansionBinding(for: .motion),
                             accessory: {
                                 Toggle("Enable zooms", isOn: $model.zoomEnabled)
                                     .labelsHidden()
@@ -2714,7 +2797,6 @@ private struct StudioInspector: View {
                         StudioEffectSection(
                             title: "Cursor",
                             systemImage: "cursorarrow",
-                            isExpanded: expansionBinding(for: .cursor),
                             accessory: {
                                 if model.style.cursorScale != RecordingStudioStyle.defaultCursorScale {
                                     InspectorClearButton(help: "Reset cursor size") {
@@ -2731,7 +2813,6 @@ private struct StudioInspector: View {
                         StudioEffectSection(
                             title: "Keystrokes",
                             systemImage: "keyboard",
-                            isExpanded: expansionBinding(for: .keystrokes),
                             accessory: {
                                 Toggle("Show keystrokes", isOn: $model.showsKeystrokes)
                                     .labelsHidden()
@@ -2747,7 +2828,6 @@ private struct StudioInspector: View {
                         StudioEffectSection(
                             title: "Transcription",
                             systemImage: "captions.bubble",
-                            isExpanded: expansionBinding(for: .transcription),
                             accessory: {
                                 if model.hasSubtitles {
                                     HStack(spacing: 2) {
@@ -2785,7 +2865,6 @@ private struct StudioInspector: View {
                         StudioEffectSection(
                             title: "Camera",
                             systemImage: "web.camera",
-                            isExpanded: expansionBinding(for: .camera),
                             accessory: {
                                 Toggle("Show camera", isOn: $model.style.camera.isVisible)
                                     .labelsHidden()
@@ -2801,7 +2880,6 @@ private struct StudioInspector: View {
                         StudioEffectSection(
                             title: "Audio",
                             systemImage: "speaker.wave.2",
-                            isExpanded: expansionBinding(for: .audio),
                             accessory: {
                                 if model.replacementAudio != nil {
                                     InspectorClearButton(
@@ -3621,19 +3699,6 @@ private struct StudioInspector: View {
     private static func spanText(_ seconds: TimeInterval) -> String {
         let value = max(0, seconds)
         return value < 60 ? String(format: "%.1fs", value) : clockText(value)
-    }
-
-    private func expansionBinding(for section: StudioInspectorSection) -> Binding<Bool> {
-        Binding(
-            get: { expandedSections.contains(section) },
-            set: { isExpanded in
-                if isExpanded {
-                    expandedSections.insert(section)
-                } else {
-                    expandedSections.remove(section)
-                }
-            }
-        )
     }
 
     private func inspectorAction(

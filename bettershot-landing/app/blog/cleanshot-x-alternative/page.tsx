@@ -204,7 +204,7 @@ export default async function Article() {
               <H2 id="screenshots">Screenshots: the core workflow</H2>
               <P>
                 Both apps use the same muscle memory. <Code>Cmd+Shift+4</Code> for a region,{" "}
-                <Code>Cmd+Shift+3</Code> for the screen, <Code>Cmd+Shift+5</Code> for a window.
+                <Code>Cmd+Shift+3</Code> for the screen, <Code>Cmd+Shift+2</Code> for Better Shot’s capture and recording bar.
                 After every capture a floating preview appears in the corner. From that preview you
                 can open the editor, copy the image, pin it above your work, or drag the file
                 directly into another app.

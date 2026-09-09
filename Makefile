@@ -65,7 +65,7 @@ run: build ## Build and launch (debug)
 	@echo "==> Launching BetterShot..."
 	@pkill -x BetterShot 2>/dev/null || true
 	@sleep 1
-	@open "$(APP_DEBUG)"
+	@open -n "$(abspath $(APP_DEBUG))"
 
 dmg: release ## Create unsigned DMG for local testing
 	@echo "==> Creating DMG..."

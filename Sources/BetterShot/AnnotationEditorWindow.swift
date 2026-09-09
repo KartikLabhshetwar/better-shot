@@ -66,7 +66,7 @@ struct AnnotationEditorWindow: View {
             imageFooter
         }
             .frame(minWidth: 980, minHeight: 640)
-            .environment(\.simpleInspectorControls, true)
+            .scrollIndicators(.hidden)
             .tint(EditorChrome.accent)
             .accentColor(EditorChrome.accent)
             .editorFullScreenByDefault()
@@ -448,7 +448,7 @@ struct AnnotationEditorWindow: View {
                     .background(.bar)
             }
         }
-        .overlay(alignment: .bottom) {
+        .overlay(alignment: .bottomTrailing) {
             if let transferStatus {
                 TransferStatusCard(
                     status: transferStatus,
@@ -456,11 +456,11 @@ struct AnnotationEditorWindow: View {
                     onRetry: retryUpload,
                     onDismiss: { uploadPhase = .idle }
                 )
-                .padding(.bottom, 16)
-                .transition(transferCardTransition)
+                .padding(16)
+                .transition(.opacity)
             }
         }
-        .animation(RecordingMotion.showHideSpring, value: transferStatus)
+        .animation(RecordingMotion.reduceMotion ? nil : .easeOut(duration: 0.15), value: transferStatus != nil)
     }
 
     private var transferStatus: TransferStatus? {
@@ -479,12 +479,6 @@ struct AnnotationEditorWindow: View {
                 canRetry: lastUploadOptions != nil
             )
         }
-    }
-
-    private var transferCardTransition: AnyTransition {
-        RecordingMotion.reduceMotion
-            ? .opacity
-            : AnyTransition.offset(y: 24).combined(with: .opacity)
     }
 
     private func retryUpload() {

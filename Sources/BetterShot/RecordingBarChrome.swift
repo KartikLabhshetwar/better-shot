@@ -16,7 +16,7 @@ enum BarMetrics {
     /// Capture modes have visible captions; active recording controls stay compact.
     static let controlSize: CGFloat = 36
     static let height: CGFloat = 64
-    static let recordingHeight: CGFloat = 44
+    static let recordingHeight: CGFloat = 38
     static let cornerRadius: CGFloat = 16
     static let itemSpacing: CGFloat = 2
     static let horizontalPadding: CGFloat = 6

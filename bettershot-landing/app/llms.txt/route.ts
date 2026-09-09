@@ -36,7 +36,7 @@ Better Shot is a native macOS app built with Swift 6 and SwiftUI. It lives in th
 - OCR text extraction (Apple Vision framework)
 - Color picker: sample any on-screen pixel, copies hex to the clipboard
 - Self-timer countdown overlay (3s, 5s, 10s)
-- Customizable global keyboard shortcuts (Cmd+Shift+3, Cmd+Shift+4, Cmd+Shift+5, Cmd+Shift+2, Cmd+Shift+O, Cmd+Shift+C)
+- Customizable global keyboard shortcuts (Cmd+Shift+4 for region capture, Cmd+Shift+2 for the capture/recording bar, Cmd+Shift+3 for fullscreen, Cmd+Shift+O for OCR, Cmd+Shift+C for color picking)
 
 ### Edit and beautify
 - Backgrounds: 12 solid color presets, 16 gradient presets, bundled macOS wallpapers, custom images

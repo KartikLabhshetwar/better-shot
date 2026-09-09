@@ -96,7 +96,10 @@ extension View {
     }
 
     func studioEffectCard() -> some View {
-        overlay(alignment: .bottom) { Divider() }
+        background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 10))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10).strokeBorder(EditorChrome.border, lineWidth: 0.5)
+            }
     }
 
 }

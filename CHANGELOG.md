@@ -21,13 +21,14 @@ All pending changes are included in this unreleased 0.5.0 update.
 
 ### Changed
 
-- **Capture shortcuts**: `⌘⇧2` starts region capture directly; `⌘⇧5` opens the shared capture/recording bar. Existing default bindings migrate, preserving custom shortcuts and disabled states.
-- **Compact classic glass bar**: The capture bar is shorter with smaller labeled controls and a more transparent frosted background. The recording dashboard is smaller too: Stop and the red timer, Pause, Restart, and Discard share one row. Restart and Discard require confirmation; Reduce Transparency remains supported.
-- **Simpler left inspectors**: Both editors use flat grey sections, native sliders, and exact value entry. Secondary controls stay in disclosure sections, with detailed zoom framing under Advanced.
+- **Capture shortcuts**: `⌘⇧4` starts region capture directly; `⌘⇧2` opens the shared capture/recording bar. Existing default bindings migrate, preserving custom shortcuts and disabled states.
+- **Compact classic glass bar**: The capture bar is shorter with smaller labeled controls and a more transparent frosted background. The recording dashboard is now 38 points tall: Stop and the red timer, Pause, Restart, and Discard share one row. Restart and Discard require confirmation; Reduce Transparency remains supported.
+- **Simpler left inspectors**: Both editors restore the compact 0.4.0 sliders with labels inside the track and exact value entry. Scrollbars are hidden while scrolling remains available. Video effects use lighter grey cards on a darker sidebar; Effect cards stay expanded without dropdowns. Detailed zoom framing remains under Advanced.
 - **Focused image editor**: Annotation tools, color, and style share one toolbar. Background owns canvas settings; aspect ratio and redaction remain in the toolbar without sidebar duplicates. Zoom, Copy, and cloud sharing sit in the footer, with a cloud upload icon for sharing.
 - **Clearer video editor**: Background, Camera, Effects, and Zoom & Clips group related settings. Crop and Censor live in Effects. Blue zoom segments sit above video thumbnails, with a red playhead, centered playback controls, and timeline zoom on the right.
-- **Persistent scissors tool**: Scissors starts selected at the left of the timeline and stays selected across cuts. Click it again or press S to return to selecting and trimming clips. Scissors markers beneath the timeline show removed source ranges; clicking one seeks to the cut. Secondary editing actions remain in the timeline menu.
+- **Persistent scissors tool**: Scissors starts unselected at the left of the timeline. Selecting it enables repeated cuts until explicitly deselected. Click it again or press S to return to selecting and trimming clips. Scissors badges sit directly below each split, with the removed duration shown when footage was deleted or trimmed. Hovering previews the original footage and source range; clicking seeks to the cut. Secondary editing actions remain in the timeline menu.
 - **Recent Captures**: Screenshots and recordings share the existing recent-capture navigation. The interim Media Gallery and Recording Projects browser are removed while captures, share links, and editable projects are preserved.
+- **Export and sharing feedback**: A compact frosted corner card uses native progress, clear Copy/Open/Reveal actions, and short fades that respect Reduce Motion.
 - **Settings**: Capture and recording options have inline explanations, sharing fields remain editable, and image/video editor preferences remain independent.
 
 ### Fixed
