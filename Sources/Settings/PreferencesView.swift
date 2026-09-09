@@ -95,6 +95,7 @@ struct GeneralSettingsTab: View {
     @AppStorage(AppPreferences.editorOpensFullScreenKey) private var editorFullScreen = true
     @State private var defaultConfig = AppPreferences.defaultBeautifierConfig
     @State private var isConfirmingReset = false
+    @State private var showingMediaGallery = false
 
     private var appAppearance: Binding<AppAppearance> {
         Binding(
@@ -119,6 +120,18 @@ struct GeneralSettingsTab: View {
 
     var body: some View {
         Form {
+            Section {
+                Button {
+                    showingMediaGallery = true
+                } label: {
+                    Label("Open Media Gallery", systemImage: "photo.on.rectangle")
+                }
+            } header: {
+                Text("Media Gallery")
+            } footer: {
+                Text("Browse saved screenshots, videos, and cloud share links.")
+            }
+
             Section {
                 Picker("Theme", selection: appAppearance) {
                     ForEach(AppAppearance.allCases) { appearance in
@@ -235,6 +248,7 @@ struct GeneralSettingsTab: View {
             }
         }
         .formStyle(.grouped)
+        .sheet(isPresented: $showingMediaGallery) { MediaGallery() }
         .alert("Restore General settings to their defaults?", isPresented: $isConfirmingReset) {
             Button("Restore Defaults", role: .destructive, action: restoreDefaults)
             Button("Cancel", role: .cancel) {}

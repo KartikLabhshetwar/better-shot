@@ -269,7 +269,9 @@ final class HistoryStore {
         guard let data = try? Data(contentsOf: manifestURL) else { return }
         let decoded = (try? JSONDecoder().decode([CaptureRecord].self, from: data)) ?? []
         // Filter out records whose files no longer exist
-        records = decoded.filter { FileManager.default.fileExists(atPath: urlForRecord($0).path) }
+        records = decoded.filter {
+            FileManager.default.fileExists(atPath: urlForRecord($0).path) || $0.shareURL != nil
+        }
         trimToRetentionLimit()
         if records.count != decoded.count { saveRecords() }
     }

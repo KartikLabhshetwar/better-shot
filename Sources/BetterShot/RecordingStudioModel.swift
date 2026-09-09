@@ -2435,6 +2435,8 @@ final class RecordingStudioModel {
                 NSPasteboard.general.setString(result.url, forType: .string)
                 if let session {
                     ScreenshotHistoryStore.shared.setCloudURL(forSession: session, cloudURL: result.url)
+                } else {
+                    await ScreenshotHistoryStore.shared.setCloudURL(for: uploadURL, cloudURL: result.url)
                 }
                 self.shareState = .finished(result.url)
             } catch is CancellationError {

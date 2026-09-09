@@ -12,7 +12,7 @@ share it, and shares go to storage you own.
 
 ## What it does
 
-This describes the current **0.5.0 development version**, which is not released
+This describes the current **0.5.1 development version**, which is not released
 yet. See [CHANGELOG.md](CHANGELOG.md) for pending changes and release history.
 
 - **Capture** regions with macOS's native selector, full screens, and windows; extract text with OCR or pick a color.
@@ -22,6 +22,7 @@ yet. See [CHANGELOG.md](CHANGELOG.md) for pending changes and release history.
 - **Style cursors** in BetterShot recordings: Recorded, Dark, Light, Dot, or the native macOS Hand; size, visibility, Natural/Smooth motion, press/ripple effects, and idle hiding. High-resolution artwork preserves the click point in previews and exports.
 - **Frame captures** with padding, corners, shadow, wallpapers, and ten shared soft gradients. Configure the shared image and video look in General settings.
 - **Keep a capture deck** of up to five items, with optional save-on-demand, Copy, Pin, Edit, and drag-out actions.
+- **Browse media** from the clover menu → Settings → General → Open Media Gallery. Local shows retained captures, saved edits, and recording projects; Cloud shows links saved by this Mac. Filter screenshots/videos, search, preview, edit, reveal files, or open/copy a cloud link. Unsaved deck captures appear after saving; Cloud does not scan your R2 bucket or sync other devices.
 - **Share** through your own Cloudflare R2 bucket. Image sharing optimizes size; shared videos use MP4. Native progress cards show completion or retry actions.
 
 Both editors use a left inspector, compact controls, and classic frosted chrome.

@@ -136,8 +136,8 @@ source of instructions for coding agents; `CLAUDE.md` imports it.
   permissions, or interactive capture; report what was actually checked.
 - Tests must use `BETTERSHOT_TESTING=1` through the provided runners and must not
   access real R2 credentials. Never log credentials or weaken release signing.
-- `version.json` is the version source. Keep pending work in the single unreleased
-  0.5.0 changelog section until release is explicitly requested; no 0.4.3 release.
+- `version.json` is the version source. Keep pending work in the single current unreleased
+  0.5.1 changelog section until release is explicitly requested; no 0.4.3 release.
   Preserve historical release entries and contributor credit.
 - Update README and contributor guidance when behavior or workflows change.
   Keep `CLAUDE.md` a short import of shared instructions rather than a second rulebook.

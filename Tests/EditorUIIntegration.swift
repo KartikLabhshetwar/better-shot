@@ -7,6 +7,7 @@ import SwiftUI
 /// AVPlayer layers and window toolbars require live UI testing and are not captured here.
 @MainActor
 func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
+    try await checkMediaGallery(imageURL: imageURL, movieURL: movieURL)
     checkTransferToastPresentation(movieURL: movieURL)
     try await checkGeneralEditorDefaults(movieURL: movieURL)
     for appearanceName in [NSAppearance.Name.aqua, .darkAqua] {
@@ -570,4 +571,88 @@ private func checkTransferToastPresentation(movieURL: URL) {
     }), "Closing the editor must clean up its transfer panel")
     anchor.removeFromSuperview()
     print("PASS external transfer toast placement, progress/completion, focus, appearances, dismissal, and close cleanup")
+}
+
+
+@MainActor
+private func checkMediaGallery(imageURL: URL, movieURL: URL) async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let history = HistoryStore(storageDirectory: root.appendingPathComponent("history"))
+    let raw = history.referenceCapture(at: imageURL)!
+    let session = RecordingSession(directoryURL: root.appendingPathComponent("Demo.bettershotrec", isDirectory: true))
+    try FileManager.default.createDirectory(at: session.directoryURL, withIntermediateDirectories: true)
+    try FileManager.default.copyItem(at: movieURL, to: session.screenURL)
+    history.referenceCapture(at: session.screenURL, kind: .recording)
+    let project = RecordingProjectSummary(session: session, displayName: "Demo", createdAt: Date(),
+        duration: 2, pixelSize: CGSize(width: 1920, height: 1080), isSaved: false,
+        hasUnsavedDraft: true, sizeOnDisk: 0, lastOpenedAt: nil)
+    let image = ScreenshotHistoryItem(id: UUID(), createdAt: Date(), updatedAt: Date(),
+        fileName: UUID().uuidString + ".png", pixelWidth: 1920, pixelHeight: 1080,
+        cloudURL: "https://example.com/s/image", hasEdits: true, sourceCapturePath: imageURL.path)
+    let video = ScreenshotHistoryItem(id: UUID(), createdAt: Date(), updatedAt: Date(),
+        fileName: "Demo.mov", pixelWidth: 1920, pixelHeight: 1080, kind: .video,
+        cloudURL: "https://example.com/s/video", recordingSessionPath: session.directoryURL.path)
+    let entries = MediaGalleryItem.collect(history: history, edits: [image, video], projects: [project])
+    precondition(entries.count == 2, "Capture, edited history, and package must not duplicate media")
+    precondition(entries.first { $0.kind == .recording }!.editorURL == session.directoryURL,
+                 "Videos must reopen their editable project")
+    precondition(entries.first { $0.kind == .screenshot }!.localURL == imageURL,
+                 "A missing shared copy must not hide an available original")
+    precondition(!entries.contains { $0.id == raw.id.uuidString })
+    let recovered = MediaGalleryItem.collect(history: HistoryStore(storageDirectory: root.appendingPathComponent("empty")),
+        edits: [], projects: [project])
+    precondition(recovered.count == 1 && recovered[0].editorURL == session.directoryURL,
+                 "Projects outside recent history must remain discoverable")
+    precondition(MediaGalleryItem.filtered(entries, kind: .recording, cloud: false, search: " demo ").count == 1)
+    precondition(MediaGalleryItem.filtered(entries, kind: .screenshot, cloud: true, search: "").count == 1)
+    precondition(MediaGalleryItem.filtered(entries, kind: nil, cloud: true, search: "no match").isEmpty)
+    precondition(ScreenshotHistoryStore.shouldKeep(image), "Missing files must retain cloud links on reload")
+    var missing = image
+    missing.cloudURL = nil
+    precondition(!ScreenshotHistoryStore.shouldKeep(missing))
+    for value in ["file:///tmp/file", "javascript:alert(1)", "https://", "not a link"] {
+        precondition(MediaGalleryItem.cloudLink(value) == nil)
+    }
+    let cloudOnly = MediaGalleryItem(id: "cloud-only", title: "Cloud screenshot", createdAt: Date(),
+        kind: .screenshot, localURL: root.appendingPathComponent("missing.png"),
+        editorURL: root.appendingPathComponent("missing.png"), cloudURL: URL(string: "https://example.com/s/missing"))
+    precondition(MediaGalleryItem.filtered([cloudOnly], kind: nil, cloud: false, search: "").isEmpty)
+    precondition(MediaGalleryItem.filtered([cloudOnly], kind: nil, cloud: true, search: "").count == 1)
+    for item in entries {
+        precondition(HistoryStore.decodeThumbnail(.init(url: item.localURL, kind: item.kind), maxSize: 480) != nil,
+                     "Both screenshot and video gallery sources must decode")
+    }
+    let output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        .appendingPathComponent(".build/editor-snapshots")
+    try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+    for scheme in [ColorScheme.light, .dark] {
+        for width: CGFloat in [540, 740] {
+            NSApplication.shared.appearance = NSAppearance(named: scheme == .light ? .aqua : .darkAqua)
+            let hosting = NSHostingView(rootView: MediaGalleryContent(items: entries)
+                .environment(\.colorScheme, scheme).background(EditorChrome.workspace)
+                .frame(width: width, height: 520))
+            hosting.appearance = NSApplication.shared.appearance
+            let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: width, height: 520),
+                styleMask: [.borderless], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.appearance = NSAppearance(named: scheme == .light ? .aqua : .darkAqua)
+            window.contentView = hosting
+            defer { window.contentView = nil; window.close() }
+            hosting.layoutSubtreeIfNeeded()
+            // Yield the main actor so the real card tasks can decode their thumbnails.
+            try await Task.sleep(for: .milliseconds(300))
+            hosting.layoutSubtreeIfNeeded()
+            let bitmap = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds)!
+            hosting.cacheDisplay(in: hosting.bounds, to: bitmap)
+            try bitmap.representation(using: .png, properties: [:])!.write(
+                to: output.appendingPathComponent("gallery-\(scheme)-\(Int(width)).png"))
+        }
+        try snapshot(MediaGalleryCard(item: cloudOnly, cloud: true), scheme: scheme, width: 240,
+            to: output.appendingPathComponent("gallery-cloud-\(scheme).png"), height: 250)
+        try snapshot(MediaGalleryContent(items: []), scheme: scheme, width: 540,
+            to: output.appendingPathComponent("gallery-empty-\(scheme).png"), height: 520)
+    }
+    print("PASS gallery source merging, project reopening, local/cloud/type/search filters, missing local shares, and compact/light/dark layouts")
 }

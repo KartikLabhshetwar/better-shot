@@ -204,8 +204,11 @@ settings; project edits never replace General's defaults. Recording retains its
 capture and export options, without a separate background default.
 
 The native Settings sidebar has General, Capture, Recording, Shortcuts, Sharing,
-and About. Recent captures are accessed from the menu; do not reintroduce removed
-Settings library tabs as part of an unrelated change.
+and About. Recent captures remain accessible from the menu. General > Open Media Gallery
+combines retained capture history, edited images, and recording projects, with
+Local/Cloud and screenshot/video filters. Reuse the existing editor URL resolvers
+and preserve cloud links even when local media is missing; the gallery does not
+list the R2 bucket. Gallery checks cover merging, filters, and light/dark layouts.
 
 ## Validation
 
@@ -269,7 +272,7 @@ commands from `bettershot-landing/`, such as `pnpm lint` and `pnpm build`.
 
 `version.json` is the version source (`version`, `build`, `minimumOS`).
 `make generate` syncs version/build into the project. Current pending changes belong
-under **0.5.0 — Unreleased**; do not create a 0.4.3 release or mark 0.5.0 shipped
+under **0.5.1 — Unreleased**; do not create a 0.4.3 release or mark a version shipped
 without an explicit release request. Keep historical entries and contributor credit.
 
 Use short, descriptive commit messages, for example `fix: preserve cursor hotspot

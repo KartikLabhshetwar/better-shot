@@ -5,6 +5,16 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - Unreleased
+
+### Added
+
+- **Media Gallery in General settings**: Open Settings from the menu bar, then General > Open Media Gallery to browse saved screenshots and videos. Search by name, filter by media type, preview local captures, reopen editable projects, reveal files in Finder, and open or copy saved cloud links.
+
+### Fixed
+
+- **Cloud share history**: Sharing an untouched screenshot or an imported video now records its cloud link. Cloud links remain available when their local file is missing. The gallery combines capture history, edited images, and recording projects without duplicating their source files.
+
 ## [0.5.0] - 2026-09-10
 
 A complete introduction to screenshots, video, and permissions; a simpler capture

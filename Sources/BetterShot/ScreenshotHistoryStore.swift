@@ -439,8 +439,17 @@ final class ScreenshotHistoryStore {
         return true
     }
 
-    func setCloudURL(for fileURL: URL, cloudURL: String) {
-        let standardized = fileURL.standardizedFileURL
+    func setCloudURL(for fileURL: URL, cloudURL: String) async {
+        var standardized = fileURL.standardizedFileURL
+        if !items.contains(where: { $0.url.standardizedFileURL == standardized }) {
+            // Untouched images and imported videos can be shared without an editor save.
+            if ShareBundle.mimeType(for: fileURL).hasPrefix("video/") {
+                standardized = await importVideo(from: fileURL).standardizedFileURL
+            } else {
+                standardized = importScreenshot(from: fileURL,
+                    sourceCapturePath: standardized.path).standardizedFileURL
+            }
+        }
         guard let index = items.firstIndex(where: { $0.url.standardizedFileURL == standardized }) else {
             return
         }
@@ -527,12 +536,17 @@ final class ScreenshotHistoryStore {
         }
 
         items = decoded
-            .filter { FileManager.default.fileExists(atPath: $0.url.path) }
+            .filter { Self.shouldKeep($0) }
             .sorted { $0.createdAt > $1.createdAt }
 
         if !FileManager.default.fileExists(atPath: Self.metadataURL.path) {
             saveMetadata()
         }
+    }
+
+    static func shouldKeep(_ item: ScreenshotHistoryItem) -> Bool {
+        FileManager.default.fileExists(atPath: item.url.path)
+            || MediaGalleryItem.cloudLink(item.cloudURL) != nil
     }
 
     private static func decodeItems(at url: URL) -> [ScreenshotHistoryItem]? {

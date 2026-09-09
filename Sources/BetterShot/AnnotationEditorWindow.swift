@@ -601,7 +601,7 @@ struct AnnotationEditorWindow: View {
                 )
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(result.url, forType: .string)
-                ScreenshotHistoryStore.shared.setCloudURL(for: resultURL, cloudURL: result.url)
+                await ScreenshotHistoryStore.shared.setCloudURL(for: resultURL, cloudURL: result.url)
                 if let shareURL = URL(string: result.url) {
                     uploadPhase = .finished(shareURL)
                 } else {
