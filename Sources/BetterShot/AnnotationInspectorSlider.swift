@@ -137,6 +137,10 @@ struct InspectorValueFormat {
     }
 }
 
+extension EnvironmentValues {
+    @Entry var simpleInspectorControls = false
+}
+
 /// A compact label-in-track scrubber paired with an exact editable value.
 /// Hovering or focusing reveals calibrated markers and the current position;
 /// the full left field remains draggable, so there is no tiny thumb to chase.
@@ -147,6 +151,7 @@ struct InspectorSlider: View {
     let format: InspectorValueFormat
     var onEditingChanged: (Bool) -> Void
 
+    @Environment(\.simpleInspectorControls) private var simpleControls
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
@@ -177,14 +182,34 @@ struct InspectorSlider: View {
     }
 
     var body: some View {
-        HStack(spacing: 7) {
-            GeometryReader { proxy in
-                scrubTrack(width: proxy.size.width)
-            }
-            .frame(height: InspectorMetrics.sliderHeight)
+        Group {
+            if simpleControls {
+                VStack(spacing: 4) {
+                    HStack {
+                        Text(title).font(.inspectorLabel).foregroundStyle(.secondary)
+                        Spacer()
+                        valueField.frame(width: InspectorMetrics.sliderValueWidth)
+                    }
+                    Slider(value: Binding(get: { value }, set: setValue), in: range,
+                           onEditingChanged: { editing in
+                        isDragging = editing
+                        onEditingChanged(editing)
+                    })
+                    .controlSize(.small)
+                    .accessibilityLabel(title)
+                    .accessibilityValue(format.displayString(for: value))
+                }
+            } else {
+                HStack(spacing: 7) {
+                    GeometryReader { proxy in
+                        scrubTrack(width: proxy.size.width)
+                    }
+                    .frame(height: InspectorMetrics.sliderHeight)
 
-            valueField
-                .frame(width: InspectorMetrics.sliderValueWidth)
+                    valueField
+                        .frame(width: InspectorMetrics.sliderValueWidth)
+                }
+            }
         }
         .frame(maxWidth: .infinity)
         .onAppear(perform: syncDraftText)

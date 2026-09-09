@@ -35,7 +35,7 @@ struct CloudUploadOptionsPopover: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
-                Image(systemName: "link")
+                Image(systemName: "icloud.and.arrow.up")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 28, height: 28)
@@ -68,7 +68,7 @@ struct CloudUploadOptionsPopover: View {
                     dismiss()
                     onConfirm(options)
                 } label: {
-                    Label("Share", systemImage: "arrow.up.circle.fill")
+                    Label("Share", systemImage: "icloud.and.arrow.up")
                 }
                 .buttonStyle(.bordered)
                 .keyboardShortcut(.defaultAction)

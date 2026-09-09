@@ -30,6 +30,8 @@ extension RecordingBarPresenter {
 
 struct RecordingSessionControls: View {
     @State private var manager = ScreenRecordingManager.shared
+    @State private var confirmsRestart = false
+    @State private var confirmsDiscard = false
 
     private var isPaused: Bool {
         manager.state == .paused
@@ -42,80 +44,67 @@ struct RecordingSessionControls: View {
     }
 
     var body: some View {
-        HStack(spacing: BarMetrics.itemSpacing) {
-            elapsed
+        HStack(spacing: 0) {
+            Button { manager.stopRecording() } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "stop.circle").font(.system(size: 23))
+                    Text(manager.formattedElapsedTime)
+                        .font(.system(size: 16, weight: .medium).monospacedDigit())
+                        .frame(minWidth: 48, alignment: .leading)
+                }
+                .foregroundStyle(BarMetrics.recordTint)
+                .padding(.horizontal, 16)
+                .frame(height: BarMetrics.recordingHeight)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(BarButtonStyle())
+            .disabled(isSettling)
+            .help("Stop and save the recording")
+            .accessibilityLabel("Stop and save recording, \(manager.formattedElapsedTime) elapsed")
 
-            BarDivider()
-
+            separator
             BarActionButton(
                 id: .pauseResume,
                 title: isPaused ? "Resume recording" : "Pause recording",
-                systemImage: isPaused ? "play.fill" : "pause.fill"
+                systemImage: isPaused ? "play.circle" : "pause.circle"
             ) {
-                if isPaused {
-                    manager.resumeRecording()
-                } else {
-                    manager.pauseRecording()
-                }
+                if isPaused { manager.resumeRecording() }
+                else { manager.pauseRecording() }
             }
+            .frame(width: 56)
             .disabled(isSettling)
 
-            BarActionButton(
-                id: .restart,
-                title: "Start over",
-                systemImage: "arrow.counterclockwise",
-                accessibility: "Restart - discard what's recorded and start again"
-            ) {
-                manager.restartRecording()
+            separator
+            BarActionButton(id: .restart, title: "Start over", systemImage: "arrow.counterclockwise") {
+                confirmsRestart = true
             }
+            .frame(width: 56)
             .disabled(isSettling)
 
-            BarActionButton(
-                id: .stop,
-                title: "Stop and save",
-                systemImage: "stop.fill",
-                tint: BarMetrics.recordTint,
-                accessibility: "Stop and save the recording"
-            ) {
-                manager.stopRecording()
+            separator
+            BarActionButton(id: .discard, title: "Discard recording", systemImage: "trash") {
+                confirmsDiscard = true
             }
+            .frame(width: 56)
             .disabled(isSettling)
-
-            BarActionButton(
-                id: .discard,
-                title: "Discard recording",
-                systemImage: "trash.fill",
-                accessibility: "Discard - delete this recording without saving"
-            ) {
-                manager.deleteRecording()
-            }
-            .disabled(manager.state == .starting)
+        }
+        .alert("Start a new recording?", isPresented: $confirmsRestart) {
+            Button("Start Over", role: .destructive) { manager.restartRecording() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This recording will be discarded and recording will start again.")
+        }
+        .alert("Discard this recording?", isPresented: $confirmsDiscard) {
+            Button("Discard", role: .destructive) { manager.deleteRecording() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This recording will be deleted without saving.")
         }
     }
 
-    private var elapsed: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(BarMetrics.recordTint)
-                .frame(width: 8, height: 8)
-                .opacity(isPaused ? 0.35 : 1)
-
-            Text(manager.formattedElapsedTime)
-                .font(.system(size: 16, weight: .medium, design: .monospaced))
-                .monospacedDigit()
-                .foregroundStyle(BarMetrics.activeTint)
-                // Fixed width so the clock ticking over from 9:59 to 10:00
-                // doesn't nudge the whole bar sideways.
-                .frame(minWidth: 56, alignment: .leading)
-        }
-        .padding(.leading, 8)
-        .padding(.trailing, 2)
-        .frame(height: BarMetrics.controlSize)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(
-            isPaused
-                ? "Recording paused at \(manager.formattedElapsedTime)"
-                : "Recording, \(manager.formattedElapsedTime) elapsed"
-        )
+    private var separator: some View {
+        Rectangle()
+            .fill(BarMetrics.edge)
+            .frame(width: 1, height: BarMetrics.recordingHeight)
     }
 }

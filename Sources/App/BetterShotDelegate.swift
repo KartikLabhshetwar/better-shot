@@ -20,6 +20,7 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
 
         MenuBarPopoverController.shared.setup()
         RecordingRecoveryCoordinator.recoverInterruptedRecordings()
+        RecordingBarPresenter.shared.showPicker(activate: false)
 
         Task {
             await AppUpdater.shared.checkForUpdatesQuietly()
@@ -73,7 +74,7 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag {
-            NSApp.activate(ignoringOtherApps: true)
+            RecordingBarPresenter.shared.showPicker()
         }
         return true
     }

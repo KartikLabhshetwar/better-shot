@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import SwiftUI
 @testable import BetterShot
 
@@ -14,6 +15,43 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
                          "Editor chrome must remain neutral in both appearances")
         }
     }
+    let suiteName = "BetterShot-shortcuts-" + UUID().uuidString
+    let shortcutDefaults = UserDefaults(suiteName: suiteName)!
+    defer { shortcutDefaults.removePersistentDomain(forName: suiteName) }
+    let shortcuts = ShortcutService.Shortcut.self
+    precondition(shortcuts.defaultRegion.keyCode == UInt32(kVK_ANSI_2))
+    precondition(shortcuts.defaultRecording.keyCode == UInt32(kVK_ANSI_5))
+    for (oldRegionKey, oldRecordingKey, enabled) in [
+        (kVK_ANSI_4, kVK_ANSI_2, true),
+        (kVK_ANSI_4, kVK_ANSI_2, false),
+        (kVK_ANSI_7, kVK_ANSI_8, true)
+    ] {
+        shortcutDefaults.removePersistentDomain(forName: suiteName)
+        var region = shortcuts.defaultRegion
+        region.keyCode = UInt32(oldRegionKey)
+        region.enabled = enabled
+        var recording = shortcuts.defaultRecording
+        recording.keyCode = UInt32(oldRecordingKey)
+        recording.enabled = enabled
+        try shortcutDefaults.set(JSONEncoder().encode(region), forKey: "bs_hotkey_1")
+        try shortcutDefaults.set(JSONEncoder().encode(recording), forKey: "bs_hotkey_6")
+        ShortcutService.migrateCaptureShortcuts(defaults: shortcutDefaults)
+        let migratedRegion = try JSONDecoder().decode(ShortcutService.Shortcut.self,
+            from: shortcutDefaults.data(forKey: "bs_hotkey_1")!)
+        let migratedRecording = try JSONDecoder().decode(ShortcutService.Shortcut.self,
+            from: shortcutDefaults.data(forKey: "bs_hotkey_6")!)
+        precondition(migratedRegion.keyCode == UInt32(oldRegionKey == kVK_ANSI_4 ? kVK_ANSI_2 : oldRegionKey))
+        precondition(migratedRecording.keyCode == UInt32(oldRecordingKey == kVK_ANSI_2 ? kVK_ANSI_5 : oldRecordingKey))
+        precondition(migratedRegion.enabled == enabled && migratedRecording.enabled == enabled)
+        // A later intentional reassignment must survive subsequent launches.
+        try shortcutDefaults.set(JSONEncoder().encode(recording), forKey: "bs_hotkey_6")
+        ShortcutService.migrateCaptureShortcuts(defaults: shortcutDefaults)
+        let reassigned = try JSONDecoder().decode(ShortcutService.Shortcut.self,
+            from: shortcutDefaults.data(forKey: "bs_hotkey_6")!)
+        precondition(reassigned == recording)
+    }
+    print("PASS screenshot/recording defaults, migration, custom bindings, and disabled shortcuts")
+
     let imageModel = AnnotationEditorModel()
     imageModel.previewImage = NSImage(contentsOf: imageURL)!
     imageModel.imageSize = CGSize(width: 1920, height: 1080)
@@ -30,6 +68,26 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     precondition(imageModel.zoomPercent == 10)
     imageModel.fitCanvas()
     precondition(imageModel.zoomToFit && imageModel.panOffset == .zero)
+
+    var sliderAmount: CGFloat = 1.5
+    let sliderHost = NSHostingView(rootView: InspectorSlider("Zoom", value: Binding(
+        get: { sliderAmount }, set: { sliderAmount = $0 }), range: 1...4,
+        format: .magnification(fractionDigits: 1))
+        .environment(\.simpleInspectorControls, true))
+    sliderHost.frame = NSRect(x: 0, y: 0, width: 280, height: 64)
+    sliderHost.layoutSubtreeIfNeeded()
+    func nativeSlider(in view: NSView) -> NSSlider? {
+        if let slider = view as? NSSlider { return slider }
+        return view.subviews.lazy.compactMap { nativeSlider(in: $0) }.first
+    }
+    let slider = nativeSlider(in: sliderHost)!
+    for (progress, expected) in [(0.0, 1.0), (5.0 / 12, 2.25), (1.0, 4.0)] {
+        slider.doubleValue = slider.minValue + progress * (slider.maxValue - slider.minValue)
+        slider.sendAction(slider.action!, to: slider.target)
+        precondition(abs(sliderAmount - expected) < 0.001,
+                     "Native inspector slider must preserve model bounds and precision")
+    }
+    print("PASS native inspector slider bounds and binding")
 
     let videoModel = RecordingStudioModel(url: movieURL)
     await videoModel.load()
@@ -54,30 +112,6 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     precondition(videoModel.zoomCues.first?.zoom == 2)
     precondition(videoModel.zoomEnabled, "Redo must restore zoom playback")
 
-    var selectedTab = StudioInspectorTab.background
-    let tabHost = NSHostingView(rootView: StudioInspectorTabs(
-        selection: Binding(get: { selectedTab }, set: { selectedTab = $0 }),
-        isAvailable: { $0 != .camera }))
-    tabHost.frame = NSRect(x: 0, y: 0, width: 336, height: 48)
-    tabHost.layoutSubtreeIfNeeded()
-    func inspectorSegments(in view: NSView) -> NSSegmentedControl? {
-        if let control = view as? NSSegmentedControl { return control }
-        return view.subviews.lazy.compactMap { inspectorSegments(in: $0) }.first
-    }
-    let tabs = inspectorSegments(in: tabHost)!
-    precondition(tabs.segmentCount == 4 && StudioInspectorTab.allCases.count == 4)
-    for (index, tab) in StudioInspectorTab.allCases.enumerated() {
-        precondition(tabs.image(forSegment: index)?.accessibilityDescription == tab.title)
-        precondition(tabs.toolTip(forSegment: index) == nil)
-    }
-    precondition(tabs.selectedSegmentBezelColor == .controlBackgroundColor)
-    precondition(!tabs.isEnabled(forSegment: 1))
-    tabs.selectedSegment = 1
-    tabs.sendAction(tabs.action!, to: tabs.target)
-    precondition(selectedTab == .background, "Unavailable inspectors cannot become selected")
-    tabs.selectedSegment = 2
-    tabs.sendAction(tabs.action!, to: tabs.target)
-    precondition(selectedTab == .effects, "Native segment selection must reach SwiftUI")
     let clipControl = RecordingClipTimelineControl(frame: NSRect(x: 0, y: 0, width: 600, height: 52))
     clipControl.update(timeline: videoModel.clipTimeline, sourceDuration: videoModel.sourceDuration,
                        thumbnails: videoModel.timelineThumbnails, selectedClipID: nil, playheadTime: 0)
@@ -93,7 +127,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         clickCount: 1, pressure: 1)!)
     precondition(abs((splitTime ?? -1) - videoModel.duration / 2) < 0.01, "The split tool cuts at the click")
     clipControl.toggleSplitRequested = nil
-    print("PASS accessible icon tabs, unavailable tabs, selection, split tool, zoom editing, and undo/redo")
+    print("PASS split tool, zoom editing, and undo/redo")
     let output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         .appendingPathComponent(".build/editor-snapshots")
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
@@ -106,6 +140,12 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     print("PASS effect toggle defaults and previous amount restoration")
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
+        try snapshot(RecordingSessionControls().studioGlass(cornerRadius: 16),
+                     scheme: scheme, width: 360,
+                     to: output.appendingPathComponent("recording-\(name).png"), height: 64)
+        try snapshot(RecordingPickerControls().padding(8).studioGlass(cornerRadius: 16)
+            .background(EditorChrome.workspace), scheme: scheme, width: 760,
+                     to: output.appendingPathComponent("capture-\(name).png"), height: 100)
         try snapshot(
             AnnotationEditorWindow(url: .constant(nil), model: imageModel),
             scheme: scheme, width: 1280, to: output.appendingPathComponent("image-\(name).png"))
@@ -134,15 +174,16 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
 
 @MainActor
 private func snapshot<V: View>(
-    _ view: V, scheme: ColorScheme, width: CGFloat, to url: URL
+    _ view: V, scheme: ColorScheme, width: CGFloat, to url: URL, height: CGFloat = 800
 ) throws {
     let app = NSApplication.shared
     app.appearance = NSAppearance(named: scheme == .light ? .aqua : .darkAqua)
     let hosting = NSHostingView(rootView: view
         .environment(\.colorScheme, scheme)
-        .frame(width: width, height: 800))
+        .background(EditorChrome.workspace)
+        .frame(width: width, height: height))
     hosting.appearance = app.appearance
-    hosting.frame = NSRect(x: 0, y: 0, width: width, height: 800)
+    hosting.frame = NSRect(x: 0, y: 0, width: width, height: height)
     let window = NSWindow(contentRect: hosting.frame, styleMask: [.borderless], backing: .buffered, defer: false)
     window.isReleasedWhenClosed = false
     window.appearance = app.appearance

@@ -35,15 +35,16 @@ screenshot shortcuts.
 
 | Action | Shortcut |
 |---|---|
-| Region screenshot | `⌘⇧4` |
+| Region screenshot | `⌘⇧2` |
 | Fullscreen screenshot | `⌘⇧3` |
-| Record screen | `⌘⇧2` |
+| Capture & recording bar | `⌘⇧5` |
 | OCR text scan | `⌘⇧O` |
 | Color picker (hex) | `⌘⇧C` |
 
-`⌘⇧2` opens the all-in-one bar: region, window, screen, OCR, color picker and
-recording all live on it. Your last region appears as a dashed ghost as soon as
-the bar opens; press `A` to capture it again. During region capture the ghost
+The all-in-one bar appears at launch. `⌘⇧5` reopens that same bar; `⌘⇧2`
+starts region selection directly. The bar contains region, window, screen, OCR,
+color picker, and recording controls. Opening it with the shortcut also shows
+your last region as a dashed ghost; press `A` to capture it again. During region capture the ghost
 stays: `Return`, `A`, or a click inside it captures it, `Space` switches to
 window selection. All of these are re-bindable in
 Settings > Shortcuts. In the editor, every tool carries its

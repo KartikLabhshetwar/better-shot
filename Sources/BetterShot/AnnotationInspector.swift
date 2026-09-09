@@ -35,8 +35,6 @@ private enum AnnotationInspectorSectionState {
 
 struct AnnotationEditorInspector: View {
     private static let minimumColumnWidth: CGFloat = 260
-    private static let idealColumnWidth: CGFloat = 280
-    private static let maximumColumnWidth: CGFloat = 440
 
     @Bindable var model: AnnotationEditorModel
     @Bindable var wallpaperStore: AnnotationWallpaperStore
@@ -44,50 +42,34 @@ struct AnnotationEditorInspector: View {
     let focusedField: FocusState<AnnotationEditorFocusedField?>.Binding
     let onEditorAction: () -> Void
     let onPickWallpaper: () -> Void
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var expandedAdvancedSections: Set<AnnotationInspectorAdvancedSection> = AnnotationInspectorSectionState.loadExpandedSections()
 
     var body: some View {
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: 0) {
-                InspectorSection("Smart Redaction") {
-                    HStack(spacing: 8) {
-                        SmartRedactionButton(
-                            title: "Pixelate",
-                            systemImage: "app.background.dotted",
-                            isRunning: model.isSmartRedacting
-                        ) {
-                            onEditorAction()
-                            model.smartRedact(using: .pixelate)
-                        }
-
-                        SmartRedactionButton(
-                            title: "Blur",
-                            systemImage: "drop.fill",
-                            isRunning: model.isSmartRedacting
-                        ) {
-                            onEditorAction()
-                            model.smartRedact(using: .blur)
+                InspectorDisclosureSection(
+                    title: "Background",
+                    isExpanded: expansionBinding(for: .background),
+                    accessory: {
+                        if model.backgroundSettings.style != .none {
+                            InspectorClearButton(help: "Remove background") {
+                                onEditorAction()
+                                model.backgroundSettings.style = .none
+                            }
                         }
                     }
-
-                    if model.isSmartRedacting {
-                        HStack(spacing: 6) {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text("Scanning screenshot…")
-                                .font(.inspectorLabel)
-                                .foregroundStyle(.secondary)
-                        }
-                    } else if let message = model.smartRedactionMessage {
-                        Text(message)
-                            .font(.inspectorLabel)
-                            .foregroundStyle(.secondary)
-                    }
+                ) {
+                    AnnotationBackgroundInspector(
+                        settings: Binding(
+                            get: { model.backgroundSettings },
+                            set: { model.backgroundSettings = $0 }
+                        ),
+                        wallpaperStore: wallpaperStore,
+                        onEditorAction: onEditorAction,
+                        onPickWallpaper: onPickWallpaper
+                    )
                 }
-
-                InspectorSectionDivider()
 
                 InspectorDisclosureSection(
                     title: "Camera",
@@ -161,29 +143,6 @@ struct AnnotationEditorInspector: View {
                     )
                     .disabled(!model.backgroundSettings.progressiveBlur.isEnabled)
                     .opacity(model.backgroundSettings.progressiveBlur.isEnabled ? 1 : 0.48)
-                }
-
-                InspectorDisclosureSection(
-                    title: "Background",
-                    isExpanded: expansionBinding(for: .background),
-                    accessory: {
-                        if model.backgroundSettings.style != .none {
-                            InspectorClearButton(help: "Remove background") {
-                                onEditorAction()
-                                model.backgroundSettings.style = .none
-                            }
-                        }
-                    }
-                ) {
-                    AnnotationBackgroundInspector(
-                        settings: Binding(
-                            get: { model.backgroundSettings },
-                            set: { model.backgroundSettings = $0 }
-                        ),
-                        wallpaperStore: wallpaperStore,
-                        onEditorAction: onEditorAction,
-                        onPickWallpaper: onPickWallpaper
-                    )
                 }
 
                 InspectorDisclosureSection(
@@ -268,26 +227,17 @@ struct AnnotationEditorInspector: View {
                     .fill(Color(nsColor: .separatorColor).opacity(0.45))
                     .frame(height: 0.5)
             }
-            .background(sidebarBackground)
+            .background(.regularMaterial)
         }
         .scrollContentBackground(.hidden)
         .scrollEdgeEffectSoftIfAvailable()
-        .background(sidebarBackground)
-        .inspectorColumnWidth(
-            min: Self.minimumColumnWidth,
-            ideal: Self.idealColumnWidth,
-            max: Self.maximumColumnWidth
-        )
+        .background(.regularMaterial)
         .frame(
             minWidth: Self.minimumColumnWidth,
             maxWidth: .infinity,
             maxHeight: .infinity,
             alignment: .topLeading
         )
-    }
-
-    private var sidebarBackground: Color {
-        colorScheme == .dark ? Color(nsColor: .windowBackgroundColor) : .white
     }
 
     private var sectionAnimation: Animation? {
@@ -308,6 +258,51 @@ struct AnnotationEditorInspector: View {
                 AnnotationInspectorSectionState.saveExpandedSections(expandedAdvancedSections)
             }
         )
+    }
+}
+
+struct AnnotationSmartRedactionControls: View {
+    @Bindable var model: AnnotationEditorModel
+    let onEditorAction: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Automatically hide sensitive information")
+                .font(.subheadline).foregroundStyle(.secondary)
+            HStack(spacing: 8) {
+                SmartRedactionButton(
+                    title: "Pixelate",
+                    systemImage: "app.background.dotted",
+                    isRunning: model.isSmartRedacting
+                ) {
+                    onEditorAction()
+                    model.smartRedact(using: .pixelate)
+                }
+
+                SmartRedactionButton(
+                    title: "Blur",
+                    systemImage: "drop.fill",
+                    isRunning: model.isSmartRedacting
+                ) {
+                    onEditorAction()
+                    model.smartRedact(using: .blur)
+                }
+            }
+
+            if model.isSmartRedacting {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Scanning screenshot…")
+                        .font(.inspectorLabel)
+                        .foregroundStyle(.secondary)
+                }
+            } else if let message = model.smartRedactionMessage {
+                Text(message)
+                    .font(.inspectorLabel)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 }
 

@@ -13,15 +13,15 @@ import AppKit
 import SwiftUI
 
 enum BarMetrics {
-    /// Sized off the control row rather than a caption: the icons carry the
-    /// bar and the tooltip carries the naming.
+    /// Capture modes have visible captions; active recording controls stay compact.
     static let controlSize: CGFloat = 40
-    static let height: CGFloat = 52
+    static let height: CGFloat = 80
+    static let recordingHeight: CGFloat = 52
     static let cornerRadius: CGFloat = 16
     static let itemSpacing: CGFloat = 2
     static let horizontalPadding: CGFloat = 6
 
-    /// Transparent slack around the bar so the shadow Liquid Glass casts
+    /// Transparent slack around the bar so its shadow
     /// isn't clipped by the panel edge. The panel is positioned lower by
     /// exactly this much so the bar itself doesn't move.
     static let shadowSlack: CGFloat = 28
@@ -33,8 +33,7 @@ enum BarMetrics {
     static let panelWidth: CGFloat = 760
     static var panelHeight: CGFloat { BarTooltip.reservedHeight + height + shadowSlack }
 
-    /// The bar's surface is Liquid Glass, which brings its own fill and
-    /// shadow. These are the marks drawn on top of it.
+    /// Marks drawn over the classic frosted backing.
     ///
     /// They're all AppKit label colours rather than SwiftUI's `.primary` and
     /// friends. Hierarchical styles also resolve against the *control* active
@@ -96,6 +95,7 @@ enum BarTooltipID: String {
     case ocr
     case colorPicker
 
+    case recording
     case display
     case window
     case area
@@ -187,7 +187,7 @@ struct BarTooltipPill: View {
             .fixedSize()
             .padding(.horizontal, 9)
             .frame(height: BarTooltip.pillHeight)
-            .glassEffect(.regular, in: shape)
+            .studioGlass()
             .overlay {
                 shape.strokeBorder(BarMetrics.edge, lineWidth: 0.5)
             }
@@ -210,6 +210,7 @@ struct BarActionLabel: View {
     let title: String
     let systemImage: String
     var tint: Color = BarMetrics.activeTint
+    var caption: String? = nil
 
     @Environment(\.isEnabled) private var isEnabled
     @Environment(BarTooltipModel.self) private var tooltip: BarTooltipModel?
@@ -217,22 +218,23 @@ struct BarActionLabel: View {
     @State private var frame: CGRect = .zero
 
     var body: some View {
-        Image(systemName: systemImage)
-            .font(.system(size: 17, weight: .regular))
+        VStack(spacing: 7) {
+            Image(systemName: systemImage)
+                .font(.system(size: caption == nil ? 17 : 23, weight: .regular))
+            if let caption {
+                Text(caption)
+                    .font(.system(size: 12))
+                    .lineLimit(1)
+            }
+        }
             .foregroundStyle(tint.opacity(isEnabled ? 1 : 0.3))
-            .frame(width: BarMetrics.controlSize, height: BarMetrics.controlSize)
-            // As a background so the puck never takes part in layout - it's
-            // wider than the icon and would otherwise spread the bar.
+            .frame(width: caption == nil ? BarMetrics.controlSize : 78,
+                   height: caption == nil ? BarMetrics.controlSize : 64)
             .background {
-                Circle()
+                RoundedRectangle(cornerRadius: 10)
                     .fill(BarMetrics.hoverFill)
-                    .frame(
-                        width: BarMetrics.hoverDiameter,
-                        height: BarMetrics.hoverDiameter
-                    )
                     .opacity(isHovering ? 1 : 0)
             }
-            .animation(.easeOut(duration: 0.12), value: isHovering)
             .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             // One of two cursor paths, for the two states the bar lives in.
             // While BetterShot is the active app the system's pointer-style
@@ -294,6 +296,7 @@ struct BarActionButton: View {
     let title: String
     let systemImage: String
     var tint: Color = BarMetrics.activeTint
+    var caption: String? = nil
     /// Only worth setting where the tooltip leaves something out - the device
     /// a control is bound to, what a destructive action destroys.
     var accessibility: String?
@@ -306,7 +309,7 @@ struct BarActionButton: View {
             tooltip?.dismiss()
             action()
         } label: {
-            BarActionLabel(id: id, title: title, systemImage: systemImage, tint: tint)
+            BarActionLabel(id: id, title: title, systemImage: systemImage, tint: tint, caption: caption)
         }
         .buttonStyle(BarButtonStyle())
         .accessibilityLabel(accessibility ?? title)

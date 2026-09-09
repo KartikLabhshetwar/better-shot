@@ -870,7 +870,7 @@ struct ShortcutSettingsTab: View {
         ("Capture Screen", "Grab the whole display at once", .fullscreen),
         ("OCR", "Read the text out of any region", .ocr),
         ("Pick Color", "Sample a color from anywhere on screen", .colorPicker),
-        ("Record Screen", "Open the recording bar", .recording),
+        ("Capture & Recording Bar", "Show the shared bar to choose a recording source", .recording),
     ]
 
     var body: some View {

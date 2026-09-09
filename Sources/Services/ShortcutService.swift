@@ -17,7 +17,7 @@ final class ShortcutService {
 
     var isRegistered: Bool { eventTap != nil }
 
-    private init() {}
+    private init() { Self.migrateCaptureShortcuts() }
 
     // MARK: - Shortcut Definition
 
@@ -26,11 +26,11 @@ final class ShortcutService {
         var modifiers: UInt32
         var enabled: Bool
 
-        static let defaultRegion = Shortcut(keyCode: UInt32(kVK_ANSI_4), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
+        static let defaultRegion = Shortcut(keyCode: UInt32(kVK_ANSI_2), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultFullscreen = Shortcut(keyCode: UInt32(kVK_ANSI_3), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultOCR = Shortcut(keyCode: UInt32(kVK_ANSI_O), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultColorPicker = Shortcut(keyCode: UInt32(kVK_ANSI_C), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
-        static let defaultRecording = Shortcut(keyCode: UInt32(kVK_ANSI_2), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
+        static let defaultRecording = Shortcut(keyCode: UInt32(kVK_ANSI_5), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
     }
 
     enum Action: UInt32, CaseIterable {
@@ -117,6 +117,24 @@ final class ShortcutService {
         return try? JSONDecoder().decode(Shortcut.self, from: data)
     }
 
+    /// Move only the old defaults; preserve custom combinations and disabled shortcuts.
+    static func migrateCaptureShortcuts(defaults: UserDefaults = .standard) {
+        let migrationKey = "bs_captureShortcuts050Migrated"
+        guard !defaults.bool(forKey: migrationKey) else { return }
+        for (action, oldKey, replacement) in [
+            (Action.region, UInt32(kVK_ANSI_4), Shortcut.defaultRegion),
+            (Action.recording, UInt32(kVK_ANSI_2), Shortcut.defaultRecording)
+        ] {
+            let key = "bs_hotkey_\(action.rawValue)"
+            guard let data = defaults.data(forKey: key),
+                  var saved = try? JSONDecoder().decode(Shortcut.self, from: data),
+                  saved.keyCode == oldKey, saved.modifiers == replacement.modifiers else { continue }
+            saved.keyCode = replacement.keyCode
+            if let data = try? JSONEncoder().encode(saved) { defaults.set(data, forKey: key) }
+        }
+        defaults.set(true, forKey: migrationKey)
+    }
+
     // MARK: - Accessibility Permission
 
     static func requestAccessibilityPermission() {
@@ -157,12 +175,11 @@ final class ShortcutService {
         for (action, shortcut) in cachedShortcuts {
             guard shortcut.enabled else { continue }
             if keyCode == shortcut.keyCode && carbonMods == shortcut.modifiers {
-                let pointerLocation = event.location
                 Task { @MainActor in
                     let mouseScreen = ActiveDisplayResolver.activeScreen(preferPointer: true)
                     if action == .recording {
                         guard !ScreenRecordingManager.shared.isActive else { return }
-                        RecordingBarPresenter.shared.togglePicker()
+                        RecordingBarPresenter.shared.showPicker()
                     } else {
                         await CaptureOrchestrator.shared.performCapture(action, on: mouseScreen)
                     }

@@ -50,23 +50,29 @@ final class RecordingBarPresenter {
         }
     }
 
-    func showPicker() {
+    func showPicker(activate: Bool = true) {
+        guard !ScreenRecordingManager.shared.isActive else { return }
         let panel = panel ?? makePanel()
         PreviewWindowCaptureExclusion.shared.register(window: panel)
-        Task {
-            await RecordingSourceCatalog.shared.refresh()
-        }
         mode = .picker
         position(panel, displayID: ActiveDisplayResolver.activeDisplayID(preferPointer: false))
         panel.orderFrontRegardless()
         // The picker is driven from the keyboard too (Esc, A for the last
         // region), and key events only reach the panel while BetterShot is
         // the active app. Focus is handed back when the picker leaves.
-        previousApp = NSApp.isActive ? nil : NSWorkspace.shared.frontmostApplication
+        guard activate else { return }
+        if !NSApp.isActive { previousApp = NSWorkspace.shared.frontmostApplication }
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKey()
         LastRegionGhostPresenter.shared.show()
         warmCameraPreviewIfEnabled()
+    }
+
+    /// All screenshot entry points clear the shared picker before capturing.
+    func hidePickerForCapture() async {
+        guard mode == .picker, !ScreenRecordingManager.shared.isActive else { return }
+        hide()
+        await CameraRecordingManager.shared.stopPreview()
     }
 
     /// The remembered region, captured without going through the selection
@@ -327,13 +333,13 @@ private struct RecordingBarView: View {
         // immediately; a fading-out set would hold its layout width and the
         // bar would visibly bulge to fit both before collapsing.
         .transition(.asymmetric(insertion: .opacity, removal: .identity))
-        .padding(.horizontal, BarMetrics.horizontalPadding)
-        .frame(height: BarMetrics.height)
+        .padding(.horizontal, presenter.mode == .picker ? BarMetrics.horizontalPadding : 0)
+        .frame(height: presenter.mode == .picker ? BarMetrics.height : BarMetrics.recordingHeight)
         // Clipped to the same shape the glass takes, so a morph reveals and
         // hides the controls behind the narrowing edge instead of letting
         // them spill past it.
         .clipShape(barShape)
-        .glassEffect(.regular, in: barShape)
+        .studioGlass(cornerRadius: BarMetrics.cornerRadius)
         .overlay {
             barShape.strokeBorder(BarMetrics.edge, lineWidth: 0.5)
         }

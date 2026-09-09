@@ -3,10 +3,8 @@
 //  BetterShot
 //
 //  The recording studio: a Screen Studio-style editor for screen recordings.
-//  Left/center is the composited live preview (background, padded rounded
-//  card, zoom-follow-pointer, draggable camera bubble) over a timeline with
-//  editable zoom cues; the trailing inspector uses the annotation
-//  editor's design system.
+//  A left inspector, composited live preview, and full-width timeline share
+//  the annotation editor's classic macOS chrome.
 //
 
 import AppKit
@@ -46,8 +44,13 @@ struct RecordingStudioContent: View {
     @State private var closeGuard = EditorCloseGuard()
 
     var body: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 8) {
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                if isInspectorPresented {
+                    StudioInspector(model: model)
+                        .frame(width: 360)
+                    Divider()
+                }
                 Group {
                     if let loadError = model.loadError {
                         ContentUnavailableView(
@@ -68,24 +71,17 @@ struct RecordingStudioContent: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .editorPanel()
 
-                if isInspectorPresented {
-                    StudioInspector(model: model)
-                        .frame(width: 360)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                }
             }
 
             if model.loadError == nil {
                 StudioTimelineEditor(model: model)
-                    .editorPanel()
             }
         }
-        .padding(8)
         .background(EditorChrome.workspace)
-        .tint(StudioChrome.accent)
-        .accentColor(StudioChrome.accent)
+        .environment(\.simpleInspectorControls, true)
+        .tint(EditorChrome.accent)
+        .accentColor(EditorChrome.accent)
         .frame(minWidth: 1100, minHeight: 720)
         .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
         .toolbar {
@@ -113,26 +109,6 @@ struct RecordingStudioContent: View {
                 } else if model.isEditingMasks {
                     maskActions
                 } else {
-                    Button {
-                        withAnimation(.snappy(duration: 0.22)) {
-                            model.beginVideoCrop()
-                        }
-                    } label: {
-                        Label("Crop", systemImage: "crop")
-                    }
-                    .disabled(!model.isLoaded)
-                    .help("Crop the video")
-
-                    Button {
-                        withAnimation(.snappy(duration: 0.22)) {
-                            model.beginMaskEditing()
-                        }
-                    } label: {
-                        Label("Mask", systemImage: "eye.slash")
-                    }
-                    .disabled(!model.isLoaded)
-                    .help("Blur or pixelate parts of the video")
-
                     if model.isProject {
                         saveStatus
                     }
@@ -146,12 +122,13 @@ struct RecordingStudioContent: View {
                     Button {
                         isInspectorPresented.toggle()
                     } label: {
-                        Image(systemName: "sidebar.right")
+                        Image(systemName: "sidebar.left")
                     }
                     .help(isInspectorPresented ? "Hide Inspector" : "Show Inspector")
                     .accessibilityLabel("Toggle video inspector")
                 }
             }
+            .sharedBackgroundVisibility(.hidden)
         }
         .editorFullScreenByDefault()
         .navigationTitle(windowTitle)
@@ -344,7 +321,7 @@ struct RecordingStudioContent: View {
     @ViewBuilder
     private var shareStatus: some View {
         CloudUploadButton(suggestedTitle: shareSuggestedTitle, onUpload: model.shareToCloud) {
-            Label("Share", systemImage: "link")
+            Label("Share", systemImage: "icloud.and.arrow.up")
                 .labelStyle(.titleAndIcon)
         }
         .disabled(!model.isLoaded || model.exportState.isExporting || model.shareState.isBusy)
@@ -360,7 +337,7 @@ struct RecordingStudioContent: View {
             Label("Export", systemImage: "arrow.down.circle")
                 .labelStyle(.titleAndIcon)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.borderedProminent)
         .disabled(!model.isLoaded || model.shareState.isBusy || model.exportState.isExporting)
         .help("Save the finished video to your Mac")
     }
@@ -1250,7 +1227,6 @@ private struct StudioTimelineEditor: View {
             transport
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .studioGlass()
             lanes
         }
         .padding(.horizontal, 16)
@@ -1331,7 +1307,6 @@ private struct StudioTimelineEditor: View {
                            origin: scale.time(forX: x + scrollX))
             }
         ))
-        .padding(.leading, 76)
         .frame(height: StudioTimelineMetrics.lanesHeight(showsMaskLane: model.showsMaskLane))
         .onChange(of: model.duration, initial: true) { old, duration in
             if old == 0 || old == duration { viewport.fit(duration: duration) }
@@ -1352,10 +1327,10 @@ private struct StudioTimelineEditor: View {
     private func scrollingLanes(scale: StudioTimelineScale) -> some View {
         ZStack(alignment: .topLeading) {
             VStack(spacing: StudioTimelineMetrics.rowSpacing) {
-                Color.clear
-                    .frame(height: StudioTimelineMetrics.clipLaneHeight)
                 StudioZoomLaneBackground()
                     .frame(height: StudioTimelineMetrics.zoomLaneHeight)
+                Color.clear
+                    .frame(height: StudioTimelineMetrics.clipLaneHeight)
                 if model.showsMaskLane {
                     StudioZoomLaneBackground()
                         .frame(height: StudioTimelineMetrics.maskLaneHeight)
@@ -1366,13 +1341,6 @@ private struct StudioTimelineEditor: View {
 
             ScrollView(.horizontal) {
                 VStack(spacing: StudioTimelineMetrics.rowSpacing) {
-                    clipLane
-                        .frame(
-                            width: scale.x(for: model.duration),
-                            height: StudioTimelineMetrics.clipLaneHeight
-                        )
-                        .frame(width: scale.contentWidth, alignment: .leading)
-
                     StudioZoomLane(
                         model: model,
                         scale: scale,
@@ -1382,6 +1350,13 @@ private struct StudioTimelineEditor: View {
                         width: scale.contentWidth,
                         height: StudioTimelineMetrics.zoomLaneHeight
                     )
+
+                    clipLane
+                        .frame(
+                            width: scale.x(for: model.duration),
+                            height: StudioTimelineMetrics.clipLaneHeight
+                        )
+                        .frame(width: scale.contentWidth, alignment: .leading)
 
                     if model.showsMaskLane {
                         StudioMaskLane(
@@ -1400,7 +1375,7 @@ private struct StudioTimelineEditor: View {
                 }
             }
             .scrollPosition($scrollPosition)
-            .scrollIndicators(.never)
+            .scrollIndicators(.visible)
             .scrollBounceBehavior(.basedOnSize)
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
                 geometry.contentOffset.x
@@ -1412,23 +1387,6 @@ private struct StudioTimelineEditor: View {
         }
         .frame(height: StudioTimelineMetrics.scrollingLanesHeight(showsMaskLane: model.showsMaskLane))
         .mask(edgeFadeMask(scale: scale))
-        .overlay(alignment: .topLeading) {
-            VStack(alignment: .leading, spacing: StudioTimelineMetrics.rowSpacing) {
-                trackLabel("Video", icon: "film", height: StudioTimelineMetrics.clipLaneHeight)
-                trackLabel("Zoom", icon: "plus.magnifyingglass", height: StudioTimelineMetrics.zoomLaneHeight)
-                if model.showsMaskLane {
-                    trackLabel("Masks", icon: "eye.slash", height: StudioTimelineMetrics.maskLaneHeight)
-                }
-            }
-            .offset(x: -76)
-        }
-    }
-
-    private func trackLabel(_ title: String, icon: String, height: CGFloat) -> some View {
-        Label(title, systemImage: icon)
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(.secondary)
-            .frame(width: 68, height: height, alignment: .leading)
     }
 
     /// Fades scrolled-out lane content at the viewport edges instead of
@@ -1513,14 +1471,7 @@ private struct StudioTimelineEditor: View {
             .keyboardShortcut("-", modifiers: .command)
             .disabled(viewport.visibleSeconds >= RecordingTimelineViewport.zoomOutLimit(duration: model.duration))
 
-            timelineButton("Zoom In (⌘+)", systemImage: "plus.magnifyingglass") {
-                updateZoom(viewport.visibleSeconds / 1.6, origin: buttonZoomAnchor)
-            }
-            .keyboardShortcut("=", modifiers: .command)
-            .disabled(model.duration <= 0 || viewport.visibleSeconds <=
-                      RecordingTimelineViewport.zoomInLimit(duration: model.duration, viewportWidth: Double(viewportWidth)))
-
-            InspectorSlider("Detail", value: Binding(
+            Slider(value: Binding(
                 get: { CGFloat(viewport.zoomProgress(duration: model.duration, viewportWidth: Double(viewportWidth))) },
                 set: {
                     model.timelineThumbnails.deferSampling()
@@ -1528,12 +1479,20 @@ private struct StudioTimelineEditor: View {
                                                 viewportWidth: Double(viewportWidth))
                     syncScroll()
                 }
-            ), range: 0...1, format: .percent())
-            .frame(width: 170)
+            ), in: 0...1)
+            .frame(width: 110)
+            .controlSize(.small)
             .disabled(model.duration <= 0)
             .accessibilityLabel("Timeline zoom")
             .accessibilityValue("\(viewport.visibleSeconds.formatted(.number.precision(.fractionLength(1)))) seconds visible")
             .help("\(viewport.visibleSeconds.formatted(.number.precision(.fractionLength(1)))) seconds visible — pinch or ⌘-scroll to zoom")
+
+            timelineButton("Zoom In (⌘+)", systemImage: "plus.magnifyingglass") {
+                updateZoom(viewport.visibleSeconds / 1.6, origin: buttonZoomAnchor)
+            }
+            .keyboardShortcut("=", modifiers: .command)
+            .disabled(model.duration <= 0 || viewport.visibleSeconds <=
+                      RecordingTimelineViewport.zoomInLimit(duration: model.duration, viewportWidth: Double(viewportWidth)))
 
             Button("Fit") {
                 viewport.fit(duration: model.duration)
@@ -1553,77 +1512,70 @@ private struct StudioTimelineEditor: View {
 
     private var transport: some View {
         HStack(spacing: 12) {
-            zoomControls
-            Spacer(minLength: 12)
-            HStack(spacing: 10) {
-                Text(studioPreciseTimecode(model.displayTime))
-                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(.primary.opacity(0.9))
-
-                HStack(spacing: 2) {
-                    timelineButton("Back to Start", systemImage: "backward.end.fill") {
-                        model.pause()
-                        model.seek(to: 0)
-                    }
-
-                    Button {
-                        model.togglePlayback()
-                    } label: {
-                        Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(.primary.opacity(0.85))
-                            .frame(width: 30, height: 30)
-                            .background(Circle().fill(Color.primary.opacity(0.07)))
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .keyboardShortcut(.space, modifiers: [])
-                    .help(model.isPlaying ? "Pause" : "Play")
-                    .accessibilityLabel(model.isPlaying ? "Pause" : "Play")
-                    .disabled(!model.isLoaded)
-
-                    timelineButton("Skip to End", systemImage: "forward.end.fill") {
-                        model.pause()
-                        model.seek(to: model.duration)
-                    }
-                }
-
-                Text(studioPreciseTimecode(model.duration))
-                    .font(.system(size: 12, weight: .medium).monospacedDigit())
-                    .foregroundStyle(.secondary)
+            Toggle(isOn: $isSplitting) {
+                Label("Split", systemImage: "scissors").labelStyle(.iconOnly)
             }
+            .toggleStyle(.button)
+            .buttonStyle(EditorButtonStyle(selected: isSplitting))
+            .keyboardShortcut("s", modifiers: [])
+            .help("Split tool (S) — click the video track to cut")
+            .accessibilityLabel("Split tool")
+            Divider().frame(height: 24)
+            Text("\(studioTimecode(model.displayTime)) / \(studioTimecode(model.duration))")
+                .font(.system(size: 12).monospacedDigit())
+                .foregroundStyle(.secondary)
             Spacer(minLength: 12)
             HStack(spacing: 2) {
-                Toggle(isOn: $isSplitting) {
-                    Label("Split", systemImage: "scissors").labelStyle(.iconOnly)
+                timelineButton("Back to Start", systemImage: "backward.end.fill") {
+                    model.pause()
+                    model.seek(to: 0)
                 }
-                .toggleStyle(.button)
-                .keyboardShortcut("s", modifiers: [])
-                .help("Split tool (S) — click the video track to cut")
 
-                timelineButton("Delete Selection", systemImage: "trash") {
+                Button {
+                    model.togglePlayback()
+                } label: {
+                    Image(systemName: model.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.primary.opacity(0.85))
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(Color.primary.opacity(0.07)))
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.space, modifiers: [])
+                .help(model.isPlaying ? "Pause" : "Play")
+                .accessibilityLabel(model.isPlaying ? "Pause" : "Play")
+                .disabled(!model.isLoaded)
+
+                timelineButton("Skip to End", systemImage: "forward.end.fill") {
+                    model.pause()
+                    model.seek(to: model.duration)
+                }
+            }
+
+            Spacer(minLength: 12)
+            zoomControls
+            Menu {
+                Button("Delete Selection") {
                     deleteSelection()
                 }
                 .disabled(!canDeleteSelection)
 
-                Rectangle()
-                    .fill(Color(nsColor: .separatorColor))
-                    .frame(width: 1, height: 14)
-                    .padding(.horizontal, 6)
+                Divider()
 
-                timelineButton("Undo", systemImage: "arrow.uturn.backward") {
+                Button("Undo") {
                     model.undo()
                 }
                 .keyboardShortcut("z", modifiers: .command)
                 .disabled(!model.canUndo)
 
-                timelineButton("Redo", systemImage: "arrow.uturn.forward") {
+                Button("Redo") {
                     model.redo()
                 }
                 .keyboardShortcut("z", modifiers: [.command, .shift])
                 .disabled(!model.canRedo)
 
-                timelineButton("Reset Clips", systemImage: "arrow.counterclockwise") {
+                Button("Reset Clips") {
                     model.resetClips()
                 }
                 .disabled(!model.hasClipEdits)
@@ -1642,9 +1594,14 @@ private struct StudioTimelineEditor: View {
                 .disabled(RecordingTimelineViewport.newZoomRange(at: model.currentTime,
                     secondsPerPoint: scale.secondsPerPoint, duration: model.duration,
                     occupied: model.zoomTimelineBlocks.map { $0.editorStart...$0.editorEnd }) == nil)
+            } label: {
+                Image(systemName: "ellipsis")
             }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .accessibilityLabel("Timeline actions")
         }
-        .frame(height: 32)
+        .frame(height: 36)
     }
 
     private var canDeleteSelection: Bool {
@@ -1694,7 +1651,7 @@ private enum StudioTimelineMetrics {
     static let playheadLaneHeight: CGFloat = 14
     static let rulerHeight: CGFloat = 16
     static let clipLaneHeight: CGFloat = 52
-    static let zoomLaneHeight: CGFloat = 56
+    static let zoomLaneHeight: CGFloat = 36
     static let minimapHeight: CGFloat = 12
     /// Room under the lanes for the horizontal scroller, so it never sits on
     /// top of a zoom block.
@@ -1839,7 +1796,7 @@ private struct StudioTimelinePlayhead: View {
                 let tail = StudioTimelineMetrics.rowSpacing
                     + StudioTimelineMetrics.scrollerGutter
                 Rectangle()
-                    .fill(Color.accentColor)
+                    .fill(Color(nsColor: .systemRed))
                     .frame(
                         width: Metrics.lineWidth,
                         height: max(0, proxy.size.height - tail - Metrics.crownHeight + 2)
@@ -1853,7 +1810,7 @@ private struct StudioTimelinePlayhead: View {
                     .contentShape(Rectangle())
                     .overlay(alignment: .top) {
                         PlayheadCrownShape()
-                            .fill(Color.accentColor)
+                            .fill(Color(nsColor: .systemRed))
                             .frame(width: Metrics.crownWidth, height: Metrics.crownHeight)
                             .shadow(color: .black.opacity(0.22), radius: 1, y: 0.5)
                     }
@@ -2165,7 +2122,7 @@ private enum StudioZoomLaneMetrics {
     static let laneCornerRadius = blockCornerRadius + laneInset
     static let selectionRingPadding: CGFloat = 1
     static let selectionRingCornerRadius = blockCornerRadius + selectionRingPadding
-    static let blockHeight: CGFloat = 48
+    static let blockHeight: CGFloat = 28
     static let blockInset: CGFloat = 4
 }
 
@@ -2207,15 +2164,10 @@ private struct StudioZoomCueBlock: View {
         return AnyView(
             HStack(spacing: 0) {
                 resizeHandle(edge: .leading)
-                VStack(spacing: 3) {
-                    if width >= 130 {
-                        Text(cue.anchorMode == .pinnedAnchor ? "Manual Zoom" : "Automatic Zoom")
-                            .font(.system(size: 10))
-                            .opacity(0.8)
-                    }
+                Group {
                     if width >= 50 {
-                        Label(String(format: "%.1f×", cue.zoom), systemImage: "magnifyingglass")
-                            .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                        Text("Zoom \(Int((cue.zoom * 100).rounded()))%")
+                            .font(.system(size: 12, weight: .medium).monospacedDigit())
                     }
                 }
                 .foregroundStyle(.white)
@@ -2231,7 +2183,7 @@ private struct StudioZoomCueBlock: View {
                     cornerRadius: StudioZoomLaneMetrics.blockCornerRadius,
                     style: .continuous
                 )
-                    .fill(Color(nsColor: .darkGray).opacity(isSelected ? 1 : 0.85))
+                    .fill(EditorChrome.accent.opacity(isSelected ? 1 : 0.7))
             )
             .overlay {
                 if isSelected {
@@ -2613,7 +2565,7 @@ private struct StudioInspector: View {
     @State private var wallpaperStore = AnnotationWallpaperStore.shared
     @State private var stylePresetStore = RecordingStudioStylePresetStore.shared
     @State private var expandedSections: Set<StudioInspectorSection> = [
-        .background, .motion, .cursor, .keystrokes, .transcription, .camera, .audio
+        .background, .camera
     ]
     @State private var transcriptTab: StudioTranscriptTab = .captions
     @Environment(\.colorScheme) private var colorScheme
@@ -2621,6 +2573,28 @@ private struct StudioInspector: View {
     private let swatchColumns = [GridItem(.adaptive(minimum: 30, maximum: 44), spacing: 6)]
 
     var body: some View {
+        HStack(spacing: 0) {
+            StudioInspectorTabs(selection: $selectedTab, isAvailable: isAvailable)
+            Divider()
+            inspectorContent
+        }
+        .background(.regularMaterial)
+        .frame(minWidth: 260, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .task {
+            await wallpaperStore.reload()
+        }
+        .onChange(of: isAvailable(selectedTab)) { _, available in
+            if !available { selectedTab = .background }
+        }
+        .onChange(of: model.selectedCueID, initial: true) { _, cue in
+            if cue != nil { selectedTab = .zoom }
+        }
+        .onChange(of: model.selectedClipID) { _, clip in
+            if clip != nil { selectedTab = .zoom }
+        }
+    }
+
+    private var inspectorContent: some View {
         VStack(spacing: 0) {
             inspectorHeader
             ScrollView(.vertical) {
@@ -2642,14 +2616,11 @@ private struct StudioInspector: View {
                         }
 
                         StudioAmountEffect(title: "Padding", systemImage: "rectangle.inset.filled",
-                            value: $model.style.padding, range: 0...0.18, defaultValue: 0.06,
-                            presets: [0, 0.04, 0.08, 0.12, 0.18])
+                            value: $model.style.padding, range: 0...0.18, defaultValue: 0.06)
                         StudioAmountEffect(title: "Rounded Corners", systemImage: "rectangle.roundedtop",
-                            value: $model.style.cornerRadius, range: 0...0.08, defaultValue: 0.02,
-                            presets: [0, 0.01, 0.02, 0.04, 0.08])
+                            value: $model.style.cornerRadius, range: 0...0.08, defaultValue: 0.02)
                         StudioAmountEffect(title: "Shadow", systemImage: "square.3.layers.3d",
-                            value: $model.style.shadow, range: 0...1, defaultValue: 0.45,
-                            presets: [0, 0.25, 0.45, 0.75, 1])
+                            value: $model.style.shadow, range: 0...1, defaultValue: 0.45)
 
                     }
 
@@ -2820,20 +2791,6 @@ private struct StudioInspector: View {
             .scrollContentBackground(.hidden)
             .scrollEdgeEffectSoftIfAvailable()
         }
-        .background(.thinMaterial)
-        .frame(minWidth: 260, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .task {
-            await wallpaperStore.reload()
-        }
-        .onChange(of: isAvailable(selectedTab)) { _, available in
-            if !available { selectedTab = .background }
-        }
-        .onChange(of: model.selectedCueID, initial: true) { _, cue in
-            if cue != nil { selectedTab = .zoom }
-        }
-        .onChange(of: model.selectedClipID) { _, clip in
-            if clip != nil { selectedTab = .zoom }
-        }
     }
 
     private var effectActions: some View {
@@ -2851,7 +2808,7 @@ private struct StudioInspector: View {
             }
             .help("Blur or pixelate part of the recording")
         }
-        .buttonStyle(.glass)
+        .buttonStyle(EditorButtonStyle())
         .controlSize(.large)
         .disabled(!model.isLoaded)
         .padding(.horizontal, 12)
@@ -2859,22 +2816,14 @@ private struct StudioInspector: View {
 
     private var inspectorHeader: some View {
         VStack(spacing: 0) {
-            GlassEffectContainer(spacing: 8) {
-                VStack(spacing: 0) {
-                    StudioInspectorTabs(selection: $selectedTab, isAvailable: isAvailable)
-                        .frame(height: 32)
-                        .padding(4)
-                        .background(Color.primary.opacity(0.055), in: Capsule())
-                        .clipShape(Capsule())
-                        .padding(12)
-                    effectActions
-                }
-            }
             HStack {
                 Text(selectedTab.title).font(.system(size: 13, weight: .semibold))
                 Spacer()
             }
             .padding(16)
+            if selectedTab == .effects {
+                effectActions.padding(.bottom, 12)
+            }
             if selectedTab == .background {
                 RecordingStudioStylePresetBar(model: model, presetStore: stylePresetStore)
             }
@@ -3059,7 +3008,7 @@ private struct StudioInspector: View {
     private func selectedZoomControls(for selected: ZoomCue) -> some View {
         VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
             VStack(alignment: .leading, spacing: InspectorMetrics.groupLabelSpacing) {
-                InspectorGroupLabel("Zoom Mode")
+                InspectorGroupLabel("Focus")
 
                 InspectorSegmented(
                     options: ZoomAnchorMode.allCases,
@@ -3080,7 +3029,7 @@ private struct StudioInspector: View {
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                InspectorSlider("Zoom Amount", value: Binding(
+                InspectorSlider("Zoom", value: Binding(
                     get: { CGFloat(selected.zoom) },
                     set: { amount in
                         var updated = selected
@@ -3091,76 +3040,63 @@ private struct StudioInspector: View {
                     if editing { model.beginZoomCueEdit() }
                     else { model.endZoomCueEdit(actionName: "Change Zoom Amount") }
                 })
-                HStack(spacing: 4) {
-                    ForEach([1.0, 1.5, 2.0, 3.0, 4.0], id: \.self) { amount in
-                        Button(amount.formatted() + "×") {
-                            model.beginZoomCueEdit()
-                            var updated = selected
-                            updated.zoom = amount
-                            model.updateZoomCue(updated)
-                            model.endZoomCueEdit(actionName: "Change Zoom Amount")
-                        }
-                        .buttonStyle(EditorButtonStyle(selected: abs(selected.zoom - amount) < 0.01))
-                    }
-                }
-                Text("The recording zooms in when this segment starts and zooms out when it ends.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
 
-            if selected.anchorMode == .pinnedAnchor {
-                VStack(alignment: .leading, spacing: InspectorMetrics.groupLabelSpacing) {
-                    HStack(spacing: 8) {
-                        InspectorGroupLabel("Target position")
-                        Spacer(minLength: 0)
-                        Text(zoomTargetPositionText(selected.pinnedPoint))
-                            .font(.inspectorNumeric)
-                            .foregroundStyle(.tertiary)
+            DisclosureGroup("Advanced") {
+                if selected.anchorMode == .pinnedAnchor {
+                    VStack(alignment: .leading, spacing: InspectorMetrics.groupLabelSpacing) {
+                        HStack(spacing: 8) {
+                            InspectorGroupLabel("Target position")
+                            Spacer(minLength: 0)
+                            Text(zoomTargetPositionText(selected.pinnedPoint))
+                                .font(.inspectorNumeric)
+                                .foregroundStyle(.tertiary)
+                        }
+
+                        RecordingZoomFocusPad(
+                            position: Binding(
+                                get: { selected.pinnedPoint },
+                                set: { target in
+                                    var updated = selected
+                                    updated.pinnedPoint = target
+                                    model.updateZoomCue(updated)
+                                }
+                            ),
+                            magnification: selected.zoom,
+                            onEditingChanged: { editing in
+                                if editing { model.beginZoomCueEdit() }
+                                else { model.endZoomCueEdit(actionName: "Move Zoom Target") }
+                            }
+                        )
                     }
 
-                    RecordingZoomFocusPad(
-                        position: Binding(
-                            get: { selected.pinnedPoint },
-                            set: { target in
+                    inspectorAction("Set Target to Pointer", systemImage: "scope") {
+                        guard let pointer = model.pointerLocation(at: model.currentTime) else { return }
+                        model.beginZoomCueEdit()
+                        var updated = selected
+                        updated.pinnedPoint = pointer
+                        model.updateZoomCue(updated)
+                        model.endZoomCueEdit(actionName: "Move Zoom Target")
+                    }
+                } else {
+                    InspectorSlider(
+                        "Edge in Frame",
+                        value: Binding(
+                            get: { CGFloat(selected.boundsBias) },
+                            set: { boundsBias in
                                 var updated = selected
-                                updated.pinnedPoint = target
+                                updated.boundsBias = Double(boundsBias)
                                 model.updateZoomCue(updated)
                             }
                         ),
-                        magnification: selected.zoom,
+                        range: 0...1,
+                        format: .percent(),
                         onEditingChanged: { editing in
                             if editing { model.beginZoomCueEdit() }
-                            else { model.endZoomCueEdit(actionName: "Move Zoom Target") }
+                            else { model.endZoomCueEdit(actionName: "Change Zoom Framing") }
                         }
                     )
                 }
-
-                inspectorAction("Set Target to Pointer", systemImage: "scope") {
-                    guard let pointer = model.pointerLocation(at: model.currentTime) else { return }
-                    model.beginZoomCueEdit()
-                    var updated = selected
-                    updated.pinnedPoint = pointer
-                    model.updateZoomCue(updated)
-                    model.endZoomCueEdit(actionName: "Move Zoom Target")
-                }
-            } else {
-                InspectorSlider(
-                    "Edge in Frame",
-                    value: Binding(
-                        get: { CGFloat(selected.boundsBias) },
-                        set: { boundsBias in
-                            var updated = selected
-                            updated.boundsBias = Double(boundsBias)
-                            model.updateZoomCue(updated)
-                        }
-                    ),
-                    range: 0...1,
-                    format: .percent(),
-                    onEditingChanged: { editing in
-                        if editing { model.beginZoomCueEdit() }
-                        else { model.endZoomCueEdit(actionName: "Change Zoom Framing") }
-                    }
-                )
             }
 
             inspectorAction(

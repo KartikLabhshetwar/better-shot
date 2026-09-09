@@ -45,20 +45,53 @@ struct RecordingPickerControls: View {
     @AppStorage(BetterShotPreferences.recordingStartDelaySecondsKey) private var startDelaySeconds = 0
     @AppStorage(BetterShotPreferences.recordingTeleprompterEnabledKey) private var teleprompterEnabled = false
 
+    @State private var showsRecordingOptions = false
+
     private static let timerOptions = [0, 1, 3, 5]
 
     var body: some View {
-        HStack(spacing: BarMetrics.itemSpacing) {
+        HStack(spacing: 4) {
             screenshotGroup
-
             BarDivider()
+            timerMenu
+            Button { showsRecordingOptions.toggle() } label: {
+                BarActionLabel(id: .recording, title: "Recording options", systemImage: "video",
+                               caption: "Recording")
+            }
+            .buttonStyle(BarButtonStyle())
+            .accessibilityLabel("Recording options")
+            .popover(isPresented: $showsRecordingOptions, arrowEdge: .top) {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Recording").font(.headline)
+                    Text("Choose a source to start recording.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                    if sources.isLoading {
+                        ProgressView("Loading recording sources…")
+                    }
+                    if let error = sources.errorMessage {
+                        Text(error).font(.caption).foregroundStyle(.red)
+                        Button("Try Again") { Task { await sources.refresh() } }
+                    }
+                    recordingOptions.disabled(sources.isLoading)
+                }
+                .padding(20)
+                .task { await sources.refresh() }
+            }
+            BarActionButton(id: .close, title: "Close", systemImage: "xmark",
+                            accessibility: "Close capture bar — Esc") {
+                dismissPicker()
+            }
+        }
+    }
 
+    private var recordingOptions: some View {
+        HStack(spacing: 8) {
             displaySource
             windowSource
             BarActionButton(
                 id: .area,
                 title: "Drag to select a region",
-                systemImage: "rectangle.dashed",
+                systemImage: "rectangle.dashed", caption: "Area",
                 accessibility: "Area - drag to select the region to record"
             ) {
                 startAreaRecording()
@@ -68,6 +101,7 @@ struct RecordingPickerControls: View {
 
             inputToggle(
                 id: .camera,
+                caption: "Camera",
                 title: cameraID.isEmpty ? "Camera off" : "Camera on",
                 isOn: !cameraID.isEmpty,
                 onIcon: "video.fill",
@@ -84,6 +118,7 @@ struct RecordingPickerControls: View {
 
             inputToggle(
                 id: .systemAudio,
+                caption: "Audio",
                 title: systemAudio ? "System audio on" : "System audio off",
                 isOn: systemAudio,
                 onIcon: "speaker.wave.2.fill",
@@ -97,6 +132,7 @@ struct RecordingPickerControls: View {
 
             inputToggle(
                 id: .teleprompter,
+                caption: "Script",
                 title: teleprompterEnabled ? "Teleprompter on" : "Teleprompter off",
                 isOn: teleprompterEnabled,
                 onIcon: "text.pad.header",
@@ -108,44 +144,30 @@ struct RecordingPickerControls: View {
                 TeleprompterComposerPresenter.shared.toggle()
             }
 
-            timerMenu
-
-            BarActionButton(
-                id: .close,
-                title: "Close",
-                systemImage: "xmark",
-                accessibility: "Close the recorder - Esc"
-            ) {
-                dismissPicker()
-            }
-        }
-        .task {
-            await sources.refresh()
         }
     }
 
     // MARK: Screenshots
 
     private static let screenshotActions: [(BarTooltipID, ShortcutService.Action, String, String)] = [
-        (.screenshotRegion, .region, "Capture a region", "rectangle.dashed.badge.record"),
-        (.screenshotWindow, .window, "Capture a window", "macwindow.badge.plus"),
-        (.screenshotFullscreen, .fullscreen, "Capture the whole screen", "desktopcomputer"),
-        (.ocr, .ocr, "Copy text from the screen", "doc.text.viewfinder"),
-        (.colorPicker, .colorPicker, "Pick a color", "eyedropper"),
+        (.screenshotRegion, .region, "Area", "viewfinder"),
+        (.screenshotFullscreen, .fullscreen, "Fullscreen", "desktopcomputer"),
+        (.screenshotWindow, .window, "Window", "macwindow"),
+        (.ocr, .ocr, "OCR", "textformat"),
+        (.colorPicker, .colorPicker, "Color", "eyedropper"),
     ]
 
     private var screenshotGroup: some View {
         ForEach(Self.screenshotActions, id: \.0) { id, action, title, icon in
-            BarActionButton(id: id, title: title, systemImage: icon) {
+            BarActionButton(id: id, title: title, systemImage: icon, caption: title) {
                 captureScreenshot(action)
             }
         }
     }
 
     private func captureScreenshot(_ action: ShortcutService.Action) {
+        showsRecordingOptions = false
         let screen = ActiveDisplayResolver.activeScreen(preferPointer: true)
-        RecordingBarPresenter.shared.hide()
-        Task { await CameraRecordingManager.shared.stopPreview() }
         Task { await CaptureOrchestrator.shared.performCapture(action, on: screen) }
     }
 
@@ -166,7 +188,7 @@ struct RecordingPickerControls: View {
                 BarActionLabel(
                     id: .display,
                     title: "Pick a screen to record",
-                    systemImage: "menubar.rectangle"
+                    systemImage: "menubar.rectangle", caption: "Display"
                 )
             }
             .menuStyle(.button)
@@ -177,7 +199,7 @@ struct RecordingPickerControls: View {
             BarActionButton(
                 id: .display,
                 title: "Record the whole screen",
-                systemImage: "menubar.rectangle",
+                systemImage: "menubar.rectangle", caption: "Display",
                 accessibility: "Display - record the whole screen"
             ) {
                 guard let display = sources.displays.first else { return }
@@ -212,7 +234,7 @@ struct RecordingPickerControls: View {
             BarActionLabel(
                 id: .window,
                 title: "Pick an app window",
-                systemImage: "macwindow"
+                systemImage: "macwindow", caption: "Window"
             )
         }
         .menuStyle(.button)
@@ -222,6 +244,7 @@ struct RecordingPickerControls: View {
     }
 
     private func startAreaRecording() {
+        showsRecordingOptions = false
         let displayID = ActiveDisplayResolver.activeDisplayID(preferPointer: false)
         guard let display = sources.displays.first(where: { $0.displayID == displayID })
             ?? sources.displays.first else { return }
@@ -237,6 +260,7 @@ struct RecordingPickerControls: View {
     /// actually begins. The warm camera preview (if any) is left running so it
     /// flows straight into the recording instead of restarting and refading.
     private func startRecording(_ start: () -> Void) {
+        showsRecordingOptions = false
         TeleprompterComposerPresenter.shared.hide()
         start()
     }
@@ -334,7 +358,8 @@ struct RecordingPickerControls: View {
                 id: .microphone,
                 title: microphoneTooltip,
                 systemImage: microphoneID.isEmpty ? "mic.slash" : "mic.fill",
-                tint: microphoneID.isEmpty ? BarMetrics.inactiveTint : BarMetrics.activeTint
+                tint: microphoneID.isEmpty ? BarMetrics.inactiveTint : BarMetrics.activeTint,
+                caption: "Mic"
             )
         }
         .menuStyle(.button)
@@ -348,11 +373,22 @@ struct RecordingPickerControls: View {
     /// with a start-delay timer.
     private var timerMenu: some View {
         Menu {
-            ForEach(Self.timerOptions, id: \.self) { seconds in
-                Button {
-                    startDelaySeconds = seconds
-                } label: {
-                    menuSelectionLabel(timerLabel(seconds), isSelected: startDelaySeconds == seconds)
+            Section("Screenshot timer") {
+                ForEach(SelfTimerDelay.allCases, id: \.rawValue) { delay in
+                    Button {
+                        AppPreferences.selfTimerDelay = delay
+                    } label: {
+                        menuSelectionLabel(delay.label, isSelected: AppPreferences.selfTimerDelay == delay)
+                    }
+                }
+            }
+            Section("Recording timer") {
+                ForEach(Self.timerOptions, id: \.self) { seconds in
+                    Button {
+                        startDelaySeconds = seconds
+                    } label: {
+                        menuSelectionLabel(timerLabel(seconds), isSelected: startDelaySeconds == seconds)
+                    }
                 }
             }
         } label: {
@@ -360,13 +396,14 @@ struct RecordingPickerControls: View {
                 id: .timer,
                 title: timerTooltip,
                 systemImage: "timer",
-                tint: startDelaySeconds == 0 ? BarMetrics.inactiveTint : BarMetrics.activeTint
+                tint: BarMetrics.activeTint,
+                caption: "Timer"
             )
         }
         .menuStyle(.button)
         .buttonStyle(BarButtonStyle())
         .menuIndicator(.hidden)
-        .accessibilityLabel(timerAccessibilityLabel)
+        .accessibilityLabel("Screenshot and recording timers")
     }
 
     private func timerLabel(_ seconds: Int) -> String {
@@ -375,12 +412,6 @@ struct RecordingPickerControls: View {
 
     private var timerTooltip: String {
         startDelaySeconds == 0 ? "Timer off" : "Timer \(startDelaySeconds)s"
-    }
-
-    private var timerAccessibilityLabel: String {
-        startDelaySeconds == 0
-            ? "Timer off - click to add a countdown before recording starts"
-            : "Timer: \(timerLabel(startDelaySeconds)) before recording starts"
     }
 
     @ViewBuilder
@@ -426,6 +457,7 @@ struct RecordingPickerControls: View {
     /// state is carried by dimming the tint, not by shrinking the target.
     private func inputToggle(
         id: BarTooltipID,
+        caption: String,
         title: String,
         isOn: Bool,
         onIcon: String,
@@ -438,6 +470,7 @@ struct RecordingPickerControls: View {
             title: title,
             systemImage: isOn ? onIcon : offIcon,
             tint: isOn ? BarMetrics.activeTint : BarMetrics.inactiveTint,
+            caption: caption,
             accessibility: accessibility,
             action: action
         )

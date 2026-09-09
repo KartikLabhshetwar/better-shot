@@ -110,24 +110,7 @@ struct AnnotationBackgroundInspector: View {
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
 
-            VStack(alignment: .leading, spacing: InspectorMetrics.groupLabelSpacing) {
-                InspectorGroupLabel("Aspect ratio")
 
-                InspectorSegmented(
-                    options: AnnotationBackgroundAspectRatio.allCases,
-                    isSelected: { $0 == settings.aspectRatio },
-                    onTap: {
-                        onEditorAction()
-                        settings.aspectRatio = $0
-                    },
-                    label: { ratio in
-                        Text(ratio.title)
-                            .font(.system(size: 11, weight: .medium))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                    }
-                )
-            }
         }
         .onAppear {
             syncFillLibrary(with: settings.style)

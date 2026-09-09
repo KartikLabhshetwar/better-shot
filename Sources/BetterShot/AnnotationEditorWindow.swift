@@ -27,7 +27,7 @@ struct AnnotationEditorWindow: View {
     @State private var model: AnnotationEditorModel
     @State private var wallpaperStore = AnnotationWallpaperStore.shared
     @State private var backgroundPresetStore = AnnotationBackgroundPresetStore.shared
-    @State private var isInspectorPresented = false
+    @State private var isInspectorPresented = true
     @State private var isSaving = false
     @State private var isExporting = false
     @State private var saveFlash = false
@@ -47,14 +47,28 @@ struct AnnotationEditorWindow: View {
     var body: some View {
         VStack(spacing: 0) {
             imageTools
-            if model.hasInspectorStyleControls && !model.isCropping {
-                annotationStyleBar
+            Divider()
+            HStack(spacing: 0) {
+                if isInspectorPresented {
+                    AnnotationEditorInspector(
+                        model: model, wallpaperStore: wallpaperStore,
+                        backgroundPresetStore: backgroundPresetStore,
+                        focusedField: $focusedField, onEditorAction: clearInspectorFocus,
+                        onPickWallpaper: pickCustomWallpaper
+                    )
+                    .frame(width: 300)
+                    .disabled(model.isCropping)
+                    Divider()
+                }
+                mainContent
             }
             Divider()
-            mainContent
+            imageFooter
         }
-            .tint(StudioChrome.accent)
-            .accentColor(StudioChrome.accent)
+            .frame(minWidth: 980, minHeight: 640)
+            .environment(\.simpleInspectorControls, true)
+            .tint(EditorChrome.accent)
+            .accentColor(EditorChrome.accent)
             .editorFullScreenByDefault()
             .navigationTitle(url?.deletingPathExtension().lastPathComponent ?? "Image Editor")
             .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
@@ -84,6 +98,7 @@ struct AnnotationEditorWindow: View {
                         editingActions
                     }
                 }
+                .sharedBackgroundVisibility(.hidden)
             }
             .task(id: url) {
                 clearInspectorFocus()
@@ -133,17 +148,6 @@ struct AnnotationEditorWindow: View {
                 onCancelCrop: { withAnimation(.snappy(duration: 0.2)) { model.cancelCrop() } },
                 isCropping: { model.isCropping }
             ))
-            .inspector(isPresented: $isInspectorPresented) {
-                AnnotationEditorInspector(
-                    model: model,
-                    wallpaperStore: wallpaperStore,
-                    backgroundPresetStore: backgroundPresetStore,
-                    focusedField: $focusedField,
-                    onEditorAction: clearInspectorFocus,
-                    onPickWallpaper: pickCustomWallpaper
-                )
-                .disabled(model.isCropping)
-            }
     }
 
     private var imageTools: some View {
@@ -166,7 +170,7 @@ struct AnnotationEditorWindow: View {
             .help("Crop Image")
             Divider().frame(height: 24)
 
-            ForEach(AnnotationTool.allCases) { tool in
+            ForEach(AnnotationTool.allCases.filter { !$0.isRedactionTool }) { tool in
                 Button {
                     clearInspectorFocus()
                     model.selectTool(tool)
@@ -178,63 +182,57 @@ struct AnnotationEditorWindow: View {
                 .help(tool.helpText)
             }
 
-            Divider().frame(height: 24)
-            EditorPopover(title: "Background", systemImage: "photo") {
-                AnnotationBackgroundPresetBar(model: model, presetStore: backgroundPresetStore,
-                                             onEditorAction: clearInspectorFocus)
-                AnnotationBackgroundInspector(settings: $model.backgroundSettings,
-                    wallpaperStore: wallpaperStore, onEditorAction: clearInspectorFocus,
-                    onPickWallpaper: pickCustomWallpaper)
-            }
-            EditorPopover(title: "Padding", systemImage: "rectangle.inset.filled") {
-                InspectorSlider("Padding", value: $model.backgroundSettings.padding,
-                                range: 0.04...0.45, format: .percent())
-            }
-            EditorPopover(title: "Rounding", systemImage: "app") {
-                InspectorSlider("Corners", value: $model.backgroundSettings.cornerRadius,
-                                range: 0...0.12, format: .percent())
-            }
-            EditorPopover(title: "Shadow", systemImage: "square.on.square") {
-                InspectorSlider("Shadow", value: $model.backgroundSettings.shadow,
-                                range: 0...1, format: .percent())
-                Picker("Style", selection: $model.backgroundSettings.shadowStyle) {
-                    ForEach(AnnotationShadowStyle.allCases) { style in
-                        Text(style.title).tag(style)
+            EditorPopover(title: "Redact", systemImage: "eye.slash", selected: model.selectedTool.isRedactionTool) {
+                HStack {
+                    ForEach([AnnotationTool.pixelate, .blur]) { tool in
+                        Button("\(tool.title) an area") {
+                            clearInspectorFocus()
+                            model.selectTool(tool)
+                        }
                     }
                 }
+                Divider()
+                AnnotationSmartRedactionControls(model: model, onEditorAction: clearInspectorFocus)
             }
-            EditorPopover(title: "Border", systemImage: "rectangle") {
-                Toggle("Enable border", isOn: $model.backgroundSettings.border.isEnabled)
-                AnnotationScreenshotBorderInspector(settings: $model.backgroundSettings.border,
-                                                     onEditorAction: clearInspectorFocus)
-                    .disabled(!model.backgroundSettings.border.isEnabled)
+
+            Divider().frame(height: 24)
+            if model.hasInspectorStyleControls && !model.isCropping {
+                annotationStyleBar
             }
             Spacer(minLength: 0)
             Button {
                 clearInspectorFocus()
                 isInspectorPresented.toggle()
             } label: {
-                Label("Effects", systemImage: "slider.horizontal.3")
+                Label("Inspector", systemImage: "sidebar.left").labelStyle(.iconOnly)
             }
-            .help("Smart redaction, camera, blur, and watermark")
+            .help(isInspectorPresented ? "Hide Inspector" : "Show Inspector")
+            .accessibilityLabel("Toggle image inspector")
         }
         .buttonStyle(EditorButtonStyle())
         .padding(.horizontal, 16)
-        .frame(height: 56)
-        .background(EditorChrome.panel)
+        .frame(height: 48)
+        .studioGlass(cornerRadius: 0)
         .disabled(model.previewImage == nil || model.isCropping)
     }
 
     private var annotationStyleBar: some View {
-        HStack(spacing: 16) {
-            Text(model.inspectedTool?.title ?? "Selection")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
+        HStack(spacing: 8) {
             if model.isColorStyleAvailable {
-                AnnotationSwatchStrip(selectedSwatch: model.selectedSwatch) { swatch in
-                    clearInspectorFocus()
-                    model.setSwatch(swatch)
+                EditorPopover(title: "Color", systemImage: "paintpalette") {
+                    AnnotationSwatchStrip(selectedSwatch: model.selectedSwatch) { swatch in
+                        clearInspectorFocus()
+                        model.setSwatch(swatch)
+                    }
                 }
+                ColorPicker("Annotation color", selection: Binding(
+                    get: { model.selectedSwatch.color },
+                    set: { color in
+                        clearInspectorFocus()
+                        model.setSwatch(.custom(from: color))
+                    }
+                ))
+                .labelsHidden()
                 .fixedSize()
             }
             if model.isStrokeStyleAvailable {
@@ -257,9 +255,8 @@ struct AnnotationEditorWindow: View {
                         model.setRedactionDensity($0)
                     }
                 ), range: 0.15...1, format: .percent())
-                .frame(width: 220)
+                .frame(width: 180)
             }
-            Spacer()
             Button { model.deleteSelectedAnnotation() } label: {
                 Label("Delete Selection", systemImage: "trash").labelStyle(.iconOnly)
             }
@@ -267,9 +264,6 @@ struct AnnotationEditorWindow: View {
             .disabled(model.selectionCount == 0)
             .help("Delete selected annotation (⌫)")
         }
-        .padding(.horizontal, 20)
-        .frame(height: 44)
-        .background(EditorChrome.panel)
     }
 
     // MARK: Toolbar actions
@@ -293,49 +287,65 @@ struct AnnotationEditorWindow: View {
         .disabled(!model.hasUnsavedChanges || isSaving || isExporting)
         .help("Save your edits in BetterShot (⌘S)")
 
-        if CloudUploader.shared.isConfigured {
-            CloudUploadButton(
-                suggestedTitle: model.sourceURL?.deletingPathExtension().lastPathComponent ?? "",
-                onUpload: uploadAnnotation
-            ) {
-                Label("Share", systemImage: "link")
-                    .labelStyle(.titleAndIcon)
-                    .padding(.horizontal, 6)
-            }
-            .help("Upload and copy a share link")
-            .disabled(model.previewImage == nil || model.imageSize == .zero || uploadPhase.isUploading || isExporting)
-        }
-
-        Button(action: copyToClipboard) {
-            if isCopying {
-                ProgressView().controlSize(.small)
-            } else if copyFlash {
-                Label("Copied", systemImage: "checkmark.circle.fill")
-                    .labelStyle(.titleAndIcon)
-                    .foregroundStyle(.green)
-            } else {
-                Label("Copy", systemImage: "doc.on.doc")
-                    .labelStyle(.titleAndIcon)
-            }
-        }
-        .keyboardShortcut("c", modifiers: [.command, .shift])
-        .disabled(model.previewImage == nil || model.imageSize == .zero || isCopying || isExporting)
-        .help("Copy the finished image to the clipboard (⇧⌘C)")
-
         Button(action: exportImage) {
             if isExporting {
                 ProgressView().controlSize(.small)
             } else {
-                Label("Export", systemImage: "arrow.down.circle")
+                Label("Save as…", systemImage: "arrow.down.circle")
                     .labelStyle(.titleAndIcon)
             }
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.borderedProminent)
         .disabled(model.previewImage == nil || model.imageSize == .zero || isExporting || isSaving || isCopying || uploadPhase.isUploading)
         .accessibilityLabel(isExporting ? "Exporting image" : "Export image")
         .help("Save the finished image to your Mac")
 
 
+    }
+
+    private var imageFooter: some View {
+        HStack(spacing: 12) {
+            AnnotationZoomControl(model: model)
+            if model.isPreviewDownscaled { LowResolutionPreviewNotice() }
+            Spacer()
+            if model.isCropping {
+                CropResolutionBadge(size: model.cropPixelSize)
+            } else {
+                if CloudUploader.shared.isConfigured {
+                    CloudUploadButton(
+                        suggestedTitle: model.sourceURL?.deletingPathExtension().lastPathComponent ?? "",
+                        onUpload: uploadAnnotation
+                    ) {
+                        Label("Share", systemImage: "icloud.and.arrow.up")
+                            .labelStyle(.titleAndIcon)
+                            .padding(.horizontal, 6)
+                    }
+                    .help("Upload and copy a share link")
+                    .disabled(model.previewImage == nil || model.imageSize == .zero || uploadPhase.isUploading || isExporting)
+                }
+
+                Button(action: copyToClipboard) {
+                    if isCopying {
+                        ProgressView().controlSize(.small)
+                    } else if copyFlash {
+                        Label("Copied", systemImage: "checkmark.circle.fill")
+                            .labelStyle(.titleAndIcon)
+                            .foregroundStyle(.green)
+                    } else {
+                        Label("Copy", systemImage: "doc.on.doc")
+                            .labelStyle(.titleAndIcon)
+                    }
+                }
+                .keyboardShortcut("c", modifiers: [.command, .shift])
+                .disabled(model.previewImage == nil || model.imageSize == .zero || isCopying || isExporting)
+                .help("Copy the finished image to the clipboard (⇧⌘C)")
+
+            }
+        }
+        .buttonStyle(EditorButtonStyle())
+        .padding(.horizontal, 16)
+        .frame(height: 52)
+        .studioGlass(cornerRadius: 0)
     }
 
     /// The crop controls that replace the trailing actions while cropping.
@@ -422,29 +432,8 @@ struct AnnotationEditorWindow: View {
                     .controlSize(.large)
             }
         }
-        .frame(minWidth: 980, minHeight: 580)
+        .frame(minWidth: 600, minHeight: 440)
         .clipped()
-        .overlay(alignment: .bottomLeading) {
-            if model.previewImage != nil, model.imageSize != .zero {
-                HStack(spacing: 8) {
-                    AnnotationZoomControl(model: model)
-
-                    if model.isPreviewDownscaled {
-                        LowResolutionPreviewNotice()
-                    }
-                }
-                .padding(.leading, 16)
-                .padding(.bottom, 16)
-            }
-        }
-        .overlay(alignment: .bottomTrailing) {
-            if model.isCropping, model.imageSize != .zero {
-                CropResolutionBadge(size: model.cropPixelSize)
-                    .padding(.trailing, 16)
-                    .padding(.bottom, 16)
-                    .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .bottomTrailing)))
-            }
-        }
         .overlay(alignment: .bottomLeading) {
             // Only inline saves/uploads (which fail with an image already on
             // screen) land here; a load failure shows the full-canvas state

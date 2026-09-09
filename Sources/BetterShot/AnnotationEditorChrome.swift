@@ -9,47 +9,26 @@ struct AnnotationZoomControl: View {
     @Bindable var model: AnnotationEditorModel
 
     var body: some View {
-        HStack(spacing: 4) {
-            Button { model.zoomOut() } label: {
-                Label("Zoom Out", systemImage: "minus.magnifyingglass").labelStyle(.iconOnly)
+        Menu {
+            Button("Zoom In", action: model.zoomIn)
+                .disabled(model.zoomPercent >= AnnotationEditorModel.maxZoomPercent)
+            Button("Zoom Out", action: model.zoomOut)
+                .disabled(model.zoomPercent <= AnnotationEditorModel.minZoomPercent)
+            Divider()
+            Button("Fit Canvas", action: model.fitCanvas)
+            ForEach([25, 50, 100, 200, 400], id: \.self) { percent in
+                Button("\(percent)%") { model.setZoomPercent(percent) }
             }
-            .disabled(model.zoomPercent <= AnnotationEditorModel.minZoomPercent)
-            .help("Zoom Out (⌘−)")
-
-            InspectorSlider("Zoom", value: Binding(
-                get: { CGFloat(model.zoomPercent) / 100 },
-                set: { model.setZoomPercent(Int(($0 * 100).rounded())) }
-            ), range: CGFloat(AnnotationEditorModel.minZoomPercent) / 100...CGFloat(AnnotationEditorModel.maxZoomPercent) / 100,
-               format: .percent())
-            .frame(width: 170)
-
-            Button { model.zoomIn() } label: {
-                Label("Zoom In", systemImage: "plus.magnifyingglass").labelStyle(.iconOnly)
-            }
-            .disabled(model.zoomPercent >= AnnotationEditorModel.maxZoomPercent)
-            .help("Zoom In (⌘+)")
-
-            Menu {
-                Button("Fit Canvas", action: model.fitCanvas)
-                Divider()
-                ForEach([25, 50, 100, 200, 400], id: \.self) { percent in
-                    Button("\(percent)%") { model.setZoomPercent(percent) }
-                }
-            } label: {
-                Text("Presets")
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-            .accessibilityLabel("Zoom presets")
-
-            Divider().frame(height: 20)
-            Button("Fit", action: model.fitCanvas)
-                .help("Fit Canvas (⌘1)")
+        } label: {
+            Text("\(model.zoomPercent)%")
+                .monospacedDigit()
+                .frame(width: 64)
         }
-        .buttonStyle(EditorButtonStyle())
-        .padding(4)
-        .background(EditorChrome.panel, in: RoundedRectangle(cornerRadius: 8))
-        .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(EditorChrome.border) }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .padding(8)
+        .background(EditorChrome.panel, in: Capsule())
+        .accessibilityLabel("Canvas zoom, \(model.zoomPercent) percent")
     }
 }
 
@@ -67,7 +46,7 @@ struct CropResolutionBadge: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .fixedSize()
-            .glassEffect()
+            .studioGlass()
             .help("Crop size")
     }
 }
@@ -105,7 +84,7 @@ struct LowResolutionPreviewNotice: View {
             }
             .frame(height: diameter)
             .fixedSize()
-            .glassEffect()
+            .studioGlass()
         }
         .buttonStyle(.plain)
         .help("Why is this preview low resolution?")

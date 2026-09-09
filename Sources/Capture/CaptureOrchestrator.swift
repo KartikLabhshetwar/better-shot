@@ -39,11 +39,15 @@ final class CaptureOrchestrator {
         guard !captureInProgress, AppPreferences.lastRegionRect != nil else { return }
         captureInProgress = true
         captureScreen = screen
+        await RecordingBarPresenter.shared.hidePickerForCapture()
         await captureAndProcess { try await ScreenCapture.shared.captureLastRegion() }
         await finishCaptures()
     }
 
     private func executeCapture(_ action: ShortcutService.Action) async {
+        if action != .recording {
+            await RecordingBarPresenter.shared.hidePickerForCapture()
+        }
         switch action {
         case .region:
             await captureAndProcess { try await ScreenCapture.shared.captureRegion() }

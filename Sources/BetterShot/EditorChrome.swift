@@ -7,21 +7,30 @@ enum StudioChrome {
     static let accent = Color(nsColor: accentNSColor)
 }
 
+/// Classic frosted macOS chrome, without Tahoe's Liquid Glass treatment.
 private struct StudioGlassSurface: ViewModifier {
+    var cornerRadius: CGFloat
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     func body(content: Content) -> some View {
-        if reduceTransparency {
-            content.background(EditorChrome.panel, in: RoundedRectangle(cornerRadius: 16))
-                .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(EditorChrome.border) }
-        } else {
-            content.glassEffect(.regular, in: .rect(cornerRadius: 16))
-        }
+        content
+            .background {
+                if reduceTransparency {
+                    EditorChrome.panel
+                } else {
+                    VisualEffectBackdrop(material: .sidebar)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius).strokeBorder(EditorChrome.border)
+            }
     }
 }
 
 /// Shared editor chrome built on native controls; rendering stays in the existing canvases.
 enum EditorChrome {
+    static let accent = Color(nsColor: .systemBlue)
     static let panel = Color(nsColor: .controlBackgroundColor)
     static let workspace = Color(nsColor: .windowBackgroundColor)
     static let border = Color.primary.opacity(0.10)
@@ -36,9 +45,10 @@ struct EditorButtonStyle: ButtonStyle {
             .font(.system(size: 12, weight: .medium))
             .padding(.horizontal, 10)
             .frame(minHeight: 32)
-            .foregroundStyle(Color.primary)
+            .foregroundStyle(selected ? Color.white : Color.primary)
             .background(
-                Color.primary.opacity(configuration.isPressed ? 0.20 : selected ? 0.12 : 0),
+                selected ? EditorChrome.accent.opacity(configuration.isPressed ? 0.8 : 1)
+                    : Color.primary.opacity(configuration.isPressed ? 0.12 : 0),
                 in: RoundedRectangle(cornerRadius: 6)
             )
             .contentShape(RoundedRectangle(cornerRadius: 6))
@@ -49,6 +59,7 @@ struct EditorButtonStyle: ButtonStyle {
 struct EditorPopover<Content: View>: View {
     let title: String
     let systemImage: String
+    var selected = false
     @ViewBuilder var content: () -> Content
     @State private var isPresented = false
 
@@ -58,7 +69,8 @@ struct EditorPopover<Content: View>: View {
         } label: {
             Label(title, systemImage: systemImage).labelStyle(.iconOnly)
         }
-        .buttonStyle(EditorButtonStyle(selected: isPresented))
+        .buttonStyle(EditorButtonStyle(selected: selected || isPresented))
+        .accessibilityAddTraits(selected ? .isSelected : [])
         .help(title)
         .accessibilityLabel(title)
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {
@@ -77,18 +89,12 @@ struct EditorPopover<Content: View>: View {
 }
 
 extension View {
-    func studioGlass() -> some View { modifier(StudioGlassSurface()) }
+    func studioGlass(cornerRadius: CGFloat = 8) -> some View {
+        modifier(StudioGlassSurface(cornerRadius: cornerRadius))
+    }
 
     func studioEffectCard() -> some View {
-        background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-            .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(EditorChrome.border) }
+        overlay(alignment: .bottom) { Divider() }
     }
 
-    func editorPanel() -> some View {
-        background(EditorChrome.panel)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12).strokeBorder(EditorChrome.border)
-            }
-    }
 }
