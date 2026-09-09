@@ -235,6 +235,10 @@ final class R2Uploader {
         let prefix = ShareBundle.objectPrefix(id: slug)
         var keys = [prefix + ShareBundle.posterFilename, prefix + ShareBundle.manifestFilename]
         if let media = try await manifestMediaFilename(prefix: prefix, credentials: credentials) {
+            guard media != ".", media != "..", !media.isEmpty,
+                  ShareBundle.sanitizedFilename(media) == media else {
+                throw R2UploadError(message: "The cloud manifest has an invalid media filename. Check this share in your R2 bucket.")
+            }
             keys.insert(prefix + media, at: 0)
         }
         for key in keys {

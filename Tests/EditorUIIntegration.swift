@@ -627,14 +627,24 @@ private func checkMediaGallery(imageURL: URL, movieURL: URL) async throws {
     let output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         .appendingPathComponent(".build/editor-snapshots")
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+    let configuration = ProcessInfo.processInfo.environment["BETTERSHOT_BUILD_CONFIGURATION"] ?? "Debug"
+    let galleryBundle = Bundle(url: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        .appendingPathComponent(".build/Build/Products/\(configuration)/BetterShot.app"))!
+    var snapshotItems = entries
+    for sample in OnboardingSample.allCases {
+        let url = sample.sourceURL(in: galleryBundle)!
+        snapshotItems.append(MediaGalleryItem(id: url.path, title: url.deletingPathExtension().lastPathComponent,
+            createdAt: Date(timeIntervalSince1970: 1788958800), kind: .screenshot,
+            localURL: url, editorURL: url, cloudURL: nil))
+    }
     for scheme in [ColorScheme.light, .dark] {
-        for width: CGFloat in [540, 740] {
+        for width: CGFloat in [780, 1080] {
             NSApplication.shared.appearance = NSAppearance(named: scheme == .light ? .aqua : .darkAqua)
-            let hosting = NSHostingView(rootView: MediaGalleryContent(items: entries)
+            let hosting = NSHostingView(rootView: MediaGalleryContent(items: snapshotItems)
                 .environment(\.colorScheme, scheme).background(EditorChrome.workspace)
-                .frame(width: width, height: 520))
+                .frame(width: width, height: 680))
             hosting.appearance = NSApplication.shared.appearance
-            let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: width, height: 520),
+            let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: width, height: 680),
                 styleMask: [.borderless], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
             window.appearance = NSAppearance(named: scheme == .light ? .aqua : .darkAqua)
@@ -649,10 +659,76 @@ private func checkMediaGallery(imageURL: URL, movieURL: URL) async throws {
             try bitmap.representation(using: .png, properties: [:])!.write(
                 to: output.appendingPathComponent("gallery-\(scheme)-\(Int(width)).png"))
         }
-        try snapshot(MediaGalleryCard(item: cloudOnly, cloud: true), scheme: scheme, width: 240,
-            to: output.appendingPathComponent("gallery-cloud-\(scheme).png"), height: 250)
-        try snapshot(MediaGalleryContent(items: []), scheme: scheme, width: 540,
+        try snapshot(MediaGalleryCard(item: cloudOnly, cloud: true), scheme: scheme, width: 260,
+            to: output.appendingPathComponent("gallery-cloud-\(scheme).png"), height: 400)
+        try snapshot(MediaGalleryContent(items: []), scheme: scheme, width: 780,
             to: output.appendingPathComponent("gallery-empty-\(scheme).png"), height: 520)
     }
+    try await checkGalleryDeletion(imageURL: imageURL, movieURL: movieURL, root: root)
     print("PASS gallery source merging, project reopening, local/cloud/type/search filters, missing local shares, and compact/light/dark layouts")
+}
+
+
+@MainActor
+private func checkGalleryDeletion(imageURL: URL, movieURL: URL, root: URL) async throws {
+    let fm = FileManager.default
+    let local = root.appendingPathComponent("local.png")
+    try fm.copyItem(at: imageURL, to: local)
+    let history = HistoryStore(storageDirectory: root.appendingPathComponent("deletion-history"))
+    let record = history.referenceCapture(at: local)!
+    let edits = ScreenshotHistoryStore.shared
+    let saved = edits.importScreenshot(from: local, sourceCapturePath: local.path)
+    let link = ShareBundle.pageURL(id: "test-share", publicBaseURL: "https://cdn.example.com")!
+    await edits.setCloudURL(for: saved, cloudURL: link.absoluteString)
+    let savedItem = edits.items.first { $0.url == saved }!
+    try Data("edits".utf8).write(to: ScreenshotHistoryStore.editDocumentURL(for: saved))
+    try fm.copyItem(at: local, to: ScreenshotHistoryStore.baseImageURL(for: saved))
+    let entry = MediaGalleryItem.collect(history: history, edits: [savedItem], projects: []).first!
+    precondition(entry.captureIDs == [record.id] && entry.historyID == savedItem.id)
+    precondition(MediaGalleryItem.deletionSlug(for: link, publicBaseURL: "https://cdn.example.com") == "test-share")
+    precondition(MediaGalleryItem.deletionSlug(for: link, publicBaseURL: "https://other.example.com") == nil)
+    precondition(MediaGalleryItem.deletionSlug(for: URL(string: "https://example.com/s/other")!, publicBaseURL: "https://cdn.example.com") == nil)
+    let trash = root.appendingPathComponent("trash", isDirectory: true)
+    try fm.createDirectory(at: trash, withIntermediateDirectories: true)
+    let targets = MediaGalleryItem.deletionTargets(entry.deletionURLs)
+    precondition(Set(targets.map(\.path)).count == targets.count)
+    precondition(targets.contains(saved) && targets.contains(local))
+    do {
+        try entry.deleteLocal(history: history, edits: edits) { _ in throw CocoaError(.fileWriteNoPermission) }
+        preconditionFailure("Deletion failures must be reported")
+    } catch {}
+    precondition(fm.fileExists(atPath: saved.path) && fm.fileExists(atPath: local.path))
+    precondition(history.records.contains { $0.id == record.id })
+    precondition(edits.items.contains { $0.id == savedItem.id })
+    try entry.deleteLocal(history: history, edits: edits) { url in
+        try fm.moveItem(at: url, to: trash.appendingPathComponent(UUID().uuidString + "-" + url.lastPathComponent))
+    }
+    precondition(targets.allSatisfy { !fm.fileExists(atPath: $0.path) })
+    precondition(history.records.isEmpty, "Local deletion must clear the matching recent capture")
+    edits.reload()
+    precondition(edits.items.first { $0.id == savedItem.id }?.cloudURL == link.absoluteString,
+                 "Local deletion must preserve the cloud link across reload")
+    try edits.forgetCloudLink(link.absoluteString)
+    precondition(!edits.items.contains { $0.id == savedItem.id }, "Deleting both copies must clear the row")
+
+    let keep = edits.importScreenshot(from: imageURL)
+    await edits.setCloudURL(for: keep, cloudURL: link.absoluteString)
+    try edits.forgetCloudLink(link.absoluteString)
+    precondition(fm.fileExists(atPath: keep.path) && edits.items.contains { $0.url == keep && $0.cloudURL == nil },
+                 "Clearing a cloud share must preserve the local screenshot")
+
+    let session = RecordingSession(directoryURL: root.appendingPathComponent("DeleteVideo.bettershotrec", isDirectory: true))
+    try fm.createDirectory(at: session.directoryURL, withIntermediateDirectories: true)
+    try fm.copyItem(at: movieURL, to: session.screenURL)
+    try Data("pointer".utf8).write(to: session.pointerCaptureURL)
+    let videoRecord = history.referenceCapture(at: session.screenURL, kind: .recording)!
+    let video = MediaGalleryItem.collect(history: history, edits: [], projects: []).first!
+    precondition(video.captureIDs == [videoRecord.id])
+    precondition(MediaGalleryItem.deletionTargets(video.deletionURLs) == [session.directoryURL],
+                 "Delete a recording package as one unit, including its sidecars")
+    try video.deleteLocal(history: history, edits: edits) { url in
+        try fm.moveItem(at: url, to: trash.appendingPathComponent(url.lastPathComponent))
+    }
+    precondition(!fm.fileExists(atPath: session.directoryURL.path) && history.records.isEmpty)
+    print("PASS local deletion failure/retry, source/edit/package cleanup, cloud/local preservation, and cloud origin validation")
 }

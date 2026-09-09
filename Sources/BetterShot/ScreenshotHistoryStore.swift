@@ -98,7 +98,11 @@ struct ScreenshotHistoryItem: Identifiable, Codable, Equatable {
 final class ScreenshotHistoryStore {
     static let shared = ScreenshotHistoryStore()
 
+    private static let testingDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("BetterShotHistoryTests-\(UUID().uuidString)", isDirectory: true)
+
     static var applicationSupportDirectory: URL {
+        if ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] == "1" { return testingDirectory }
         let baseURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support", isDirectory: true)
         return baseURL.appendingPathComponent("BetterShot", isDirectory: true)
@@ -378,6 +382,27 @@ final class ScreenshotHistoryStore {
         }
 
         return displayURL
+    }
+
+    func forgetLocalItems(ids: Set<UUID>) throws {
+        guard !ids.isEmpty else { return }
+        let remaining = items.filter { !ids.contains($0.id) || $0.cloudURL != nil }
+        try persistGalleryItems(remaining)
+    }
+
+    func forgetCloudLink(_ link: String) throws {
+        guard items.contains(where: { $0.cloudURL == link }) else { return }
+        var remaining = items
+        for index in remaining.indices where remaining[index].cloudURL == link {
+            remaining[index].cloudURL = nil
+        }
+        try persistGalleryItems(remaining.filter(Self.shouldKeep))
+    }
+
+    private func persistGalleryItems(_ remaining: [ScreenshotHistoryItem]) throws {
+        try FileManager.default.createDirectory(at: Self.applicationSupportDirectory, withIntermediateDirectories: true)
+        try JSONEncoder().encode(remaining).write(to: Self.metadataURL, options: .atomic)
+        items = remaining
     }
 
     func delete(_ item: ScreenshotHistoryItem) {

@@ -205,6 +205,24 @@ final class HistoryStore {
 
     // MARK: - Delete
 
+    func forgetLocalRecords(ids: Set<UUID>) throws {
+        guard !ids.isEmpty else { return }
+        let remaining = records.filter { !ids.contains($0.id) || $0.shareURL != nil }
+        try JSONEncoder().encode(remaining).write(to: manifestURL, options: .atomic)
+        records = remaining
+    }
+
+    func forgetCloudLink(_ link: String) throws {
+        guard records.contains(where: { $0.shareURL == link }) else { return }
+        var remaining = records
+        for index in remaining.indices where remaining[index].shareURL == link {
+            remaining[index].shareURL = nil
+        }
+        remaining.removeAll { $0.shareURL == nil && !FileManager.default.fileExists(atPath: urlForRecord($0).path) }
+        try JSONEncoder().encode(remaining).write(to: manifestURL, options: .atomic)
+        records = remaining
+    }
+
     func deleteRecord(_ record: CaptureRecord) {
         let url = urlForRecord(record)
 

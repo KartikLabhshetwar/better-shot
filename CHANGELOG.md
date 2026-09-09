@@ -5,11 +5,11 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.1] - Unreleased
+## [0.5.1] - 2026-09-10
 
 ### Added
 
-- **Media Gallery in General settings**: Open Settings from the menu bar, then General > Open Media Gallery to browse saved screenshots and videos. Search by name, filter by media type, preview local captures, reopen editable projects, reveal files in Finder, and open or copy saved cloud links.
+- **Media Gallery**: Open directly from the menu tray or General settings. A resizable native window presents a left sidebar, larger thumbnails, screenshot/video and Local/Cloud filters, search, and newest/oldest sorting. Each card offers Edit, Reveal, and cloud link actions. Confirmed local deletion moves sources and saved edits to Trash while preserving cloud shares; confirmed cloud deletion removes the shared copy while preserving local files. Errors remain beside the action for retry.
 
 ### Fixed
 

@@ -12,6 +12,7 @@ struct ExportIntegration {
         precondition(ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] == "1",
                      "Run through Tests/run-exports.sh to keep the real Keychain isolated")
         precondition(R2CredentialStore.shared.keychainAccess == .empty)
+        defer { try? FileManager.default.removeItem(at: ScreenshotHistoryStore.applicationSupportDirectory) }
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
