@@ -42,6 +42,57 @@ enum ShareLinkCheck {
         expect(decodeBase64URL(encoded) == "https://cdn.example.com", "b should round-trip to the trimmed origin")
     }
 
+    static func checkDirectURL() {
+        let slug = "abcDEF-123_xyz"
+        expect(ShareBundle.directURL(id: slug, filename: "clip.mp4", publicBaseURL: "http://cdn.example.com") == nil, "http origins must be rejected")
+        expect(ShareBundle.directURL(id: slug, filename: "clip.mp4", publicBaseURL: "") == nil, "empty origins must be rejected")
+        expect(ShareBundle.directURL(id: slug, filename: "", publicBaseURL: "https://cdn.example.com") == nil, "an empty filename has nothing to link to")
+
+        guard let url = ShareBundle.directURL(id: slug, filename: "clip.mp4", publicBaseURL: "https://cdn.example.com/") else {
+            fatalError("an https origin should produce a direct URL")
+        }
+
+        let key = ShareBundle.objectPrefix(id: slug) + "clip.mp4"
+        expect(url.absoluteString == "https://cdn.example.com/\(key)", "direct URL must match the uploaded object key: \(url)")
+        expect(!url.absoluteString.contains(ShareBundle.pageBaseURL), "a direct link must not route through the viewer: \(url)")
+
+        guard let spaced = ShareBundle.directURL(id: slug, filename: "my clip.mp4", publicBaseURL: "https://cdn.example.com") else {
+            fatalError("a filename needing encoding should still produce a URL")
+        }
+        expect(!spaced.absoluteString.contains(" "), "spaces must be percent-encoded: \(spaced)")
+    }
+
+    static func checkPublicBaseURLValidation() {
+        typealias Problem = ShareBundle.PublicBaseURLProblem
+
+        expect(ShareBundle.validatePublicBaseURL("") == .empty, "an empty field is empty, not malformed")
+        expect(ShareBundle.validatePublicBaseURL("   ") == .empty, "whitespace only is still empty")
+        expect(ShareBundle.validatePublicBaseURL("cdn.example.com") == .notHTTPS, "a bare domain has no scheme")
+        expect(ShareBundle.validatePublicBaseURL("http://cdn.example.com") == .notHTTPS, "http is rejected")
+        expect(ShareBundle.validatePublicBaseURL("https://") == .invalidHost, "a scheme with no domain is a missing host, not a missing scheme")
+        expect(ShareBundle.validatePublicBaseURL("https://localhost") == .invalidHost, "a single label is not a public bucket domain")
+        expect(ShareBundle.validatePublicBaseURL("https://cdn.example.com?x=1") == .hasQueryOrFragment, "a query would land in the middle of the key")
+        expect(ShareBundle.validatePublicBaseURL("https://cdn.example.com#top") == .hasQueryOrFragment, "so would a fragment")
+
+        let valid = [
+            "https://cdn.example.com",
+            "https://cdn.example.com/",
+            "  https://cdn.example.com  ",
+            "https://pub-1a2b3c.r2.dev",
+            "https://cdn.example.com/files",
+        ]
+        for origin in valid {
+            expect(ShareBundle.validatePublicBaseURL(origin) == nil, "should be accepted: \(origin)")
+            expect(ShareBundle.directURL(id: "abc", filename: "a.png", publicBaseURL: origin) != nil, "accepted origin must build a direct link: \(origin)")
+            expect(ShareBundle.pageURL(id: "abc", publicBaseURL: origin) != nil, "accepted origin must build a viewer link: \(origin)")
+        }
+
+        let problems: [Problem] = [.empty, .notHTTPS, .invalidHost, .hasQueryOrFragment]
+        for problem in problems {
+            expect(!problem.message.isEmpty, "every problem needs something to show the user")
+        }
+    }
+
     static func checkManifestEncoding() throws {
         let manifest = ShareManifest(
             version: ShareManifest.currentVersion,
@@ -86,6 +137,8 @@ enum ShareLinkCheck {
     static func main() throws {
         checkSlug()
         checkPageURL()
+        checkDirectURL()
+        checkPublicBaseURLValidation()
         try checkManifestEncoding()
         checkSanitizedFilename()
         print("ShareLinkCheck: all assertions passed")
