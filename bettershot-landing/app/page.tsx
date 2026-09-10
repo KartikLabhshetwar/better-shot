@@ -27,28 +27,28 @@ function formatCount(n: number): string {
 
 const features = [
   {
+    label: "Capture",
+    title: "Screenshots that need nothing else",
+    body: "Region, fullscreen, and window capture with macOS's native selector. OCR text extraction, hex color picker, and a floating deck that holds up to five captures for copy, save, pin, edit, or drag-out.",
+    tags: ["Region and fullscreen", "OCR", "Color picker", "Capture deck", "Capture on release"],
+  },
+  {
     label: "Record",
     title: "Cursor zoom that tracks you",
-    body: "Pick a display, a window, or an area. The pointer is sampled at 30 Hz and clicks become smooth zoom moves, so a 4K screen stays readable in a small player. Recordings are written as fragmented MP4 and survive a crash mid-take.",
-    tags: ["Cursor auto-zoom", "Face cam", "Microphone", "24/30/60 fps", "Pause and resume"],
+    body: "Pick a display, a window, or an area. The pointer is sampled at 30 Hz and clicks become smooth zoom moves, so a 4K screen stays readable in a small player. Recordings auto-save to your folder and survive a crash mid-take.",
+    tags: ["Cursor auto-zoom", "Face cam", "Microphone", "Auto-save", "Pause and resume"],
   },
   {
     label: "Edit",
-    title: "A timeline, not a trim slider",
-    body: "Split at the playhead, drag an edge to trim, speed a slow stretch up to 4x, cross into the next clip. Then tilt the card, grade the color, set it on a background, and export MP4.",
-    tags: ["Multi-clip timeline", "0.25x to 4x", "Transitions", "3D tilt", "Color grading"],
-  },
-  {
-    label: "Overlay",
-    title: "Captions and masks, on device",
-    body: "Captions, keystrokes, masks, and text are timeline lanes you drag and retime next to your zoom cues. Transcription runs on device. A hide mask destroys its pixels in the export, so the password on screen never ships.",
-    tags: ["Captions", "Keystrokes", "Blur and pixelate", "Spotlight", "Canvas text"],
+    title: "Two editors, one app",
+    body: "Image editor: arrows, shapes, text, markers, highlight, blur, pixelate, and crop with background framing. Video editor: multi-clip timeline, speed control, transitions, captions, masks, and zoom cues.",
+    tags: ["Image annotations", "Video timeline", "0.25x to 8x", "Backgrounds", "Color grading"],
   },
   {
     label: "Share",
     title: "Links you own, on your storage",
-    body: "Connect a Cloudflare R2 bucket and Share uploads the edited recording straight from the app, then copies the link. No proxy, no vendor in the middle, no viewer limit.",
-    tags: ["Your own R2 bucket", "Keychain keys", "Direct SigV4", "Edits baked in"],
+    body: "Connect a Cloudflare R2 bucket and Share uploads from the editor or the capture deck, then copies the link. No proxy, no vendor in the middle, no viewer limit.",
+    tags: ["Your own R2 bucket", "Deck sharing", "Keychain keys", "Direct SigV4"],
   },
 ]
 
@@ -76,11 +76,11 @@ const performanceHighlights = [
 ]
 
 const moreFeatures = [
-  { title: "Face cam bubble", body: "Record your face alongside your screen. Camera feed composited live during capture." },
-  { title: "Microphone capture", body: "System audio and mic recorded on separate tracks. Mix or mute either one. Requires macOS 15." },
-  { title: "Backgrounds and beautify", body: "Padding, shadow, corner radius, and gradient backgrounds. Presentable screenshots and videos without a second app." },
-  { title: "Keyboard-first", body: "Six global shortcuts, all remappable. Capture, record, OCR, and color picker from anywhere." },
-  { title: "OCR and color picker", body: "Extract text from any region. Sample any pixel on screen. Copy HEX, RGB, or HSL." },
+  { title: "75 customizable shortcuts", body: "Global captures, recording controls, deck actions, image tools, and video editing keys. Search, filter, and rebind with conflict detection." },
+  { title: "URL scheme", body: "Trigger captures, recordings, OCR, or color picker from Raycast, Shortcuts, Alfred, or scripts with bettershot:// URLs." },
+  { title: "Auto-save recordings", body: "Finished recordings save to your configured folder automatically. Manual Save on deck cards writes recordings too." },
+  { title: "Backgrounds and beautify", body: "Padding, shadow, corner radius, and ten soft gradient backgrounds. Presentable screenshots and videos without a second app." },
+  { title: "Cursor styling", body: "Recorded, Dark, Light, Dot, or native Hand cursor with adjustable size, motion smoothing, press effects, and idle hiding." },
   { title: "No watermark, no account", body: "Every export is clean. No trial, no upsell. BSD 3 Clause licensed and auditable." },
 ]
 
@@ -106,15 +106,15 @@ export default async function Home() {
           <div className="mx-auto max-w-[1100px] px-6 text-center">
             <Reveal>
               <h1 className="mx-auto max-w-[18ch] text-[clamp(2.5rem,6vw,4.5rem)] font-normal leading-[1.1] tracking-tight text-zinc-900">
-                Screen recorder for Mac.{" "}
+                One app for the whole screen.{" "}
                 <span className="text-zinc-400">Free and open source.</span>
               </h1>
             </Reveal>
 
             <Reveal>
               <p className="mx-auto mt-6 max-w-lg text-[17px] leading-relaxed text-zinc-600">
-                A Mac screen recorder for clear, polished videos without complicated editing.
-                Cursor auto-zoom, face cam, on-device captions, and share links you own.
+                Screenshots, screen recording, image editor, and video editor, native on macOS.
+                No subscription, no account, no telemetry. Nothing leaves your Mac unless you share it.
               </p>
             </Reveal>
 
@@ -159,7 +159,7 @@ export default async function Home() {
                 One app instead of four subscriptions
               </h2>
               <p className="mt-4 text-[16px] leading-relaxed text-zinc-600">
-                Record, edit, caption, and share. Plus screenshots and annotations. All on your Mac.
+                Capture, record, annotate, edit, and share. All on your Mac, all in one app.
               </p>
             </Reveal>
 
@@ -252,9 +252,10 @@ export default async function Home() {
               ))}
             </ol>
             <p className="mt-10 max-w-2xl text-[14px] leading-relaxed text-zinc-600">
-              Coming in 0.5.0: a guided introduction to screenshots, video editing, and permission
-              setup, plus practice images you can edit without screen access. Reopen it anytime
-              from Getting Started in the menu bar.
+              New in 0.5.2: capture on mouse release, URL scheme for automation, auto-save
+              recordings, and 75 customizable shortcuts. See the{" "}
+              <a href="/changelog" className="text-brand-700 underline underline-offset-2 hover:text-brand">changelog</a>{" "}
+              for the full list.
             </p>
           </div>
         </section>
@@ -283,7 +284,7 @@ export default async function Home() {
               <CopyCommand command="brew install --cask bettershot" />
             </div>
             <p className="mt-4 text-[13px] text-zinc-400">
-              No account. No subscription. No uploads. macOS 14+.
+              No account. No subscription. No uploads. macOS 26.0+.
             </p>
           </div>
         </Reveal>

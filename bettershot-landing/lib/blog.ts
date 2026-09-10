@@ -11,6 +11,28 @@ export interface Post {
 
 export const posts: Post[] = [
   {
+    slug: "bettershot-0-5-2",
+    title: "BetterShot 0.5.2: URL scheme, 75 shortcuts, and six community PRs",
+    headline: "BetterShot 0.5.2: automation, shortcuts, and community fixes",
+    description:
+      "Version 0.5.2 adds a URL scheme for Raycast, Shortcuts, and Alfred, 75 customizable keyboard shortcuts, capture on mouse release, auto-save recordings, and six bug fixes from community pull requests.",
+    date: "2026-09-10",
+    readingTime: "4 min read",
+    tag: "Release",
+    keywords: [
+      "bettershot 0.5.2",
+      "bettershot release",
+      "bettershot url scheme",
+      "bettershot shortcuts",
+      "bettershot automation",
+      "mac screenshot app update",
+      "screen recorder mac update",
+      "bettershot capture on release",
+      "bettershot auto save recordings",
+      "open source screenshot tool mac",
+    ],
+  },
+  {
     slug: "loom-alternative",
     title: "The best free Loom alternative for Mac in 2026",
     headline: "Why Better Shot is the best free Loom alternative for Mac",

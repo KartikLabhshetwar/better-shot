@@ -36,11 +36,15 @@ export const faqs = [
   },
   {
     q: "What are the system requirements?",
-    a: "macOS 14 (Sonoma) or later, on Apple Silicon or Intel. Microphone recording requires macOS 15, which is where ScreenCaptureKit added microphone capture.",
+    a: "macOS 26.0 or later, on Apple Silicon or Intel.",
   },
   {
     q: "How do I install it?",
-    a: "Run brew install --cask bettershot, or download the DMG for Apple Silicon or Intel. Updates can be checked and installed from inside the app.",
+    a: "Run brew install --cask bettershot, or download the DMG from GitHub Releases. A three-step onboarding (Welcome, Permissions, First Capture) walks you through setup on first run.",
+  },
+  {
+    q: "Can I trigger captures from Raycast or Shortcuts?",
+    a: "Yes. BetterShot registers a URL scheme. Use bettershot://capture/region, bettershot://record, bettershot://ocr, bettershot://color-picker, or bettershot://settings from any automation tool, shell script, or keyboard launcher.",
   },
   {
     q: "Can I use it for client or commercial work?",
