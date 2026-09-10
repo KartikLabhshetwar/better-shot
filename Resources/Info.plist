@@ -22,6 +22,17 @@
     <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
     <key>LSUIElement</key>
     <true/>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.bettershot.url</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>bettershot</string>
+            </array>
+        </dict>
+    </array>
     <key>NSInputMonitoringUsageDescription</key>
     <string>BetterShot uses input monitoring for precise pointer motion during recordings and, when enabled, shortcut and special-key overlays. Plain typing is never recorded.</string>
     <key>NSCameraUsageDescription</key>
