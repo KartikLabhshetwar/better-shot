@@ -67,6 +67,9 @@ const jsonLd = {
   ],
 }
 
+const th = "border-b border-zinc-200 px-3 py-2.5 text-left text-[12px] font-semibold uppercase tracking-widest text-zinc-400"
+const td = "border-b border-zinc-100 px-3 py-2.5"
+
 export default async function Article() {
   const release = await getLatestRelease()
 
@@ -94,100 +97,222 @@ export default async function Article() {
           <div>
             <article className="mx-auto max-w-[680px] pb-16 pt-12">
               <p className="mb-8 text-[19px] leading-[32px] text-zinc-600">
-                BetterShot 0.5.2 ships today with a URL scheme for automation, 75 customizable
-                keyboard shortcuts, three new capture features, and six community-contributed bug
-                fixes. Every change in this release came from a GitHub issue or pull request.
+                If the last version of BetterShot felt like a screen recorder that happened to take
+                screenshots, this one is a proper screenshot and recording app. New editors, a capture
+                deck, a media gallery, 75 shortcuts, a URL scheme, five cursor styles, and a
+                three-step onboarding that gets out of the way. The 0.5 series is the biggest update
+                since the native rewrite, and every piece of it ships today.
               </p>
 
               <div className="mb-10 rounded-2xl border border-zinc-200 p-6">
                 <p className="mb-4 text-[13px] font-semibold uppercase tracking-widest text-brand-700">
-                  What&apos;s new
+                  The short version
                 </p>
                 <ul>
                   <TldrItem>
-                    <Strong>URL scheme:</Strong> trigger captures, recordings, OCR, and color picker
-                    from Raycast, Shortcuts, Alfred, or shell scripts.
+                    <Strong>Editors rebuilt:</Strong> a focused image editor with one toolbar, a
+                    video editor with tabbed inspectors, compact frosted chrome, and shared
+                    backgrounds. Closer to CleanShot X than anything free.
                   </TldrItem>
                   <TldrItem>
-                    <Strong>75 shortcuts:</Strong> every action in the app is now bindable, searchable,
-                    and conflict-checked.
+                    <Strong>Capture deck:</Strong> up to five screenshots in a floating stack with
+                    copy, save, pin, edit, cloud share, and drag-out. Stage captures until you are
+                    ready.
                   </TldrItem>
                   <TldrItem>
-                    <Strong>Capture on release:</Strong> take the screenshot the moment you release the
-                    mouse, matching the classic draw-and-release gesture.
+                    <Strong>75 shortcuts and URL scheme:</Strong> every action is bindable. Trigger
+                    anything from Raycast, Alfred, Shortcuts, or a shell script.
                   </TldrItem>
                   <TldrItem>
-                    <Strong>Auto-save recordings:</Strong> finished recordings save to your folder
-                    automatically. No more forgotten unsaved takes.
+                    <Strong>Media Gallery:</Strong> browse, search, filter, edit, and delete
+                    captures and recordings. Manage cloud links without leaving the app.
                   </TldrItem>
                   <TldrItem>
-                    <Strong>Six community fixes:</Strong> deck copy, save behavior, drawing cursor,
-                    and more, all from contributor PRs.
+                    <Strong>Community:</Strong> six PRs merged from contributors. Capture on release,
+                    auto-save recordings, deck copy fix, save behavior fix, cursor fix, and the
+                    URL scheme itself.
                   </TldrItem>
                 </ul>
               </div>
 
-              <H2 id="url-scheme">URL scheme for automation</H2>
+              <H2 id="editors">The editors, rebuilt</H2>
               <P>
-                BetterShot now registers <Code>bettershot://</Code> URLs. You can trigger any
-                capture action from outside the app without touching the menu bar or remembering a
-                shortcut.
+                The old image editor had tools scattered between a toolbar and a sidebar, background
+                settings in two places, and controls that looked nothing like the video editor next
+                to them. That is gone. Both editors now share the same design language: a left
+                inspector with compact frosted chrome, label-in-track sliders, and a consistent
+                blue selection accent. The image editor has one toolbar. The video editor has five
+                tabs: Background, Cursor, Camera, Effects, and Zoom &amp; Clips.
+              </P>
+              <P>
+                If you have used CleanShot X, this will feel familiar. The inspector is on the left.
+                Controls are compact. There is no wall of disclosure triangles. The difference is
+                that BetterShot gives you a full video editor in the same window, and both editors
+                share the same backgrounds, gradients, and default look.
               </P>
               <List
                 items={[
-                  "bettershot://capture/region, bettershot://capture/fullscreen, bettershot://capture/window",
-                  "bettershot://ocr, bettershot://color-picker",
-                  "bettershot://record",
-                  "bettershot://settings",
+                  "One toolbar for annotation tools, color, and style. No duplicates in the sidebar.",
+                  "Background owns canvas settings: padding, corner radius, shadow, and ten soft gradients (Blush, Peach, Mint, Powder Blue, Butter, Lilac, Sage, Coral, Aqua, Mauve).",
+                  "General > Default Look supplies shared defaults for new images and videos. Saved projects keep their own settings.",
+                  "Video inspector tabs are expanded by default. No outer disclosure chevrons.",
+                  "Label-in-track sliders everywhere: JPEG quality, preview margin, timeline zoom, all with exact value entry.",
+                  "Frosted chrome, subtle borders, compact spacing, and readable disabled states in both light and dark.",
                 ]}
               />
+              <blockquote className="my-9 max-w-[34ch] border-l-2 border-brand pl-6 text-[clamp(24px,2.6vw,30px)] leading-[1.24] tracking-tight">
+                The best screenshot app is the one you never think about.
+              </blockquote>
+
+              <H2 id="capture-deck">Capture deck</H2>
               <P>
-                This means you can add a Raycast command, an Alfred workflow, or a Shortcuts
-                action that opens a URL, and BetterShot handles the rest. Unknown or malformed URLs
-                are silently ignored, and the recording guard prevents stacking on an active session.
+                This is the feature that makes daily use feel different. Take a screenshot, and
+                it appears in a floating stack at the corner of your screen. Take another, it
+                stacks on top. Up to five captures sit there, each with its own dismiss timer and
+                a set of actions: Copy, Save, Pin, Edit, cloud share, and drag-out.
               </P>
+              <P>
+                When &quot;Keep screenshots in the deck until saved&quot; is on, captures stay in the
+                deck until you explicitly save or promote them. Copy puts the image on your
+                clipboard without writing to disk. Dismissing an unsaved card deletes it.
+                This is the staging workflow people loved in CleanShot X, and it works the same way
+                here.
+              </P>
+              <List
+                items={[
+                  "Small, Medium, or Large card sizes with adjustable edge margin (0 to 48 pt).",
+                  "Cloud share directly from a deck card with progress, retry, and automatic link copying.",
+                  "Six overlay positions, configurable in Settings > Overlay with Standard, Sharing, and Minimal presets.",
+                  "Copy writes to clipboard only. Save, Pin, Edit, and drag-out promote the capture.",
+                  "Save All commits the entire deck. Clear All dismisses it.",
+                ]}
+              />
+
+              <H2 id="cursor-styles">Five cursor styles</H2>
+              <P>
+                The pointer is no longer burned into the recording. BetterShot captures the cursor
+                path, click positions, and cursor shape as separate data, then draws it back in the
+                editor. You can restyle the cursor after the fact.
+              </P>
+              <List
+                items={[
+                  "Recorded: the exact cursor you had during capture.",
+                  "Dark, Light, Dot: generated from vector paths with transparent backgrounds and contrast outlines.",
+                  "Hand: native macOS pointingHand artwork, highest-resolution representation preserved.",
+                  "Natural or Smooth motion, adjustable size, press and ripple effects, idle hiding.",
+                  "Cursor choices persist with the project and match between preview, export, and shared video.",
+                ]}
+              />
 
               <H2 id="shortcuts">75 customizable shortcuts</H2>
               <P>
-                The shortcut system has been rebuilt. Every action in the app, across seven
-                categories (general, screenshots, OCR and color, recording, capture deck, image
-                tools, and video editing), is now listed in Settings &gt; Shortcuts with search,
-                filtering, and per-scope conflict detection.
+                The shortcut system was rebuilt from scratch. Every action in the app, across seven
+                categories, is listed in Settings &gt; Shortcuts. Search by name, filter by
+                category, record a new binding, check for conflicts, or reset to defaults. The
+                seven categories: general, screenshots, OCR and color, recording, capture deck,
+                image tools, and video editing.
               </P>
               <P>
-                Default bindings are preserved on upgrade. New actions start unassigned so they
-                never collide with your existing setup. Editor shortcuts take priority over global
-                ones when the editor is active, and text fields retain native typing behavior.
-              </P>
-
-              <H2 id="capture-on-release">Capture on mouse release</H2>
-              <P>
-                A new toggle in Settings &gt; Capture takes the screenshot as soon as you release
-                the mouse button. This matches the draw-and-release gesture that many people expect
-                from region capture. It is off by default; the adjustable rectangle remains the
-                default behavior.
+                Default bindings are preserved on upgrade. New actions start unassigned. Editor
+                shortcuts take priority over global ones when the editor is focused. Text fields
+                retain native typing, copy/paste, and undo.
               </P>
 
-              <H2 id="auto-save">Auto-save recordings</H2>
+              <H2 id="url-scheme">URL scheme for automation</H2>
               <P>
-                A new toggle in Settings &gt; Recording saves finished recordings to your configured
-                save folder automatically. If you use the capture deck, Save on a recording card
-                also writes to the folder using the flattened deliverable. No more closing the app
-                and losing an unsaved take.
+                BetterShot registers <Code>bettershot://</Code> URLs. Trigger any capture action
+                without touching the menu bar.
+              </P>
+              <div className="my-8 overflow-x-auto rounded-2xl border border-zinc-200">
+                <table className="w-full min-w-[420px] border-collapse text-[14px]">
+                  <thead>
+                    <tr className="bg-zinc-50">
+                      <th className={th}>URL</th>
+                      <th className={th}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ["bettershot://capture/region", "Region screenshot"],
+                      ["bettershot://capture/fullscreen", "Fullscreen screenshot"],
+                      ["bettershot://capture/window", "Window screenshot"],
+                      ["bettershot://ocr", "OCR text extraction"],
+                      ["bettershot://color-picker", "Hex color picker"],
+                      ["bettershot://record", "Start recording"],
+                      ["bettershot://settings", "Open Settings"],
+                    ].map(([scheme, action]) => (
+                      <tr key={scheme} className="transition-colors hover:bg-zinc-50">
+                        <td className={`${td} font-mono text-[13px] text-brand-700`}>{scheme}</td>
+                        <td className={`${td} text-zinc-600`}>{action}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <P>
+                Add a Raycast command, an Alfred workflow, a Shortcuts action, or a shell alias.
+                Unknown or malformed URLs are silently ignored, and the recording guard prevents
+                stacking on an active session.
               </P>
 
-              <H2 id="community-fixes">Community fixes</H2>
+              <H2 id="media-gallery">Media Gallery</H2>
               <P>
-                Six pull requests from the community landed in this release. Each one fixed a
-                reported issue, included tests, and was reviewed before merge.
+                Open it from the menu tray or General settings. A resizable native window with a
+                left sidebar, larger thumbnails, screenshot/video and Local/Cloud filters, search,
+                and newest/oldest sorting. Each card offers Edit, Reveal, and cloud link actions.
+              </P>
+              <P>
+                Local deletion moves files to Trash while preserving cloud share links. Cloud
+                deletion removes the shared copy from R2 while preserving local files. Both require
+                confirmation. Errors stay beside the action for retry instead of flashing and
+                disappearing.
+              </P>
+
+              <H2 id="onboarding">Three-step onboarding</H2>
+              <P>
+                Welcome, Permissions, First Capture. That is the entire setup. Optional silent
+                six-second demo videos show how screenshots and recordings work. Screen access is
+                marked required; microphone, camera, accessibility, and input monitoring are
+                optional. Finish by opening the capture bar or editing a practice image. No
+                autoplay, no looping, no network dependency.
+              </P>
+
+              <H2 id="capture-and-recording">Capture and recording improvements</H2>
+              <List
+                items={[
+                  "Capture on mouse release: a Settings > Capture toggle takes the screenshot the moment you release the mouse, matching the classic draw-and-release gesture.",
+                  "Auto-save recordings: finished recordings save to your folder automatically. Manual Save on deck cards writes recordings too.",
+                  "One shared capture and recording bar: Area, Fullscreen, Window, OCR, Color, Timer, and Recording in one compact glass bar.",
+                  "Adjustable recording areas with drag, resize, Return/double-click confirmation, and Escape to cancel.",
+                  "Cmd+S in the image editor updates the previously exported file on disk, not just internal history.",
+                ]}
+              />
+
+              <H2 id="everything-else">Settings, installer, and polish</H2>
+              <List
+                items={[
+                  "Overlay settings: Standard, Sharing, and Minimal presets. Click any of six positions in the layout preview to move, swap, or hide tools.",
+                  "Startup controls: Launch at Login, Show in Dock, Show in Menu Bar.",
+                  "DMG installer: Retina-ready lavender background, clover volume icon, aligned drag-to-Applications layout.",
+                  "Button contrast fixed in both light and dark appearances.",
+                  "Editor shortcuts use configured bindings instead of parallel hard-coded keys.",
+                  "Failed saves retain captures with retry guidance instead of discarding them.",
+                  "SF Symbols for all action icons. No third-party icon packs.",
+                ]}
+              />
+
+              <H2 id="community">Six community PRs</H2>
+              <P>
+                Every one of these started as a GitHub issue filed by a user, then a pull request
+                from a contributor. Reviewed, tested, and merged.
               </P>
               <div className="my-8 overflow-x-auto rounded-2xl border border-zinc-200">
                 <table className="w-full min-w-[520px] border-collapse text-[14px]">
                   <thead>
                     <tr className="bg-zinc-50">
-                      <th className="border-b border-zinc-200 px-3 py-2.5 text-left text-[12px] font-semibold uppercase tracking-widest text-zinc-400">Fix</th>
-                      <th className="border-b border-zinc-200 px-3 py-2.5 text-left text-[12px] font-semibold uppercase tracking-widest text-zinc-400">Issue</th>
-                      <th className="border-b border-zinc-200 px-3 py-2.5 text-left text-[12px] font-semibold uppercase tracking-widest text-zinc-400">PR</th>
+                      <th className={th}>Fix</th>
+                      <th className={th}>Issue</th>
+                      <th className={th}>PR</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -200,8 +325,8 @@ export default async function Article() {
                       ["Auto-save recordings", "#136", "#143"],
                     ].map(([fix, issue, pr]) => (
                       <tr key={fix} className="transition-colors hover:bg-zinc-50">
-                        <td className="border-b border-zinc-100 px-3 py-2.5 font-medium">{fix}</td>
-                        <td className="border-b border-zinc-100 px-3 py-2.5 text-zinc-600">
+                        <td className={`${td} font-medium`}>{fix}</td>
+                        <td className={`${td} text-zinc-600`}>
                           <a
                             href={`https://github.com/KartikLabhshetwar/better-shot/issues/${issue.slice(1)}`}
                             target="_blank"
@@ -211,7 +336,7 @@ export default async function Article() {
                             {issue}
                           </a>
                         </td>
-                        <td className="border-b border-zinc-100 px-3 py-2.5 text-zinc-600">
+                        <td className={`${td} text-zinc-600`}>
                           <a
                             href={`https://github.com/KartikLabhshetwar/better-shot/pull/${pr.slice(1)}`}
                             target="_blank"
@@ -236,26 +361,24 @@ export default async function Article() {
                 >
                   @zergzorg
                 </a>{" "}
-                for all six contributions.
+                for all six. And thanks to{" "}
+                <a
+                  href="https://github.com/BradleyAllanDavis"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-brand-700 underline underline-offset-2 hover:text-brand"
+                >
+                  @BradleyAllanDavis
+                </a>{" "}
+                for the preview sizing and placement work that shipped in 0.5.0.
               </P>
 
-              <H2 id="other-changes">Other changes in 0.5.2</H2>
-              <List
-                items={[
-                  "Overlay settings with Standard, Sharing, and Minimal presets and a visual layout editor",
-                  "Cloud sharing directly from the capture deck with progress and retry",
-                  "Launch at Login, Show in Dock, and Show in Menu Bar startup controls",
-                  "DMG installer with Retina background, clover volume icon, and aligned drag-to-Applications layout",
-                  "Three-step onboarding: Welcome, Permissions, First Capture",
-                  "Button contrast and editor shortcut handling fixes in both appearances",
-                ]}
-              />
-
-              <H2 id="upgrading">Upgrading</H2>
+              <H2 id="upgrading">Get it</H2>
               <P>
-                If you already have BetterShot, check for updates from the app or run{" "}
-                <Code>brew upgrade --cask bettershot</Code>. New users can install with{" "}
-                <Code>brew install --cask bettershot</Code> or grab the DMG from{" "}
+                Existing users: check for updates in the app, or
+                run <Code>brew upgrade --cask bettershot</Code>. New
+                users: <Code>brew install --cask bettershot</Code> or download the DMG
+                from{" "}
                 <a
                   href="https://github.com/KartikLabhshetwar/better-shot/releases"
                   target="_blank"
@@ -264,32 +387,78 @@ export default async function Article() {
                 >
                   GitHub Releases
                 </a>
-                .
+                . All preferences and shortcuts are preserved on upgrade. New shortcut
+                actions start unassigned.
               </P>
               <P>
-                Existing shortcuts and preferences are preserved on upgrade. The new shortcut
-                actions start unassigned so nothing changes until you bind them.
+                The full changelog for{" "}
+                <a
+                  href="/changelog#v0-5-0"
+                  className="text-brand-700 underline underline-offset-2 hover:text-brand"
+                >
+                  0.5.0
+                </a>
+                ,{" "}
+                <a
+                  href="/changelog#v0-5-1"
+                  className="text-brand-700 underline underline-offset-2 hover:text-brand"
+                >
+                  0.5.1
+                </a>
+                , and{" "}
+                <a
+                  href="/changelog#v0-5-2"
+                  className="text-brand-700 underline underline-offset-2 hover:text-brand"
+                >
+                  0.5.2
+                </a>{" "}
+                is on the changelog page.
               </P>
 
               <div className="mt-14 rounded-2xl border border-zinc-200 p-8">
                 <h2 className="text-[28px] leading-[34px] tracking-tight">
-                  Try BetterShot 0.5.2
+                  Try BetterShot 0.5
                 </h2>
                 <p className="mb-7 mt-4 max-w-[46ch] text-[16px] leading-[28px] text-zinc-600">
-                  Free, open source, macOS 26.0+. No account, no subscription.
+                  Free, open source, macOS 26.0+. Screenshots, recording, and editing in one
+                  native app. No account, no subscription.
                 </p>
                 <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
                   <DownloadDropdown release={release} source="cta" className="w-full sm:w-auto" />
                   <Link
-                    href="/changelog"
+                    href="/#compare"
                     className="inline-flex items-center justify-center rounded-xl border border-zinc-200 px-5 py-3 text-[15px] font-semibold text-zinc-700 outline-none transition-colors duration-150 hover:border-zinc-400 hover:bg-zinc-50"
                   >
-                    Full changelog
+                    See how it compares
                   </Link>
                 </div>
               </div>
 
+              <div className="mt-12 border-t border-zinc-200 pt-6">
+                <p className="mb-3 text-[13px] font-semibold uppercase tracking-widest text-zinc-400">
+                  Links
+                </p>
+                <ul className="space-y-2">
+                  {[
+                    ["Full changelog", "https://bettershot.site/changelog"],
+                    ["GitHub repository", "https://github.com/KartikLabhshetwar/better-shot"],
+                    ["Feature comparison", "https://bettershot.site/#compare"],
+                  ].map(([label, href]) => (
+                    <li key={href}>
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[13px] text-zinc-400 underline underline-offset-2 outline-none transition-colors duration-150 hover:text-zinc-700"
+                      >
+                        {label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </article>
+
           </div>
         </div>
       </main>
