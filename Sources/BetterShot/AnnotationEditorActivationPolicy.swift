@@ -5,12 +5,16 @@
 
 import AppKit
 
-/// Manages the app's activation policy so that regular windows (annotation
-/// editor, settings) show the Dock icon and appear in Cmd-Tab.  Uses
-/// reference counting so the policy stays `.regular` until *all* windows leave.
+/// Keeps Dock visibility consistent across launch, settings, and every editor.
 @MainActor
 enum AppActivationPolicy {
     private static var activeWindowCount = 0
+
+    static func applyVisibility() {
+        let visibility = AppPreferences.visibility()
+        NSApp.setActivationPolicy(visibility.dock ? .regular : .accessory)
+        MenuBarPopoverController.shared.setVisible(visibility.menuBar)
+    }
 
     /// Call when a regular window (annotation editor, video editor, settings, etc.) appears.
     /// Pass `hidePreview: true` for editing flows launched from the preview panel.
@@ -22,7 +26,7 @@ enum AppActivationPolicy {
             // so there's no show/hide race when the editor closes.
             ScreenshotPreviewStack.shared.collapse()
         }
-        NSApp.setActivationPolicy(.regular)
+        applyVisibility()
         NSApp.unhide(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -39,7 +43,7 @@ enum AppActivationPolicy {
 
         Task { @MainActor in
             guard activeWindowCount == 0 else { return }
-            NSApp.setActivationPolicy(.accessory)
+            applyVisibility()
         }
     }
 }

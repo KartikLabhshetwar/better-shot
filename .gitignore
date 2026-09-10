@@ -35,6 +35,8 @@ scripts/
 !/scripts/
 /scripts/*
 !/scripts/run-checks.sh
+!/scripts/create-dmg.sh
+!/scripts/dmg-background.swift
 
 # Claude Code local worktrees (shared CLAUDE.md is tracked)
 .claude/worktrees/

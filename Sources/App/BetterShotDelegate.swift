@@ -17,9 +17,7 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
         DeckStaging.purge()
         AppPreferences.migrateEditorPreferences()
         AppPreferences.applyAppearance()
-        NSApp.setActivationPolicy(.accessory)
-
-        MenuBarPopoverController.shared.setup()
+        AppActivationPolicy.applyVisibility()
         RecordingRecoveryCoordinator.recoverInterruptedRecordings()
         do {
             try Tips.configure([.displayFrequency(.daily)])

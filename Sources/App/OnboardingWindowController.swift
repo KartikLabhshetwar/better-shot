@@ -8,6 +8,7 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
 
     func show() {
+        guard OnboardingState.shouldPresent() else { return }
         if let window {
             NSApp.activate(ignoringOtherApps: true)
             window.makeKeyAndOrderFront(nil)

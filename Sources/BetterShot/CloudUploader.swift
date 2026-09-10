@@ -42,6 +42,7 @@ final class CloudUploader {
         fileURL: URL,
         title: String? = nil
     ) async throws -> CloudUploadResult {
+        try Task.checkCancellation()
         let stagingDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("BetterShotShare-\(itemID.uuidString)")
         try? FileManager.default.createDirectory(at: stagingDir, withIntermediateDirectories: true)
@@ -59,6 +60,7 @@ final class CloudUploader {
             uploadFile = fileURL
         }
 
+        try Task.checkCancellation()
         let pageURL = try await R2Uploader.shared.uploadShare(
             itemID: itemID,
             fileURL: uploadFile,

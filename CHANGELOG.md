@@ -5,6 +5,35 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-09-10
+
+More control over startup, keyboard shortcuts, and the capture overlay, with a clearer installer and simpler onboarding.
+
+### Added
+
+- **Overlay settings and visual layout editor**: A dedicated Settings > Overlay page offers Standard, Sharing, and Minimal presets. Click any of six positions in the preview to move, swap, or hide tools; Dismiss remains available. Quick Setup controls card size and screen position, while Advanced controls edge margin, dismissal timing including Never, and always-visible actions. Changes apply immediately, existing preferences are preserved, and restoring overlay defaults leaves other settings untouched.
+- **Cloud sharing from the capture deck**: Share directly from a preview card with processing and upload progress, automatic link copying, and Copy Link/Open actions in the overlay. Finished links are saved in Media Gallery. Sharing errors offer retry or a route to Sharing settings, and recording shares include saved edits, cursor styling, and camera composition.
+- **General startup and visibility controls**: Launch at Login uses macOS registration with inline errors and a Login Items settings link when approval is needed. Show in Dock and Show in Menu Bar keep at least one app icon available, preserving BetterShot's clover identity.
+- **75 customizable shortcut actions**: Search or filter categories for general actions, screenshots, OCR and color, recording, the capture deck, image tools, and video editing. Open customization from Settings > Shortcuts. Record, disable, clear, or reset each binding with conflict checking. Existing shortcuts are preserved; additional actions start unassigned.
+- **More capture and recording shortcuts**: Assign keys for window and previous-region captures, timed region capture, capture-and-copy/save/annotate/pin, OCR without line breaks, area recording, Stop, Pause/Resume, Restart, and Discard. Per-capture actions preserve General preferences, and destructive actions retain native confirmation.
+
+### Changed
+
+- **Capture overlay actions**: Removed the Delete button. The Standard layout puts Pin at the top left and Cloud Share at the bottom right, using the same cloud icon as the editors. Overlay customization lives in its dedicated settings tab. Removed duplicate Overlay navigation from General and Capture, and duplicate Shortcuts navigation from General.
+- **DMG installer**: A Retina-ready lavender background, clear drag-to-Applications instructions, aligned native icons, and a clover volume icon replace the plain installation folder. Local and maintainer release packaging share one verified layout.
+- **Three-step onboarding**: Welcome → Permissions → First Capture replaces the longer setup. Screenshot and recording examples include optional, silent six-second Hyperframes demos and still previews, with no autoplay or looping. Finish by opening the capture bar or editing a separate practice image. Compact layouts support light and dark appearances.
+- **All permissions visible**: Screen Capture, Accessibility, Input Monitoring, Microphone, and Camera appear together without dropdowns. Each row explains its purpose and shows an Allow or Open Settings action, granted status, or restriction guidance. Screen capture is marked required; the other permissions are optional. Granting access does not turn on the microphone or camera.
+- **No onboarding reopening controls**: Removed introduction actions from the menu tray, Settings, and the shortcut catalog. The test pilot clearly identifies itself as a preview and disables real permission requests.
+
+### Fixed
+
+- **Overlay sharing recovery and cancellation**: Sharing progress and errors pause automatic dismissal. Closing a sharing error returns to the capture, and cancelling preparation prevents a later upload from starting. Customized tools retain accessible names and keyboard focus, and preview controls stay within the selected card size.
+- **First-launch-only onboarding**: Fresh user profiles begin setup; existing profiles and users who completed an older introduction skip it. Skipping, closing, or finishing setup prevents repeat prompts. Unfinished permission setup can still resume after a macOS-requested restart.
+- **Permission retries and recovery**: Camera and microphone requests remain retryable until the user makes a decision. Denied access and previously requested system permissions lead to the relevant System Settings page. Permission status refreshes on return, and settings errors appear beside the affected action with retry guidance.
+- **Button contrast in both appearances**: Settings uses readable neutral button labels, visible borders and hover feedback, and a blue selection accent. Shared editor buttons respect destructive roles with red styling; clearing locked sharing keys asks for confirmation.
+- **Editor shortcut handling**: Image and video editors use the configured bindings instead of parallel hard-coded keys. Active editor shortcuts take priority over matching global shortcuts, including Copy Screenshot versus Pick Color. Text fields retain native typing, copy/paste, and undo; shortcut recording suspends action dispatch.
+- **Failed capture-deck saves**: Save and Save All retain captures when saving fails and provide retry guidance instead of discarding unsaved files.
+
 ## [0.5.1] - 2026-09-10
 
 ### Added

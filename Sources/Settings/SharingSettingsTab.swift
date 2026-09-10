@@ -12,6 +12,7 @@ struct SharingSettingsTab: View {
 
     @State private var isTesting = false
     @State private var testStatus: TestStatus = .idle
+    @State private var confirmingClearKeys = false
 
     private enum TestStatus: Equatable {
         case idle
@@ -94,6 +95,17 @@ struct SharingSettingsTab: View {
         }
         .formStyle(.grouped)
         .onAppear { loadFromStore() }
+        .alert("Clear saved keys?", isPresented: $confirmingClearKeys) {
+            Button("Clear Keys", role: .destructive) {
+                store.forgetStoredKeys()
+                accessKeyID = ""
+                secretAccessKey = ""
+                testStatus = .idle
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("You will need to enter your API keys again to share captures. Existing cloud shares stay available.")
+        }
     }
 
     @ViewBuilder
@@ -109,11 +121,8 @@ struct SharingSettingsTab: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Button("Clear Locked Keys") {
-                    store.forgetStoredKeys()
-                    accessKeyID = ""
-                    secretAccessKey = ""
-                    testStatus = .idle
+                Button("Clear Locked Keys", role: .destructive) {
+                    confirmingClearKeys = true
                 }
             }
             .padding(.vertical, 2)

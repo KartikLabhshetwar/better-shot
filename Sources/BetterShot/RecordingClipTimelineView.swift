@@ -449,21 +449,20 @@ final class RecordingClipTimelineControl: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
-        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        let characters = event.charactersIgnoringModifiers?.lowercased()
-
-        if modifiers.isEmpty, characters == "s" {
+        let action = ShortcutService.shared.action(keyCode: UInt32(event.keyCode),
+            modifiers: ShortcutService.Shortcut.modifiers(from: event.modifierFlags), scope: .video)
+        if action == .videoSplitTool {
             toggleSplitRequested?()
             return
         }
-        if modifiers.isEmpty, characters == "c" {
+        if action == .videoCut {
             let target = hoveredClipID != nil ? hoverTime ?? playheadTime : playheadTime
             if let time = splitTime(near: target, allowSnap: !NSEvent.modifierFlags.contains(.option)) {
                 splitRequested?(time)
             }
             return
         }
-        if modifiers.isEmpty, event.keyCode == 51 || event.keyCode == 117 {
+        if action == .videoDelete {
             deleteRequested?()
             return
         }

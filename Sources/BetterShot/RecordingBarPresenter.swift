@@ -32,6 +32,7 @@ final class RecordingBarPresenter {
     /// tells the hosting view which part of itself is real and satellite
     /// windows where to anchor.
     var showsRecordingOptions = false
+    var recordingConfirmation: ShortcutService.Action?
 
     var barFrameInPanel: CGRect = .zero
 

@@ -81,7 +81,7 @@ struct AnnotationEditorWindow: View {
                         Label("Undo", systemImage: "arrow.uturn.backward")
                     }
                     .disabled(!model.canUndo)
-                    .help("Undo (⌘Z)")
+                    .help(ShortcutService.shared.help("Undo", for: .imageUndo))
 
                     Button {
                         model.redo()
@@ -89,7 +89,7 @@ struct AnnotationEditorWindow: View {
                         Label("Redo", systemImage: "arrow.uturn.forward")
                     }
                     .disabled(!model.canRedo)
-                    .help("Redo (⇧⌘Z)")
+                    .help(ShortcutService.shared.help("Redo", for: .imageRedo))
                 }
 
                 ToolbarItemGroup(placement: .primaryAction) {
@@ -119,9 +119,6 @@ struct AnnotationEditorWindow: View {
                 closeGuard.attach(to: window)
                 closeGuard.refreshDocumentEdited()
             }
-            .onDeleteCommand {
-                model.deleteSelectedAnnotation()
-            }
             .onChange(of: model.revision) { _, _ in
                 closeGuard.refreshDocumentEdited()
             }
@@ -133,22 +130,47 @@ struct AnnotationEditorWindow: View {
                 // engine, so it never bumps `revision`.
                 closeGuard.refreshDocumentEdited()
             }
-            .background(AnnotationKeyCommandHandler(
-                onDelete: model.deleteSelectedAnnotation,
-                onSave: saveEdits,
-                onUndo: model.undo,
-                onRedo: model.redo,
-                onSelectAll: model.selectAllAnnotations,
-                onSelectTool: model.selectTool,
-                onZoomIn: model.zoomIn,
-                onZoomOut: model.zoomOut,
-                onFitCanvas: model.fitCanvas,
-                onActualSize: { model.setZoomPercent(100) },
-                onToggleCrop: { withAnimation(.snappy(duration: 0.2)) { model.toggleCropping() } },
-                onApplyCrop: { withAnimation(.snappy(duration: 0.2)) { model.applyCrop() } },
-                onCancelCrop: { withAnimation(.snappy(duration: 0.2)) { model.cancelCrop() } },
-                isCropping: { model.isCropping }
-            ))
+            .background(EditorShortcutHandler(scope: .image, intercept: { event in
+                guard model.isCropping else { return false }
+                if event.keyCode == 36 || event.keyCode == 76 { model.applyCrop() }
+                else if event.keyCode == 53 || ShortcutService.shared.action(
+                    keyCode: UInt32(event.keyCode), modifiers: ShortcutService.Shortcut.modifiers(from: event.modifierFlags),
+                    scope: .image) == .imageCrop { model.cancelCrop() }
+                return true
+            }, perform: performShortcut))
+    }
+
+    private func performShortcut(_ action: ShortcutService.Action) -> Bool {
+        if let tool = action.annotationTool {
+            clearInspectorFocus()
+            model.selectTool(tool)
+            return true
+        }
+        switch action {
+        case .imageBackground: isInspectorPresented.toggle()
+        case .imageCrop: model.toggleCropping()
+        case .imageSave: saveEdits()
+        case .imageExport:
+            guard model.previewImage != nil, !isExporting, !isSaving, !isCopying, !uploadPhase.isUploading else { return true }
+            exportImage()
+        case .imageCopy:
+            guard model.previewImage != nil, !isCopying, !isExporting else { return true }
+            copyToClipboard()
+        case .imageUndo: model.undo()
+        case .imageRedo: model.redo()
+        case .imageSelectAll: model.selectAllAnnotations()
+        case .imageDelete: model.deleteSelectedAnnotation()
+        case .imageZoomIn: model.zoomIn()
+        case .imageZoomOut: model.zoomOut()
+        case .imageFit: model.fitCanvas()
+        case .imageActualSize: model.setZoomPercent(100)
+        case .imageIncreaseSize, .imageDecreaseSize:
+            let delta: CGFloat = action == .imageIncreaseSize ? 1 : -1
+            if model.isTextStyleAvailable { model.setTextFontSize(min(300, max(4, model.selectedTextFontSize + delta * 2))) }
+            else if model.isStrokeStyleAvailable { model.setStrokeWidth(min(24, max(1, model.strokeWidth + delta))) }
+        default: return false
+        }
+        return true
     }
 
     private var imageTools: some View {
@@ -182,7 +204,7 @@ struct AnnotationEditorWindow: View {
                 }
                 .buttonStyle(EditorButtonStyle(selected: model.selectedTool == tool, horizontalPadding: 6))
                 .accessibilityAddTraits(model.selectedTool == tool ? .isSelected : [])
-                .help(tool.helpText)
+                .help(ShortcutService.shared.help(tool.helpText, for: ShortcutService.Action.allCases.first { $0.annotationTool == tool }))
                 .popoverTip(tool == .arrow && !OnboardingState.shouldPresent() ? ImageEditingTip() : nil, arrowEdge: .bottom)
             }
 
@@ -278,9 +300,8 @@ struct AnnotationEditorWindow: View {
                     .labelStyle(.titleAndIcon)
             }
         }
-        .keyboardShortcut("s", modifiers: .command)
         .disabled(!model.hasUnsavedChanges || isSaving || isExporting)
-        .help("Save your edits in BetterShot (⌘S)")
+        .help(ShortcutService.shared.help("Save your edits in BetterShot", for: .imageSave))
 
         Button(action: exportImage) {
             if isExporting {
@@ -309,7 +330,7 @@ struct AnnotationEditorWindow: View {
                 if CloudUploader.shared.isConfigured {
                     CloudUploadButton(
                         suggestedTitle: model.sourceURL?.deletingPathExtension().lastPathComponent ?? "",
-                        onUpload: uploadAnnotation
+                        onUpload: uploadAnnotation, shortcutAction: .imageShare
                     ) {
                         Label("Share", systemImage: "icloud.and.arrow.up")
                             .labelStyle(.titleAndIcon)
@@ -331,9 +352,8 @@ struct AnnotationEditorWindow: View {
                             .labelStyle(.titleAndIcon)
                     }
                 }
-                .keyboardShortcut("c", modifiers: [.command, .shift])
                 .disabled(model.previewImage == nil || model.imageSize == .zero || isCopying || isExporting)
-                .help("Copy the finished image to the clipboard (⇧⌘C)")
+                .help(ShortcutService.shared.help("Copy the finished image to the clipboard", for: .imageCopy))
 
             }
         }

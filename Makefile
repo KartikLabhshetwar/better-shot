@@ -68,16 +68,7 @@ run: build ## Build and launch (debug)
 	@open -n "$(abspath $(APP_DEBUG))"
 
 dmg: release ## Create unsigned DMG for local testing
-	@echo "==> Creating DMG..."
-	@mkdir -p $(DMG_DIR)/staging
-	@cp -R "$(APP_RELEASE)" $(DMG_DIR)/staging/
-	@ln -sf /Applications $(DMG_DIR)/staging/Applications
-	@hdiutil create -volname "BetterShot" \
-		-srcfolder $(DMG_DIR)/staging \
-		-ov -format UDZO \
-		"$(DMG_DIR)/$(DMG_NAME)" 2>/dev/null
-	@rm -rf $(DMG_DIR)/staging
-	@echo "==> $(DMG_DIR)/$(DMG_NAME)"
+	@bash scripts/create-dmg.sh "$(APP_RELEASE)" "$(DMG_DIR)/$(DMG_NAME)"
 
 clean: ## Remove build artifacts
 	@echo "==> Cleaning..."

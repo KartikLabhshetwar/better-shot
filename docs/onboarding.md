@@ -1,39 +1,60 @@
-# BetterShot onboarding (0.5.0, unreleased)
+# BetterShot onboarding
 
-Updated September 10, 2026 for 0.5.0 release preparation.
+Updated September 10, 2026 for 0.5.1.
 
-1. **Welcome:** a centered clover and short introduction to screenshots and recordings. Start Setup begins; Set Up Later opens the shared bar.
-2. **Permissions:** screen access is prominent. A native Optional permissions disclosure contains Accessibility, Input Monitoring, Microphone, and Camera. Existing per-feature request, denial, restriction, and restart recovery controls remain. Nothing is requested automatically; granting access never enables recording inputs or key capture.
-3. **Shortcuts:** the capture-bar binding is prominent, followed by region, fullscreen, and recording-options bindings from ShortcutService. Customized bindings and disabled states are preserved. Review Access opens the optional permission controls when Accessibility is missing or shortcuts need a restart.
-4. **First Capture:** the bundled menu-bar clover shows where to find BetterShot. Short instructions lead to screenshot or recording capture; two practice photos open unique full-resolution copies in the real editor without screen access. Missing screen permission offers an Enable Access route.
+1. **Welcome:** a short introduction, Screenshots/Recordings picker, still preview,
+   and optional six-second demo. No autoplay, sound, looping, or network dependency.
+2. **Permissions:** all five permissions are shown in compact rows, with no
+   disclosures. Screen capture is marked Required; Accessibility, Input Monitoring,
+   Microphone, and Camera are Optional. Each row shows Allow, Open Settings, Allowed,
+   or Restricted. Denied access and previous system requests lead to Settings;
+   undecided microphone/camera requests can be retried. Errors stay beside the action.
+   No permission or recording input is enabled automatically.
+3. **First Capture:** find the menu-bar clover, see the current capture-bar shortcut, then
+   open the shared bar or edit a separate practice image in the real editor.
 
-The resizable 760 × 680-point window uses centered content, neutral system colors,
-existing frosted chrome, and a persistent footer with Back, accessible step markers,
-Set Up Later, and Return to continue. At 520 × 560 points, content scrolls while the
-footer stays reachable. No animation or new dependency is added.
+Back, Skip Setup, and Continue remain in a persistent footer. The 760 × 680 window
+resizes down to 520 × 560; longer content scrolls. System colors and existing chrome
+support light/dark and Reduce Transparency. Demos start only after Watch Demo;
+leaving the page stops them, losing app focus pauses them, and enabling Reduce
+Motion returns to the still. The same explanation is available as text.
 
-Onboarding version 2 covers new users, existing users, and users of the previous
-brief guide. Set Up Later, the close button, and completion mark it seen. Permission
-requests that may require relaunch persist a resume flag; quitting then reopening
-returns to Permissions, including when the guide was reopened manually. Explicit
-dismissal clears the flag. Requests made from Settings do not schedule onboarding.
-Status always comes from macOS: returning to the app, a two-second refresh while
-Permissions/Shortcuts/First Capture is visible, and Check Again all recheck the grants.
-CoreGraphics preflight APIs cannot distinguish a first request from a denial, so
-those rows say Not enabled and offer a settings route. AVFoundation distinguishes
-not determined, authorized, denied, and restricted. Restricted access is explained
-without prompting. TipKit still teaches Arrow beside its editor control.
+Setup is first-run-only. Before launch writes preferences, `prepareForLaunch`
+records a zero seen-version for fresh profiles or marks existing BetterShot profiles
+seen. A positive seen-version, including version 1, never triggers setup again.
+Skip, close, and completion mark it seen. Neither the menu tray nor Settings exposes onboarding.
+The window controller rejects attempts after completion. Permission requests that
+may need a relaunch preserve the existing resume flag; explicit dismissal clears it.
+Settings permission requests never set it. Grants always come from macOS.
+The isolated test pilot disables permission actions and explains that access must
+be granted in the actual BetterShot app; it cannot modify real permissions.
 
-## Sources and decisions
+## Design reference
 
-- Inspected the installed Raycast macOS app using Show Onboarding: a centered welcome, focused content, and a persistent bottom progress/action strip. Adapted these patterns to BetterShot’s clover and neutral native chrome. The guide stays optional and avoids Raycast’s decorative motion and longer feature tour.
+[Apple’s onboarding guidance](https://developer.apple.com/design/human-interface-guidelines/onboarding)
+informs the brief, optional setup and hands-on practice. The user explicitly asked
+to remove reopening controls. The compact native window retains the existing
+Raycast-inspired structure without the extra shortcuts slide.
 
-- [Apple HIG: Onboarding](https://developer.apple.com/design/human-interface-guidelines/onboarding): brief, optional, interactive learning after launch; easy reopening.
-- [Apple HIG: Privacy](https://developer.apple.com/design/human-interface-guidelines/privacy): explicit feature-driven permission requests. No launch-time Accessibility prompt; status comes from macOS.
-- [Apple: Designing for macOS](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos): a normal resizable window, native buttons, keyboard behavior, and the existing menu-bar identity.
-- [Apple HIG: Launching](https://developer.apple.com/design/human-interface-guidelines/launching): the introduction is presented after launch setup.
-- [Apple TipKit](https://developer.apple.com/documentation/tipkit): one contextual tip, anchored to the control it teaches.
-- Reviewed [SwiftUI-Onboarding](https://github.com/Sedlacek-Solutions/SwiftUI-Onboarding), [TourKit](https://github.com/rampatra/TourKit), [PermissionPilot](https://github.com/arpitagarwal1301/PermissionPilot), and [WelcomeWindow](https://github.com/CodeEditApp/WelcomeWindow). No package added: this four-step flow uses existing SwiftUI/AppKit presentation and permission services. Extract a shared package only when another real app needs it.
+## Hyperframes demos
+
+`docs/onboarding-media/DESIGN.md` defines the neutral visual direction. The two
+`index.html` compositions illustrate annotation and video trim/zoom using the
+existing coastal photo. They are illustrative examples, not recordings of app UI.
+The app bundles only rendered MP4s and PNG posters in `Resources/Onboarding`.
+
+Render with Hyperframes 0.8.33, Node 22+, FFmpeg, and its Chrome renderer. For each
+of `screenshot` and `recording`, copy its index.html, DESIGN.md, and
+Resources/Onboarding/coast.png into a temporary composition directory. Run:
+
+```sh
+npx --yes hyperframes@0.8.33 check /path/to/composition
+npx --yes hyperframes@0.8.33 render /path/to/composition --quality high --fps 30 --output /path/to/demo.mp4
+ffmpeg -ss 4.5 -i /path/to/demo.mp4 -frames:v 1 /path/to/demo.png
+```
+
+Copy the results to `Resources/Onboarding/<kind>-demo.mp4` and `<kind>-demo.png`.
+The Swift app has no Hyperframes or JavaScript runtime dependency.
 
 ## Artwork
 
@@ -50,32 +71,19 @@ Use case: photorealistic-natural. Asset type: second bundled practice photograph
 
 ## Verification
 
-Run `make test` with the provided runners (`BETTERSHOT_TESTING=1`).
-OnboardingStateCheck verifies first presentation, existing-user presentation, dismissal,
-preserved preferences, the version-1 upgrade, permission-restart recovery, and downgrade behavior. EditorUIIntegration checks original-byte
-copies, unique working files, write failure, AV permission status mapping, and testing guards.
-It renders sixteen snapshots of the four steps in light/dark at 520/760-point widths,
-plus two sheets of permission recovery states. The flow adds no animations and reuses the existing chrome
-that supports Reduce Transparency; OS accessibility settings need a live check.
+Run `make test` using the provided BETTERSHOT_TESTING=1 runners. Standalone checks
+cover onboarding state and preserved preferences. Editor integration checks
+full-resolution practice copies, silent six-second playable videos, 16:9 posters,
+permission status/recovery, and compact/light/dark snapshots of every step.
 
-The redesigned flow passed `make test`, including all sixteen onboarding snapshots
-and the existing permission, sample-copy, editor, and export checks. Reviewed each
-step in light/dark and compact/default layouts; longer compact content scrolls
-while the footer stays visible. Live navigation remains unverified: automatic
-approval review blocked launching the locally built isolated test host as
-unrecognized software. That host uses BETTERSHOT_TESTING=1 to avoid requesting
-TCC access or reading R2 credentials; launching it requires user approval.
+Offscreen snapshots do not validate native video playback, VoiceOver, live capture,
+or macOS permission dialogs. Check those on a signed app before release.
 
-Still required before release: signed-app first launch, Escape/Tab/VoiceOver,
-actual permission grant/denial/revocation and system-triggered relaunch, switching
-to the real sample editor, and capturing after setup. The automated checks do not
-prove these OS interactions.
 
-The website removes launch.mp4 and feature-1.mp4 through feature-4.mp4. It keeps
-the shared-recording player, adds first-capture guidance, and labels the new introduction
-as coming in 0.5.0. `pnpm build` passes; desktop and 390-point mobile feature layouts were reviewed
-in Chrome. `pnpm exec tsc --noEmit` finds four pre-existing nullable `parsed`
-errors in components/count-up.tsx (lines 46 and 48); the Next.js configuration skips
-type validation during builds. `pnpm lint` cannot run because ESLint is absent
-from the project's dependencies. These unrelated issues were left unchanged.
-
+September 10 permission-page verification: `make test` passed, including first-run
+eligibility, existing-profile migration, permission retry routing, test isolation,
+and all five visible rows in compact/light/dark snapshots. The final build and
+editor/export integration rerun also passed. The refreshed native pilot shows all
+five permission actions and an explicit preview-only explanation, without a
+disclosure. Real permission grants and system-triggered restart still require a
+signed-app manual check; the pilot never requests those permissions.

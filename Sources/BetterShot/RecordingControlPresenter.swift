@@ -30,8 +30,12 @@ extension RecordingBarPresenter {
 
 struct RecordingSessionControls: View {
     @State private var manager = ScreenRecordingManager.shared
-    @State private var confirmsRestart = false
-    @State private var confirmsDiscard = false
+    @State private var presenter = RecordingBarPresenter.shared
+
+    private func confirmation(_ action: ShortcutService.Action) -> Binding<Bool> {
+        Binding(get: { presenter.recordingConfirmation == action },
+                set: { if !$0 { presenter.recordingConfirmation = nil } })
+    }
 
     private var isPaused: Bool {
         manager.state == .paused
@@ -76,25 +80,25 @@ struct RecordingSessionControls: View {
 
             separator
             BarActionButton(id: .restart, title: "Start over", systemImage: "arrow.counterclockwise") {
-                confirmsRestart = true
+                presenter.recordingConfirmation = .restartRecording
             }
             .frame(width: 42)
             .disabled(isSettling)
 
             separator
             BarActionButton(id: .discard, title: "Discard recording", systemImage: "trash") {
-                confirmsDiscard = true
+                presenter.recordingConfirmation = .discardRecording
             }
             .frame(width: 42)
             .disabled(isSettling)
         }
-        .alert("Start a new recording?", isPresented: $confirmsRestart) {
+        .alert("Start a new recording?", isPresented: confirmation(.restartRecording)) {
             Button("Start Over", role: .destructive) { manager.restartRecording() }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This recording will be discarded and recording will start again.")
         }
-        .alert("Discard this recording?", isPresented: $confirmsDiscard) {
+        .alert("Discard this recording?", isPresented: confirmation(.discardRecording)) {
             Button("Discard", role: .destructive) { manager.deleteRecording() }
             Button("Cancel", role: .cancel) {}
         } message: {

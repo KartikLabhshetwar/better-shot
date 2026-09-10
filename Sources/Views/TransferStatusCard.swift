@@ -12,6 +12,7 @@ struct TransferStage: Equatable {
     let label: String
     let icon: String
 
+    static let processing = TransferStage(label: "Processing", icon: "gearshape")
     static let rendering = TransferStage(label: "Rendering", icon: "film.stack")
     static let uploading = TransferStage(label: "Uploading", icon: "icloud.and.arrow.up")
     static let exporting = TransferStage(label: "Exporting", icon: "arrow.down.circle")
@@ -23,38 +24,105 @@ struct TransferStatusCard: View {
     var onRetry: () -> Void = {}
     var onDismiss: () -> Void = {}
 
+    var compactSize: CGSize? = nil
+    var onSettings: (() -> Void)? = nil
+
     @State private var didCopy = false
     @State private var copyReset: Task<Void, Never>?
     @State private var isHovering = false
 
     var body: some View {
         Group {
-            switch status {
-            case .working(let stage, let progress):
-                workingRow(stage: stage, progress: progress.flatMap { $0.isFinite ? min(max($0, 0), 1) : nil })
-            case .linkReady(let url):
-                linkReadyRows(url: url)
-            case .exported(let url):
-                exportedRow(url: url)
-            case .failed(let headline, let message, let canRetry):
-                failedRow(headline: headline, message: message, canRetry: canRetry)
+            if compactSize != nil {
+                compactContent
+            } else {
+                fullContent
             }
         }
         .id(caseKey)
         .transition(.opacity)
-        .padding(12)
-        .frame(width: 340, height: 88)
-        .studioGlass(cornerRadius: 12)
-        .animation(RecordingMotion.reduceMotion ? nil : .easeOut(duration: 0.15), value: caseKey)
+        .padding(compactSize == nil ? 12 : 8)
+        .frame(width: compactSize?.width ?? 340, height: compactSize?.height ?? 88)
+        .studioGlass(cornerRadius: compactSize == nil ? 12 : 8)
+        .animation(compactSize != nil || RecordingMotion.reduceMotion ? nil : .easeOut(duration: 0.15), value: caseKey)
         .onHover { isHovering = $0 }
         .onChange(of: caseKey) { didCopy = false }
         .task(id: "\(caseKey)-\(isHovering)") {
-            guard let delay = autoDismissDelay, !isHovering else { return }
+            guard compactSize == nil, let delay = autoDismissDelay, !isHovering else { return }
             try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
             onDismiss()
         }
         .onDisappear { copyReset?.cancel() }
+    }
+
+    @ViewBuilder
+    private var fullContent: some View {
+        switch status {
+        case .working(let stage, let progress):
+            workingRow(stage: stage, progress: progress.flatMap { $0.isFinite ? min(max($0, 0), 1) : nil })
+        case .linkReady(let url):
+            linkReadyRows(url: url)
+        case .exported(let url):
+            exportedRow(url: url)
+        case .failed(let headline, let message, let canRetry):
+            failedRow(headline: headline, message: message, canRetry: canRetry)
+        }
+    }
+
+    @ViewBuilder
+    private var compactContent: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 4) {
+                Text(compactTitle).font(.system(size: 11, weight: .semibold))
+                    .lineLimit(1).minimumScaleFactor(0.9)
+                Spacer(minLength: 0)
+                circleButton(help: isWorking ? "Cancel sharing" : "Dismiss", action: isWorking ? onCancel : onDismiss)
+            }
+            switch status {
+            case .working(_, let progress):
+                TransferProgressBar(progress: progress.flatMap { $0.isFinite ? min(max($0, 0), 1) : nil })
+                Text(progress.map { "\(Int((min(max($0.isFinite ? $0 : 0, 0), 1) * 100).rounded()))% uploaded" } ?? "Preparing your capture…")
+                    .font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(2)
+            case .linkReady(let url):
+                Button { NSWorkspace.shared.open(url) } label: {
+                    Text(url.absoluteString).lineLimit(1).truncationMode(.middle)
+                        .font(.system(size: 10, design: .monospaced))
+                }
+                .buttonStyle(.plain).foregroundStyle(Color.accentColor)
+                .help(url.absoluteString).accessibilityLabel("Open share link: \(url.absoluteString)")
+                HStack(spacing: 6) {
+                    Button(didCopy ? "Copied" : "Copy Link") { copy(url) }
+                    Button("Open") { NSWorkspace.shared.open(url) }
+                }
+                .buttonStyle(.bordered).controlSize(.mini)
+            case .failed(_, let message, let canRetry):
+                Text(message).font(.system(size: 10)).foregroundStyle(.secondary)
+                    .lineLimit(2).help(message)
+                if let onSettings {
+                    Button("Sharing Settings", action: onSettings).controlSize(.mini)
+                } else if canRetry {
+                    Button("Retry", action: onRetry).controlSize(.mini)
+                }
+            case .exported(let url):
+                Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                    .controlSize(.mini)
+            }
+        }
+    }
+
+    private var isWorking: Bool {
+        if case .working = status { return true }
+        return false
+    }
+
+    private var compactTitle: String {
+        switch status {
+        case .working(let stage, _): stage.label
+        case .linkReady: "Link copied"
+        case .failed: "Share failed"
+        case .exported: "Saved"
+        }
     }
 
     private var caseKey: String {

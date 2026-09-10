@@ -44,26 +44,34 @@ The keystroke overlay captures shortcuts and special keys, never plain typing.
 
 ### Onboarding
 
-`OnboardingState` versions the introduction independently of app releases. New and
-existing users see it once; Skip, the window close button, and completion all mark
-it seen. Version 2 uses Welcome, Permissions, Shortcuts, and First Capture. Keep the setup
-brief: screen access is prominent, other permissions are in an optional disclosure,
-and shortcut labels come from `ShortcutService.effectiveShortcut`. Do not reset
-custom or disabled bindings.
-Reopening from the menu or About does not reset preferences or TipKit. When an
-onboarding request may need a restart, persist only the pending Permissions step,
-never the grant. Explicit dismissal clears it; quitting for permission setup retains
-it so launch can resume there. Keep this flag scoped to onboarding requests.
+`OnboardingState` tracks the introduction independently of app releases. Skip,
+the window close button, and completion mark it seen. The three steps are Welcome,
+Permissions, and First Capture. `BetterShotApp.init` calls `prepareForLaunch`
+before services or migrations write defaults. A fresh profile records pending setup;
+existing BetterShot preference keys without a marker are migrated as seen. Any
+positive seen version skips setup, so app and onboarding updates never repeat it. There are no menu tray or Settings reopening actions;
+`OnboardingWindowController.show` also guards against completed setup.
+
+Welcome uses bundled Hyperframes demo videos and still posters. Playback is
+explicit, silent, and never loops; leaving the step stops playback. Keep posters
+and text useful without motion or a network connection. Source compositions and
+render instructions live in `docs/onboarding-media/` and `docs/onboarding.md`.
+Show all five permissions in compact rows, without disclosures. Screen access is
+required for capture; the other rows clearly state that they are optional.
+Shortcut labels come from `ShortcutService.effectiveShortcut`; preserve custom
+and disabled bindings. Permission-related restarts resume the Permissions step,
+while explicit dismissal clears that flag. Settings requests never schedule setup.
 `OnboardingSample` copies original PNGs to Application Support/BetterShot/Practice
-before opening the existing editor, without inserting samples into capture history.
-Keep permissions sourced from macOS, never from onboarding completion state.
+before opening the editor, without inserting samples into capture history.
 
 `Tests/OnboardingStateCheck.swift` covers presentation and preference preservation.
-The editor integration runner checks sample copies, AV permission-state mapping,
-and the no-TCC testing guard; it renders all four steps at 520 and 760 points in
-light/dark, plus denied/restricted/restart recovery rows. Manually verify window close,
-Escape/Return/Tab, menu reopening, sample editing, and permission denial/grant on a
-signed app. See [onboarding notes](docs/onboarding.md) for sources and artwork prompts.
+Editor integration verifies sample copies, playable silent demo assets, permission
+mapping, retry-versus-Settings routing, and the no-TCC guard. The isolated pilot
+labels itself as a preview and disables permission actions; never remove testing
+guards to make a preview request real access. It renders all three steps and recording posters in
+compact/light/dark layouts, plus permission recovery states. Manually verify
+Escape/Return/Tab, video playback, sample editing, and permission grant/relaunch
+on a signed app. See [onboarding notes](docs/onboarding.md).
 
 ### Make targets
 
@@ -81,6 +89,32 @@ signed app. See [onboarding notes](docs/onboarding.md) for sources and artwork p
 | `make version` | Print the version from `version.json` |
 | `make ship` | Maintainer's signed/notarized release workflow; not a development check |
 
+### DMG installer
+
+Install the packaging tool with `brew install create-dmg`. DMG packaging needs a
+logged-in macOS desktop and permission to automate Finder so it can save the window
+layout. Do not skip Finder customization for release builds.
+
+`make dmg` builds the app and calls `scripts/create-dmg.sh`. To preview packaging
+with an existing build:
+
+```bash
+bash scripts/create-dmg.sh .build/Build/Products/Release/BetterShot.app release/BetterShot-installer-preview.dmg
+bash Tests/check-dmg.sh release/BetterShot-installer-preview.dmg .build/Build/Products/Release/BetterShot.app
+```
+
+The maintainer's local `scripts/release.sh` uses the same packager before its existing
+signing/notarization steps. `scripts/dmg-background.swift` draws the 660 × 440 point
+background at 1× and 2×. Keep its arrow aligned with the real Finder icons in
+`scripts/create-dmg.sh`; do not paint substitute app or folder icons into the image.
+The clover volume icon comes from the built app. Packaging verifies the image before
+atomically replacing the output; it does not install or launch BetterShot.
+
+For packaging changes, build and reopen a local DMG, confirm the background and
+icon positions survive remounting, and check the Applications link resolves to
+`/Applications`. Inspect Finder in light and dark appearances at the saved window
+size. App logic tests are not a substitute for these packaging checks.
+
 ## Project map
 
 | Location | Responsibility |
@@ -91,7 +125,7 @@ signed app. See [onboarding notes](docs/onboarding.md) for sources and artwork p
 | `Sources/History/` | Capture records, retention, raw/export path mapping |
 | `Sources/Models/` | Preferences, capture records, shared gradient definitions |
 | `Sources/Services/` | Shortcuts, screenshot framing, updater, grading, silence detection |
-| `Sources/Settings/` | General, Capture, Recording, Shortcuts, Sharing, About |
+| `Sources/Settings/` | General, Capture, Overlay, Recording, Shortcuts, Sharing, About |
 | `Sources/Sharing/` | R2 credentials, request signing, uploads and manifests |
 | `Sources/Views/` | Menu tray/popover, glass surfaces, toasts, transfer feedback |
 | `Sources/BetterShot/` | Image editor, recording capture/studio, renderers, geometry and supporting models |
@@ -122,6 +156,10 @@ The full requirements live in [AGENTS.md](AGENTS.md). For a UI change, start her
 | Export/share feedback | `TransferStatusCard` in `TransferToast`; separate screen-top panel with native progress |
 | Shared backgrounds | `GradientPreset.presets`, `GradientBackgroundView`, `AnnotationBackgroundStageFill` |
 
+Settings uses `EditorButtonStyle(bordered: true)` with the system blue accent. Shared
+buttons use semantic foreground colors, visible hover/pressed feedback, and red for
+`.destructive` roles. Keep disabled actions distinct and preserve native confirmations.
+
 Keep slider field labels hidden inside Forms so the numeric value stays centered
 in its right-hand field. Reuse `InspectorSlider` everywhere, including JPEG quality,
 preview margin/dismissal, and timeline zoom. Preserve steps, units, exact entry,
@@ -150,13 +188,32 @@ pixel dimensions and integer placement during framing. Full-resolution editor
 previews are the default; exported content must always come from the full source.
 
 When Keep screenshots in the deck until saved is enabled, `DeckStaging` holds
-captures until Save, Copy, drag, Pin, or Edit promotes them. Preserve failure
+captures until Save, Copy, drag, Pin, Share, or Edit promotes them. Preserve failure
 recovery and the raw image so subsequent editing does not flatten twice.
 
 `LastRegionGhostPresenter` can show an existing BetterShot remembered region when
 the bar opens, and A recaptures it. The native screenshot selector does not write
 BetterShot's remembered-region preference; do not document its keyboard behavior
 as if it were `RegionSelectionOverlay`.
+
+Overlay controls live in the dedicated Settings > Overlay page.
+Existing size, position, margin, timing, and visibility preference keys are preserved.
+Quick Setup supplies Standard, Sharing, and Minimal presets. The visual Tool Positions
+editor and the actual capture card share `OverlayToolArrangement` / `OverlayToolLabel`.
+`OverlayToolLayout` stores six tool assignments, swaps occupied positions, hides optional
+actions, and keeps Dismiss reachable. Decode invalid/duplicate entries safely. The
+Advanced section controls timing and visibility; Restore Overlay Defaults affects only
+this page, while Restore General Defaults leaves overlay customization intact.
+The Standard layout puts Pin upper-left and cloud sharing lower-right. Every placement
+routes to the same action handler. Cloud sharing uses `CloudUploader` and resolves
+recording deliverables before uploading.
+`TransferStatusCard` supplies compact processing, progress, link, and retry states in the
+deck, with `TransferToast` providing the same screen-top feedback. Sharing errors and
+completed links stay visible until dismissed or evicted by newer captures. Uploads are
+cancelled when removed; cancelled preparation cannot proceed into R2. Tests cover these
+local states, layout swaps/hiding/persistence/recovery, the compact settings page, and
+all three sizes in both appearances, without cloud credentials. Verify
+real upload/clipboard completion and keyboard navigation in the signed app.
 
 ### Recordings
 
@@ -203,7 +260,7 @@ maps the same preferences into the video editor. Saved projects retain their own
 settings; project edits never replace General's defaults. Recording retains its
 capture and export options, without a separate background default.
 
-The native Settings sidebar has General, Capture, Recording, Shortcuts, Sharing,
+The native Settings sidebar has General, Capture, Overlay, Recording, Shortcuts, Sharing,
 and About. Recent captures remain accessible from the menu. Media Gallery in the tray
 and General > Open Media Gallery open the same resizable gallery window. It
 combines retained capture history, edited images, and recording projects, with
@@ -214,6 +271,40 @@ metadata and preserves cloud links. Cloud deletion validates the share’s stora
 and clears links only after R2 confirms deletion. Use native confirmation alerts and
 inline retry errors. Gallery checks cover merging, deletion, filters, and light/dark
 layouts; test history uses a temporary Application Support directory.
+
+### Startup, visibility, and shortcuts
+
+General uses `SMAppService.mainApp` for Launch at Login; read its actual status rather
+than maintaining a second preference flag. Refresh on activation, show registration
+errors beside the toggle, and keep `BETTERSHOT_TESTING=1` free of login-item changes.
+`AppPreferences.visibility` and `AppActivationPolicy.applyVisibility` govern Dock and
+menu-bar visibility across launch and all windows. At least one icon must stay visible;
+turning off Show in Dock restores the menu-bar icon. Preserve the bundled clover.
+
+`ShortcutCatalog.swift` is the source for action IDs, groups, scopes, and defaults.
+Never renumber persisted IDs. New actions have no default binding; previously shipped
+capture/editor bindings remain available and customizable. Use the dedicated
+searchable Shortcuts page. Keep reset, clear, disabled state, and same-scope conflict
+checks consistent. Editor and global scopes may reuse keys; the active editor takes
+priority. Global bindings require Command, Control, or Option.
+
+Route global actions through `ShortcutService.performGlobal` and existing capture,
+recording, history, and preview entry points. Per-capture copy/save/edit/pin overrides
+must not overwrite General preferences. The timer action uses the configured timer,
+with a three-second minimum. Restart, Discard, and unsaved-deck clearing retain native
+confirmation. Failed deck saves stay available for retry.
+
+`EditorShortcutHandler` dispatches only in its key window, respects disabled controls
+and sheets, and yields to text fields except a Command-modified Save. Use the same
+bindings in AppKit timeline input; do not leave hard-coded keys behind after making an
+action customizable. Suspend all dispatch while the shortcut recorder has focus.
+Export/share shortcuts open the existing options controls before acting.
+
+The editor integration check covers the catalog, persistence, scoped conflicts,
+remapping, disable/reset, text focus, visibility combinations, and category snapshots
+in light/dark at compact widths. Live global interception, login-item authorization,
+Dock/menu-bar changes, and capture/recording need a signed-app manual check; offscreen
+snapshots cannot establish those behaviors.
 
 ## Validation
 
@@ -276,7 +367,7 @@ commands from `bettershot-landing/`, such as `pnpm lint` and `pnpm build`.
 6. Update [CHANGELOG.md](CHANGELOG.md) and [README.md](README.md) when behavior changes.
 
 `version.json` is the version source (`version`, `build`, `minimumOS`).
-`make generate` syncs version/build into the project. The **0.5.1** changelog entry is dated **2026-09-10** at the maintainer’s request.
+`make generate` syncs version/build into the project. Version **0.5.2**, build **19**, is prepared for **2026-09-10**. Preserve the historical **0.5.1** changelog date of **2026-09-10** at the maintainer’s request.
 Do not publish binaries or mark another version shipped without an explicit release request. Keep historical entries and contributor credit.
 
 Use short, descriptive commit messages, for example `fix: preserve cursor hotspot

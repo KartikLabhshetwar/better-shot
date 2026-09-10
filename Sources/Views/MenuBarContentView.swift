@@ -153,11 +153,6 @@ struct MenuBarContentView: View {
                 dismissPopover()
                 DispatchQueue.main.async { MediaGalleryWindowController.shared.open(on: screen) }
             }
-
-            TrayFullWidthButton(title: "Getting Started", icon: "questionmark.circle") {
-                dismissPopover()
-                OnboardingWindowController.shared.show()
-            }
         }
     }
 

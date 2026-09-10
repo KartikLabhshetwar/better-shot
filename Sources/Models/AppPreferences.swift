@@ -42,6 +42,15 @@ enum AppPreferences {
         NSApp.appearance = appearance.nsAppearance
     }
 
+    static let showInDockKey = "bs_showInDock"
+    static let showInMenuBarKey = "bs_showInMenuBar"
+
+    static func visibility(defaults: UserDefaults = .standard) -> (dock: Bool, menuBar: Bool) {
+        let dock = defaults.bool(forKey: showInDockKey)
+        let menuBar = defaults.object(forKey: showInMenuBarKey) as? Bool ?? true
+        return (dock, menuBar || !dock)
+    }
+
     // MARK: - General
     static var saveDirectory: String {
         get { UserDefaults.standard.string(forKey: saveDirKey) ?? NSHomeDirectory() + "/Desktop" }
@@ -69,6 +78,24 @@ enum AppPreferences {
     }
 
     // MARK: - Overlay
+    static let overlayToolLayoutKey = "bs_overlayToolLayout"
+
+    static var overlayToolLayout: OverlayToolLayout {
+        get { OverlayToolLayout(data: UserDefaults.standard.data(forKey: overlayToolLayoutKey)) }
+        set { UserDefaults.standard.set(newValue.data, forKey: overlayToolLayoutKey) }
+    }
+
+    static let overlayAlwaysShowActionsKey = "bs_overlayAlwaysShowActions"
+
+    static func resetOverlaySettings() {
+        UserDefaults.standard.removeObject(forKey: overlayToolLayoutKey)
+        overlayPosition = .bottomRight
+        overlayDismissDelay = 5
+        overlayCardSize = .small
+        overlayEdgeMargin = overlayEdgeMarginDefault
+        UserDefaults.standard.removeObject(forKey: overlayAlwaysShowActionsKey)
+    }
+
     static var overlayPosition: OverlayPosition {
         get {
             guard let raw = UserDefaults.standard.string(forKey: overlayPositionKey),

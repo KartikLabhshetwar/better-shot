@@ -2,18 +2,20 @@ import SwiftUI
 import AVFoundation
 import Carbon
 import UniformTypeIdentifiers
+import ServiceManagement
 
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case general, capture, recording, shortcuts, sharing, about
+    case general, capture, overlay, recording, shortcuts, sharing, about
 
     var id: String { rawValue }
 
-    static let preferenceGroup: [SettingsSection] = [.general, .capture, .recording, .shortcuts, .sharing]
+    static let preferenceGroup: [SettingsSection] = [.general, .capture, .overlay, .recording, .shortcuts, .sharing]
 
     var title: String {
         switch self {
         case .general: "General"
         case .capture: "Capture"
+        case .overlay: "Overlay"
         case .recording: "Recording"
         case .shortcuts: "Shortcuts"
         case .sharing: "Sharing"
@@ -25,6 +27,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: "gearshape"
         case .capture: "camera.viewfinder"
+        case .overlay: "rectangle.on.rectangle"
         case .recording: "record.circle"
         case .shortcuts: "command"
         case .sharing: "link"
@@ -54,12 +57,13 @@ struct PreferencesView: View {
             .navigationSplitViewColumnWidth(min: 184, ideal: 196, max: 240)
         } detail: {
             detail
+                .buttonStyle(EditorButtonStyle(bordered: true))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .navigationTitle(selection.title)
         }
         .navigationSplitViewStyle(.balanced)
-        .tint(StudioChrome.accent)
-        .accentColor(StudioChrome.accent)
+        .tint(EditorChrome.accent)
+        .accentColor(EditorChrome.accent)
         .frame(minWidth: 780, minHeight: 620)
     }
 
@@ -73,6 +77,7 @@ struct PreferencesView: View {
         switch selection {
         case .general: GeneralSettingsTab()
         case .capture: CaptureSettingsTab()
+        case .overlay: OverlaySettingsTab()
         case .recording: RecordingSettingsTab()
         case .shortcuts: ShortcutSettingsTab()
         case .sharing: SharingSettingsTab()
@@ -84,6 +89,11 @@ struct PreferencesView: View {
 // MARK: - General
 
 struct GeneralSettingsTab: View {
+    @AppStorage(AppPreferences.showInDockKey) private var showInDock = false
+    @AppStorage(AppPreferences.showInMenuBarKey) private var showInMenuBar = true
+    @State private var loginStatus: SMAppService.Status = .notRegistered
+    @State private var loginError: String?
+
     @AppStorage("bs_appAppearance") private var appAppearanceRaw: String = AppAppearance.system.rawValue
     @AppStorage("bs_saveDirectory") private var saveDir = NSHomeDirectory() + "/Desktop"
     @AppStorage("bs_copyAfterSave") private var copyAfterSave = true
@@ -119,6 +129,23 @@ struct GeneralSettingsTab: View {
 
     var body: some View {
         Form {
+            Section("Startup") {
+                Toggle("Launch at Login", isOn: Binding(
+                    get: { loginStatus == .enabled || loginStatus == .requiresApproval },
+                    set: setLaunchAtLogin
+                ))
+                if loginStatus == .requiresApproval {
+                    Text("Allow BetterShot in System Settings → General → Login Items & Extensions.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+                if let loginError {
+                    Text(loginError).font(.callout).foregroundStyle(.red)
+                }
+                if loginStatus == .requiresApproval || loginError != nil {
+                    Button("Open Login Items Settings") { SMAppService.openSystemSettingsLoginItems() }
+                }
+            }
+
             Section {
                 Button {
                     MediaGalleryWindowController.shared.open()
@@ -132,6 +159,19 @@ struct GeneralSettingsTab: View {
             }
 
             Section {
+                Toggle("Show in Dock", isOn: Binding(
+                    get: { showInDock },
+                    set: { enabled in
+                        if !enabled { showInMenuBar = true }
+                        showInDock = enabled
+                        AppActivationPolicy.applyVisibility()
+                    }
+                ))
+                Toggle("Show in Menu Bar", isOn: Binding(
+                    get: { showInMenuBar || !showInDock },
+                    set: { showInMenuBar = $0; AppActivationPolicy.applyVisibility() }
+                ))
+                .disabled(!showInDock)
                 Picker("Theme", selection: appAppearance) {
                     ForEach(AppAppearance.allCases) { appearance in
                         Text(appearance.label).tag(appearance)
@@ -141,7 +181,7 @@ struct GeneralSettingsTab: View {
             } header: {
                 Text("Appearance")
             } footer: {
-                Text("System follows whatever macOS is set to.")
+                Text("Hide the Dock icon to run BetterShot from the menu bar. The menu bar icon stays visible while the Dock icon is hidden. System theme follows macOS.")
             }
 
             Section("Editor") {
@@ -247,12 +287,33 @@ struct GeneralSettingsTab: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear(perform: refreshLoginStatus)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshLoginStatus()
+        }
         .alert("Restore General settings to their defaults?", isPresented: $isConfirmingReset) {
             Button("Restore Defaults", role: .destructive, action: restoreDefaults)
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Your screenshots and recordings are left alone.")
         }
+    }
+
+    private func refreshLoginStatus() {
+        guard ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] != "1" else { return }
+        loginStatus = SMAppService.mainApp.status
+    }
+
+    private func setLaunchAtLogin(_ enabled: Bool) {
+        guard ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] != "1" else { return }
+        loginError = nil
+        do {
+            if enabled { try SMAppService.mainApp.register() }
+            else { try SMAppService.mainApp.unregister() }
+        } catch {
+            loginError = "Couldn’t update Launch at Login. \(error.localizedDescription) Try again or check Login Items in System Settings."
+        }
+        refreshLoginStatus()
     }
 
     private func chooseSaveDirectory() {
@@ -269,6 +330,10 @@ struct GeneralSettingsTab: View {
     }
 
     private func restoreDefaults() {
+        showInMenuBar = true
+        showInDock = false
+        AppActivationPolicy.applyVisibility()
+        if loginStatus == .enabled || loginStatus == .requiresApproval { setLaunchAtLogin(false) }
         appAppearanceRaw = AppAppearance.system.rawValue
         AppPreferences.applyAppearance()
         saveDir = NSHomeDirectory() + "/Desktop"
@@ -625,10 +690,6 @@ private struct DefaultConfigPreview: View {
 
 struct CaptureSettingsTab: View {
     @AppStorage("bs_selfTimerDelay") private var selfTimerRaw: Int = 0
-    @AppStorage("bs_overlayPosition") private var overlayPositionRaw: String = OverlayPosition.bottomRight.rawValue
-    @AppStorage("bs_overlayDismissDelay") private var overlayDismissDelay: Double = 5.0
-    @AppStorage("bs_overlayCardSize") private var overlayCardSizeRaw: String = OverlayCardSize.small.rawValue
-    @AppStorage("bs_overlayEdgeMargin") private var overlayEdgeMargin: Double = AppPreferences.overlayEdgeMarginDefault
     @AppStorage("bs_openEditorAfterCapture") private var openEditorAfterCapture = false
     @AppStorage("bs_keepInDeckUntilSaved") private var keepInDeckUntilSaved = false
     @State private var isConfirmingReset = false
@@ -637,20 +698,6 @@ struct CaptureSettingsTab: View {
         Binding(
             get: { SelfTimerDelay(rawValue: selfTimerRaw) ?? .off },
             set: { selfTimerRaw = $0.rawValue }
-        )
-    }
-
-    private var overlayPosition: Binding<OverlayPosition> {
-        Binding(
-            get: { OverlayPosition(rawValue: overlayPositionRaw) ?? .bottomRight },
-            set: { overlayPositionRaw = $0.rawValue }
-        )
-    }
-
-    private var overlayCardSize: Binding<OverlayCardSize> {
-        Binding(
-            get: { OverlayCardSize(rawValue: overlayCardSizeRaw) ?? .small },
-            set: { overlayCardSizeRaw = $0.rawValue }
         )
     }
 
@@ -670,44 +717,13 @@ struct CaptureSettingsTab: View {
             }
 
             Section {
-                Picker("Show it in the", selection: overlayPosition) {
-                    Text("Bottom Right").tag(OverlayPosition.bottomRight)
-                    Text("Bottom Left").tag(OverlayPosition.bottomLeft)
-                }
-
-                Picker("Size", selection: overlayCardSize) {
-                    ForEach(OverlayCardSize.allCases) { size in
-                        Text(size.label).tag(size)
-                    }
-                }
-                .pickerStyle(.segmented)
-
-                InspectorSlider("Edge Margin", value: Binding(
-                    get: { CGFloat(overlayEdgeMargin) },
-                    set: { overlayEdgeMargin = (Double($0) / 4).rounded() * 4 }
-                ), range: CGFloat(AppPreferences.overlayEdgeMarginRange.lowerBound)...CGFloat(AppPreferences.overlayEdgeMarginRange.upperBound),
-                   format: .points)
-
-                InspectorSlider("Hide After", value: Binding(
-                    get: { CGFloat(overlayDismissDelay) },
-                    set: { overlayDismissDelay = Double($0.rounded()) }
-                ), range: CGFloat(AppPreferences.overlayDismissRange.lowerBound)...CGFloat(AppPreferences.overlayDismissRange.upperBound),
-                   format: .seconds(never: CGFloat(AppPreferences.overlayDismissNever)))
-                    .help("Choose Never at the end of the track to keep previews visible.")
-            } header: {
-                Text("Preview Thumbnail")
-            } footer: {
-                Text("Every capture drops a thumbnail on screen. Click it to edit, drag it straight into another app, or leave it and it fades away on its own.")
-            }
-
-            Section {
                 Toggle(isOn: $openEditorAfterCapture) {
                     Text("Open the editor straight away")
                     Text("Off, the screenshot is saved and copied at once, and the thumbnail is there if you want to edit it.")
                 }
                 Toggle(isOn: $keepInDeckUntilSaved) {
                     Text("Keep screenshots in the deck until saved")
-                    Text("Nothing reaches your save folder or Recent Captures until you save, copy, drag, pin or annotate a card. Cards stay up until you act on them, and clearing the deck deletes what is left.")
+                    Text("Nothing reaches your save folder or Recent Captures until you save, copy, drag, pin, share or annotate a card. Cards stay up until you act on them, and clearing the deck deletes what is left.")
                 }
                 .disabled(openEditorAfterCapture)
             } header: {
@@ -726,10 +742,6 @@ struct CaptureSettingsTab: View {
         .alert("Restore Capture settings to their defaults?", isPresented: $isConfirmingReset) {
             Button("Restore Defaults", role: .destructive) {
                 selfTimerRaw = 0
-                overlayPositionRaw = OverlayPosition.bottomRight.rawValue
-                overlayDismissDelay = 5.0
-                overlayCardSizeRaw = OverlayCardSize.small.rawValue
-                overlayEdgeMargin = AppPreferences.overlayEdgeMarginDefault
                 openEditorAfterCapture = false
                 keepInDeckUntilSaved = false
             }
@@ -863,123 +875,150 @@ struct RecordingSettingsTab: View {
 // MARK: - Shortcut Settings
 
 struct ShortcutSettingsTab: View {
-    @State private var resetID = UUID()
     @State private var isConfirmingReset = false
+    @State private var search = ""
+    @State private var category: ShortcutService.Group?
+    @State private var recordingAction: ShortcutService.Action?
 
-    private static let rows: [(label: String, help: String, action: ShortcutService.Action)] = [
-        ("Capture Region", "Drag out the area you want", .region),
-        ("Capture Screen", "Grab the whole display at once", .fullscreen),
-        ("OCR", "Read the text out of any region", .ocr),
-        ("Pick Color", "Sample a color from anywhere on screen", .colorPicker),
-        ("Capture & Recording Bar", "Show the shared capture bar", .recording),
-        ("Recording Options", "Open the recording section of the capture bar", .recordingOptions),
-    ]
+    init(category: ShortcutService.Group? = nil) {
+        _category = State(initialValue: category)
+    }
 
     var body: some View {
         Form {
             Section {
+                TextField("Search shortcuts", text: $search)
+                    .textFieldStyle(.roundedBorder)
+                Picker("Category", selection: $category) {
+                    Text("All Actions").tag(ShortcutService.Group?.none)
+                    ForEach(ShortcutService.Group.allCases, id: \.self) { group in
+                        Text(group.title).tag(Optional(group))
+                    }
+                }
                 ShortcutPermissionView()
-            }
-            Section {
-                ForEach(Self.rows, id: \.action) { row in
-                    ShortcutRow(label: row.label, help: row.help, action: row.action)
-                }
-                .id(resetID)
-            } header: {
-                Text("Global Shortcuts")
             } footer: {
-                Text("These work anywhere in macOS, whichever app is in front. Click a shortcut to record a new one, or switch one off to give the keys back to another app.")
+                Text("Existing shortcuts are preserved. Additional actions start unassigned. Editor shortcuts only work in their editor and take priority over global shortcuts there.")
             }
-
-            Section {
-                Button("Restore Defaults\u{2026}", role: .destructive) {
-                    isConfirmingReset = true
+            ForEach(ShortcutService.Group.allCases, id: \.self) { group in
+                let actions = ShortcutService.Action.allCases.filter {
+                    $0.group == group && (category == nil || category == group)
+                        && (search.isEmpty || $0.title.localizedCaseInsensitiveContains(search)
+                            || group.title.localizedCaseInsensitiveContains(search))
                 }
+                if !actions.isEmpty {
+                    Section {
+                        ForEach(actions, id: \.self) { action in
+                            ShortcutRow(action: action, recordingAction: $recordingAction)
+                        }
+                    } header: {
+                        Text(group.title)
+                    } footer: {
+                        Text(actions.first?.scope == .global
+                             ? "Available across macOS. Use Command, Control, or Option with a key."
+                             : "Available in this editor. Single keys work when you are not typing in a text field.")
+                    }
+                }
+            }
+            Section {
+                Button("Restore Defaults…", role: .destructive) { isConfirmingReset = true }
             }
         }
         .formStyle(.grouped)
+        .onChange(of: search) { recordingAction = nil }
+        .onChange(of: category) { recordingAction = nil }
         .alert("Restore all shortcuts to their defaults?", isPresented: $isConfirmingReset) {
             Button("Restore Defaults", role: .destructive) {
+                recordingAction = nil
                 ShortcutService.shared.restoreDefaults()
-                resetID = UUID()
             }
             Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes custom bindings and restores the original capture and editor keys. Additional actions become unassigned.")
         }
     }
 }
 
 struct ShortcutRow: View {
-    let label: String
-    let help: String
     let action: ShortcutService.Action
+    @Binding var recordingAction: ShortcutService.Action?
+    @State private var service = ShortcutService.shared
+    @State private var errorMessage: String?
 
-    @State private var shortcut: ShortcutService.Shortcut?
-    @State private var isRecording = false
-
-    private var isEnabled: Bool { shortcut?.enabled ?? false }
+    private var shortcut: ShortcutService.Shortcut? {
+        let _ = service.revision
+        let saved = service.loadShortcut(for: action) ?? action.defaultShortcut
+        return saved?.keyCode == UInt32.max ? nil : saved
+    }
 
     var body: some View {
-        LabeledContent {
-            HStack(spacing: 10) {
-                if isRecording {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Text(action.title).frame(maxWidth: .infinity, alignment: .leading)
+                if recordingAction == action {
                     ShortcutRecorderView { keyCode, modifiers in
-                        persist(ShortcutService.Shortcut(keyCode: keyCode, modifiers: modifiers, enabled: true))
-                        isRecording = false
+                        persist(.init(keyCode: keyCode, modifiers: modifiers, enabled: true))
+                        recordingAction = nil
                     } onCancel: {
-                        isRecording = false
+                        recordingAction = nil
                     }
-                    .frame(width: 132, height: 24)
+                    .frame(width: 124, height: 28)
+                    Button("Cancel") { recordingAction = nil }.controlSize(.small)
                 } else {
                     Button {
-                        isRecording = true
+                        errorMessage = nil
+                        recordingAction = action
                     } label: {
-                        Text(shortcut?.displayString ?? "\u{2014}")
+                        Text(shortcut?.displayString ?? "Record Shortcut")
                             .font(.system(.callout, design: .monospaced))
-                            .foregroundStyle(isEnabled ? .primary : .secondary)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .frame(width: 132)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                    .fill(Color(nsColor: .controlBackgroundColor))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                    .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
-                            )
+                            .foregroundStyle(shortcut?.enabled == false ? .secondary : .primary)
+                            .frame(width: 124)
                     }
-                    .buttonStyle(.plain)
-                    .help("Click to record a new shortcut")
-                    .accessibilityLabel("\(label) shortcut")
-                    .accessibilityValue(shortcut?.accessibilityDescription ?? "None")
-                    .accessibilityHint("Records a new shortcut")
+                    .accessibilityLabel("Record shortcut for \(action.title)")
+                    .accessibilityValue(shortcut?.accessibilityDescription ?? "Unassigned")
+                    Toggle("Enable \(action.title)", isOn: Binding(
+                        get: { shortcut?.enabled ?? false },
+                        set: { enabled in
+                            guard var updated = shortcut else { return }
+                            updated.enabled = enabled
+                            persist(updated)
+                        }
+                    ))
+                    .toggleStyle(.switch).labelsHidden()
+                    .disabled(shortcut == nil)
+                    Menu {
+                        Button("Clear Shortcut") {
+                            persist(.init(keyCode: .max, modifiers: 0, enabled: false))
+                        }.disabled(shortcut == nil)
+                        Button("Restore Default") {
+                            if let fallback = action.defaultShortcut,
+                               let error = service.validationError(for: fallback, action: action) {
+                                errorMessage = error
+                            } else {
+                                errorMessage = nil
+                                service.resetShortcut(for: action)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                    }
+                    .menuStyle(.borderlessButton).fixedSize()
+                    .accessibilityLabel("Options for \(action.title) shortcut")
                 }
-
-                Toggle("", isOn: Binding(
-                    get: { isEnabled },
-                    set: { enabled in
-                        guard var updated = shortcut else { return }
-                        updated.enabled = enabled
-                        persist(updated)
-                    }
-                ))
-                .toggleStyle(.switch)
-                .labelsHidden()
-                .accessibilityLabel("Enable the \(label) shortcut")
             }
-        } label: {
-            Text(label)
-            Text(help)
-        }
-        .onAppear {
-            shortcut = ShortcutService.shared.loadShortcut(for: action) ?? action.defaultShortcut
+            if let errorMessage {
+                Text(errorMessage).font(.callout).foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
     private func persist(_ updated: ShortcutService.Shortcut) {
-        shortcut = updated
-        ShortcutService.shared.saveShortcut(updated, for: action)
-        ShortcutService.shared.registerAll()
+        if let error = service.validationError(for: updated, action: action) {
+            errorMessage = error
+            return
+        }
+        errorMessage = nil
+        service.saveShortcut(updated, for: action)
     }
 }
 
@@ -993,7 +1032,7 @@ struct ShortcutRecorderView: NSViewRepresentable {
         let view = ShortcutRecorderNSView()
         view.onRecord = onRecord
         view.onCancel = onCancel
-        ShortcutService.shared.unregisterAll()
+        ShortcutService.shared.beginRecordingShortcut()
         DispatchQueue.main.async {
             view.window?.makeFirstResponder(view)
         }
@@ -1004,7 +1043,7 @@ struct ShortcutRecorderView: NSViewRepresentable {
 
     static func dismantleNSView(_ nsView: ShortcutRecorderNSView, coordinator: ()) {
         nsView.removeMonitor()
-        ShortcutService.shared.registerAll()
+        ShortcutService.shared.endRecordingShortcut()
     }
 }
 
@@ -1025,7 +1064,7 @@ final class ShortcutRecorderNSView: NSView {
     private func installMonitor() {
         guard eventMonitor == nil else { return }
         eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self else { return event }
+            guard let self, self.window?.isKeyWindow == true, self.window?.firstResponder === self else { return event }
 
             let keyCode = UInt32(event.keyCode)
 
@@ -1041,7 +1080,8 @@ final class ShortcutRecorderNSView: NSView {
             if flags.contains(.option) { carbonMods |= UInt32(optionKey) }
             if flags.contains(.control) { carbonMods |= UInt32(controlKey) }
 
-            guard carbonMods != 0 else { return event }
+            if keyCode == UInt32(kVK_Tab) { self.onCancel?(); return event }
+            guard !event.isARepeat else { return nil }
 
             self.onRecord?(keyCode, carbonMods)
             return nil
@@ -1101,10 +1141,6 @@ struct AboutTab: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
                 header
-
-                section("Getting Started") {
-                    Button("Open Introduction…") { OnboardingWindowController.shared.show() }
-                }
 
                 section("Updates") {
                     updateContent

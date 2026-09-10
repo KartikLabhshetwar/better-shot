@@ -85,6 +85,7 @@ struct CloudUploadOptionsPopover: View {
 struct CloudUploadButton<Label: View>: View {
     let suggestedTitle: String
     let onUpload: (CloudUploadOptions) -> Void
+    var shortcutAction: ShortcutService.Action? = nil
     @ViewBuilder let label: () -> Label
 
     @State private var showingOptions = false
@@ -94,6 +95,15 @@ struct CloudUploadButton<Label: View>: View {
             showingOptions = true
         } label: {
             label()
+        }
+        .background {
+            if let shortcutAction {
+                EditorShortcutHandler(scope: shortcutAction.scope) { action in
+                    guard action == shortcutAction else { return false }
+                    showingOptions = true
+                    return true
+                }
+            }
         }
         .popover(isPresented: $showingOptions, arrowEdge: .bottom) {
             CloudUploadOptionsPopover(suggestedTitle: suggestedTitle, onConfirm: onUpload)

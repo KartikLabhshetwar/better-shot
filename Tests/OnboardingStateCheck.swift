@@ -6,12 +6,21 @@ struct OnboardingStateCheck {
         let suite = "BetterShot-onboarding-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
-        precondition(OnboardingState.shouldPresent(defaults: defaults), "New users see the introduction")
+        OnboardingState.prepareForLaunch(defaults: defaults)
+        precondition(OnboardingState.shouldPresent(defaults: defaults), "Fresh installs see setup")
         defaults.set("custom shortcut", forKey: "bs_hotkey_1")
         defaults.set("existing look", forKey: "bs_defaultBeautifierConfig")
-        precondition(OnboardingState.shouldPresent(defaults: defaults), "Existing users also see it once")
+        OnboardingState.prepareForLaunch(defaults: defaults)
+        precondition(OnboardingState.shouldPresent(defaults: defaults), "Launch migrations must not skip pending first-time setup")
+        defaults.removePersistentDomain(forName: suite)
+        defaults.set(false, forKey: "bs_openEditorAfterRecording")
+        OnboardingState.prepareForLaunch(defaults: defaults)
+        precondition(!OnboardingState.shouldPresent(defaults: defaults), "Existing users without an onboarding marker skip setup, including stored false values")
+        defaults.set("custom shortcut", forKey: "bs_hotkey_1")
+        defaults.set("existing look", forKey: "bs_defaultBeautifierConfig")
         defaults.set(1, forKey: OnboardingState.seenVersionKey)
-        precondition(OnboardingState.shouldPresent(defaults: defaults), "The old brief guide upgrades to image, video, and permission setup")
+        OnboardingState.prepareForLaunch(defaults: defaults)
+        precondition(!OnboardingState.shouldPresent(defaults: defaults), "Older onboarding completion must never trigger another introduction")
         OnboardingState.markSeen(defaults: defaults)
         precondition(!OnboardingState.shouldPresent(defaults: defaults), "Skip, close, and completion do not nag")
         precondition(defaults.string(forKey: "bs_hotkey_1") == "custom shortcut")
@@ -26,6 +35,6 @@ struct OnboardingStateCheck {
         OnboardingState.markSeen(defaults: defaults)
         precondition(defaults.integer(forKey: OnboardingState.seenVersionKey) == OnboardingState.currentVersion + 1)
         precondition(!OnboardingState.shouldPresent(defaults: defaults), "Downgrades do not repeat the guide")
-        print("Onboarding: new/existing users, guide upgrade, restart recovery, dismissal, preference preservation, and downgrade checks passed")
+        print("Onboarding: first-run-only, existing-user migration, restart recovery, dismissal, preference preservation, and downgrade checks passed")
     }
 }

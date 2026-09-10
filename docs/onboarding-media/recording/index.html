@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=1120, height=630">
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; }
+html, body { width:1120px; height:630px; overflow:hidden; background:#EAE9E6; }
+body { font-family:-apple-system,BlinkMacSystemFont,sans-serif; color:#252629; }
+.scene-content { width:100%; height:100%; padding:42px 72px; display:flex; flex-direction:column; justify-content:center; gap:24px; }
+.photo { position:relative; width:100%; height:100%; overflow:hidden; border-radius:16px; box-shadow:0 10px 24px #25262920; }
+.photo img { width:100%; height:100%; object-fit:cover; }
+.annotation { position:absolute; inset:0; }
+.note { position:absolute; top:76px; left:58px; font-size:36px; font-weight:600; color:#0865CE; background:#FFFFFF; padding:14px 22px; border-radius:10px; }
+.timeline { height:58px; flex-shrink:0; position:relative; display:flex; border:2px solid #C6C7CA; border-radius:8px; overflow:hidden; }
+.filmstrip { width:100%; height:100%; background:url(coast.png) repeat-x; background-size:12.5% 100%; opacity:0.65; }
+.range { position:absolute; inset:0 80px; border:4px solid #0865CE; border-left-width:12px; border-right-width:12px; border-radius:6px; }
+.playhead { position:absolute; top:0; bottom:0; left:110px; width:3px; background:#FFFFFF; box-shadow:0 0 0 1px #252629; }
+</style></head><body>
+<div id="demo" data-composition-id="demo" data-start="0" data-duration="6" data-width="1120" data-height="630">
+<div class="scene-content">
+<div class="photo" data-layout-allow-overflow><img id="photo" src="coast.png" alt="Coastal path overlooking the sea"></div><div class="timeline" aria-label="Trimmed video timeline"><div class="filmstrip"></div><div class="range"></div><div class="playhead"></div></div>
+</div></div>
+<script>
+window.__timelines = window.__timelines || {};
+const tl = gsap.timeline({ paused:true });
+tl.from(".photo", {opacity:0, duration:0.2, ease:"power2.out"}, 0.1);
+tl.from(".range", {scaleX:1.18, duration:0.2, ease:"power2.out"}, 0.8);
+tl.to("#photo", {scale:1.45, transformOrigin:"54% 65%", duration:1.2, ease:"power2.inOut"}, 2);
+tl.to(".playhead", {x:730, duration:5, ease:"none"}, 0.5);
+window.__timelines.demo = tl;
+</script></body></html>

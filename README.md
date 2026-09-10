@@ -12,7 +12,8 @@ share it, and shares go to storage you own.
 
 ## What it does
 
-This describes **0.5.1**, dated September 10, 2026 in the changelog.
+This describes **0.5.2**, dated September 10, 2026 in the changelog.
+Settings buttons adapt to light and dark appearances, with hover feedback and red destructive actions.
 See [CHANGELOG.md](CHANGELOG.md) for changes and release history.
 
 - **Capture** regions with macOS's native selector, full screens, and windows; extract text with OCR or pick a color.
@@ -21,7 +22,7 @@ See [CHANGELOG.md](CHANGELOG.md) for changes and release history.
 - **Edit videos** with cuts, custom clip speeds from 0.25× to 8× (including 1.25×), transitions, crop, zoom, masks, captions, and camera controls. Blur and Pixelate offer Crop Only or Full Frame coverage.
 - **Style cursors** in BetterShot recordings: Recorded, Dark, Light, Dot, or the native macOS Hand; size, visibility, Natural/Smooth motion, press/ripple effects, and idle hiding. High-resolution artwork preserves the click point in previews and exports.
 - **Frame captures** with padding, corners, shadow, wallpapers, and ten shared soft gradients. Configure the shared image and video look in General settings.
-- **Keep a capture deck** of up to five items, with optional save-on-demand, Copy, Pin, Edit, and drag-out actions.
+- **Keep a capture deck** of up to five items, with optional save-on-demand, Copy, Pin, Edit, cloud sharing, and drag-out actions. The Standard layout puts Pin at the top left and cloud sharing at the bottom right. Sharing shows processing/upload progress, copies the finished link, and keeps Copy Link/Open actions in the deck. Links are also saved in Media Gallery. Open Settings → Overlay for Standard, Sharing, and Minimal presets, a visual editor for all six tool positions, and advanced margin, dismissal (including Never), and action visibility controls. Click a position to move or hide a tool; tools swap without duplication and Dismiss stays available. Changes apply immediately.
 - **Browse media** directly from the clover menu → Media Gallery, or Settings → General → Open Media Gallery. Local shows retained captures, saved edits, and recording projects; Cloud shows links saved by this Mac. Use the sidebar, search, and date sorting to find captures. Preview, edit, reveal files, or open/copy a cloud link from each card. Move local captures and their edits to Trash, or delete a cloud share separately, with confirmation. Unsaved deck captures appear after saving; Cloud does not scan your R2 bucket or sync other devices.
 - **Share** through your own Cloudflare R2 bucket. Image sharing optimizes size; shared videos use MP4. Native progress cards show completion or retry actions.
 
@@ -41,15 +42,18 @@ brew install --cask bettershot
 ```
 
 Or download the latest `.dmg` from [Releases](https://github.com/KartikLabhshetwar/better-shot/releases).
+Open the disk image, drag **BetterShot** onto **Applications**, then open BetterShot
+from Applications. You can eject the disk image after copying finishes.
 
-The 0.5.0 introduction walks through **Welcome → Permissions → Shortcuts → First Capture**.
-A brief native setup introduces screenshots and recordings, explains screen access,
-shows your current shortcut bindings, and leads into a capture or practice edit.
-Skip or close it anytime; reopen **Getting Started** in the clover menu or
-Settings > About. Contextual tips teach editing tools when you use them.
+The introduction walks through **Welcome → Permissions → First Capture**.
+Switch between screenshot and recording examples, with optional six-second demos,
+then enable screen access and open the capture bar or try a practice image.
+Setup starts only for a fresh user profile; updates and existing users skip it.
+Skip or close it anytime, with no reopening entry in the menu tray or Settings. Contextual tips teach editing tools when you use them.
 
-The Permissions step shows screen access first. Expand **Optional permissions**
-for the other features. Each has an individual request and live macOS status:
+The Permissions step shows all five permissions in one list, with screen access
+first. Each has a clear purpose, an Allow or Open Settings action, and live macOS
+status. Nothing is hidden behind a disclosure:
 
 - **Screen & System Audio Recording:** needed for screenshots and screen recording.
 - **Accessibility:** optional global capture shortcuts; the menu bar works without it.
@@ -59,7 +63,7 @@ for the other features. Each has an individual request and live macOS status:
 Denied access has a direct System Settings link and retry instructions. If macOS
 requires a restart during setup, save your work and reopen BetterShot to return
 to Permissions. Capture paths still check permissions when needed. The final step
-offers two practice photos that use separate full-resolution copies in the image
+offers a practice image that opens a separate full-resolution copy in the image
 editor, without screen access or changes to your captures.
 
 ## Shortcuts
@@ -76,6 +80,17 @@ editor, without screen access or changes to your captures.
 After the introduction has been dismissed, the shared bar appears at launch. `⌘⇧2` reopens it; `⌘⇧5` opens its Recording
 section. `⌘⇧4` starts native screenshot selection directly. Customize these
 bindings in Settings > Shortcuts.
+Search or filter the action list to configure global capture/recording controls, the
+capture deck, image tools, and video editing. Additional actions start unassigned;
+existing capture and editor keys stay in place. Each action can be recorded, disabled,
+cleared, or reset. Conflicting bindings within the same context are rejected.
+Editor shortcuts take priority in their editor, while text fields keep native typing,
+copy/paste, and undo.
+
+General also includes **Launch at Login**, **Show in Dock**, and **Show in Menu Bar**.
+BetterShot stays reachable: hiding the Dock icon keeps its clover in the menu bar.
+Launch at Login reflects macOS registration and provides a System Settings link if
+approval is needed. It is off until you enable it.
 
 In the image editor, `⌘S` saves the editable image, `⇧⌘C` copies, and `⌘Z` undoes.
 Scissors in the video timeline starts off. Click it or press `S` to enable

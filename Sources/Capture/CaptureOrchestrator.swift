@@ -49,27 +49,27 @@ final class CaptureOrchestrator {
             await RecordingBarPresenter.shared.hidePickerForCapture()
         }
         switch action {
-        case .region:
-            await captureAndProcess { try await ScreenCapture.shared.captureRegion() }
+        case .region, .timedRegion, .regionCopy, .regionSave, .regionEdit, .regionPin:
+            await captureAndProcess(action: action) { try await ScreenCapture.shared.captureRegion() }
         case .fullscreen:
             await captureAndProcess { try await ScreenCapture.shared.captureFullscreen() }
         case .window:
             await captureAndProcess { try await ScreenCapture.shared.captureWindow() }
-        case .ocr:
-            await performOCR()
+        case .ocr, .ocrSingleLine:
+            await performOCR(singleLine: action == .ocrSingleLine)
         case .colorPicker:
             await performColorPick()
-        case .recording, .recordingOptions:
+        default:
             break
         }
     }
 
     // MARK: - Private
 
-    private func captureAndProcess(_ capture: () async throws -> URL?) async {
-        let delay = AppPreferences.selfTimerDelay
-        if delay != .off {
-            await CountdownOverlay.shared.showCountdown(seconds: delay.rawValue, on: captureScreen)
+    private func captureAndProcess(action: ShortcutService.Action = .region, _ capture: () async throws -> URL?) async {
+        let delay = action == .timedRegion ? max(3, AppPreferences.selfTimerDelay.rawValue) : AppPreferences.selfTimerDelay.rawValue
+        if delay > 0 {
+            await CountdownOverlay.shared.showCountdown(seconds: delay, on: captureScreen)
         }
 
         do {
@@ -77,7 +77,7 @@ final class CaptureOrchestrator {
 
             ScreenCapture.shared.playShutterSound()
 
-            if AppPreferences.keepInDeckUntilSaved, !AppPreferences.openEditorAfterCapture {
+            if AppPreferences.keepInDeckUntilSaved, !AppPreferences.openEditorAfterCapture, action == .region || action == .timedRegion {
                 await stageForDeck(url)
                 return
             }
@@ -91,7 +91,7 @@ final class CaptureOrchestrator {
             }
             let capturedURL = HistoryStore.shared.urlForRecord(record)
             lastCaptureURL = capturedURL
-            await applyAndSave(capturedURL, recordID: record.id)
+            await applyAndSave(capturedURL, recordID: record.id, action: action)
         } catch {
             print("Capture failed: \(error.localizedDescription)")
         }
@@ -113,12 +113,12 @@ final class CaptureOrchestrator {
         )
     }
 
-    private func performOCR() async {
+    private func performOCR(singleLine: Bool = false) async {
         do {
             guard let text = try await ScreenCapture.shared.captureAndOCR() else { return }
             let pasteboard = NSPasteboard.general
             pasteboard.clearContents()
-            pasteboard.setString(text, forType: .string)
+            pasteboard.setString(singleLine ? text.split(whereSeparator: \.isNewline).joined(separator: " ") : text, forType: .string)
             ScreenCapture.shared.playShutterSound()
             ToastWindow.shared.show(
                 title: "Copied",
@@ -162,7 +162,7 @@ final class CaptureOrchestrator {
         PreviewOverlay.shared.show(url: stagedURL, on: captureScreen)
     }
 
-    private func applyAndSave(_ url: URL, recordID: UUID) async {
+    private func applyAndSave(_ url: URL, recordID: UUID, action: ShortcutService.Action) async {
         let config = AppPreferences.defaultBeautifierConfig
         let saveDirectory = AppPreferences.saveDirectory
 
@@ -184,7 +184,8 @@ final class CaptureOrchestrator {
             ToastWindow.shared.show(title: "Couldn’t save the edited image", message: "The original screenshot is still available in the preview.", systemIcon: "exclamationmark.triangle", on: captureScreen)
         }
 
-        if AppPreferences.copyAfterSave, let savedURL {
+        let shouldCopy = action == .regionCopy || (action != .regionSave && AppPreferences.copyAfterSave)
+        if shouldCopy, let savedURL {
             copyToClipboard(savedURL)
         }
 
@@ -193,13 +194,15 @@ final class CaptureOrchestrator {
         if savedURL != nil {
             let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage
             ToastWindow.shared.show(
-                message: AppPreferences.copyAfterSave ? "Screenshot saved & copied!" : "Screenshot saved!",
+                message: shouldCopy ? "Screenshot saved & copied!" : "Screenshot saved!",
                 icon: appIcon,
                 on: captureScreen
             )
         }
 
-        if AppPreferences.openEditorAfterCapture {
+        if action == .regionPin {
+            PinnedScreenshotController.shared.pin(url: displayURL, on: captureScreen)
+        } else if action == .regionEdit || (AppPreferences.openEditorAfterCapture && action != .regionCopy && action != .regionSave) {
             PreviewPanelPresenter.shared.openEditor(for: displayURL)
         } else {
             PreviewOverlay.shared.show(url: displayURL, on: captureScreen)

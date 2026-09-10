@@ -86,7 +86,7 @@ struct RecordingStudioContent: View {
                     Label("Undo", systemImage: "arrow.uturn.backward")
                 }
                 .disabled(!model.canUndo)
-                .help("Undo (⌘Z)")
+                .help(ShortcutService.shared.help("Undo", for: .videoUndo))
 
                 Button {
                     model.redo()
@@ -94,7 +94,7 @@ struct RecordingStudioContent: View {
                     Label("Redo", systemImage: "arrow.uturn.forward")
                 }
                 .disabled(!model.canRedo)
-                .help("Redo (⇧⌘Z)")
+                .help(ShortcutService.shared.help("Redo", for: .videoRedo))
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
@@ -135,15 +135,7 @@ struct RecordingStudioContent: View {
             configureCloseGuard()
             closeGuard.refreshDocumentEdited()
         }
-        .onDeleteCommand {
-            if model.isEditingMasks {
-                model.deleteSelectedMask()
-            } else if let selectedCueID = model.selectedCueID {
-                model.removeZoomCue(id: selectedCueID)
-            } else if model.selectedClipID != nil {
-                model.deleteSelectedClip()
-            }
-        }
+        .background(EditorShortcutHandler(scope: .video, perform: performShortcut))
         .onAppear {
             AppActivationPolicy.enter(hidePreview: true)
         }
@@ -151,6 +143,31 @@ struct RecordingStudioContent: View {
             closeGuard.detach()
             AppActivationPolicy.leave(restorePreview: true)
         }
+    }
+
+    private func performShortcut(_ action: ShortcutService.Action) -> Bool {
+        guard model.isLoaded else { return false }
+        switch action {
+        case .videoCrop: model.beginVideoCrop()
+        case .videoBlur: model.toggleMaskTool(.blur)
+        case .videoPixelate: model.toggleMaskTool(.pixelate)
+        case .videoDelete:
+            if model.isEditingMasks { model.deleteSelectedMask() }
+            else if !model.isCroppingVideo {
+                if let id = model.selectedCueID { model.removeZoomCue(id: id) }
+                else { model.deleteSelectedClip() }
+            }
+        default:
+            guard !model.isCroppingVideo, !model.isEditingMasks else { return true }
+            switch action {
+            case .videoSave: if model.isProject { model.saveProject() }
+            case .videoUndo: model.undo()
+            case .videoRedo: model.redo()
+            case .videoInspector: isInspectorPresented.toggle()
+            default: return false
+            }
+        }
+        return true
     }
 
     @ViewBuilder
@@ -318,14 +335,13 @@ struct RecordingStudioContent: View {
                     .labelStyle(.titleAndIcon)
             }
         }
-        .keyboardShortcut("s", modifiers: .command)
         .disabled(!model.hasUnsavedChanges)
-        .help("Save your edits in BetterShot (⌘S)")
+        .help(ShortcutService.shared.help("Save your edits in BetterShot", for: .videoSave))
     }
 
     @ViewBuilder
     private var shareStatus: some View {
-        CloudUploadButton(suggestedTitle: shareSuggestedTitle, onUpload: model.shareToCloud) {
+        CloudUploadButton(suggestedTitle: shareSuggestedTitle, onUpload: model.shareToCloud, shortcutAction: .videoShare) {
             Label("Share", systemImage: "icloud.and.arrow.up")
                 .labelStyle(.titleAndIcon)
         }
@@ -337,7 +353,7 @@ struct RecordingStudioContent: View {
     private var exportStatus: some View {
         RecordingExportButton(
             currentSettings: model.exportSettings,
-            onExport: model.export(settings:)
+            onExport: model.export(settings:), shortcutAction: .videoExport
         ) {
             Label("Export", systemImage: "arrow.down.circle")
                 .labelStyle(.titleAndIcon)
@@ -1237,10 +1253,39 @@ private struct StudioTimelineEditor: View {
         .padding(.top, 12)
         .padding(.bottom, 14)
         .background(Color(nsColor: .windowBackgroundColor))
+        .background(EditorShortcutHandler(scope: .video, perform: performShortcut))
         .overlay(alignment: .top) {
             Rectangle()
                 .fill(Color(nsColor: .separatorColor).opacity(0.45))
                 .frame(height: 0.5)
+        }
+    }
+
+    private func performShortcut(_ action: ShortcutService.Action) -> Bool {
+        guard model.isLoaded else { return false }
+        guard !model.isCroppingVideo, !model.isEditingMasks else { return false }
+        switch action {
+        case .videoPlay: model.togglePlayback()
+        case .videoStart: model.pause(); model.seek(to: 0)
+        case .videoEnd: model.pause(); model.seek(to: model.duration)
+        case .videoSplitTool: isSplitting.toggle()
+        case .videoCut:
+            if NSApp.keyWindow?.firstResponder is RecordingClipTimelineControl { return false }
+            model.splitClip(at: model.timelineHoverTime ?? model.currentTime)
+        case .videoZoomIn: updateZoom(viewport.visibleSeconds / 1.6, origin: buttonZoomAnchor)
+        case .videoZoomOut: updateZoom(viewport.visibleSeconds * 1.6, origin: buttonZoomAnchor)
+        case .videoFit: viewport.fit(duration: model.duration); syncScroll()
+        case .videoAddZoom: addZoomAtPlayhead()
+        default: return false
+        }
+        return true
+    }
+
+    private func addZoomAtPlayhead() {
+        if let range = RecordingTimelineViewport.newZoomRange(at: model.currentTime,
+            secondsPerPoint: scale.secondsPerPoint, duration: model.duration,
+            occupied: model.zoomTimelineBlocks.map { $0.editorStart...$0.editorEnd }) {
+            model.addZoomCue(fromEditorTime: range.lowerBound, toEditorTime: range.upperBound)
         }
     }
 
@@ -1500,10 +1545,9 @@ private struct StudioTimelineEditor: View {
 
     private var zoomControls: some View {
         HStack(spacing: 4) {
-            timelineButton("Zoom Out (⌘−)", systemImage: "minus.magnifyingglass") {
+            timelineButton(ShortcutService.shared.help("Zoom Out", for: .videoZoomOut), systemImage: "minus.magnifyingglass") {
                 updateZoom(viewport.visibleSeconds * 1.6, origin: buttonZoomAnchor)
             }
-            .keyboardShortcut("-", modifiers: .command)
             .disabled(viewport.visibleSeconds >= RecordingTimelineViewport.zoomOutLimit(duration: model.duration))
 
             InspectorSlider("Zoom", value: Binding(
@@ -1521,10 +1565,9 @@ private struct StudioTimelineEditor: View {
             .accessibilityValue("\(viewport.visibleSeconds.formatted(.number.precision(.fractionLength(1)))) seconds visible")
             .help("\(viewport.visibleSeconds.formatted(.number.precision(.fractionLength(1)))) seconds visible — pinch or ⌘-scroll to zoom")
 
-            timelineButton("Zoom In (⌘+)", systemImage: "plus.magnifyingglass") {
+            timelineButton(ShortcutService.shared.help("Zoom In", for: .videoZoomIn), systemImage: "plus.magnifyingglass") {
                 updateZoom(viewport.visibleSeconds / 1.6, origin: buttonZoomAnchor)
             }
-            .keyboardShortcut("=", modifiers: .command)
             .disabled(model.duration <= 0 || viewport.visibleSeconds <=
                       RecordingTimelineViewport.zoomInLimit(duration: model.duration, viewportWidth: Double(viewportWidth)))
 
@@ -1533,8 +1576,7 @@ private struct StudioTimelineEditor: View {
                 syncScroll()
             }
             .buttonStyle(EditorButtonStyle())
-            .keyboardShortcut("0", modifiers: .command)
-            .help("Fit timeline (⌘0)")
+            .help(ShortcutService.shared.help("Fit timeline", for: .videoFit))
         }
     }
 
@@ -1551,8 +1593,7 @@ private struct StudioTimelineEditor: View {
             }
             .toggleStyle(.button)
             .buttonStyle(EditorButtonStyle(selected: isSplitting))
-            .keyboardShortcut("s", modifiers: [])
-            .help("Split tool (S) — click to cut; click scissors again to select or trim clips")
+            .help(ShortcutService.shared.help("Split tool — click again to select or trim clips", for: .videoSplitTool))
             .accessibilityLabel("Split tool")
             Divider().frame(height: 24)
             Text("\(studioTimecode(model.displayTime)) / \(studioTimecode(model.duration))")
@@ -1576,7 +1617,6 @@ private struct StudioTimelineEditor: View {
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .keyboardShortcut(.space, modifiers: [])
                 .help(model.isPlaying ? "Pause" : "Play")
                 .accessibilityLabel(model.isPlaying ? "Pause" : "Play")
                 .disabled(!model.isLoaded)
@@ -1600,13 +1640,11 @@ private struct StudioTimelineEditor: View {
                 Button("Undo") {
                     model.undo()
                 }
-                .keyboardShortcut("z", modifiers: .command)
                 .disabled(!model.canUndo)
 
                 Button("Redo") {
                     model.redo()
                 }
-                .keyboardShortcut("z", modifiers: [.command, .shift])
                 .disabled(!model.canRedo)
 
                 Button("Reset Clips") {
@@ -1615,11 +1653,7 @@ private struct StudioTimelineEditor: View {
                 .disabled(!model.hasClipEdits)
 
                 Button {
-                    if let range = RecordingTimelineViewport.newZoomRange(at: model.currentTime,
-                        secondsPerPoint: scale.secondsPerPoint, duration: model.duration,
-                        occupied: model.zoomTimelineBlocks.map { $0.editorStart...$0.editorEnd }) {
-                        model.addZoomCue(fromEditorTime: range.lowerBound, toEditorTime: range.upperBound)
-                    }
+                    addZoomAtPlayhead()
                 } label: {
                     Label("Add Zoom", systemImage: "plus")
                 }

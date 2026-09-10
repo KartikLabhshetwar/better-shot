@@ -5,6 +5,12 @@ struct BetterShotApp: App {
     @NSApplicationDelegateAdaptor(BetterShotDelegate.self) var delegate
     @Environment(\.openWindow) var openWindow
 
+    init() {
+        if ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] != "1" {
+            OnboardingState.prepareForLaunch()
+        }
+    }
+
     var body: some Scene {
         let _ = configureEditorPresentation()
 

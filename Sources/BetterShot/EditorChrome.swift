@@ -41,21 +41,40 @@ enum EditorChrome {
 struct EditorButtonStyle: ButtonStyle {
     var selected = false
     var horizontalPadding: CGFloat = 10
+    var bordered = false
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var contrast
+    @State private var isHovered = false
 
     func makeBody(configuration: Configuration) -> some View {
+        let destructive = configuration.role == .destructive
+        // Darken system red on light surfaces so small destructive labels stay readable.
+        let destructiveColor = colorScheme == .light
+            ? NSColor.systemRed.blended(withFraction: 0.25, of: .black) ?? .systemRed
+            : NSColor.systemRed
+        let accent = destructive ? Color(nsColor: destructiveColor) : EditorChrome.accent
+        let active = isEnabled && (configuration.isPressed || isHovered)
         configuration.label
             .font(.system(size: 12, weight: .medium))
             .padding(.horizontal, horizontalPadding)
             .frame(minHeight: 32)
-            .foregroundStyle(selected ? Color.white : Color.primary)
+            .foregroundStyle(!isEnabled ? Color.secondary : selected ? Color.white : destructive ? accent : Color.primary)
             .background(
-                selected ? EditorChrome.accent.opacity(configuration.isPressed ? 0.8 : 1)
-                    : Color.primary.opacity(configuration.isPressed ? 0.12 : 0),
+                selected && isEnabled ? accent.opacity(active ? 0.8 : 1)
+                    : (destructive && isEnabled ? accent : Color.primary)
+                        .opacity(active ? (configuration.isPressed ? 0.16 : 0.10) : bordered ? 0.05 : 0),
                 in: RoundedRectangle(cornerRadius: 6)
             )
+            .overlay {
+                if bordered || (active && !selected) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder((destructive && isEnabled ? accent : Color.primary)
+                            .opacity(contrast == .increased ? 0.5 : active ? 0.25 : 0.15))
+                }
+            }
             .contentShape(RoundedRectangle(cornerRadius: 6))
-            .opacity(isEnabled ? 1 : 0.4)
+            .onHover { isHovered = $0 }
     }
 }
 

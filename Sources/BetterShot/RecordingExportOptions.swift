@@ -167,6 +167,7 @@ struct RecordingExportOptionsPopover: View {
 struct RecordingExportButton<Label: View>: View {
     let currentSettings: VideoCompressionSettings
     let onExport: (VideoCompressionSettings) -> Void
+    var shortcutAction: ShortcutService.Action? = nil
     @ViewBuilder let label: () -> Label
 
     @State private var showingOptions = false
@@ -176,6 +177,15 @@ struct RecordingExportButton<Label: View>: View {
             showingOptions = true
         } label: {
             label()
+        }
+        .background {
+            if let shortcutAction {
+                EditorShortcutHandler(scope: shortcutAction.scope) { action in
+                    guard action == shortcutAction else { return false }
+                    showingOptions = true
+                    return true
+                }
+            }
         }
         .popover(isPresented: $showingOptions, arrowEdge: .bottom) {
             RecordingExportOptionsPopover(

@@ -1,8 +1,10 @@
 import Carbon
 import AppKit
 import CoreGraphics
+import Observation
 
 @MainActor
+@Observable
 final class ShortcutService {
     static let shared = ShortcutService()
 
@@ -17,7 +19,34 @@ final class ShortcutService {
 
     var isRegistered: Bool { eventTap != nil }
 
-    private init() { Self.migrateCaptureShortcuts() }
+    @ObservationIgnored private let defaults: UserDefaults
+    private(set) var revision = 0
+    private var recorderCount = 0
+    var isRecordingShortcut: Bool { recorderCount > 0 }
+
+    func beginRecordingShortcut() {
+        recorderCount += 1
+        unregisterAll()
+    }
+
+    func endRecordingShortcut() {
+        recorderCount = max(0, recorderCount - 1)
+        if recorderCount == 0 { registerAll() }
+    }
+    @ObservationIgnored private let windowScopes = NSMapTable<NSWindow, NSNumber>.weakToStrongObjects()
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        Self.migrateCaptureShortcuts(defaults: defaults)
+    }
+
+    func registerScope(_ scope: Scope, for window: NSWindow) {
+        windowScopes.setObject(NSNumber(value: scope.rawValue), forKey: window)
+    }
+
+    func scope(for window: NSWindow) -> Scope? {
+        windowScopes.object(forKey: window).flatMap { Scope(rawValue: $0.intValue) }
+    }
 
     // MARK: - Shortcut Definition
 
@@ -34,21 +63,12 @@ final class ShortcutService {
         static let defaultRecording = Shortcut(keyCode: UInt32(kVK_ANSI_2), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
     }
 
-    enum Action: UInt32, CaseIterable {
-        case region = 1
-        case fullscreen = 2
-        case window = 3
-        case ocr = 4
-        case colorPicker = 5
-        case recording = 6
-        case recordingOptions = 7
-    }
-
     // MARK: - Registration (CGEvent tap — intercepts system shortcuts)
 
     func registerAll() {
         unregisterAll()
 
+        guard !isRecordingShortcut, ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] != "1" else { return }
         guard Self.hasAccessibilityPermission else {
             print("BetterShot: No accessibility permission, skipping event tap registration")
             return
@@ -80,14 +100,11 @@ final class ShortcutService {
 
     private static func cacheShortcuts() {
         let service = ShortcutService.shared
-        cachedShortcuts = [
-            (.region, service.loadShortcut(for: .region) ?? .defaultRegion),
-            (.fullscreen, service.loadShortcut(for: .fullscreen) ?? .defaultFullscreen),
-            (.ocr, service.loadShortcut(for: .ocr) ?? .defaultOCR),
-            (.colorPicker, service.loadShortcut(for: .colorPicker) ?? .defaultColorPicker),
-            (.recording, service.loadShortcut(for: .recording) ?? .defaultRecording),
-            (.recordingOptions, service.loadShortcut(for: .recordingOptions) ?? .defaultRecordingOptions),
-        ]
+        cachedShortcuts = Action.allCases.filter { $0.scope == .global }.compactMap { action in
+            guard let shortcut = service.effectiveShortcut(for: action),
+                  shortcut.modifiers & UInt32(cmdKey | controlKey | optionKey) != 0 else { return nil }
+            return (action, shortcut)
+        }
     }
 
     func unregisterAll() {
@@ -109,14 +126,15 @@ final class ShortcutService {
     func saveShortcut(_ shortcut: Shortcut, for action: Action) {
         let key = "bs_hotkey_\(action.rawValue)"
         if let data = try? JSONEncoder().encode(shortcut) {
-            UserDefaults.standard.set(data, forKey: key)
+            defaults.set(data, forKey: key)
         }
-        Self.cacheShortcuts()
+        revision &+= 1
+        if self === Self.shared { Self.cacheShortcuts() }
     }
 
     func loadShortcut(for action: Action) -> Shortcut? {
         let key = "bs_hotkey_\(action.rawValue)"
-        guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
+        guard let data = defaults.data(forKey: key) else { return nil }
         return try? JSONDecoder().decode(Shortcut.self, from: data)
     }
 
@@ -175,37 +193,29 @@ final class ShortcutService {
         if flags.contains(.maskAlternate) { carbonMods |= UInt32(optionKey) }
         if flags.contains(.maskControl) { carbonMods |= UInt32(controlKey) }
 
+        // The tap runs on the main run loop. Editor bindings take precedence
+        // over global captures (e.g. Copy Image and Pick Color both used ⌘⇧C).
+        let passesToEditor = MainActor.assumeIsolated {
+            let service = ShortcutService.shared
+            if service.isRecordingShortcut { return true }
+            guard NSApp.isActive, let window = NSApp.keyWindow else { return false }
+            if window.attachedSheet != nil || window.sheetParent != nil { return true }
+            guard let scope = service.scope(for: window) else { return false }
+            return service.action(keyCode: keyCode, modifiers: carbonMods, scope: scope) != nil
+        }
+        if passesToEditor { return Unmanaged.passUnretained(event) }
+
         for (action, shortcut) in cachedShortcuts {
-            guard shortcut.enabled else { continue }
             if keyCode == shortcut.keyCode && carbonMods == shortcut.modifiers {
-                Task { @MainActor in
-                    let mouseScreen = ActiveDisplayResolver.activeScreen(preferPointer: true)
-                    if action == .recording || action == .recordingOptions {
-                        guard !ScreenRecordingManager.shared.isActive else { return }
-                        RecordingBarPresenter.shared.showPicker(recordingOptions: action == .recordingOptions)
-                    } else {
-                        await CaptureOrchestrator.shared.performCapture(action, on: mouseScreen)
-                    }
+                // Holding a shortcut must not queue repeated captures or confirmations.
+                if event.getIntegerValueField(.keyboardEventAutorepeat) == 0 {
+                    Task { @MainActor in await ShortcutService.shared.performGlobal(action) }
                 }
                 return nil
             }
         }
 
         return Unmanaged.passUnretained(event)
-    }
-}
-
-extension ShortcutService.Action {
-    var defaultShortcut: ShortcutService.Shortcut? {
-        switch self {
-        case .region: .defaultRegion
-        case .fullscreen: .defaultFullscreen
-        case .ocr: .defaultOCR
-        case .colorPicker: .defaultColorPicker
-        case .recording: .defaultRecording
-        case .recordingOptions: .defaultRecordingOptions
-        case .window: nil
-        }
     }
 }
 
@@ -244,22 +254,85 @@ extension ShortcutService.Shortcut {
             0x1F: "O", 0x20: "U", 0x21: "[", 0x22: "I",
             0x23: "P", 0x25: "L", 0x26: "J", 0x28: "K",
             0x2C: "/", 0x2D: "N", 0x2E: "M",
+            0x18: "=", 0x1B: "−", 0x27: "'", 0x29: ";", 0x2A: "\\",
+            0x2B: ",", 0x2F: ".", 0x32: "`", 0x31: "Space",
+            0x24: "Return", 0x30: "Tab", 0x33: "Delete", 0x35: "Escape",
+            0x75: "Forward Delete", 0x7B: "←", 0x7C: "→", 0x7D: "↓", 0x7E: "↑",
+            0x7A: "F1", 0x78: "F2", 0x63: "F3", 0x76: "F4", 0x60: "F5", 0x61: "F6",
+            0x62: "F7", 0x64: "F8", 0x65: "F9", 0x6D: "F10", 0x67: "F11", 0x6F: "F12",
         ]
-        return map[code] ?? "?"
+        return map[code] ?? "Key \(code)"
     }
 }
 
 extension ShortcutService {
+    func help(_ title: String, for action: Action?) -> String {
+        let _ = revision
+        guard let action, let shortcut = effectiveShortcut(for: action) else { return title }
+        return "\(title) (\(shortcut.displayString))"
+    }
+
     func effectiveShortcut(for action: Action) -> Shortcut? {
         guard let shortcut = loadShortcut(for: action) ?? action.defaultShortcut, shortcut.enabled else { return nil }
         return shortcut
     }
 
+    func resetShortcut(for action: Action) {
+        defaults.removeObject(forKey: "bs_hotkey_\(action.rawValue)")
+        revision &+= 1
+        if self === Self.shared { Self.cacheShortcuts() }
+    }
+
     func restoreDefaults() {
-        for action in Action.allCases {
-            guard let fallback = action.defaultShortcut else { continue }
-            saveShortcut(fallback, for: action)
+        Action.allCases.forEach { resetShortcut(for: $0) }
+    }
+
+    func action(keyCode: UInt32, modifiers: UInt32, scope: Scope) -> Action? {
+        let candidates = Action.allCases.filter { $0.scope == scope }
+        if let exact = candidates.first(where: {
+            guard let shortcut = effectiveShortcut(for: $0) else { return false }
+            return shortcut.keyCode == keyCode && shortcut.modifiers == modifiers
+        }) { return exact }
+        // Preserve the old alternate Delete and ⌘+ spellings only while their
+        // original binding remains in use; a custom binding replaces them too.
+        for action in candidates {
+            guard let shortcut = effectiveShortcut(for: action), shortcut == action.defaultShortcut else { continue }
+            if (action == .imageDelete || action == .videoDelete), keyCode == UInt32(kVK_ForwardDelete), modifiers == 0 { return action }
+            if (action == .imageZoomIn || action == .videoZoomIn), keyCode == UInt32(kVK_ANSI_Equal), modifiers == UInt32(cmdKey | shiftKey) { return action }
         }
-        registerAll()
+        return nil
+    }
+
+    func validationError(for shortcut: Shortcut, action: Action) -> String? {
+        guard shortcut.enabled else { return nil }
+        if shortcut.keyCode == UInt32(kVK_Escape) || shortcut.keyCode == UInt32(kVK_Tab)
+            || shortcut.keyCode == UInt32(kVK_Return) {
+            return "Tab, Return, and Escape are reserved for navigation and dialogs."
+        }
+        if action.scope == .global && shortcut.modifiers & UInt32(cmdKey | controlKey | optionKey) == 0 {
+            return "Global shortcuts need Command, Control, or Option."
+        }
+        let reserved: [UInt32] = [UInt32(kVK_ANSI_Q), UInt32(kVK_ANSI_W), UInt32(kVK_ANSI_H), UInt32(kVK_ANSI_M), UInt32(kVK_ANSI_Comma)]
+        if shortcut.modifiers == UInt32(cmdKey), reserved.contains(shortcut.keyCode) {
+            return "This shortcut is reserved for standard macOS window and app commands."
+        }
+        if let conflict = Action.allCases.first(where: {
+            guard $0 != action, $0.scope == action.scope, let other = effectiveShortcut(for: $0) else { return false }
+            return other.keyCode == shortcut.keyCode && other.modifiers == shortcut.modifiers
+        }) {
+            return "Already assigned to \(conflict.title). Clear or change that shortcut first."
+        }
+        return nil
+    }
+}
+
+extension ShortcutService.Shortcut {
+    static func modifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {
+        var value: UInt32 = 0
+        if flags.contains(.command) { value |= UInt32(cmdKey) }
+        if flags.contains(.shift) { value |= UInt32(shiftKey) }
+        if flags.contains(.option) { value |= UInt32(optionKey) }
+        if flags.contains(.control) { value |= UInt32(controlKey) }
+        return value
     }
 }

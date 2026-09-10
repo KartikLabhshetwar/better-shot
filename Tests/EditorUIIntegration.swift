@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Carbon
 import SwiftUI
 @testable import BetterShot
@@ -7,6 +8,7 @@ import SwiftUI
 /// AVPlayer layers and window toolbars require live UI testing and are not captured here.
 @MainActor
 func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
+    try await checkPreviewOverlay(imageURL: imageURL)
     try await checkMediaGallery(imageURL: imageURL, movieURL: movieURL)
     checkTransferToastPresentation(movieURL: movieURL)
     try await checkGeneralEditorDefaults(movieURL: movieURL)
@@ -56,6 +58,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         precondition(reassigned == recording)
     }
     print("PASS screenshot/recording defaults, migration, custom bindings, and disabled shortcuts")
+    checkShortcutCustomization(defaults: shortcutDefaults)
 
     let imageModel = AnnotationEditorModel()
     imageModel.previewImage = NSImage(contentsOf: imageURL)!
@@ -293,14 +296,34 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
             preconditionFailure("An unwritable destination must report failure")
         } catch {}
     }
+    for demo in OnboardingDemo.allCases {
+        let posterURL = demo.url(extension: "png", in: appBundle)!
+        let poster = NSImage(contentsOf: posterURL)!
+        precondition(poster.size.width / poster.size.height == 16 / 9, "Demo posters must match the player aspect ratio")
+        let movie = AVURLAsset(url: demo.url(extension: "mp4", in: appBundle)!)
+        let playable = try await movie.load(.isPlayable)
+        let duration = try await movie.load(.duration).seconds
+        let audio = try await movie.loadTracks(withMediaType: .audio)
+        precondition(playable && abs(duration - 6) < 0.1 && audio.isEmpty,
+                     "Onboarding demos must be playable, six seconds, and silent")
+    }
     precondition(OnboardingPermissionStatus.media(.authorized) == .allowed)
     precondition(OnboardingPermissionStatus.media(.notDetermined) == .notEnabled)
     precondition(OnboardingPermissionStatus.media(.denied) == .denied)
     precondition(OnboardingPermissionStatus.media(.restricted) == .restricted)
+    for permission in OnboardingPermission.allCases {
+        precondition(!permission.needsSettings(status: .notEnabled, attempted: false))
+        precondition(permission.needsSettings(status: .denied, attempted: false))
+        precondition(!permission.needsSettings(status: .allowed, attempted: true))
+        precondition(!permission.needsSettings(status: .restricted, attempted: true))
+        precondition(permission.needsSettings(status: .notEnabled, attempted: true) == permission.mayNeedRestart,
+                     "Undecided camera/microphone requests remain retryable; system permissions offer Settings after a request")
+    }
     let permissionState = OnboardingPermissions()
     permissionState.refresh()
     for permission in OnboardingPermission.allCases {
         await permissionState.request(permission)
+        permissionState.openSettings(permission)
         precondition(permissionState.status(permission) == .notEnabled && permissionState.attempted.isEmpty,
                      "The test runner must never request real permissions or persist setup attempts")
         precondition(permission.settingsURL.scheme == "x-apple.systempreferences")
@@ -308,11 +331,16 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     for scheme in [ColorScheme.light, .dark] {
         for step in OnboardingView.Step.allCases {
             for width: CGFloat in [520, 760] {
-                try snapshot(OnboardingView(step: step, resourceBundle: appBundle),
+                try snapshot(OnboardingView(step: step, resourceBundle: appBundle, isPermissionPreview: false),
                     scheme: scheme, width: width,
                     to: output.appendingPathComponent("onboarding-\(step)-\(scheme)-\(Int(width)).png"),
                     height: width == 520 ? 560 : 680)
             }
+        }
+        for width: CGFloat in [520, 760] {
+            try snapshot(OnboardingDemoView(demo: .recording, resourceBundle: appBundle).padding(32),
+                scheme: scheme, width: width,
+                to: output.appendingPathComponent("onboarding-recording-demo-\(scheme)-\(Int(width)).png"), height: 460)
         }
         try snapshot(VStack(spacing: 12) {
             OnboardingPermissionRow(permission: .screen, status: .notEnabled, attempted: true,
@@ -320,10 +348,15 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
             OnboardingPermissionRow(permission: .camera, status: .denied, request: {}, openSettings: {})
             OnboardingPermissionRow(permission: .microphone, status: .restricted, request: {}, openSettings: {})
             OnboardingPermissionRow(permission: .accessibility, status: .allowed, request: {}, openSettings: {})
+            OnboardingPermissionRow(permission: .microphone, status: .notEnabled, attempted: true,
+                request: {}, openSettings: {})
+            OnboardingPermissionRow(permission: .screen, status: .notEnabled, attempted: true,
+                errorMessage: "Couldn’t open settings. Try again, or open System Settings manually.",
+                request: {}, openSettings: {})
         }.padding(16), scheme: scheme, width: 520,
             to: output.appendingPathComponent("onboarding-permission-recovery-\(scheme).png"), height: 900)
     }
-    print("PASS onboarding artwork copies, permission status mapping/testing guard, recovery states, and all four steps in compact/light/dark snapshots")
+    print("PASS onboarding artwork copies, permission status mapping/testing guard, recovery states, bundled silent demos, and all three steps in compact/light/dark snapshots")
     try snapshot(LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 12) {
         ForEach(GradientPreset.presets) { preset in
             VStack {
@@ -334,8 +367,31 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     }.padding(), scheme: .light, width: 900, to: output.appendingPathComponent("shared-gradients.png"), height: 360)
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
+        try snapshot(PreferencesView(selection: .sharing), scheme: scheme, width: 780,
+                     to: output.appendingPathComponent("sharing-buttons-\(name).png"), height: 720)
+        try snapshot(VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 12) {
+                Button("Test Connection") {}
+                Label("Connected", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+            }
+            HStack {
+                Button("Restore Defaults…", role: .destructive) {}
+                Button("Clear Locked Keys", role: .destructive) {}
+            }
+            HStack {
+                Button("Test Connection") {}.disabled(true)
+                Button("Delete", role: .destructive) {}.disabled(true)
+                Button("Selected") {}.buttonStyle(EditorButtonStyle(selected: true))
+            }
+        }.buttonStyle(EditorButtonStyle(bordered: true)).padding(20),
+            scheme: scheme, width: 480,
+            to: output.appendingPathComponent("button-states-\(name).png"), height: 180)
         try snapshot(RecordingSettingsTab(), scheme: scheme, width: 580,
                      to: output.appendingPathComponent("recording-settings-\(name).png"), height: 1100)
+        for group in ShortcutService.Group.allCases {
+            try snapshot(ShortcutSettingsTab(category: group), scheme: scheme, width: 580,
+                         to: output.appendingPathComponent("shortcuts-\(group.rawValue)-\(name).png"), height: 1400)
+        }
         try snapshot(GeneralSettingsTab(), scheme: scheme, width: 580,
                      to: output.appendingPathComponent("general-settings-\(name).png"), height: 1300)
         try snapshot(MenuBarContentView(dismissPopover: {}), scheme: scheme, width: 296,
@@ -731,4 +787,203 @@ private func checkGalleryDeletion(imageURL: URL, movieURL: URL, root: URL) async
     }
     precondition(!fm.fileExists(atPath: session.directoryURL.path) && history.records.isEmpty)
     print("PASS local deletion failure/retry, source/edit/package cleanup, cloud/local preservation, and cloud origin validation")
+}
+
+@MainActor
+private func checkShortcutCustomization(defaults: UserDefaults) {
+    let service = ShortcutService(defaults: defaults)
+    service.restoreDefaults()
+    let actions = ShortcutService.Action.allCases
+    precondition(Set(actions.map(\.rawValue)).count == actions.count)
+    precondition(Set(actions.compactMap(\.annotationTool)) == Set(AnnotationTool.allCases))
+    for action in actions where action.defaultShortcut == nil {
+        precondition(service.effectiveShortcut(for: action) == nil, "New actions must start unassigned")
+    }
+    for scope in [ShortcutService.Scope.global, .image, .video] {
+        let bindings = actions.filter { $0.scope == scope }.compactMap { service.effectiveShortcut(for: $0) }
+        let keys = bindings.map { "\($0.keyCode):\($0.modifiers)" }
+        precondition(Set(keys).count == keys.count, "Defaults must not conflict within a scope")
+    }
+    let custom = ShortcutService.Shortcut(keyCode: UInt32(kVK_ANSI_9), modifiers: UInt32(cmdKey | optionKey), enabled: true)
+    precondition(service.validationError(for: custom, action: .window) == nil)
+    service.saveShortcut(custom, for: .window)
+    precondition(service.action(keyCode: custom.keyCode, modifiers: custom.modifiers, scope: .global) == .window)
+    precondition(service.validationError(for: custom, action: .region) != nil)
+    precondition(service.validationError(for: custom, action: .imageFreehand) == nil, "Editors have independent scopes")
+    precondition(ShortcutService(defaults: defaults).effectiveShortcut(for: .window) == custom)
+    var disabled = custom
+    disabled.enabled = false
+    service.saveShortcut(disabled, for: .window)
+    precondition(service.effectiveShortcut(for: .window) == nil)
+    precondition(ShortcutService(defaults: defaults).loadShortcut(for: .window) == disabled)
+    precondition(service.action(keyCode: custom.keyCode, modifiers: custom.modifiers, scope: .global) == nil)
+    precondition(service.validationError(for: .init(keyCode: UInt32(kVK_ANSI_D), modifiers: 0, enabled: true), action: .region) != nil)
+    precondition(service.validationError(for: .init(keyCode: UInt32(kVK_ANSI_D), modifiers: 0, enabled: true), action: .imageFreehand) == nil)
+    service.saveShortcut(custom, for: .imageRectangle)
+    precondition(service.action(keyCode: UInt32(kVK_ANSI_R), modifiers: 0, scope: .image) == nil)
+    precondition(service.action(keyCode: custom.keyCode, modifiers: custom.modifiers, scope: .image) == .imageRectangle)
+    service.resetShortcut(for: .imageRectangle)
+    precondition(service.action(keyCode: UInt32(kVK_ANSI_R), modifiers: 0, scope: .image) == .imageRectangle)
+    precondition(service.action(keyCode: UInt32(kVK_ForwardDelete), modifiers: 0, scope: .image) == .imageDelete)
+    service.saveShortcut(custom, for: .imageDelete)
+    precondition(service.action(keyCode: UInt32(kVK_ForwardDelete), modifiers: 0, scope: .image) == nil)
+    service.restoreDefaults()
+    precondition(service.loadShortcut(for: .window) == nil)
+    precondition(service.effectiveShortcut(for: .imageDelete) == ShortcutService.Action.imageDelete.defaultShortcut)
+    let window = ShortcutTestWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 100),
+                          styleMask: [.titled], backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    let handler = EditorShortcutHandlerView()
+    handler.service = service
+    window.contentView = handler
+    var fired: [ShortcutService.Action] = []
+    handler.perform = { fired.append($0); return true }
+    func key(_ code: Int, _ modifiers: NSEvent.ModifierFlags = []) -> NSEvent {
+        NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers,
+            timestamp: 0, windowNumber: window.windowNumber, context: nil,
+            characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: UInt16(code))!
+    }
+    precondition(handler.handle(key(kVK_ANSI_R)))
+    precondition(fired == [.imageRectangle])
+    let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 100, height: 40))
+    handler.addSubview(textView)
+    window.makeFirstResponder(textView)
+    precondition(!handler.handle(key(kVK_ANSI_R)), "Typing R must not select Rectangle")
+    precondition(!handler.handle(key(kVK_ANSI_C, .command)), "Copy in text fields stays native")
+    precondition(!handler.handle(key(kVK_ANSI_Z, .command)), "Text undo stays native")
+    precondition(handler.handle(key(kVK_ANSI_S, .command)), "Save remains available while typing")
+    service.beginRecordingShortcut()
+    precondition(!handler.handle(key(kVK_ANSI_S, .command)), "Recording a shortcut must not run it")
+    service.endRecordingShortcut()
+    window.simulatesKeyWindow = false
+    precondition(!handler.handle(key(kVK_ANSI_R)), "Inactive editor windows must ignore shortcuts")
+    window.close()
+    for dock in [false, true] {
+        for menuBar in [false, true] {
+            defaults.set(dock, forKey: AppPreferences.showInDockKey)
+            defaults.set(menuBar, forKey: AppPreferences.showInMenuBarKey)
+            let visibility = AppPreferences.visibility(defaults: defaults)
+            precondition(visibility.dock == dock)
+            precondition(visibility.menuBar == (menuBar || !dock))
+            precondition(visibility.dock || visibility.menuBar)
+        }
+    }
+    print("PASS \(actions.count) shortcut actions, unassigned additions, scope conflicts, persistence, disable/reset, alternate keys, and app visibility safety")
+}
+
+/// Exercise the production focus gates without activating a real editor window.
+private final class ShortcutTestWindow: NSWindow {
+    var simulatesKeyWindow = true
+    override var isKeyWindow: Bool { simulatesKeyWindow }
+}
+
+@MainActor
+private func checkPreviewOverlay(imageURL: URL) async throws {
+    let defaults = UserDefaults.standard
+    let keys = ["bs_overlayPosition", "bs_overlayCardSize", "bs_overlayEdgeMargin",
+                "bs_overlayDismissDelay", AppPreferences.overlayAlwaysShowActionsKey, AppPreferences.overlayToolLayoutKey]
+    let saved = keys.map { defaults.object(forKey: $0) }
+    let overlay = PreviewOverlay.shared
+    defer {
+        overlay.dismiss()
+        for (key, value) in zip(keys, saved) {
+            if let value { defaults.set(value, forKey: key) }
+            else { defaults.removeObject(forKey: key) }
+        }
+        overlay.refreshSettings()
+    }
+    AppPreferences.overlayDismissDelay = 0.05
+    overlay.show(url: imageURL)
+    let panel = NSApp.windows.first { $0.identifier?.rawValue == "BetterShot.CaptureOverlay" }!
+    precondition(panel.canBecomeKey && !panel.canBecomeMain, "Overlay actions must support native keyboard focus")
+    let originalWidth = panel.frame.width
+    AppPreferences.overlayCardSize = .large
+    overlay.refreshSettings()
+    precondition(panel.frame.width > originalWidth, "Changing Overlay settings must resize an existing overlay")
+    precondition(!CloudUploader.shared.isConfigured, "Tests must not access R2 credentials")
+    overlay.share(imageURL)
+    guard case .failed(_, _, true) = overlay.transferStatus(for: imageURL) else {
+        preconditionFailure("An unconfigured share must offer recovery")
+    }
+    overlay.refreshSettings()
+    try await Task.sleep(for: .milliseconds(100))
+    precondition(overlay.items.contains(imageURL), "A sharing error must survive automatic dismissal and settings changes")
+    overlay.share(imageURL)
+    precondition(overlay.items.count == 1, "Retry must retain the same card")
+    overlay.dismissShareStatus(for: imageURL)
+    precondition(overlay.items.contains(imageURL) && overlay.transferStatus(for: imageURL) == nil,
+                 "Dismissing a sharing failure returns to the capture without deleting it")
+    overlay.share(imageURL)
+    overlay.remove(imageURL)
+    precondition(overlay.items.isEmpty && overlay.transferStatus(for: imageURL) == nil)
+    precondition(overlay.toastURL == nil, "Removing a preview clears its transfer toast")
+    overlay.share(imageURL)
+    precondition(overlay.transferStatus(for: imageURL) == nil, "Removed cards cannot start uploads")
+
+    let id = UUID()
+    let cancelledUpload = Task {
+        try await CloudUploader.shared.upload(itemID: id, fileURL: imageURL)
+    }
+    cancelledUpload.cancel()
+    do {
+        _ = try await cancelledUpload.value
+        preconditionFailure("Cancelled preparation must not upload")
+    } catch is CancellationError { }
+    precondition(R2Uploader.shared.failedItems[id] == nil && R2Uploader.shared.uploadProgress[id] == nil,
+                 "Cancelled preparation must never enter the R2 uploader")
+
+    AppPreferences.resetOverlaySettings()
+    precondition(AppPreferences.overlayPosition == .bottomRight && AppPreferences.overlayCardSize == .small)
+    precondition(AppPreferences.overlayDismissDelay == 5 && AppPreferences.overlayEdgeMargin == 20)
+    precondition(!defaults.bool(forKey: AppPreferences.overlayAlwaysShowActionsKey))
+    defaults.set(true, forKey: AppPreferences.overlayAlwaysShowActionsKey)
+    let output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        .appendingPathComponent(".build/editor-snapshots", isDirectory: true)
+    try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+    for scheme in [ColorScheme.light, .dark] {
+        let name = scheme == .light ? "light" : "dark"
+        let bundle = Bundle(url: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent(".build/Build/Products/\(ProcessInfo.processInfo.environment["BETTERSHOT_BUILD_CONFIGURATION"] ?? "Debug")/BetterShot.app"))!
+        try snapshot(OverlaySettingsTab(resourceBundle: bundle), scheme: scheme,
+                     width: 540, to: output.appendingPathComponent("overlay-settings-\(name).png"), height: 1050)
+        try snapshot(PreferencesView(selection: .overlay), scheme: scheme, width: 780,
+                     to: output.appendingPathComponent("overlay-settings-compact-\(name).png"), height: 620)
+        for preset in [OverlayLayoutPreset.standard, .sharing, .minimal] {
+            try snapshot(OverlayLayoutEditor(layout: .constant(preset.layout!), resourceBundle: bundle),
+                         scheme: scheme, width: 298,
+                         to: output.appendingPathComponent("overlay-layout-\(preset.rawValue)-\(name).png"), height: 228)
+        }
+        for size in OverlayCardSize.allCases {
+            AppPreferences.overlayCardSize = size
+            AppPreferences.overlayPosition = .bottomLeft
+            overlay.refreshSettings()
+            precondition(overlay.cardSize == size && overlay.position == .bottomLeft)
+            precondition(overlay.panelSize.width == size.panelSize(margin: AppPreferences.overlayEdgeMargin).width)
+            let statuses: [TransferStatus] = [
+                .working(stage: .processing, progress: nil),
+                .working(stage: .uploading, progress: 0.42),
+                .linkReady(url: URL(string: "https://example.com/s/a-long-capture-link")!),
+                .failed(headline: "Upload failed", message: "Check your connection and try again.", canRetry: true)
+            ]
+            try snapshot(HStack(spacing: 16) {
+                PreviewCardView(overlay: overlay, url: imageURL, thumbnail: NSImage(contentsOf: imageURL))
+                ForEach(statuses.indices, id: \.self) { index in
+                    TransferStatusCard(status: statuses[index], compactSize: size.thumbnailSize)
+                }
+            }.padding(24), scheme: scheme, width: size.thumbnailSize.width * 5 + 112,
+                to: output.appendingPathComponent("overlay-\(size.rawValue)-\(name).png"),
+                height: size.thumbnailSize.height + 48)
+        }
+    }
+    AppPreferences.overlayCardSize = .small
+    overlay.refreshSettings()
+    for preset in [OverlayLayoutPreset.standard, .sharing, .minimal] {
+        AppPreferences.overlayToolLayout = preset.layout!
+        try snapshot(PreviewCardView(overlay: overlay, url: imageURL, thumbnail: NSImage(contentsOf: imageURL)),
+                     scheme: .dark, width: 178,
+                     to: output.appendingPathComponent("overlay-runtime-\(preset.rawValue).png"), height: 146)
+    }
+    AppPreferences.resetOverlaySettings()
+    precondition(AppPreferences.overlayToolLayout == .standard)
+    print("PASS overlay configuration/reset, share recovery/retention, cancelled preparation, and small/medium/large light/dark snapshots")
 }

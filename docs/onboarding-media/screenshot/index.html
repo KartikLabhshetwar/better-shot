@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=1120, height=630">
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; }
+html, body { width:1120px; height:630px; overflow:hidden; background:#EAE9E6; }
+body { font-family:-apple-system,BlinkMacSystemFont,sans-serif; color:#252629; }
+.scene-content { width:100%; height:100%; padding:42px 72px; display:flex; flex-direction:column; justify-content:center; gap:24px; }
+.photo { position:relative; width:100%; height:100%; overflow:hidden; border-radius:16px; box-shadow:0 10px 24px #25262920; }
+.photo img { width:100%; height:100%; object-fit:cover; }
+.annotation { position:absolute; inset:0; }
+.note { position:absolute; top:76px; left:58px; font-size:36px; font-weight:600; color:#0865CE; background:#FFFFFF; padding:14px 22px; border-radius:10px; }
+.timeline { height:58px; flex-shrink:0; position:relative; display:flex; border:2px solid #C6C7CA; border-radius:8px; overflow:hidden; }
+.timeline img { width:12.5%; object-fit:cover; opacity:0.45; }
+.range { position:absolute; inset:0 80px; border:4px solid #0865CE; border-left-width:12px; border-right-width:12px; border-radius:6px; }
+.playhead { position:absolute; top:0; bottom:0; left:110px; width:3px; background:#FFFFFF; box-shadow:0 0 0 1px #252629; }
+</style></head><body>
+<div id="demo" data-composition-id="demo" data-start="0" data-duration="6" data-width="1120" data-height="630">
+<div class="scene-content">
+<div class="photo"><img id="photo" src="coast.png" alt="Coastal path overlooking the sea"><svg class="annotation" viewBox="0 0 976 546" aria-label="Arrow pointing to the path"><path d="M 306 183 Q 252 284 355 448 M 322 432 L 355 448 L 355 410" fill="none" stroke="#FFFFFF" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/><path d="M 306 183 Q 252 284 355 448 M 322 432 L 355 448 L 355 410" fill="none" stroke="#0865CE" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg><div class="note">Walk this way</div></div>
+</div></div>
+<script>
+window.__timelines = window.__timelines || {};
+const tl = gsap.timeline({ paused:true });
+tl.from(".photo", {opacity:0, duration:0.2, ease:"power2.out"}, 0.1);
+tl.from(".annotation", {opacity:0, duration:0.2, ease:"power2.out"}, 1.2);
+tl.from(".note", {opacity:0, duration:0.2, ease:"power2.out"}, 2.4);
+window.__timelines.demo = tl;
+</script></body></html>

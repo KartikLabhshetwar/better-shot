@@ -18,6 +18,7 @@ final class MenuBarPopoverController: NSObject {
     private override init() { super.init() }
 
     func setup() {
+        guard statusItem == nil else { return }
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
         if let button = item.button {
@@ -34,6 +35,12 @@ final class MenuBarPopoverController: NSObject {
         }
 
         statusItem = item
+    }
+
+    func setVisible(_ visible: Bool) {
+        if visible { setup() }
+        else { closePopover() }
+        statusItem?.isVisible = visible
     }
 
     @objc private func togglePopover(_ sender: NSStatusBarButton) {
