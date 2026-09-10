@@ -14,7 +14,7 @@ unless you share it, and shares go to storage you own.
 
 - **Screenshots:** region, fullscreen, and window capture with macOS's native selector. OCR text extraction and hex color picker included.
 - **Screen recording:** capture a display, window, or adjustable region with system audio, microphone, camera overlay, and teleprompter.
-- **Image editor:** arrows, shapes, text, numbered markers, highlight, blur, pixelate, and crop. Background framing with padding, corners, shadow, wallpapers, and ten soft gradients.
+- **Image editor:** arrows, shapes, text, numbered markers, highlight, blur, pixelate, crop, rotate, and mirror flip. Background framing with padding, corners, shadow, wallpapers, and ten soft gradients.
 - **Video editor:** cuts, clip speeds (0.25x to 8x), transitions, crop, zoom, masks (blur/pixelate with Crop Only or Full Frame), captions, and camera controls.
 - **Cursor styling:** choose Recorded, Dark, Light, Dot, or native Hand with size, motion, press/ripple effects, and idle hiding. High-resolution artwork preserved in exports.
 - **Capture deck:** keep up to five captures in a floating stack with Copy, Save, Pin, Edit, cloud share, and drag-out. Configurable layouts, tool positions, and dismissal timing.

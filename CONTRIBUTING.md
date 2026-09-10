@@ -114,7 +114,9 @@ and keys are kept as separate tracks.
 ### Editing and persistence
 
 Image annotations live in source-pixel coordinates. `AnnoShapeDrawing` is shared
-between the canvas and export. Recording packages contain `screen.mov`, optional
+between the canvas and export. Image rotation and mirror actions bake pixels into
+a new base PNG and remap annotations before the shared renderer runs. Recording
+packages contain `screen.mov`, optional
 `camera.mov`, input/capture/edit JSON, and a flattened deliverable. Source movies
 are never modified.
 

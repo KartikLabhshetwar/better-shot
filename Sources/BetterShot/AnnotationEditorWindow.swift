@@ -194,6 +194,29 @@ struct AnnotationEditorWindow: View {
             }
             .buttonStyle(EditorButtonStyle(selected: model.isCropping))
             .help("Crop Image — click again to cancel")
+            Button {
+                clearInspectorFocus()
+                model.rotateClockwise()
+            } label: {
+                Label("Rotate Clockwise", systemImage: "rotate.right").labelStyle(.iconOnly)
+            }
+            .help("Rotate Image 90° Clockwise")
+
+            Menu {
+                Button("Flip Horizontal", systemImage: "arrow.left.and.right.righttriangle.left.righttriangle.right") {
+                    clearInspectorFocus()
+                    model.flipHorizontally()
+                }
+                Button("Flip Vertical", systemImage: "arrow.up.and.down.righttriangle.up.righttriangle.down") {
+                    clearInspectorFocus()
+                    model.flipVertically()
+                }
+            } label: {
+                Label("Flip Image", systemImage: "arrow.left.and.right.righttriangle.left.righttriangle.right")
+                    .labelStyle(.iconOnly)
+            }
+            .fixedSize()
+            .help("Flip Image")
             Divider().frame(height: 24)
 
             ForEach(AnnotationTool.allCases) { tool in
@@ -665,6 +688,7 @@ struct AnnotationEditorWindow: View {
         let bindings = model.bindings
         let backgroundSettings = model.backgroundSettings
         let hasContent = !shapes.isEmpty || backgroundSettings.hasRenderableContent || model.isCropped
+            || model.isTransformed
         let hadDocument = ScreenshotHistoryStore.shared.hasEditDocument(for: sourceURL)
 
         // Nothing drawn and nothing previously saved: there is no work to lose.

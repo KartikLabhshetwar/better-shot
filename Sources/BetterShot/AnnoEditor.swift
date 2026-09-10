@@ -111,6 +111,11 @@ struct AnnoViewport {
         guard imageSize.width > 0, imageFrame.width > 0 else { return 1 }
         return Double(imageFrame.width / imageSize.width)
     }
+
+    var pageToView: CGAffineTransform {
+        CGAffineTransform(translationX: imageFrame.minX, y: imageFrame.minY)
+            .scaledBy(x: scale, y: scale)
+    }
 }
 
 @MainActor
@@ -152,8 +157,13 @@ final class AnnoEditor {
     /// The shape an arrow terminal would bind to if the pointer were released now.
     private(set) var hintedBindingId: AnnoShapeID?
 
-    private var undoStack: [AnnoDocument.Snapshot] = []
-    private var redoStack: [AnnoDocument.Snapshot] = []
+    private enum HistoryEntry {
+        case document(AnnoDocument.Snapshot)
+        case image(undo: () -> Void, redo: () -> Void)
+    }
+
+    private var undoStack: [HistoryEntry] = []
+    private var redoStack: [HistoryEntry] = []
 
     /// Called after every change, for the canvas to redraw itself.
     var onChange: (() -> Void)?
@@ -167,20 +177,11 @@ final class AnnoEditor {
     // MARK: - Camera
 
     func pageToScreen(_ p: Vec) -> Vec {
-        let s = viewport.scale
-        return Vec(
-            Double(viewport.imageFrame.minX) + p.x * s,
-            Double(viewport.imageFrame.minY) + p.y * s
-        )
+        Vec(p.cgPoint.applying(viewport.pageToView))
     }
 
     func screenToPage(_ p: Vec) -> Vec {
-        let s = viewport.scale
-        guard s != 0 else { return p }
-        return Vec(
-            (p.x - Double(viewport.imageFrame.minX)) / s,
-            (p.y - Double(viewport.imageFrame.minY)) / s
-        )
+        Vec(p.cgPoint.applying(viewport.pageToView.inverted()))
     }
 
     /// A screen-space distance expressed in page units, so hit margins and handle sizes stay a
@@ -193,12 +194,16 @@ final class AnnoEditor {
     // MARK: - Document access
 
     func replaceDocument(shapes: [AnnoShape], bindings: [ArrowBinding] = []) {
+        undoStack.removeAll()
+        redoStack.removeAll()
+        restoreDocument(shapes: shapes, bindings: bindings)
+    }
+
+    func restoreDocument(shapes: [AnnoShape], bindings: [ArrowBinding] = []) {
         document.restore(AnnoDocument.Snapshot(shapes: shapes, bindings: bindings))
         selectedIds.removeAll()
         editingTextId = nil
         interaction = .idle
-        undoStack.removeAll()
-        redoStack.removeAll()
         notifyChanged()
     }
 
@@ -207,7 +212,15 @@ final class AnnoEditor {
     // MARK: - Undo
 
     func markUndo() {
-        undoStack.append(document.snapshot())
+        appendUndo(.document(document.snapshot()))
+    }
+
+    func markImageUndo(undo: @escaping () -> Void, redo: @escaping () -> Void) {
+        appendUndo(.image(undo: undo, redo: redo))
+    }
+
+    private func appendUndo(_ entry: HistoryEntry) {
+        undoStack.append(entry)
         if undoStack.count > 200 { undoStack.removeFirst() }
         redoStack.removeAll()
     }
@@ -217,8 +230,14 @@ final class AnnoEditor {
 
     func undo() {
         guard let snapshot = undoStack.popLast() else { return }
-        redoStack.append(document.snapshot())
-        document.restore(snapshot)
+        switch snapshot {
+        case .document(let documentSnapshot):
+            redoStack.append(.document(document.snapshot()))
+            document.restore(documentSnapshot)
+        case .image(let restorePrevious, _):
+            redoStack.append(snapshot)
+            restorePrevious()
+        }
         selectedIds = selectedIds.filter { document.shape($0) != nil }
         stopEditingText()
         notifyChanged()
@@ -226,8 +245,14 @@ final class AnnoEditor {
 
     func redo() {
         guard let snapshot = redoStack.popLast() else { return }
-        undoStack.append(document.snapshot())
-        document.restore(snapshot)
+        switch snapshot {
+        case .document(let documentSnapshot):
+            undoStack.append(.document(document.snapshot()))
+            document.restore(documentSnapshot)
+        case .image(_, let restoreNext):
+            undoStack.append(snapshot)
+            restoreNext()
+        }
         selectedIds = selectedIds.filter { document.shape($0) != nil }
         stopEditingText()
         notifyChanged()

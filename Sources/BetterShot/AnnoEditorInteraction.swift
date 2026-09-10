@@ -700,7 +700,7 @@ extension AnnoEditor {
             if let delta {
                 // The shift happens in the shape's own frame, so rotated text still grows the
                 // right way.
-                let rotated = Vec.rot(delta, shape.rotation)
+                let rotated = Vec.rot(Vec(shape.isMirrored == true ? -delta.x : delta.x, delta.y), shape.rotation)
                 shape.x -= rotated.x
                 shape.y -= rotated.y
             }
