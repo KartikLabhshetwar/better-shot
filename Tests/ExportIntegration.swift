@@ -60,6 +60,7 @@ struct ExportIntegration {
         precondition(CGImageDestinationFinalize(destination))
         try benchmarkImageExports(image: image, directory: directory)
         try await checkCaptureStorage(image: image, source: source, directory: directory)
+        try await checkAnnotationExport(image: image, source: source, directory: directory)
         let exported = directory.appendingPathComponent("export.png")
         let start = Date()
         try AnnotationRenderer.render(
@@ -512,6 +513,45 @@ struct ExportIntegration {
         await writer.finishWriting()
         precondition(writer.status == .completed)
     }
+}
+
+@MainActor
+private func checkAnnotationExport(image: CGImage, source: URL, directory: URL) async throws {
+    let history = HistoryStore(storageDirectory: directory.appendingPathComponent("annotation-history"))
+    let record = history.importCapture(from: source, deleteSource: false)!
+    let raw = history.urlForRecord(record)
+    let rawData = try Data(contentsOf: raw)
+    precondition(history.annotationExportURL(for: raw) == nil)
+    let output = directory.appendingPathComponent("annotation-export.png")
+    try FileManager.default.copyItem(at: source, to: output)
+    precondition(history.setBeautifiedPath(output.path, for: record.id))
+    precondition(history.annotationExportURL(for: raw) == output)
+    precondition(history.annotationExportURL(for: output) == output)
+    precondition(history.annotationExportURL(for: source) == nil)
+    let edited = CaptureOrchestrator.saveImage(
+        image.cropping(to: CGRect(x: 0, y: 0, width: 32, height: 32))!, in: directory.path)!
+    try ScreenshotFileActions.replaceExistingExport(from: edited, at: history.annotationExportURL(for: raw)!, compressionQuality: 0.9)
+    let savedData = try Data(contentsOf: output)
+    precondition(savedData != rawData)
+    precondition((try? Data(contentsOf: raw)) == rawData)
+    do {
+        try ScreenshotFileActions.replaceExistingExport(
+            from: directory.appendingPathComponent("missing.png"), at: output, compressionQuality: 0.9)
+        preconditionFailure("Expected reading the source to fail")
+    } catch {}
+    precondition((try? Data(contentsOf: output)) == savedData)
+    for type in [UTType.jpeg, .heic] {
+        let encoded = directory.appendingPathComponent("annotation-export.\(type.preferredFilenameExtension!)")
+        try await Task.detached {
+            try ScreenshotFileActions.replaceExistingExport(from: edited, at: encoded, compressionQuality: 0.9)
+        }.value
+        let encodedSource = CGImageSourceCreateWithURL(encoded as CFURL, nil)!
+        precondition(CGImageSourceGetType(encodedSource) as String? == type.identifier)
+        let decoded = CGImageSourceCreateImageAtIndex(encodedSource, 0, nil)!
+        precondition(decoded.width == 32 && decoded.height == 32)
+    }
+    precondition(history.records.count == 1)
+    print("PASS annotation saves update the associated export and preserve the source and previous export on failure")
 }
 
 /// Exercises production persistence in an isolated directory; never alters the user's captures.

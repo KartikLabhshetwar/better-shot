@@ -31,6 +31,7 @@ struct AnnotationEditorWindow: View {
     @State private var isInspectorPresented = true
     @State private var isSaving = false
     @State private var isExporting = false
+    @State private var lastExportURL: URL?
     @State private var saveFlash = false
     @State private var isCopying = false
     @State private var copyFlash = false
@@ -103,6 +104,7 @@ struct AnnotationEditorWindow: View {
             }
             .task(id: url) {
                 clearInspectorFocus()
+                lastExportURL = nil
                 model.load(url: url, dismiss: dismissWindow)
             }
             .onAppear {
@@ -565,6 +567,7 @@ struct AnnotationEditorWindow: View {
                         destinationURL: destinationURL,
                         contentType: contentType
                     )
+                    lastExportURL = destinationURL
                 } catch {
                     model.errorMessage = "Failed to export image: \(error.localizedDescription)"
                 }
@@ -653,8 +656,9 @@ struct AnnotationEditorWindow: View {
     /// out of the editor - Done, Save, Upload, the close prompt - goes
     /// through it.
     @discardableResult
-    private func commitEdits() async throws -> URL? {
+    private func commitEdits(updatingExport: Bool = false) async throws -> URL? {
         guard let sourceURL = model.sourceURL else { return nil }
+        let exportURL = lastExportURL ?? HistoryStore.shared.annotationExportURL(for: sourceURL)
 
         let baseURL = model.baseImageURL ?? sourceURL
         let shapes = model.shapes
@@ -696,6 +700,13 @@ struct AnnotationEditorWindow: View {
             model.baseImageURL = resultURL
         }
 
+        if updatingExport, let exportURL {
+            let compressionQuality = BetterShotPreferences.compressionQuality
+            try await Task.detached(priority: .userInitiated) {
+                try ScreenshotFileActions.replaceExistingExport(
+                    from: resultURL, at: exportURL, compressionQuality: compressionQuality)
+            }.value
+        }
         model.markSaved()
         return resultURL
     }
@@ -713,7 +724,7 @@ struct AnnotationEditorWindow: View {
             defer { isSaving = false }
             do {
                 guard let sourceURL = model.sourceURL,
-                      let resultURL = try await commitEdits() else { return }
+                      let resultURL = try await commitEdits(updatingExport: true) else { return }
                 _ = ScreenshotPreviewStack.shared.applyAnnotation(
                     originalURL: sourceURL,
                     historyURL: resultURL
@@ -745,7 +756,7 @@ struct AnnotationEditorWindow: View {
                 Task {
                     do {
                         if let sourceURL = model.sourceURL,
-                           let resultURL = try await commitEdits() {
+                           let resultURL = try await commitEdits(updatingExport: true) {
                             _ = ScreenshotPreviewStack.shared.applyAnnotation(
                                 originalURL: sourceURL,
                                 historyURL: resultURL

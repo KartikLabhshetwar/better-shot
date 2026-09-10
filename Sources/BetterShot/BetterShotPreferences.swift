@@ -320,7 +320,7 @@ enum ScreenshotFileActions {
             
             try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
         } else {
-            try exportImage(from: sourceURL, to: destinationURL, contentType: BetterShotPreferences.exportFormat.contentType)
+            try exportImage(from: sourceURL, to: destinationURL, contentType: BetterShotPreferences.exportFormat.contentType, compressionQuality: BetterShotPreferences.compressionQuality)
         }
     }
 
@@ -328,7 +328,7 @@ enum ScreenshotFileActions {
     /// The replacement is staged beside the destination and atomically swapped
     /// in only after encoding succeeds, so the last good export is never deleted
     /// first. Pixel dimensions are preserved; PNG-to-PNG updates copy bytes.
-    static func replaceExistingExport(from sourceURL: URL, at destinationURL: URL) throws {
+    nonisolated static func replaceExistingExport(from sourceURL: URL, at destinationURL: URL, compressionQuality: Double) throws {
         guard let destinationType = exportContentType(for: destinationURL) else {
             throw CocoaError(.fileWriteUnknown)
         }
@@ -341,7 +341,7 @@ enum ScreenshotFileActions {
         if destinationType == .png, actualImageContentType(at: sourceURL) == .png {
             try FileManager.default.copyItem(at: sourceURL, to: stagingURL)
         } else {
-            try exportImage(from: sourceURL, to: stagingURL, contentType: destinationType)
+            try exportImage(from: sourceURL, to: stagingURL, contentType: destinationType, compressionQuality: compressionQuality)
         }
 
         if FileManager.default.fileExists(atPath: destinationURL.path) {
@@ -362,7 +362,7 @@ enum ScreenshotFileActions {
         BetterShotPreferences.exportFormat.contentType
     }
     
-    private static func exportImage(from sourceURL: URL, to destinationURL: URL, contentType: UTType) throws {
+    nonisolated private static func exportImage(from sourceURL: URL, to destinationURL: URL, contentType: UTType, compressionQuality: Double) throws {
         if FileManager.default.fileExists(atPath: destinationURL.path) {
             try FileManager.default.removeItem(at: destinationURL)
         }
@@ -384,7 +384,7 @@ enum ScreenshotFileActions {
         }
         
         let options: [CFString: Any] = contentType == .png ? [:] : [
-            kCGImageDestinationLossyCompressionQuality: BetterShotPreferences.compressionQuality
+            kCGImageDestinationLossyCompressionQuality: compressionQuality
         ]
         
         CGImageDestinationAddImageFromSource(destination, source, 0, options as CFDictionary)
@@ -394,7 +394,7 @@ enum ScreenshotFileActions {
         }
     }
 
-    private static func exportContentType(for url: URL) -> UTType? {
+    nonisolated private static func exportContentType(for url: URL) -> UTType? {
         guard let type = UTType(filenameExtension: url.pathExtension) else { return nil }
         if type.conforms(to: .png) { return .png }
         if type.conforms(to: .jpeg) { return .jpeg }
@@ -402,7 +402,7 @@ enum ScreenshotFileActions {
         return nil
     }
 
-    private static func actualImageContentType(at url: URL) -> UTType? {
+    nonisolated private static func actualImageContentType(at url: URL) -> UTType? {
         guard let source = CGImageSourceCreateWithURL(
             url as CFURL,
             [kCGImageSourceShouldCache: false] as CFDictionary
