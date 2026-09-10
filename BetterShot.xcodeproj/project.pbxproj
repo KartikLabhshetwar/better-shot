@@ -116,6 +116,7 @@
 		8782829F9AD2E1BE2B796AC7 /* ShortcutService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAE1EE5C32D7D0D099A88951 /* ShortcutService.swift */; };
 		88E571E986C805E582BE853A /* RecordingPointerTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AAC5749AE8D3AA8D0826D94 /* RecordingPointerTimeline.swift */; };
 		8939FAA9B01BDCCFC1C9277E /* AnnotationBackgroundPresetBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 751FDBAB1B6B4ABB24713FA4 /* AnnotationBackgroundPresetBar.swift */; };
+		8A3678236C5B3E1EDBDDF0E5 /* CaptureURLAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D024DBA83E8292A232F91B1 /* CaptureURLAction.swift */; };
 		8B60C5A0D9E05E27D0CDB08A /* AnnotationEditorChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7768BE2B53992147285FACBF /* AnnotationEditorChrome.swift */; };
 		8BF5172EE59AE9CAA014B690 /* AnnotationCropOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1546D84751A7403E9E6ACF0 /* AnnotationCropOverlay.swift */; };
 		8C76612CC356391B94F0AD36 /* StrokeOutline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7846895DF5BEB0C9BC144710 /* StrokeOutline.swift */; };
@@ -221,6 +222,7 @@
 		087AF8EECF1AB0781D8D1F70 /* PerfectDash.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerfectDash.swift; sourceTree = "<group>"; };
 		098DDCECCCE5591FAA09480B /* ShortcutActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutActions.swift; sourceTree = "<group>"; };
 		0BF1FA787AC739460BAB2EB2 /* ViewModifiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModifiers.swift; sourceTree = "<group>"; };
+		0D024DBA83E8292A232F91B1 /* CaptureURLAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureURLAction.swift; sourceTree = "<group>"; };
 		0D62F387131F8D7E1EF8BD54 /* SharingSettingsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharingSettingsTab.swift; sourceTree = "<group>"; };
 		0DF213690A822844610DB6E0 /* RecordingViewportTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingViewportTimeline.swift; sourceTree = "<group>"; };
 		0FC7A31E31203B3330CE5AA0 /* ScreenshotPreviewItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotPreviewItem.swift; sourceTree = "<group>"; };
@@ -716,6 +718,7 @@
 			children = (
 				F74F2F48E0775A96906E180F /* BetterShotApp.swift */,
 				1A8FF0E5AD713FC1D7E99DE7 /* BetterShotDelegate.swift */,
+				0D024DBA83E8292A232F91B1 /* CaptureURLAction.swift */,
 				F486BA8CF557A0B458CBE106 /* OnboardingWindowController.swift */,
 			);
 			path = App;
@@ -877,6 +880,7 @@
 				752F3C9795A6BE679382C7ED /* CaptureCountdownPresenter.swift in Sources */,
 				FE59D61ABB427B6DFC1D377A /* CaptureOrchestrator.swift in Sources */,
 				918CF31A69D7A8EB445F4164 /* CaptureRecord.swift in Sources */,
+				8A3678236C5B3E1EDBDDF0E5 /* CaptureURLAction.swift in Sources */,
 				E9B0C8420D6AA0CFCC0AD25D /* CloudUploadOptions.swift in Sources */,
 				387EB7D93F69E67AE33613AD /* CloudUploader.swift in Sources */,
 				24A92D5E02A892E928CE1D5B /* ColorGrade.swift in Sources */,

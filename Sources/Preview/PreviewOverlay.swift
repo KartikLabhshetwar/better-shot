@@ -354,7 +354,7 @@ struct PreviewDeckView: View {
         VStack(alignment: pinnedLeft ? .leading : .trailing, spacing: 10) {
             if overlay.items.count > 1 {
                 HStack(spacing: 6) {
-                    if overlay.hasSavableItems {
+                    if overlay.hasStagedItems {
                         deckButton("Save All") { overlay.saveAll() }
                     }
                     deckButton("Clear All") { overlay.clearAll() }
@@ -576,7 +576,7 @@ struct PreviewCardView: View {
             overlay.save(url)
         case .copy:
             do {
-                if Self.isVideo(url) { try VideoFileActions.copyToClipboard(from: url) }
+                if isVideo { try VideoFileActions.copyToClipboard(from: url) }
                 else { try ScreenshotFileActions.copyImageToClipboard(from: url) }
                 overlay.remove(url)
             } catch {
