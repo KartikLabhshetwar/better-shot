@@ -11,6 +11,7 @@ private enum AnnotationCanvasCursor: Equatable {
     case placement
     case openHand
     case closedHand
+    case text
 
     var nsCursor: NSCursor {
         switch self {
@@ -22,6 +23,8 @@ private enum AnnotationCanvasCursor: Equatable {
             .openHand
         case .closedHand:
             .closedHand
+        case .text:
+            .iBeam
         }
     }
 }
@@ -664,10 +667,24 @@ struct AnnotationCanvas: View {
 
         if hasActiveInteraction {
             setCursor(model.isTransformingExistingAnnotation ? .closedHand : .placement)
-        } else if model.hoveredAnnotation(at: location, imageFrame: imageFrame, boundaryFrame: boundaryFrame) != nil {
-            setCursor(.openHand)
         } else if model.selectedTool == .select {
-            setCursor(.arrow)
+            // The grab cursor is a promise that a press picks the shape up, which only
+            // Select keeps. A drawing tool draws over whatever is under the pointer, so
+            // it stays on the crosshair however many shapes are already there.
+            let hovering = model.hoveredAnnotation(
+                at: location,
+                imageFrame: imageFrame,
+                boundaryFrame: boundaryFrame
+            ) != nil
+            setCursor(hovering ? .openHand : .arrow)
+        } else if model.selectedTool == .text,
+                  model.hoveredAnnotation(
+                      at: location,
+                      imageFrame: imageFrame,
+                      boundaryFrame: boundaryFrame
+                  )?.isText == true {
+            // Text is the one tool that edits what it lands on instead of adding to it.
+            setCursor(.text)
         } else {
             setCursor(.placement)
         }
