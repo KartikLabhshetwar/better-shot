@@ -766,6 +766,7 @@ struct CaptureSettingsTab: View {
 // MARK: - Recording Settings
 
 struct RecordingSettingsTab: View {
+    @AppStorage(AfterCaptureAction.save.storageKey(for: .recording)) private var saveToFolder = false
     @AppStorage(BetterShotPreferences.recordingCameraDeviceIDKey) private var cameraID: String = ""
     @AppStorage(BetterShotPreferences.recordingMicrophoneDeviceIDKey) private var microphoneID: String = ""
     @AppStorage(BetterShotPreferences.recordingSystemAudioKey) private var captureAudio: Bool = false
@@ -840,6 +841,10 @@ struct RecordingSettingsTab: View {
                     Text("Open the editor when I stop")
                     Text("Off, you get a preview card and can open the editor from there.")
                 }
+                Toggle(isOn: $saveToFolder) {
+                    Text("Save recordings to the save folder")
+                    Text("Renders a video with the cursor and camera after recording. Longer recordings may take a while.")
+                }
             } header: {
                 Text("After Recording")
             }
@@ -877,6 +882,7 @@ struct RecordingSettingsTab: View {
                 startDelaySeconds = 0
                 teleprompterEnabled = false
                 openEditor = false
+                saveToFolder = false
                 exportSettings = VideoCompressionSettings()
                 RecordingExportPreferences.lastSettings = exportSettings
             }
