@@ -537,10 +537,8 @@ struct PreviewCardView: View {
             overlay.save(url)
         case .copy:
             do {
-                // Always copy the capture itself, never the preview thumbnail.
                 if Self.isVideo(url) { try VideoFileActions.copyToClipboard(from: url) }
                 else { try ScreenshotFileActions.copyImageToClipboard(from: url) }
-                DeckStaging.promote(url)
                 overlay.remove(url)
             } catch {
                 overlay.cancelScheduledDismiss(for: url)

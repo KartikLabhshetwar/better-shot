@@ -188,7 +188,9 @@ pixel dimensions and integer placement during framing. Full-resolution editor
 previews are the default; exported content must always come from the full source.
 
 When Keep screenshots in the deck until saved is enabled, `DeckStaging` holds
-captures until Save, Copy, drag, Pin, Share, or Edit promotes them. Preserve failure
+captures until Save, drag, Pin, Share, or Edit promotes them. Copy only writes to
+the clipboard and discards the unsaved card; it does not add the capture to the
+save folder or Library. Preserve failure
 recovery and the raw image so subsequent editing does not flatten twice.
 
 `LastRegionGhostPresenter` can show an existing BetterShot remembered region when
