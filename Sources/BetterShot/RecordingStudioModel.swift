@@ -767,15 +767,16 @@ final class RecordingStudioModel {
     }
 
     func setLayoutPreset(_ preset: RecordingLayoutPreset) {
-        guard style.layoutPreset != preset else { return }
         var next = style
         next.layoutPreset = preset
         if preset != .screenOnly { next.camera.isVisible = hasCameraVideo }
-        if preset == .overlap {
-            next.camera.aspectRatio = .vertical
-            next.camera.size = 0.55
-            next.camera.roundness = 0.08
+        if preset.hasFloatingCamera {
+            let defaults = RecordingCameraBubbleSettings()
+            next.camera.aspectRatio = defaults.aspectRatio
+            next.camera.size = defaults.size
+            next.camera.roundness = defaults.roundness
         }
+        guard next != style else { return }
         setLayoutStyle(next)
     }
 

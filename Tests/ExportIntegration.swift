@@ -423,11 +423,6 @@ struct ExportIntegration {
                 var style = RecordingStudioStyle()
                 style.layoutPreset = preset
                 style.cameraOnLeft = cameraOnLeft
-                if preset == .overlap {
-                    style.camera.aspectRatio = .vertical
-                    style.camera.size = 0.55
-                    style.camera.roundness = 0.08
-                }
                 let compositor = StudioFrameCompositor(canvasSize: size, style: style,
                     viewportTimeline: .identity, pointerTimeline: nil, showsPressEffects: false,
                     keystrokeTimeline: nil, keystrokePlacement: .bottomCenter,

@@ -135,7 +135,9 @@ whole edited video. The Camera inspector exposes floating Bubble and Overlap,
 Side-by-Side, Presenter, Camera Only, and Screen Only. Paired layouts can place
 the camera on either side. Presenter fits the screen beside a full-height camera;
 Side-by-Side respects the video Fill/Fit setting. Floating camera ratio/size/
-rounding controls remain available. Missing layout fields retain the legacy
+rounding controls remain available. Selecting Bubble or Overlap restores the
+compact 0.5.2 camera defaults (1:1, 26% size, 25% rounding), including reselection
+of the active preset; undo restores the previous camera settings. Missing layout fields retain the legacy
 bubble, and unavailable/hidden camera footage falls back to the screen. Preview,
 export, project persistence, render-cache invalidation, and undo share the style.
 

@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Camera Bubble and Overlap use the compact 0.5.2 camera defaults (1:1, 26% size, 25% rounding). Selecting either preset resets an elongated camera, including when reselecting the active preset.
+
 - **Screenshot Copy stays clipboard-only (#134, follow-up to #138)**: All screenshot capture paths now stage privately instead of saving to the configured folder before the preview appears. Opening the editor, pinning, sharing, and dragging keep working copies inside BetterShot. Only explicit Save/Export (including the capture-and-save shortcut) writes a deliverable to the save folder.
 - **Save untouched screenshots from the editor**: Save now works before any edits, writes to the configured folder, and updates the associated file on subsequent saves. Copy preserves a private file reference for paste targets after the preview is dismissed.
 

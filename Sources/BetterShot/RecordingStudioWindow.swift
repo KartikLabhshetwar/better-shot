@@ -1125,11 +1125,6 @@ struct StudioLayoutThumbnail: View {
                 var style = RecordingStudioStyle()
                 style.layoutPreset = preset
                 style.cameraOnLeft = cameraOnLeft
-                if preset == .overlap {
-                    style.camera.aspectRatio = .vertical
-                    style.camera.size = 0.55
-                    style.camera.roundness = 0.08
-                }
                 return style
             }()
             let layout = RecordingStudioLayout.make(canvasSize: CGSize(width: 320, height: 180), style: style, includeBubble: true)
@@ -1146,7 +1141,11 @@ struct StudioLayoutThumbnail: View {
                 if layout.bubbleRect.width > 0 {
                     RoundedRectangle(cornerRadius: layout.bubbleCornerRadius * scale)
                         .fill(Color.accentColor.opacity(0.45))
-                        .overlay { Image(systemName: "person.fill").font(.system(size: 15)).foregroundStyle(.primary) }
+                        .overlay {
+                            Image(systemName: "person.fill")
+                                .font(.system(size: min(15, min(layout.bubbleRect.width, layout.bubbleRect.height) * scale * 0.75)))
+                                .foregroundStyle(.primary)
+                        }
                         .frame(width: layout.bubbleRect.width * scale, height: layout.bubbleRect.height * scale)
                         .clipped()
                         .position(x: layout.bubbleRect.midX * scale, y: layout.bubbleRect.midY * scale)

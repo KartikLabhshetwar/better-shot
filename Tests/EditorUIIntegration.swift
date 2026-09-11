@@ -586,7 +586,25 @@ private func checkCameraAspectRatios(movieURL: URL) async throws {
     model.undo()
     precondition(model.style == previousStyle, "Layout undo must restore camera shape and size too")
     model.redo()
-    precondition(model.style.layoutPreset == .overlap && model.style.camera.aspectRatio == .vertical)
+    precondition(model.style.layoutPreset == .overlap && model.style.camera.aspectRatio == .square)
+    for preset in [RecordingLayoutPreset.bubble, .overlap] {
+        model.style.layoutPreset = preset
+        model.style.camera.aspectRatio = .vertical
+        model.style.camera.size = 0.55
+        model.style.camera.roundness = 0.08
+        let tallStyle = model.style
+        model.setLayoutPreset(preset)
+        precondition(model.style.camera.aspectRatio == .square && model.style.camera.size == 0.26
+                     && model.style.camera.roundness == 0.25,
+                     "Both floating presets, including reselection, restore the 0.5.2 camera dimensions")
+        let layout = RecordingStudioLayout.make(canvasSize: sourceSize, style: model.style, includeBubble: true)
+        precondition(abs(layout.bubbleRect.width - 1080 * 0.26) < 0.001
+                     && layout.bubbleRect.width == layout.bubbleRect.height)
+        model.undo()
+        precondition(model.style == tallStyle, "Resetting a camera preset must be undoable")
+        model.redo()
+        precondition(model.style.camera.size == 0.26 && model.style.camera.aspectRatio == .square)
+    }
     model.setCameraOnLeft(true)
     model.undo()
     precondition(!model.style.cameraOnLeft)
