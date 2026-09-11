@@ -59,6 +59,9 @@ R2 requests, or network transfers were used.
 
 ### Verification
 
+`make test` passed on the final implementation, as did the focused export checks
+against the optimized Release build.
+
 The focused production checks cover source colors/orientation, timed masks,
 all six camera ratios, fresh versus cached GPU frames (one 8-bit rounding level
 allowed), encoded colors, 30/60 fps frame counts, audio, fractional clip timing,
