@@ -3382,7 +3382,7 @@ struct StudioInspector: View {
                         }
                     }
                     if model.style.cursor.appearance == .macOS {
-                        Text("Classic macOS Poof cursor. Adjust Size above to enlarge it further.")
+                        Text("Native macOS arrow. Adjust Size above to enlarge it further.")
                             .font(.inspectorLabel).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }

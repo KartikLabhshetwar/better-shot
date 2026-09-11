@@ -205,7 +205,6 @@
 		F825E47FC977EB83ABD059F6 /* RecordingProject.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23F4D20DF3F0349735C2F80D /* RecordingProject.swift */; };
 		F87FBF6D449686856AD05561 /* GlassSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = B82D1374FAD185152D19D7E7 /* GlassSurface.swift */; };
 		FA4BE9A7B6E26F64C88E3DCB /* LastRegionGhostPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 283839739CC9AE12352E03C1 /* LastRegionGhostPresenter.swift */; };
-		FB30410588F395CB8C57B6BA /* Cursors in Resources */ = {isa = PBXBuildFile; fileRef = D149A0A8A5ED0EEC0DC548C5 /* Cursors */; };
 		FCF6D15042D5341FE0B8F8CC /* EditorCloseGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA1C53D4E064EC5B6570D913 /* EditorCloseGuard.swift */; };
 		FE59D61ABB427B6DFC1D377A /* CaptureOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B626577BDFABF32D144DC8B /* CaptureOrchestrator.swift */; };
 		FEAA5D4F3A6152816BB7EA7B /* Vec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C0979159F4E2923F7AD447 /* Vec.swift */; };
@@ -383,7 +382,6 @@
 		CEF6CEA437885038BFEDA677 /* RecordingSessionRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSessionRenderer.swift; sourceTree = "<group>"; };
 		CFF906CEC52DCC55E1CAB388 /* TransparencyGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransparencyGrid.swift; sourceTree = "<group>"; };
 		D10A6B033CF2B257451A9159 /* RecordingControlPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingControlPresenter.swift; sourceTree = "<group>"; };
-		D149A0A8A5ED0EEC0DC548C5 /* Cursors */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Cursors; path = Resources/Cursors; sourceTree = SOURCE_ROOT; };
 		D373EFB76FA1254F635BB9A5 /* AnnoShapeDrawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnoShapeDrawing.swift; sourceTree = "<group>"; };
 		D58300A37E3A994CE15987C5 /* BeautifierRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeautifierRenderer.swift; sourceTree = "<group>"; };
 		D9CAA6D017C7FB19CD3466D7 /* MathUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MathUtils.swift; sourceTree = "<group>"; };
@@ -691,7 +689,6 @@
 			isa = PBXGroup;
 			children = (
 				A9FD147E96AE29FF1E11357F /* Backgrounds */,
-				D149A0A8A5ED0EEC0DC548C5 /* Cursors */,
 				110CD327D097B8F42B0B8BA1 /* Onboarding */,
 				10094F5FED8623DFE2FA9F1D /* Resources */,
 				C750A8B0B7E68485E0FF536F /* Sources */,
@@ -807,7 +804,6 @@
 			files = (
 				E29FA26E5F3F90C0653923E8 /* Assets.xcassets in Resources */,
 				1CBDB240923B9F176D454CEA /* Backgrounds in Resources */,
-				FB30410588F395CB8C57B6BA /* Cursors in Resources */,
 				2BDDF4C68FA168E537AF4029 /* Onboarding in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

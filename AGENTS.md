@@ -108,8 +108,7 @@ a PR unless explicitly requested.
   explicit Save/Export or capture-and-save writes a deliverable. Editor Save
   must work for untouched screenshots, and clipboard file references must
   survive dismissing the capture card.
-- The macOS cursor style uses the bundled classic Apple Poof artwork in
-  `Resources/Cursors`, cached with its arrow-tip hotspot. Hand is no longer offered, but
+- The macOS cursor style uses `NSCursor.arrow`, cached with its native hotspot. Hand is no longer offered, but
   legacy projects still render it with `NSCursor.pointingHand`. Preserve native
   hotspots and highest-resolution representations through `PointerArtworkCapture`.
 - Custom cursor raster resolution is independent of its logical size and hotspot.

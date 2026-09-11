@@ -8,6 +8,7 @@ import SwiftUI
 /// AVPlayer layers and window toolbars require live UI testing and are not captured here.
 @MainActor
 func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
+    try await checkColorPickerAndToast()
     try await checkPreviewOverlay(imageURL: imageURL)
     try await checkMediaGallery(imageURL: imageURL, movieURL: movieURL)
     checkTransferToastPresentation(movieURL: movieURL)
@@ -124,16 +125,10 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     let nativeHand = PointerArtworkCapture.capture(NSCursor.pointingHand, id: "bettershot-cursor-hand")!
     precondition(hand == nativeHand, "Hand uses the actual macOS artwork, full raster, logical size, and hotspot")
     precondition(hand == PointerArtworkCapture.styledArtwork(.hand), "Native hand artwork is cached")
-    let poof = PointerArtworkCapture.styledArtwork(.macOS)!
-    let poofBitmap = NSBitmapImageRep(data: poof.imageData)!
-    precondition(poofBitmap.pixelsWide == 72 && poofBitmap.pixelsHigh == 90,
-                 "Keep Apple's original classic Poof raster without upsampling it")
-    precondition(poofBitmap.colorAt(x: 0, y: 0)!.alphaComponent == 0)
-    precondition(poofBitmap.colorAt(x: 35, y: 50)!.alphaComponent > 0.99,
-                 "The Poof cursor includes the visible cloud")
-    precondition(poof.normalizedAnchor == CGPoint(x: 17.0 / 72, y: 9.0 / 90),
-                 "The arrow tip remains the click hotspot when enlarged")
-    precondition(poof == PointerArtworkCapture.styledArtwork(.macOS), "Poof artwork is cached")
+    let arrow = PointerArtworkCapture.styledArtwork(.macOS)!
+    precondition(arrow == PointerArtworkCapture.capture(NSCursor.arrow, id: "bettershot-cursor-macOS"),
+                 "macOS style uses only Apple's arrow, highest-resolution raster, and native hotspot")
+    precondition(arrow == PointerArtworkCapture.styledArtwork(.macOS), "Native arrow artwork is cached")
     let cursorModel = RecordingStudioModel(url: movieURL)
     cursorModel.setCursorAppearance(.macOS)
     precondition(cursorModel.style.cursorScale == 2.5 && cursorModel.style.cursor.appearance == .macOS)
@@ -154,7 +149,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     precondition(delayFormat.parse("invalid") == nil && delayFormat.parse("NaN") == nil)
     precondition(InspectorValueFormat.points.parse("24 pt") == 24 && InspectorValueFormat.points.step == 4)
     precondition(InspectorValueFormat.percent(step: 0.05).step == 0.05)
-    print("PASS classic macOS Poof, large sizing, and legacy hand capture/cache, cursor persistence, and settings slider input")
+    print("PASS native macOS arrow, large sizing, and legacy hand capture/cache, cursor persistence, and settings slider input")
     let multiResolutionCursor = NSImage(size: NSSize(width: 16, height: 20))
     for scale in [1, 4] {
         let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 16 * scale, pixelsHigh: 20 * scale,
@@ -1195,4 +1190,43 @@ private func checkPreviewOverlay(imageURL: URL) async throws {
     AppPreferences.resetOverlaySettings()
     precondition(AppPreferences.overlayToolLayout == .standard)
     print("PASS overlay configuration/reset, share recovery/retention, cancelled preparation, and small/medium/large light/dark snapshots")
+}
+
+@MainActor
+private func checkColorPickerAndToast() async throws {
+    let samples: [(NSColor, String)] = [
+        (.black, "#000000"), (.white, "#FFFFFF"),
+        (NSColor(srgbRed: 1, green: 0.5, blue: 0, alpha: 1), "#FF8000"),
+        (NSColor(white: 0.5, alpha: 1), "#808080"),
+        (NSColor(displayP3Red: 1, green: 0, blue: 0, alpha: 1), "#FF0000"),
+        (NSColor(srgbRed: -0.2, green: 1.3, blue: 0.5, alpha: 1), "#00FF80")
+    ]
+    for (color, expected) in samples {
+        let hex = try ColorPickerOverlay.hexFromColor(color)
+        precondition(hex == expected, "Color picker must produce clamped six-digit sRGB hex")
+    }
+    do {
+        _ = try ColorPickerOverlay.hexFromColor(NSColor(patternImage: NSImage(size: CGSize(width: 8, height: 8))))
+        preconditionFailure("Non-RGB colors must fail safely")
+    } catch ColorPickerOverlay.PickError.unsupportedColor { }
+    guard let screen = NSScreen.main else { preconditionFailure("Toast checks require a display") }
+    let previousKeyWindow = NSApp.keyWindow
+    defer { ToastWindow.shared.dismiss(animated: false) }
+    for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+        ToastWindow.shared.show(title: "Copied", message: "#FF8000 copied to clipboard", systemIcon: "eyedropper", duration: 10, on: screen)
+        let panel = NSApp.windows.first { $0.identifier?.rawValue == "BetterShot.Toast" && $0.isVisible }!
+        panel.appearance = NSAppearance(named: appearance)
+        let size = panel.frame.size
+        precondition(size.width > 100 && size.width <= 360 && size.height > 30 && size.height < 150, "Unexpected toast size: \(size)")
+        for _ in 0..<5 {
+            panel.updateConstraintsIfNeeded()
+            panel.displayIfNeeded()
+            try await Task.sleep(for: .milliseconds(50))
+            precondition(panel.frame.size == size, "Color-copy toast sizing must remain stable across display cycles")
+        }
+        precondition(NSApp.keyWindow === previousKeyWindow, "Color-copy feedback must preserve browser keyboard focus")
+        ToastWindow.shared.dismiss(animated: false)
+        precondition(!panel.isVisible)
+    }
+    print("PASS color picker sRGB/P3/grayscale conversion, safe unsupported colors, and stable native toast lifecycle")
 }

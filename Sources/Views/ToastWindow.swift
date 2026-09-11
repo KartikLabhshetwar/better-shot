@@ -18,9 +18,9 @@ final class ToastWindow {
 
         let toastView = ToastContentView(title: title, message: message, icon: icon, systemIcon: systemIcon)
         let hostingView = NSHostingView(rootView: toastView)
-        hostingView.setFrameSize(hostingView.fittingSize)
 
         let panel = Self.makePanel(hostingView: hostingView)
+        panel.identifier = NSUserInterfaceItemIdentifier("BetterShot.Toast")
         guard let screen = preferredScreen ?? NSScreen.main ?? NSScreen.screens.first else { return }
         let origin = Self.origin(for: panel.frame.size, in: screen.visibleFrame)
         let x = origin.x
@@ -47,9 +47,15 @@ final class ToastWindow {
     }
 
     /// Shared native presentation for informational and interactive transfer toasts.
-    static func makePanel(hostingView: NSView) -> NSPanel {
+    static func makePanel<Content: View>(hostingView: NSHostingView<Content>) -> NSPanel {
+        // The panel owns its size. Bridging SwiftUI's min/ideal/max sizes back
+        // onto this window can recursively invalidate constraints on macOS 26.
+        let size = hostingView.fittingSize
+        hostingView.sizingOptions = []
+        hostingView.setFrameSize(size)
+        hostingView.autoresizingMask = [.width, .height]
         let panel = ToastPanel(
-            contentRect: NSRect(origin: .zero, size: hostingView.fittingSize),
+            contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isOpaque = false
         panel.backgroundColor = .clear

@@ -130,11 +130,14 @@ create or update that export. Export opens an NSSavePanel for a new destination.
 General > Default Look supplies background, padding, corner radius, and shadow
 for new images and videos. Saved projects retain their own settings.
 
-The macOS cursor choice uses the classic Apple Poof artwork in `Resources/Cursors`
-with a 2.5× starting size. Current AppKit returns an X badge for that system cursor,
-so the bundled original preserves the cloud design. `PointerArtworkCapture` caches
-the transparent source and click hotspot for preview/export. The standalone
-integration runner copies the same resources beside its executable.
+The macOS cursor choice uses `NSCursor.arrow` with a 2.5× starting size.
+`PointerArtworkCapture` caches the highest-resolution native artwork and hotspot
+for preview/export.
+
+Color picking uses a retained `NSColorSampler`. Convert to sRGB before reading
+components, reject unsupported/non-finite colors, and clamp to six-digit hex.
+Cancellation leaves the clipboard unchanged. Toast panels own their measured
+size with hosting sizing options disabled to avoid recursive window constraints.
 
 Screen/camera layout presets live in `RecordingStudioLayout` and apply to the
 whole edited video. The Camera inspector exposes floating Bubble and Overlap,

@@ -85,18 +85,21 @@ final class CaptureOrchestrator {
 
 
     private func performColorPick() async {
-        let overlay = ColorPickerOverlay()
-        guard let hex = await overlay.pickColor() else { return }
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(hex, forType: .string)
-        ScreenCapture.shared.playShutterSound()
-        ToastWindow.shared.show(
-            title: "Copied",
-            message: "\(hex) copied to clipboard",
-            systemIcon: "eyedropper",
-            on: captureScreen
-        )
+        do {
+            let overlay = ColorPickerOverlay()
+            guard let hex = try await overlay.pickColor() else { return }
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(hex, forType: .string)
+            ScreenCapture.shared.playShutterSound()
+            ToastWindow.shared.show(
+                title: "Copied", message: "\(hex) copied to clipboard",
+                systemIcon: "eyedropper", on: captureScreen
+            )
+        } catch {
+            ToastWindow.shared.show(title: "Couldn’t pick color", message: error.localizedDescription,
+                systemIcon: "eyedropper", on: captureScreen)
+        }
     }
 
     private func performOCR(singleLine: Bool = false) async {
