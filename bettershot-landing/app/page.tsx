@@ -9,6 +9,7 @@ import { Comparison } from "@/components/home/comparison"
 import { FaqSection, faqs } from "@/components/home/faq"
 import { SocialProof } from "@/components/social-proof"
 import { CountUp } from "@/components/count-up"
+import { ProductFeatures, ProductLink, ProductPreview } from "@/components/product-showcase"
 
 const faqJsonLd = {
   "@context": "https://schema.org",
@@ -24,33 +25,6 @@ function formatCount(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}K+`
   return String(n)
 }
-
-const features = [
-  {
-    label: "Capture",
-    title: "Screenshots that need nothing else",
-    body: "Region, fullscreen, and window capture with macOS's native selector. OCR text extraction, hex color picker, and a floating deck that holds up to five captures for copy, save, pin, edit, or drag-out.",
-    tags: ["Region and fullscreen", "OCR", "Color picker", "Capture deck", "Capture on release"],
-  },
-  {
-    label: "Record",
-    title: "Cursor zoom that tracks you",
-    body: "Pick a display, a window, or an area. The pointer is sampled at 30 Hz and clicks become smooth zoom moves, so a 4K screen stays readable in a small player. Recordings auto-save to your folder and survive a crash mid-take.",
-    tags: ["Cursor auto-zoom", "Face cam", "Microphone", "Auto-save", "Pause and resume"],
-  },
-  {
-    label: "Edit",
-    title: "Two editors, one app",
-    body: "Image editor: arrows, shapes, text, markers, highlight, blur, pixelate, and crop with background framing. Video editor: multi-clip timeline, speed control, transitions, captions, masks, and zoom cues.",
-    tags: ["Image annotations", "Video timeline", "0.25x to 8x", "Backgrounds", "Color grading"],
-  },
-  {
-    label: "Share",
-    title: "Links you own, on your storage",
-    body: "Connect a Cloudflare R2 bucket and Share uploads from the editor or the capture deck, then copies the link. No proxy, no vendor in the middle, no viewer limit.",
-    tags: ["Your own R2 bucket", "Deck sharing", "Keychain keys", "Direct SigV4"],
-  },
-]
 
 const performanceHighlights = [
   {
@@ -80,7 +54,7 @@ const moreFeatures = [
   { title: "URL scheme", body: "Trigger captures, recordings, OCR, or color picker from Raycast, Shortcuts, Alfred, or scripts with bettershot:// URLs." },
   { title: "Auto-save recordings", body: "Finished recordings save to your configured folder automatically. Manual Save on deck cards writes recordings too." },
   { title: "Backgrounds and beautify", body: "Padding, shadow, corner radius, and ten soft gradient backgrounds. Presentable screenshots and videos without a second app." },
-  { title: "Cursor styling", body: "Recorded, Dark, Light, Dot, or native Hand cursor with adjustable size, motion smoothing, press effects, and idle hiding." },
+  { title: "Cursor styling", body: "Recorded, Arrow, Dark, Light, or Dot cursor with adjustable size, motion smoothing, press effects, and idle hiding." },
   { title: "No watermark, no account", body: "Every export is clean. No trial, no upsell. BSD 3 Clause licensed and auditable." },
 ]
 
@@ -106,15 +80,14 @@ export default async function Home() {
           <div className="mx-auto max-w-[1100px] px-6 text-center">
             <Reveal>
               <h1 className="mx-auto max-w-[18ch] text-[clamp(2.5rem,6vw,4.5rem)] font-normal leading-[1.1] tracking-tight text-zinc-900">
-                One app for the whole screen.{" "}
-                <span className="text-zinc-400">Free and open source.</span>
+                Your screen. A better story.{" "}
+                <span className="text-zinc-400">Every little detail.</span>
               </h1>
             </Reveal>
 
             <Reveal>
               <p className="mx-auto mt-6 max-w-lg text-[17px] leading-relaxed text-zinc-600">
-                Screenshots, screen recording, image editor, and video editor, native on macOS.
-                No subscription, no account, no telemetry. Nothing leaves your Mac unless you share it.
+                Beautiful screenshots. Clearer walkthroughs. Capture, edit, and share with one native Mac app. Free, open source, and entirely yours.
               </p>
             </Reveal>
 
@@ -139,6 +112,11 @@ export default async function Home() {
           </div>
         </section>
 
+        <div className="mx-auto max-w-[1100px] px-6">
+          <ProductPreview kind="video" priority />
+          <div className="mt-6 flex flex-wrap justify-center gap-x-8 gap-y-4"><ProductLink kind="video" /><ProductLink kind="image" /></div>
+        </div>
+
         <Reveal as="section" className="mx-auto max-w-[1100px] px-6 py-14" aria-label="Better Shot in numbers">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
             {stats.map((stat) => (
@@ -152,37 +130,21 @@ export default async function Home() {
           </div>
         </Reveal>
 
-        <section id="features" className="scroll-mt-20 py-20 sm:py-28">
-          <div className="mx-auto max-w-[1100px] px-6">
-            <Reveal className="mx-auto mb-16 max-w-lg text-center">
-              <h2 className="text-[28px] tracking-tight sm:text-[32px]">
-                One app instead of four subscriptions
-              </h2>
-              <p className="mt-4 text-[16px] leading-relaxed text-zinc-600">
-                Capture, record, annotate, edit, and share. All on your Mac, all in one app.
-              </p>
-            </Reveal>
-
-            <div className="grid gap-6 md:grid-cols-2">
-              {features.map((feature) => (
-                <Reveal key={feature.label} className="rounded-2xl border border-zinc-200 p-6 sm:p-8">
-                  <p className="mb-3 text-[13px] font-medium text-zinc-500">{feature.label}</p>
-                  <h3 className="text-balance text-[26px] leading-tight sm:text-[28px]">
-                    {feature.title}
-                  </h3>
-                  <p className="mt-4 text-[16px] leading-relaxed text-zinc-600">{feature.body}</p>
-                  <div className="mt-5 flex flex-wrap gap-1.5">
-                    {feature.tags.map((tag) => (
-                      <span key={tag} className="rounded-full bg-zinc-100 px-3 py-1 text-[12px] font-medium text-zinc-600">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </Reveal>
-              ))}
-            </div>
+        <section id="features" className="mx-auto max-w-[1100px] scroll-mt-20 px-6 pb-8 pt-16">
+          <div className="grid items-end gap-8 md:grid-cols-[1.2fr_1fr]">
+            <div><p className="mb-4 text-sm font-medium text-brand">Video recording</p><h2 className="max-w-[17ch] text-[36px] sm:text-[48px]">Show how it works.<br />Make it easy to follow.</h2></div>
+            <div><p className="mb-6 text-base leading-relaxed text-zinc-500">A quick update or a careful walkthrough. Record your screen and camera, guide the eye with cursor effects, and cut straight to the good part.</p><ProductLink kind="video" /></div>
           </div>
         </section>
+        <ProductFeatures kind="video" />
+
+        <section className="bg-zinc-50 py-16 sm:py-24">
+          <div className="mx-auto grid max-w-[1100px] items-center gap-12 px-6 md:grid-cols-[0.8fr_1.2fr]">
+            <div><p className="mb-4 text-sm font-medium text-brand">Screenshots</p><h2 className="text-[36px] sm:text-[48px]">Say it with<br />a screenshot.</h2><p className="mb-6 mt-5 text-base leading-relaxed text-zinc-500">An arrow in the right place. A detail kept private. A little room around your image. Small edits that make your message land.</p><ProductLink kind="image" /></div>
+            <ProductPreview kind="image" />
+          </div>
+        </section>
+        <ProductFeatures kind="image" />
 
         <section className="bg-zinc-50 py-16 sm:py-24">
           <div className="mx-auto max-w-[1100px] px-6">

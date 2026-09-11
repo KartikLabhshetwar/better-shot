@@ -28,7 +28,7 @@ export const faqs = [
   },
   {
     q: "Does it show the keys I press?",
-    a: "Only if you turn it on. The keyboard overlay records your keystrokes beside the recording and draws them under the video, collapsing typing into words instead of stuttering key by key and giving a shortcut like Command S its own moment. Capture is off until you enable it, asks for Input Monitoring, and never leaves your Mac.",
+    a: "The keyboard overlay can show supported shortcuts such as Command S in your recording. Plain typing is not recorded. You can control the overlay in the video editor, and the captured shortcut data stays on your Mac unless you explicitly share your work.",
   },
   {
     q: "Does anything get uploaded?",

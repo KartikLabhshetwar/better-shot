@@ -1,0 +1,9 @@
+{
+  "screenshot-editor.jpg": "Live capture of AnnotationEditorWindow, compiled from production sources, using Resources/Onboarding/screenshot-demo.png.",
+  "video-editor.jpg": "Live capture of RecordingStudioWindow, compiled from production sources, using a slow pan over Resources/Onboarding/coast.png.",
+  "video-timeline.jpg": "Same production video editor with Zoom & Clips selected.",
+  "video-effects.jpg": "Same production video editor with Effects selected.",
+  "video-export.webp": "Production RecordingExportOptionsPopover rendered by Tests/EditorUIIntegration.swift (export-options-light.png).",
+  "detail-images": "Unaltered crops of the corresponding editor captures.",
+  "recording-demo.mp4": "Remotion slideshow of the four actual editor screenshots. This is not a live screen recording."
+}

@@ -1,0 +1,12 @@
+{
+  "name": "bettershot-landing-video",
+  "private": true,
+  "scripts": { "render": "node render.mjs" },
+  "dependencies": {
+    "@remotion/bundler": "4.0.443",
+    "@remotion/renderer": "4.0.443",
+    "remotion": "4.0.443",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  }
+}

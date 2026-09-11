@@ -161,6 +161,10 @@ a PR unless explicitly requested.
 
 ## Website-only rules
 
+- Landing-page-only changes must not update or create README files or changelog
+  entries unless explicitly requested. Report website changes and validation in
+  the task response instead. This overrides the general documentation rule above.
+
 For `bettershot-landing/`, use existing Tailwind tokens and the `cn` utility.
 Reuse the installed Radix components; do not mix primitive systems within one
 surface. Use accessible labels, existing alert dialogs, `h-dvh` and safe-area

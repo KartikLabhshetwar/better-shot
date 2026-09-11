@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import * as Dialog from "@radix-ui/react-dialog"
+import { Menu, X } from "lucide-react"
 import { GitHubIcon } from "@/components/github-icon"
 import { DownloadDropdown } from "@/components/download-dropdown"
 import { StarCount } from "@/components/star-count"
@@ -11,6 +13,8 @@ import type { ReleaseInfo } from "@/lib/downloads"
 import { cn } from "@/lib/utils"
 
 const links = [
+  { href: "/video-recording", label: "Video recording" },
+  { href: "/screenshots", label: "Screenshots" },
   { href: "/download", label: "Download" },
   { href: "/changelog", label: "Changelog" },
   { href: "/blog", label: "Blog" },
@@ -19,132 +23,40 @@ const links = [
 export function SiteNavClient({ release }: { release: ReleaseInfo }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
-
   useEffect(() => setOpen(false), [pathname])
-
   useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : ""
-    return () => {
-      document.body.style.overflow = ""
-    }
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false)
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [open])
-
+    const desktop = window.matchMedia("(min-width: 1024px)")
+    const closeOnDesktop = () => { if (desktop.matches) setOpen(false) }
+    desktop.addEventListener("change", closeOnDesktop)
+    return () => desktop.removeEventListener("change", closeOnDesktop)
+  }, [])
   const isCurrent = (href: string) => pathname === href || pathname.startsWith(`${href}/`)
 
-  return (
-    <>
-      <nav
-        aria-label="Main"
-        className="fixed top-0 z-50 w-full border-b border-zinc-200 bg-white/80 backdrop-blur-xl"
-      >
-        <div className="mx-auto flex h-14 max-w-[1100px] items-center gap-6 px-6">
-          <Link
-            href="/"
-            aria-current={pathname === "/" ? "page" : undefined}
-            className="mr-auto flex shrink-0 items-center gap-2.5 outline-none"
-          >
-            <Image src="/logo.png" alt="Better Shot" width={24} height={24} className="rounded-md" />
-            <span className="text-[18px] font-semibold tracking-tight text-zinc-900">Better Shot</span>
-          </Link>
-
-          <div className="hidden items-center gap-6 sm:flex">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                aria-current={isCurrent(link.href) ? "page" : undefined}
-                className={cn(
-                  "text-[13px] font-medium outline-none transition-colors duration-150",
-                  isCurrent(link.href) ? "text-zinc-900" : "text-zinc-500 hover:text-zinc-900",
-                )}
-              >
-                {link.label}
-              </Link>
-            ))}
-            <a
-              href="https://github.com/KartikLabhshetwar/better-shot"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-[13px] font-medium text-zinc-500 outline-none transition-colors duration-150 hover:text-zinc-900"
-            >
-              <GitHubIcon className="size-4" />
-              <StarCount />
-            </a>
-          </div>
-
-          <DownloadDropdown
-            release={release}
-            source="navbar"
-            size="sm"
-            label="Download"
-            className="hidden sm:inline-flex"
-          />
-
-          <button
-            type="button"
-            onClick={() => setOpen((value) => !value)}
-            aria-expanded={open}
-            aria-controls="mobile-menu"
-            aria-label={open ? "Close menu" : "Open menu"}
-            className="relative -mr-2 h-10 w-10 shrink-0 outline-none sm:hidden"
-          >
-            <span
-              className={cn(
-                "absolute left-1/2 top-1/2 h-0.5 w-5 -translate-x-1/2 rounded-full bg-zinc-900 transition-transform duration-300",
-                open ? "translate-y-0 rotate-45" : "-translate-y-1",
-              )}
-            />
-            <span
-              className={cn(
-                "absolute left-1/2 top-1/2 h-0.5 w-5 -translate-x-1/2 rounded-full bg-zinc-900 transition-transform duration-300",
-                open ? "translate-y-0 -rotate-45" : "translate-y-1",
-              )}
-            />
-          </button>
-        </div>
-      </nav>
-
-      <div
-        id="mobile-menu"
-        inert={!open}
-        aria-hidden={!open}
-        className={cn(
-          "fixed inset-0 z-40 flex flex-col justify-center gap-4 bg-white px-6 transition-opacity duration-300 sm:hidden",
-          open ? "opacity-100" : "pointer-events-none opacity-0",
-        )}
-      >
-        {links.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            aria-current={isCurrent(link.href) ? "page" : undefined}
-            className={cn(
-              "border-t border-zinc-200 pt-4 text-[28px] font-semibold tracking-tight outline-none",
-              isCurrent(link.href) ? "text-brand" : "text-zinc-900",
-            )}
-          >
-            {link.label}
-          </Link>
-        ))}
-        <a
-          href="https://github.com/KartikLabhshetwar/better-shot"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-4 inline-flex w-max items-center gap-2 text-[15px] font-medium text-zinc-500 outline-none"
-        >
-          <GitHubIcon className="size-[18px]" />
-          <StarCount />
-        </a>
+  return <nav aria-label="Main" className="fixed top-0 z-50 w-full border-b border-zinc-200 bg-white/90 backdrop-blur-xl">
+    <div className="mx-auto flex h-14 max-w-[1100px] items-center gap-6 px-6">
+      <Link href="/" aria-current={pathname === "/" ? "page" : undefined} className="mr-auto flex shrink-0 items-center gap-2.5">
+        <Image src="/logo.png" alt="" width={24} height={24} className="rounded-md" />
+        <span className="text-[18px] font-semibold tracking-tight text-zinc-900">Better Shot</span>
+      </Link>
+      <div className="hidden items-center gap-6 lg:flex">
+        {links.map(link => <Link key={link.href} href={link.href} aria-current={isCurrent(link.href) ? "page" : undefined}
+          className={cn("whitespace-nowrap text-[13px] font-medium hover:text-brand", isCurrent(link.href) ? "text-brand" : "text-zinc-500")}>{link.label}</Link>)}
+        <a href="https://github.com/KartikLabhshetwar/better-shot" target="_blank" rel="noopener noreferrer" aria-label="BetterShot on GitHub" className="inline-flex shrink-0 items-center gap-1.5 text-[13px] text-zinc-500 hover:text-zinc-900"><GitHubIcon className="size-4" /><StarCount /></a>
       </div>
-    </>
-  )
+      <DownloadDropdown release={release} source="navbar" size="sm" label="Download" className="hidden lg:inline-flex" />
+      <Dialog.Root open={open} onOpenChange={setOpen}>
+        <Dialog.Trigger className="-mr-2 flex size-11 items-center justify-center lg:hidden" aria-label="Open menu"><Menu size={23} aria-hidden /></Dialog.Trigger>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-white" />
+          <Dialog.Content aria-describedby={undefined} className="fixed inset-0 z-50 flex h-dvh flex-col gap-4 overflow-y-auto bg-white px-6 pt-24 pb-[max(2rem,env(safe-area-inset-bottom))]">
+            <Dialog.Title className="sr-only">BetterShot navigation</Dialog.Title>
+            <Dialog.Close aria-label="Close menu" className="absolute right-4 top-2 flex size-11 items-center justify-center"><X size={23} aria-hidden /></Dialog.Close>
+            {links.map(link => <Dialog.Close asChild key={link.href}><Link href={link.href} aria-current={isCurrent(link.href) ? "page" : undefined}
+              className={cn("border-t border-zinc-200 py-3 text-[28px] font-medium", isCurrent(link.href) ? "text-brand" : "text-zinc-900")}>{link.label}</Link></Dialog.Close>)}
+            <div className="mt-4"><DownloadDropdown release={release} source="mobile-menu" size="default" /></div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </div>
+  </nav>
 }

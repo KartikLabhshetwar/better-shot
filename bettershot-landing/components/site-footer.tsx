@@ -6,7 +6,8 @@ const columns = [
     title: "Product",
     links: [
       { href: "/download", label: "Download" },
-      { href: "/#features", label: "Features" },
+      { href: "/video-recording", label: "Video recording" },
+      { href: "/screenshots", label: "Screenshots" },
       { href: "/#compare", label: "Compare" },
       { href: "/#faq", label: "FAQ" },
       { href: "/changelog", label: "Changelog" },

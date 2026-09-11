@@ -251,3 +251,8 @@
     transform: translateY(0);
   }
 }
+
+/* Backgrounds frame genuine app captures without recreating editor controls. */
+.product-preview { border-radius: 24px; padding: clamp(12px, 3vw, 36px); overflow: hidden; }
+.preview-lilac { background: radial-gradient(at 12% 5%, #e9ddf5, transparent 65%), radial-gradient(at 95% 95%, #b7b8ee, transparent 70%), #d4cced; }
+.preview-peach { background: radial-gradient(at 5% 95%, #efcdbf, transparent 65%), radial-gradient(at 100% 0%, #ede4da, transparent 60%), #efded7; }

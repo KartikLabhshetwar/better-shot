@@ -69,7 +69,7 @@ const jsonLd = {
   alternateName: "BetterShot",
   applicationCategory: "MultimediaApplication",
   applicationSubCategory: "Screen capture and screen recording",
-  operatingSystem: "macOS 14.0 or later",
+  operatingSystem: "macOS 26.0 or later",
   offers: {
     "@type": "Offer",
     price: "0",
@@ -88,7 +88,7 @@ const jsonLd = {
     "Face cam bubble, split screen scenes, and microphone capture",
     "Multi clip timeline with per clip speed and transitions",
     "On device captions generated from the recording audio",
-    "Keystroke overlay that groups typing into words and shortcuts",
+    "Keyboard shortcut overlay; plain typing is not recorded",
     "Blur, pixelate, and spotlight masks that redact on export",
     "Text overlays on the canvas",
     "3D camera tilt, color grading, and zoom cue editing",

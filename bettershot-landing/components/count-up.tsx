@@ -21,6 +21,7 @@ export function CountUp({ value, className }: CountUpProps) {
 
   useEffect(() => {
     if (!parsed || hasAnimated.current) return
+    const { prefix, suffix } = parsed
     const el = ref.current
     if (!el) return
 
@@ -43,9 +44,9 @@ export function CountUp({ value, className }: CountUpProps) {
           const current = eased * target
 
           if (hasDecimal) {
-            setDisplay(`${parsed.prefix}${current.toFixed(decimalPlaces)}${parsed.suffix}`)
+            setDisplay(`${prefix}${current.toFixed(decimalPlaces)}${suffix}`)
           } else {
-            setDisplay(`${parsed.prefix}${Math.round(current)}${parsed.suffix}`)
+            setDisplay(`${prefix}${Math.round(current)}${suffix}`)
           }
 
           if (progress < 1) requestAnimationFrame(frame)
