@@ -8,43 +8,40 @@ export type ProductKind = "video" | "image"
 
 const features = {
   video: [
-    { src: "video-editor.jpg", title: "Your recording, refined", body: "Open your take in the native editor. Your preview, inspector, and timeline stay together." },
-    { src: "video-background-detail.webp", title: "Add your look", body: "Choose a gradient and adjust padding, corners, and shadow for a polished frame." },
-    { src: "video-timeline-detail.webp", title: "Find the right pace", body: "Trim pauses, split clips, and adjust speed without changing your source recording." },
-    { src: "video-effects-detail.webp", title: "Keep details private", body: "Crop the frame, or blur and pixelate selected areas before you share." },
-    { src: "video-export.webp", title: "MP4 or MOV", body: "Choose your format, resolution, and quality. Export at 30 or 60 fps, with no watermark." },
+    { src: "video-editor-dark.webp", title: "Your recording, refined", body: "Your preview, inspector, and timeline together in the native video editor." },
+    { src: "video-background-dark.webp", title: "Add your look", body: "Choose a gradient and adjust padding, corners, and shadow." },
+    { src: "video-timeline-dark.webp", title: "Find the right pace", body: "Split clips and trim the pauses while keeping your source recording." },
+    { src: "video-zoom-dark.webp", title: "Bring it closer", body: "Add a zoom and adjust its focus, strength, and duration on the timeline." },
+    { src: "video-export-dark.webp", title: "MP4 or MOV", body: "Choose your format, resolution, and quality. Export without a watermark." },
   ],
   image: [
-    { src: "screenshot-editor.jpg", title: "A home for your screenshots", body: "Capture the important bit, then finish it in a native editor with full-resolution previews." },
-    { src: "screenshot-tools-detail.webp", title: "Make your point", body: "Add arrows, text, shapes, and numbered markers from one compact toolbar." },
-    { src: "screenshot-background-detail.webp", title: "Give it a background", body: "Choose a soft gradient, then dial in padding, corners, and shadow. Or keep it unframed." },
-    { src: "screenshot-canvas-detail.webp", title: "Keep the detail", body: "Work with your original capture pixels while you annotate and adjust the framing." },
-    { src: "screenshot-copy-detail.webp", title: "Ready to send", body: "Copy your finished screenshot straight into another app. Save or export when you need a file." },
+    { src: "screenshot-editor-dark.webp", title: "A home for your screenshots", body: "Finish your capture in the native editor, with the original pixels close at hand." },
+    { src: "screenshot-tools-detail-dark.webp", title: "Make your point", body: "Arrows, text, shapes, and numbered markers in one compact toolbar." },
+    { src: "screenshot-background-dark.webp", title: "Give it a background", body: "Soft gradients, padding, corners, and shadow. Your screenshot, your look." },
+    { src: "screenshot-canvas-dark.webp", title: "Keep the detail", body: "Add the context your reader needs while preserving the original capture." },
+    { src: "screenshot-copy-dark.webp", title: "Ready to send", body: "Copy into another app, or save and export when you need a file." },
   ],
 } as const
 
 export function ProductPreview({ kind, priority = false, className }: { kind: ProductKind; priority?: boolean; className?: string }) {
-  if (kind === "video") return (
-    <figure className={cn("product-preview preview-lilac", className)}>
-      <video controls playsInline preload="none" poster="/features/recording-demo-poster.jpg"
-        width={1280} height={800} aria-label="Play the 24-second animated tour of BetterShot’s real editors"
-        className="aspect-[8/5] w-full rounded-xl bg-zinc-900 shadow-lg">
-        <source src="/features/recording-demo.mp4" type="video/mp4" />
-        Your browser cannot play this video. Use the video link below.
-      </video>
-      <figcaption className="mt-5 text-center text-xs leading-relaxed text-zinc-950">
-        A closer look at BetterShot’s real editors. Animated from actual app captures.
-        {" "}<a href="/features/recording-demo.mp4" className="underline underline-offset-2">Open video</a>
-      </figcaption>
-    </figure>
-  )
-  return (
-    <figure className={cn("product-preview preview-peach", className)}>
-      <Image src="/features/screenshot-editor.jpg" alt="BetterShot’s screenshot editor with its annotation toolbar, left background inspector, and a framed coastal image"
-        width={1214} height={768} priority={priority} sizes="(max-width: 768px) 92vw, 1100px" className="h-auto w-full rounded-xl shadow-lg" />
-      <figcaption className="mt-5 text-center text-xs text-zinc-950">The actual BetterShot screenshot editor, shown with bundled practice media.</figcaption>
-    </figure>
-  )
+  return <figure className={cn("product-preview", kind === "image" ? "preview-peach" : "preview-lilac", className)}>
+    <Image src={`/features/${kind === "image" ? "screenshot" : "video"}-editor-dark.webp`}
+      alt={`BetterShot’s real ${kind === "image" ? "screenshot" : "video"} editor in dark mode, with the inspector on the left`}
+      width={1600} height={kind === "image" ? 991 : 1000} priority={priority}
+      sizes="(max-width: 768px) 92vw, 1100px" className="h-auto w-full rounded-xl shadow-lg" />
+  </figure>
+}
+
+export function EditorToolsBanner({ kind }: { kind: ProductKind }) {
+  return <figure className="mx-auto my-12 max-w-[1360px] px-6 sm:my-16">
+    <div className="editor-tools-backdrop flex aspect-[2.5/1] items-center justify-center overflow-hidden rounded-2xl p-6 sm:aspect-[3.5/1] sm:p-16">
+      <Image src={`/features/${kind === "image" ? "screenshot-tools-dark" : "video-timeline-wide-dark"}.webp`}
+        alt={kind === "image" ? "BetterShot’s actual annotation toolbar in dark mode" : "BetterShot’s actual timeline, playback controls, and zoom blocks in dark mode"}
+        width={kind === "image" ? 665 : 1710} height={kind === "image" ? 53 : 290}
+        sizes="(max-width: 768px) 84vw, 1100px" className="h-auto w-full rounded-xl shadow-2xl" />
+    </div>
+    <figcaption className="mt-4 text-center text-sm text-zinc-600">{kind === "image" ? "Every annotation tool, close at hand." : "Your clips, zooms, and playback. One timeline."}</figcaption>
+  </figure>
 }
 
 export function ProductFeatures({ kind }: { kind: ProductKind }) {

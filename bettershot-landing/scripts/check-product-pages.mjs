@@ -16,6 +16,16 @@ for (const route of routes) {
   const sources = [...html.matchAll(/(?:src|poster)="(\/features\/[^"?]+)"/g)].map(match => match[1])
   assert.ok(sources.length > 0, `${route} needs product imagery`)
   sources.forEach(source => assets.add(source))
+  const demos = [...html.matchAll(/data-demo="([^"]+)"/g)].map(match => match[1])
+  assert.equal(demos.length, route === '/' ? 5 : route === '/screenshots' ? 2 : 3, `${route} must show its relevant demos`)
+  assert.ok(html.includes('preload="none"'), `${route} must defer video downloads`)
+  assert.ok(!html.includes('/features/recording-demo'), `${route} must not use the retired slideshow`)
+  for (const demo of demos) {
+    assets.add(`/features/${demo}-demo.mp4`)
+    assets.add(`/features/${demo}-poster.webp`)
+  }
+  if (route === '/') assert.ok(html.includes('One app for the whole screen.'), 'Restore the original hero')
+  else assert.ok(html.includes('editor-tools-backdrop'), `${route} needs its dark editor detail banner`)
 }
 for (const asset of assets) {
   const response = await fetch(new URL(asset, base))

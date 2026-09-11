@@ -1,3 +1,4 @@
+import { DemoGallery } from "@/components/demo-gallery"
 import Image from "next/image"
 import { DownloadDropdown } from "@/components/download-dropdown"
 import { getLatestRelease, getDownloadCount } from "@/lib/downloads"
@@ -74,18 +75,19 @@ export default async function Home() {
       <SiteNav />
 
       <main id="main">
-        <section className="landing-hero pb-12 pt-28 sm:pb-16 sm:pt-40">
+        <section className="pb-12 pt-28 sm:pt-36">
           <div className="mx-auto max-w-[1100px] px-6 text-center">
             <Reveal>
-              <p className="mb-6 text-sm font-medium text-brand">Screenshots. Recordings. A little more polish.</p>
-              <h1 className="mx-auto max-w-[15ch] text-[clamp(3rem,7vw,5.5rem)] font-semibold leading-[1.04] text-zinc-950">
-                Make your screen<br className="hidden sm:block" /> worth sharing.
+              <h1 className="mx-auto max-w-[18ch] text-[clamp(2.5rem,6vw,4.5rem)] font-normal leading-[1.1] tracking-tight text-zinc-900">
+                One app for the whole screen.{" "}
+                <span className="text-zinc-400">Free and open source.</span>
               </h1>
             </Reveal>
 
             <Reveal>
               <p className="mx-auto mt-6 max-w-lg text-[17px] leading-relaxed text-zinc-600">
-                Capture a screenshot. Record a walkthrough. Make it clear, make it yours, and send it on. One free, native Mac app.
+                Screenshots, screen recording, image editor, and video editor, native on macOS.
+                No subscription, no account, no telemetry. Nothing leaves your Mac unless you share it.
               </p>
             </Reveal>
 
@@ -109,7 +111,7 @@ export default async function Home() {
         </section>
 
         <div id="demo" className="mx-auto max-w-[1360px] scroll-mt-20 px-6">
-          <ProductPreview kind="video" priority />
+          <DemoGallery />
           <div className="mt-6 flex flex-wrap justify-center gap-x-8 gap-y-4"><ProductLink kind="video" /><ProductLink kind="image" /></div>
         </div>
 

@@ -3,9 +3,9 @@ import { AbsoluteFill, Easing, Img, interpolate, OffthreadVideo, staticFile, use
 
 // The interface is always a production capture. Motion frames it; it never redraws controls.
 export const featureDemos = {
-  Background: { image: 'video-editor.jpg', label: 'MAKE IT YOURS', title: 'A little room. A better frame.', focus: [0.12, 0.43], zoom: 1.8, background: 'radial-gradient(ellipse at 0% 10%, #fac9b8, transparent 70%), radial-gradient(ellipse at 100% 100%, #b8abd9, transparent 70%), #e7d0df' },
-  Timeline: { image: 'video-timeline.jpg', label: 'VIDEO RECORDING', title: 'Keep the good parts.', focus: [0.5, 0.82], zoom: 1.65, background: 'radial-gradient(ellipse at 0% 0%, #e1d9ff, transparent 70%), radial-gradient(ellipse at 100% 100%, #8e89d0, transparent 70%), #c5bbe5' },
-  Screenshot: { image: 'screenshot-editor.jpg', label: 'SCREENSHOTS', title: 'Make your point.', focus: [0.63, 0.42], zoom: 1.45, background: 'radial-gradient(ellipse at 0% 100%, #baded5, transparent 70%), radial-gradient(ellipse at 100% 0%, #d8bce7, transparent 70%), #d6dfdf' },
+  Background: { image: 'video-editor-dark.webp', label: 'MAKE IT YOURS', title: 'A little room. A better frame.', focus: [0.12, 0.43], zoom: 1.8, background: 'radial-gradient(ellipse at 0% 10%, #fac9b8, transparent 70%), radial-gradient(ellipse at 100% 100%, #b8abd9, transparent 70%), #e7d0df' },
+  Timeline: { image: 'video-editor-dark.webp', label: 'VIDEO RECORDING', title: 'Keep the good parts.', focus: [0.5, 0.82], zoom: 1.65, background: 'radial-gradient(ellipse at 0% 0%, #e1d9ff, transparent 70%), radial-gradient(ellipse at 100% 100%, #8e89d0, transparent 70%), #c5bbe5' },
+  Screenshot: { image: 'screenshot-editor-dark.webp', label: 'SCREENSHOTS', title: 'Make your point.', focus: [0.63, 0.42], zoom: 1.45, background: 'radial-gradient(ellipse at 0% 100%, #baded5, transparent 70%), radial-gradient(ellipse at 100% 0%, #d8bce7, transparent 70%), #d6dfdf' },
 } as const
 
 export type FeatureDemoProps = { feature: keyof typeof featureDemos; footage?: string }

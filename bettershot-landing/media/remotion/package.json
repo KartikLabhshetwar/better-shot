@@ -1,7 +1,7 @@
 {
   "name": "bettershot-landing-video",
   "private": true,
-  "scripts": { "render": "node render.mjs" },
+  "scripts": { "render": "node render-features.mjs" },
   "dependencies": {
     "@remotion/bundler": "4.0.443",
     "@remotion/renderer": "4.0.443",

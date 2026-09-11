@@ -1,8 +1,9 @@
+import { DemoGallery } from "@/components/demo-gallery"
 import { Check } from "lucide-react"
 import { SiteNav } from "@/components/site-nav"
 import { SiteFooter } from "@/components/site-footer"
 import { DownloadDropdown } from "@/components/download-dropdown"
-import { ProductFeatures, ProductLink, ProductPreview, type ProductKind } from "@/components/product-showcase"
+import { ProductFeatures, ProductLink, EditorToolsBanner, type ProductKind } from "@/components/product-showcase"
 import { getLatestRelease } from "@/lib/downloads"
 
 const content = {
@@ -49,7 +50,8 @@ export async function ProductPage({ kind }: { kind: ProductKind }) {
         <div className="mt-8 flex flex-wrap items-center justify-center gap-6"><DownloadDropdown release={release} source="hero" /><a href="#workflow" className="text-sm font-medium text-zinc-600 hover:text-brand">See the workflow ↓</a></div>
         <p className="mt-5 text-xs text-zinc-500">Free and open source · No watermark · macOS 26.0+</p>
       </header>
-      <div className="mx-auto max-w-[1100px] px-6"><ProductPreview kind={kind} priority /></div>
+      <div className="mx-auto max-w-[1360px] px-6"><DemoGallery kind={kind} /></div>
+      <EditorToolsBanner kind={kind} />
       <ProductFeatures kind={kind} />
       <section className="bg-zinc-50 py-16 sm:py-24">
         <div className="mx-auto grid max-w-[1100px] items-center gap-10 px-6 md:grid-cols-2">

@@ -1,9 +1,160 @@
 {
-  "screenshot-editor.jpg": "Live capture of AnnotationEditorWindow, compiled from production sources, using Resources/Onboarding/screenshot-demo.png.",
-  "video-editor.jpg": "Live capture of RecordingStudioWindow, compiled from production sources, using a slow pan over Resources/Onboarding/coast.png.",
-  "video-timeline.jpg": "Same production video editor with Zoom & Clips selected.",
-  "video-effects.jpg": "Same production video editor with Effects selected.",
-  "video-export.webp": "Production RecordingExportOptionsPopover rendered by Tests/EditorUIIntegration.swift (export-options-light.png).",
-  "detail-images": "Unaltered crops of the corresponding editor captures.",
-  "recording-demo.mp4": "24-second Remotion animated tour using actual editor captures and unaltered detail crops. Editorial pans and transitions do not simulate app interactions. This is not a live screen recording."
+  "description": "Real BetterShot dark-mode recordings supplied by the maintainer. No fabricated controls or recolored interface.",
+  "videos": [
+    {
+      "source": "01-screenshot-background.mp4",
+      "output": "screenshot-background-demo.mp4",
+      "poster": "screenshot-background-poster.webp",
+      "posterTime": 2
+    },
+    {
+      "source": "02-screenshot-annotation.mp4",
+      "output": "screenshot-annotation-demo.mp4",
+      "poster": "screenshot-annotation-poster.webp",
+      "posterTime": 22.9
+    },
+    {
+      "source": "03-video-trimming.mp4",
+      "output": "video-trimming-demo.mp4",
+      "poster": "video-trimming-poster.webp",
+      "posterTime": 3.5
+    },
+    {
+      "source": "04-video-zoom.mp4",
+      "output": "video-zoom-demo.mp4",
+      "poster": "video-zoom-poster.webp",
+      "posterTime": 1
+    },
+    {
+      "source": "05-video-export.mp4",
+      "output": "video-export-demo.mp4",
+      "poster": "video-export-poster.webp",
+      "posterTime": 1.1
+    }
+  ],
+  "images": [
+    {
+      "output": "screenshot-editor-dark.webp",
+      "source": "02-screenshot-annotation.mp4",
+      "time": 22.9
+    },
+    {
+      "output": "screenshot-tools-dark.webp",
+      "source": "02-screenshot-annotation.mp4",
+      "time": 22.9,
+      "crop": [
+        155,
+        48,
+        665,
+        53
+      ]
+    },
+    {
+      "output": "screenshot-tools-detail-dark.webp",
+      "source": "02-screenshot-annotation.mp4",
+      "time": 22.9,
+      "crop": [
+        382,
+        48,
+        135,
+        53
+      ]
+    },
+    {
+      "output": "screenshot-background-dark.webp",
+      "source": "01-screenshot-background.mp4",
+      "time": 2,
+      "crop": [
+        8,
+        110,
+        330,
+        655
+      ]
+    },
+    {
+      "output": "screenshot-canvas-dark.webp",
+      "source": "02-screenshot-annotation.mp4",
+      "time": 22.9,
+      "crop": [
+        530,
+        270,
+        1030,
+        583
+      ]
+    },
+    {
+      "output": "screenshot-copy-dark.webp",
+      "source": "02-screenshot-annotation.mp4",
+      "time": 22.9,
+      "crop": [
+        1638,
+        1025,
+        98,
+        48
+      ]
+    },
+    {
+      "output": "video-editor-dark.webp",
+      "source": "04-video-zoom.mp4",
+      "time": 1
+    },
+    {
+      "output": "video-background-dark.webp",
+      "source": "03-video-trimming.mp4",
+      "time": 2.5,
+      "crop": [
+        68,
+        55,
+        325,
+        665
+      ]
+    },
+    {
+      "output": "video-timeline-dark.webp",
+      "source": "04-video-zoom.mp4",
+      "time": 4.4,
+      "crop": [
+        975,
+        842,
+        620,
+        195
+      ]
+    },
+    {
+      "output": "video-zoom-dark.webp",
+      "source": "04-video-zoom.mp4",
+      "time": 4.4,
+      "crop": [
+        70,
+        64,
+        332,
+        650
+      ]
+    },
+    {
+      "output": "video-export-dark.webp",
+      "source": "05-video-export.mp4",
+      "time": 1.1,
+      "crop": [
+        1390,
+        58,
+        322,
+        660
+      ]
+    },
+    {
+      "output": "video-timeline-wide-dark.webp",
+      "source": "04-video-zoom.mp4",
+      "time": 4.4,
+      "crop": [
+        8,
+        750,
+        1710,
+        290
+      ]
+    }
+  ],
+  "encoding": "H.264, 1280\u00d7800, 30 fps, CRF 23, yuv420p, faststart, silent audio removed; original files untouched.",
+  "originalBytes": 25066958,
+  "optimizedBytes": 3165734
 }

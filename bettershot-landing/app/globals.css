@@ -275,7 +275,7 @@
 .feature-card { flex-basis: 88%; }
 .feature-media { height: 290px; }
 .feature-card:nth-child(5n) .feature-media { background: radial-gradient(ellipse at 0% 95%, #ff9b85, transparent 65%), radial-gradient(ellipse at 100% 100%, #9c8cb8, transparent 70%), #e7e5eb; }
-.landing-hero { background: radial-gradient(ellipse at 50% 0%, #f2eafa, transparent 68%); }
+.editor-tools-backdrop { background: radial-gradient(ellipse at 8% 100%, #30494e, transparent 60%), radial-gradient(ellipse at 95% 0%, #5b3f68, transparent 65%), #121216; }
 @media (min-width: 640px) {
   .feature-card { flex-basis: 44%; }
   .feature-card:first-child, .feature-card:last-child { flex-basis: 60%; }
