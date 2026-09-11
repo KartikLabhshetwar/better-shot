@@ -221,7 +221,7 @@ export default async function Home() {
         <FaqSection />
 
         <Reveal as="section" className="py-20 sm:py-28">
-          <div className="mx-auto max-w-lg px-6 text-center">
+          <div id="download" className="mx-auto max-w-lg scroll-mt-20 px-6 text-center">
             <Image
               src="/logo.png"
               alt="Better Shot"

@@ -13,6 +13,10 @@ for (const route of routes) {
     assert.ok(html.includes(`href="${destination}"`), `${route} must link to ${destination}`)
   }
   assert.ok(html.includes(`href="https://bettershot.site${route === '/' ? '' : route}"`), `${route} needs its own canonical URL`)
+  const navigation = html.match(/<nav\b[^>]*aria-label="Main"[\s\S]*?<\/nav>/)?.[0] || ''
+  assert.ok(navigation.includes('Product'), 'Navigation needs a Product dropdown')
+  assert.ok(!navigation.includes('href="/download"'), 'Use the download button, not a separate navigation link')
+  assert.ok(navigation.includes('Download'), 'Keep the download button in navigation')
   const sources = [...html.matchAll(/(?:src|poster)="(\/features\/[^"?]+)"/g)].map(match => match[1])
   assert.ok(sources.length > 0, `${route} needs product imagery`)
   sources.forEach(source => assets.add(source))
@@ -47,6 +51,12 @@ for (const asset of assets) {
 const legacy = await fetch(new URL('/image-processing', base), {redirect:'manual'})
 assert.equal(legacy.status, 308)
 assert.equal(legacy.headers.get('location'), '/screenshots')
+const download = await fetch(new URL('/download', base), {redirect:'manual'})
+assert.equal(download.status, 308)
+assert.equal(download.headers.get('location'), '/#download')
+const homepage = await (await fetch(base)).text()
+assert.ok(homepage.includes('id="download"'), 'The old download URL must lead to download options')
 const sitemap = await (await fetch(new URL('/sitemap.xml', base))).text()
+assert.ok(!sitemap.includes('https://bettershot.site/download'), 'Do not index the retired download page')
 for (const route of routes.slice(1)) assert.ok(sitemap.includes(`https://bettershot.site${route}`), `${route} must be discoverable`)
 console.log(`PASS: ${routes.length} pages, navigation, canonical URLs, sitemap, and ${assets.size} product media files`)

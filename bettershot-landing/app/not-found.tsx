@@ -39,7 +39,7 @@ export default function NotFound() {
                   Back to the start
                 </Link>
                 <Link
-                  href="/download"
+                  href="/#download"
                   className="inline-flex items-center rounded-xl border border-zinc-200 px-5 py-3 text-[15px] font-semibold text-zinc-900 outline-none transition-colors duration-150 hover:border-zinc-400"
                 >
                   Download Better Shot

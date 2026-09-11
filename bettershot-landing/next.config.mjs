@@ -4,7 +4,10 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   async redirects() {
-    return [{ source: "/image-processing", destination: "/screenshots", permanent: true }]
+    return [
+      { source: "/image-processing", destination: "/screenshots", permanent: true },
+      { source: "/download", destination: "/#download", permanent: true },
+    ]
   },
   images: {
     unoptimized: true,
