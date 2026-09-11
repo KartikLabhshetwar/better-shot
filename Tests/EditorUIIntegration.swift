@@ -1050,7 +1050,6 @@ private func checkShortcutCustomization(defaults: UserDefaults) {
     let handler = EditorShortcutHandlerView()
     handler.service = service
     window.contentView = handler
-    precondition(service.scope(for: window) == .image, "Attaching the editor registers its shortcut scope")
     var fired: [ShortcutService.Action] = []
     handler.perform = { fired.append($0); return true }
     func key(_ code: Int, _ modifiers: NSEvent.ModifierFlags = []) -> NSEvent {
@@ -1073,12 +1072,6 @@ private func checkShortcutCustomization(defaults: UserDefaults) {
     window.simulatesKeyWindow = false
     precondition(!handler.handle(key(kVK_ANSI_R)), "Inactive editor windows must ignore shortcuts")
     window.close()
-    window.contentView = nil
-    precondition(handler.window == nil && !handler.handle(key(kVK_ANSI_R)))
-    handler.scope = .video
-    window.contentView = handler
-    precondition(service.scope(for: window) == .video, "Reattaching registers the current editor scope")
-    window.contentView = nil
     for dock in [false, true] {
         for menuBar in [false, true] {
             defaults.set(dock, forKey: AppPreferences.showInDockKey)

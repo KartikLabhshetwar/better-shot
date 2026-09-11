@@ -20,7 +20,7 @@ struct EditorShortcutHandler: NSViewRepresentable {
         view.intercept = intercept
         view.perform = perform
         view.isEnabled = isEnabled
-        // Focus updates can arrive while NSWindow deallocates. Register only on attachment.
+        if let window = view.window { ShortcutService.shared.registerScope(scope, for: window) }
     }
 }
 
@@ -36,7 +36,7 @@ final class EditorShortcutHandlerView: NSView {
         super.viewDidMoveToWindow()
         if let monitor { NSEvent.removeMonitor(monitor); self.monitor = nil }
         guard let window else { return }
-        service.registerScope(scope, for: window)
+        ShortcutService.shared.registerScope(scope, for: window)
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
             return self.handle(event) ? nil : event
