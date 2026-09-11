@@ -798,84 +798,87 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
             cachedMasks.removeAll(keepingCapacity: true)
             cachedMaskBytes = 0
         }
-        let sourceImage = CIImage(cvPixelBuffer: screenFrame)
-        let shutter = outputFrameInterval
-        let sampleCount = blurSampleCount(at: editorTime, shutter: shutter)
-        let sampleRects = (0..<sampleCount).map { sample in
-            let sampleTime = editorTime - shutter / 2
-                + shutter * (Double(sample) + 0.5) / Double(sampleCount)
-            return flipped(contentRect(at: sampleTime))
-        }
-        let cardRect = flipped(layout.cardRect).integral
-        if cachedScreen == nil || cachedSampleRects != sampleRects {
-            var averaged: CIImage?
-            for (sample, rect) in sampleRects.enumerated() {
-                let transformed = sourceImage.transformed(by: CGAffineTransform(
-                    a: rect.width / sourceImage.extent.width, b: 0,
-                    c: 0, d: rect.height / sourceImage.extent.height,
-                    tx: rect.minX, ty: rect.minY
-                ))
-                if let previous = averaged {
-                    let opacity = CIFilter.colorMatrix()
-                    opacity.inputImage = transformed
-                    opacity.aVector = CIVector(x: 0, y: 0, z: 0, w: 1 / CGFloat(sample + 1))
-                    guard let sampleImage = opacity.outputImage else {
-                        throw RecordingStudioExporter.ExportError.writerFailed(nil)
+        var result = backgroundImage
+        if layout.showsScreen {
+            let sourceImage = CIImage(cvPixelBuffer: screenFrame)
+            let shutter = outputFrameInterval
+            let sampleCount = blurSampleCount(at: editorTime, shutter: shutter)
+            let sampleRects = (0..<sampleCount).map { sample in
+                let sampleTime = editorTime - shutter / 2
+                    + shutter * (Double(sample) + 0.5) / Double(sampleCount)
+                return flipped(contentRect(at: sampleTime))
+            }
+            let cardRect = flipped(layout.cardRect).integral
+            if cachedScreen == nil || cachedSampleRects != sampleRects {
+                var averaged: CIImage?
+                for (sample, rect) in sampleRects.enumerated() {
+                    let transformed = sourceImage.transformed(by: CGAffineTransform(
+                        a: rect.width / sourceImage.extent.width, b: 0,
+                        c: 0, d: rect.height / sourceImage.extent.height,
+                        tx: rect.minX, ty: rect.minY
+                    ))
+                    if let previous = averaged {
+                        let opacity = CIFilter.colorMatrix()
+                        opacity.inputImage = transformed
+                        opacity.aVector = CIVector(x: 0, y: 0, z: 0, w: 1 / CGFloat(sample + 1))
+                        guard let sampleImage = opacity.outputImage else {
+                            throw RecordingStudioExporter.ExportError.writerFailed(nil)
+                        }
+                        averaged = sampleImage.composited(over: previous)
+                    } else {
+                        averaged = transformed
                     }
-                    averaged = sampleImage.composited(over: previous)
-                } else {
-                    averaged = transformed
                 }
-            }
-            guard let averaged else {
-                throw RecordingStudioExporter.ExportError.writerFailed(nil)
-            }
-            cachedScreen = averaged.cropped(to: cardRect).insertingIntermediate(cache: true)
-            cachedSampleRects = sampleRects
-        }
-        guard var screenImage = cachedScreen, let cardMask else {
-            throw RecordingStudioExporter.ExportError.writerFailed(nil)
-        }
-        let content = flipped(contentRect(at: editorTime))
-        let transform = CGAffineTransform(
-            a: content.width / sourceImage.extent.width, b: 0,
-            c: 0, d: content.height / sourceImage.extent.height,
-            tx: content.minX, ty: content.minY
-        )
-        for (index, segment) in masks.enumerated() where segment.isActive(at: editorTime) {
-            let region: CIImage
-            if let cached = cachedMasks[index] {
-                region = cached
-            } else {
-                guard let filtered = RecordingMaskRenderer.filteredRegion(source: sourceImage, segment: segment) else {
+                guard let averaged else {
                     throw RecordingStudioExporter.ExportError.writerFailed(nil)
                 }
-                let bytes = Int(filtered.extent.width.rounded(.up) * filtered.extent.height.rounded(.up)) * 8
-                // Bound retained half-float GPU mask rasters to 32 MiB per source frame.
-                if cachedMaskBytes + bytes <= 32 * 1024 * 1024 {
-                    region = filtered.insertingIntermediate(cache: true)
-                    cachedMasks[index] = region
-                    cachedMaskBytes += bytes
-                } else {
-                    region = filtered
-                }
+                cachedScreen = averaged.cropped(to: cardRect).insertingIntermediate(cache: true)
+                cachedSampleRects = sampleRects
             }
-            screenImage = region.transformed(by: transform).composited(over: screenImage)
-        }
-        var result = screenImage.applyingFilter("CISourceInCompositing", parameters: [
-            kCIInputBackgroundImageKey: cardMask
-        ]).composited(over: backgroundImage)
+            guard var screenImage = cachedScreen, let cardMask else {
+                throw RecordingStudioExporter.ExportError.writerFailed(nil)
+            }
+            let content = flipped(contentRect(at: editorTime))
+            let transform = CGAffineTransform(
+                a: content.width / sourceImage.extent.width, b: 0,
+                c: 0, d: content.height / sourceImage.extent.height,
+                tx: content.minX, ty: content.minY
+            )
+            for (index, segment) in masks.enumerated() where segment.isActive(at: editorTime) {
+                let region: CIImage
+                if let cached = cachedMasks[index] {
+                    region = cached
+                } else {
+                    guard let filtered = RecordingMaskRenderer.filteredRegion(source: sourceImage, segment: segment) else {
+                        throw RecordingStudioExporter.ExportError.writerFailed(nil)
+                    }
+                    let bytes = Int(filtered.extent.width.rounded(.up) * filtered.extent.height.rounded(.up)) * 8
+                    // Bound retained half-float GPU mask rasters to 32 MiB per source frame.
+                    if cachedMaskBytes + bytes <= 32 * 1024 * 1024 {
+                        region = filtered.insertingIntermediate(cache: true)
+                        cachedMasks[index] = region
+                        cachedMaskBytes += bytes
+                    } else {
+                        region = filtered
+                    }
+                }
+                screenImage = region.transformed(by: transform).composited(over: screenImage)
+            }
+            result = screenImage.applyingFilter("CISourceInCompositing", parameters: [
+                kCIInputBackgroundImageKey: cardMask
+            ]).composited(over: backgroundImage)
 
-        // Pointer motion is resolved independently from viewport shutter
-        // blur. Its interaction magnification and tilt stay anchored at the
-        // recorded artwork anchor point, while the final point still passes
-        // through the same viewport transform and rounded-card clip as the
-        // source pixels.
-        if pointerTimeline != nil || keystrokeTimeline != nil {
-            result = try raster { context in
-                drawPointer(editorTime: editorTime, in: context)
-                drawKeystrokeCaption(at: sourceTime, in: context)
-            }.composited(over: result)
+            // Pointer motion is resolved independently from viewport shutter
+            // blur. Its interaction magnification and tilt stay anchored at the
+            // recorded artwork anchor point, while the final point still passes
+            // through the same viewport transform and rounded-card clip as the
+            // source pixels.
+            if pointerTimeline != nil || keystrokeTimeline != nil {
+                result = try raster { context in
+                    drawPointer(editorTime: editorTime, in: context)
+                    drawKeystrokeCaption(at: sourceTime, in: context)
+                }.composited(over: result)
+            }
         }
 
         if let cameraFrame, layout.bubbleRect.width > 0 {
@@ -890,11 +893,11 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
                 tx: bubble.midX - camera.extent.width * scale / 2,
                 ty: bubble.midY - camera.extent.height * scale / 2
             ))
-            result = cameraShadow.composited(over: result)
+            if layout.decoratesCamera { result = cameraShadow.composited(over: result) }
             result = transformed.applyingFilter("CISourceInCompositing", parameters: [
                 kCIInputBackgroundImageKey: cameraMask
             ]).composited(over: result)
-            result = cameraBorder.composited(over: result)
+            if layout.decoratesCamera { result = cameraBorder.composited(over: result) }
         }
 
         if subtitleTimeline != nil {
@@ -1374,7 +1377,7 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
 
         // Card shadow: static, so it lives in the backdrop. The filled shape
         // is fully covered by video pixels every frame.
-        if style.shadow > 0.01, style.background != .none {
+        if layout.showsScreen, style.shadow > 0.01, style.background != .none {
             let minDimension = min(canvasSize.width, canvasSize.height)
             let blur = minDimension * 0.045 * style.shadow
             let cardRect = CGRect(

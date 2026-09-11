@@ -417,6 +417,46 @@ struct ExportIntegration {
                          "Each camera ratio must produce a distinct exported frame")
         }
         print("PASS all six face-camera ratios through the production export compositor")
+        var layoutRenders = Set<Data>()
+        for preset in RecordingLayoutPreset.allCases {
+            for cameraOnLeft in [false, true] {
+                var style = RecordingStudioStyle()
+                style.layoutPreset = preset
+                style.cameraOnLeft = cameraOnLeft
+                if preset == .overlap {
+                    style.camera.aspectRatio = .vertical
+                    style.camera.size = 0.55
+                    style.camera.roundness = 0.08
+                }
+                let compositor = StudioFrameCompositor(canvasSize: size, style: style,
+                    viewportTimeline: .identity, pointerTimeline: nil, showsPressEffects: false,
+                    keystrokeTimeline: nil, keystrokePlacement: .bottomCenter,
+                    subtitleTimeline: nil, includeBubble: true)
+                let rendered = buffer()
+                try compositor.render(screenFrame: source, cameraFrame: changedSource,
+                                      editorTime: 0, sourceTime: 0, into: rendered)
+                let first = pixels(rendered)
+                if !cameraOnLeft || preset.positionsCamera {
+                    precondition(layoutRenders.insert(first).inserted, "Every layout and mirrored position must render distinctly")
+                }
+                if preset == .cameraOnly {
+                    try compositor.render(screenFrame: changedSource, cameraFrame: changedSource,
+                                          editorTime: 0, sourceTime: 0, into: rendered)
+                    precondition(first == pixels(rendered), "Camera Only must exclude the screen track")
+                } else if preset == .screenOnly {
+                    try compositor.render(screenFrame: source, cameraFrame: source,
+                                          editorTime: 0, sourceTime: 0, into: rendered)
+                    precondition(first == pixels(rendered), "Screen Only must exclude the camera track")
+                }
+                let output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                    .appendingPathComponent(".build/editor-snapshots/layout-export-\(preset.rawValue)-\(cameraOnLeft ? "left" : "right").png")
+                let renderedImage = CIContext().createCGImage(CIImage(cvPixelBuffer: rendered), from: CGRect(origin: .zero, size: size))!
+                let destination = CGImageDestinationCreateWithURL(output as CFURL, UTType.png.identifier as CFString, 1, nil)!
+                CGImageDestinationAddImage(destination, renderedImage, nil)
+                precondition(CGImageDestinationFinalize(destination))
+            }
+        }
+        print("PASS all screen/camera layouts, positions, and exclusive track visibility through the production compositor")
         let clips = RecordingClipTimeline.full(sourceDuration: 2)
         let viewport = ViewportTimeline.build(cues: [ZoomCue(start: 0.4, end: 1.1, zoom: 2)],
             capture: PointerCaptureFile(), clipTimeline: clips)

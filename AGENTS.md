@@ -5,6 +5,9 @@ and [CONTRIBUTING.md](CONTRIBUTING.md) before editing. Preserve the current UI a
 behavior unless the task explicitly asks to change them. This file is the shared
 source of instructions for coding agents; `CLAUDE.md` imports it.
 
+For maintainer tasks, push completed changes directly to `main`; do not create
+a PR unless explicitly requested.
+
 ## Stack and scope
 
 - The macOS app in `Sources/` uses SwiftUI, AppKit, CoreGraphics, AVFoundation,
@@ -116,7 +119,9 @@ source of instructions for coding agents; `CLAUDE.md` imports it.
   footage with a baked-in cursor cannot be restyled; explain that in the UI.
 - Camera frame ratios are independent of the video canvas ratio. Use
   `RecordingStudioLayout` for preview and export, keep the frame within the canvas,
-  and default older projects/presets without a camera ratio to 1:1.
+  and default older projects/presets without a camera ratio to 1:1. Screen/camera
+  layout presets apply to the whole video, default legacy projects to Bubble,
+  and fall back to the screen when camera footage is unavailable or hidden.
 - Plain typing is not recorded. Do not expand input capture as a shortcut to a
   cursor or keyboard-overlay feature.
 

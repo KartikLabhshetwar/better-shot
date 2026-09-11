@@ -30,6 +30,25 @@ nonisolated enum RecordingCameraAspectRatio: String, Codable, CaseIterable, Send
     }
 }
 
+/// Whole-video arrangements; missing values in old projects keep the floating camera.
+nonisolated enum RecordingLayoutPreset: String, CaseIterable, Sendable {
+    case bubble, overlap, sideBySide, presenter, cameraOnly, screenOnly
+
+    var title: String {
+        switch self {
+        case .bubble: "Camera Bubble"
+        case .overlap: "Overlap"
+        case .sideBySide: "Side-by-Side"
+        case .presenter: "Presenter"
+        case .cameraOnly: "Camera Only"
+        case .screenOnly: "Screen Only"
+        }
+    }
+
+    var positionsCamera: Bool { self == .overlap || self == .sideBySide || self == .presenter }
+    var hasFloatingCamera: Bool { self == .bubble || self == .overlap }
+}
+
 /// The floating talking-head bubble composited over the recording.
 struct RecordingCameraBubbleSettings: Equatable {
     var isVisible = true
@@ -305,6 +324,8 @@ struct StoredRecordingStudioStyle: Codable, Equatable {
     var cameraRoundness: Double
     /// Missing in older square-camera projects and presets.
     var cameraAspectRatio: String?
+    var layoutPreset: String?
+    var cameraOnLeft: Bool?
 
     init(_ style: RecordingStudioStyle) {
         switch style.background {
@@ -322,6 +343,8 @@ struct StoredRecordingStudioStyle: Codable, Equatable {
         shadow = Double(style.shadow)
         cursorScale = Double(style.cursorScale)
         cursor = style.cursor
+        layoutPreset = style.layoutPreset == .bubble ? nil : style.layoutPreset.rawValue
+        cameraOnLeft = style.cameraOnLeft ? true : nil
         cameraIsVisible = style.camera.isVisible
         cameraCenterX = Double(style.camera.center.x)
         cameraCenterY = Double(style.camera.center.y)
@@ -356,7 +379,9 @@ struct StoredRecordingStudioStyle: Codable, Equatable {
                 size: CGFloat(cameraSize),
                 roundness: CGFloat(cameraRoundness),
                 aspectRatio: cameraAspectRatio.flatMap(RecordingCameraAspectRatio.init(rawValue:)) ?? .square
-            )
+            ),
+            layoutPreset: layoutPreset.flatMap(RecordingLayoutPreset.init(rawValue:)) ?? .bubble,
+            cameraOnLeft: cameraOnLeft ?? false
         )
     }
 }
@@ -380,6 +405,8 @@ struct RecordingStudioStyle: Equatable {
     var cursorScale: CGFloat = RecordingStudioStyle.defaultCursorScale
     var cursor = RecordingCursorOptions()
     var camera = RecordingCameraBubbleSettings()
+    var layoutPreset: RecordingLayoutPreset = .bubble
+    var cameraOnLeft = false
 }
 
 /// New videos inherit the same look as screenshots. Saved project styles win on reopen.
@@ -399,6 +426,8 @@ enum RecordingStudioDefaults {
 /// All rects are in the given canvas space with a top-left origin.
 nonisolated struct RecordingStudioLayout: Sendable {
     let canvasSize: CGSize
+    let showsScreen: Bool
+    let decoratesCamera: Bool
     let cardRect: CGRect
     let cardCornerRadius: CGFloat
     let bubbleRect: CGRect
@@ -443,17 +472,19 @@ nonisolated struct RecordingStudioLayout: Sendable {
                 height: fitHeight.rounded()
             )
         }
-        let cardRect = CGRect(
+        var cardRect = CGRect(
             x: ((canvasSize.width - cardSize.width) / 2).rounded(),
             y: ((canvasSize.height - cardSize.height) / 2).rounded(),
             width: cardSize.width,
             height: cardSize.height
         )
-        let cardCornerRadius = style.cornerRadius * minDimension
+        var cardCornerRadius = style.cornerRadius * minDimension
 
         var bubbleRect = CGRect.zero
         var bubbleCornerRadius: CGFloat = 0
-        if includeBubble, style.camera.isVisible {
+        let cameraAvailable = includeBubble && style.camera.isVisible
+        let preset = cameraAvailable ? style.layoutPreset : .screenOnly
+        if cameraAvailable, preset != .screenOnly {
             let longSide = min(minDimension, max(24, style.camera.size * minDimension))
             let ratio = style.camera.aspectRatio.ratio
             let width = longSide * min(1, ratio)
@@ -474,17 +505,61 @@ nonisolated struct RecordingStudioLayout: Sendable {
                                      max(0, style.camera.roundness * min(width, height)))
         }
 
+        let canvas = CGRect(origin: .zero, size: canvasSize)
+        let sourceAspect = contentAspect ?? canvasSize.width / max(1, canvasSize.height)
+        func fittedCard(in region: CGRect) -> CGRect {
+            let height = min(region.height, region.width / sourceAspect)
+            let width = height * sourceAspect
+            return CGRect(x: (region.midX - width / 2).rounded(),
+                          y: (region.midY - height / 2).rounded(),
+                          width: width.rounded(), height: height.rounded())
+        }
+        switch preset {
+        case .bubble, .screenOnly:
+            break
+        case .overlap:
+            let cameraWidth = bubbleRect.width
+            let region = CGRect(x: cardRect.minX, y: cardRect.minY,
+                                width: max(1, cardRect.width - cameraWidth / 2), height: cardRect.height)
+            cardRect = fittedCard(in: region)
+            bubbleRect.origin = CGPoint(x: min(canvas.width - cameraWidth, cardRect.maxX - cameraWidth / 2),
+                                        y: (canvas.height - bubbleRect.height) / 2)
+        case .sideBySide, .presenter:
+            let cameraWidth = (canvas.width * (preset == .sideBySide ? 0.5 : 0.32)).rounded()
+            bubbleRect = CGRect(x: canvas.width - cameraWidth, y: 0,
+                                width: cameraWidth, height: canvas.height)
+            var region = CGRect(x: 0, y: 0, width: bubbleRect.minX, height: canvas.height)
+            if preset == .presenter {
+                let padding = min(max(0, inset), min(region.width, region.height) * 0.4)
+                region = region.insetBy(dx: padding, dy: padding)
+                cardRect = fittedCard(in: region)
+            } else {
+                cardRect = contentMode == .fit ? fittedCard(in: region) : region
+                cardCornerRadius = 0
+            }
+            bubbleCornerRadius = 0
+        case .cameraOnly:
+            bubbleRect = canvas
+            bubbleCornerRadius = 0
+        }
+        if preset.positionsCamera, style.cameraOnLeft {
+            cardRect.origin.x = canvas.width - cardRect.maxX
+            bubbleRect.origin.x = canvas.width - bubbleRect.maxX
+        }
+
         var contentFillSize = cardRect.size
-        if let contentAspect, contentAspect > 0, cardRect.height > 0 {
-            let fillHeight = max(cardRect.height, cardRect.width / contentAspect)
+        if sourceAspect > 0, cardRect.height > 0 {
+            let fillHeight = max(cardRect.height, cardRect.width / sourceAspect)
             contentFillSize = CGSize(
-                width: contentAspect * fillHeight,
+                width: sourceAspect * fillHeight,
                 height: fillHeight
             )
         }
 
         return RecordingStudioLayout(
             canvasSize: canvasSize,
+            showsScreen: preset != .cameraOnly,
+            decoratesCamera: preset.hasFloatingCamera,
             cardRect: cardRect,
             cardCornerRadius: cardCornerRadius,
             bubbleRect: bubbleRect,

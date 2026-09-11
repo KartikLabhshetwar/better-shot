@@ -475,48 +475,50 @@ private struct StudioCanvas: View {
                     // transform, clipped to the rounded padded card. The
                     // synthetic cursor overlays inside the same clip so it
                     // pans, zooms, and crops exactly like the pixels below.
-                    StudioPlayerLayerView(player: model.screenPlayer, gravity: .resize)
-                        .frame(
-                            width: layout.contentFillSize.width / crop.width,
-                            height: layout.contentFillSize.height / crop.height
-                        )
-                        .scaleEffect(state.magnification)
-                        .offset(
-                            x: (cropCenter.x - state.anchor.x) * state.magnification * layout.contentFillSize.width,
-                            y: (cropCenter.y - state.anchor.y) * state.magnification * layout.contentFillSize.height
-                        )
-                        .frame(width: layout.cardRect.width, height: layout.cardRect.height)
-                        .overlay {
-                            if let pointer = model.previewPointerFrame(at: model.displayTime) {
-                                StudioCursorOverlay(
-                                    pointer: pointer,
-                                    artwork: model.artwork(id: pointer.artworkID),
-                                    state: state,
-                                    cardSize: layout.cardRect.size,
-                                    contentSize: layout.contentFillSize,
-                                    cursorScale: model.style.cursorScale,
-                                    showsClickEffect: model.showsPressEffects
-                                )
+                    if layout.showsScreen {
+                        StudioPlayerLayerView(player: model.screenPlayer, gravity: .resize)
+                            .frame(
+                                width: layout.contentFillSize.width / crop.width,
+                                height: layout.contentFillSize.height / crop.height
+                            )
+                            .scaleEffect(state.magnification)
+                            .offset(
+                                x: (cropCenter.x - state.anchor.x) * state.magnification * layout.contentFillSize.width,
+                                y: (cropCenter.y - state.anchor.y) * state.magnification * layout.contentFillSize.height
+                            )
+                            .frame(width: layout.cardRect.width, height: layout.cardRect.height)
+                            .overlay {
+                                if let pointer = model.previewPointerFrame(at: model.displayTime) {
+                                    StudioCursorOverlay(
+                                        pointer: pointer,
+                                        artwork: model.artwork(id: pointer.artworkID),
+                                        state: state,
+                                        cardSize: layout.cardRect.size,
+                                        contentSize: layout.contentFillSize,
+                                        cursorScale: model.style.cursorScale,
+                                        showsClickEffect: model.showsPressEffects
+                                    )
+                                }
                             }
-                        }
-                        .clipShape(RoundedRectangle(cornerRadius: layout.cardCornerRadius, style: .continuous))
-                        .overlay {
-                            // Keystroke caption in card space: pinned to its
-                            // edge, unaffected by the zoom transform.
-                            if let caption = model.keystrokeCaption(at: model.displayTime) {
-                                StudioKeystrokeCaptionView(
-                                    caption: caption,
-                                    placement: model.keystrokePlacement,
-                                    cardSize: layout.cardRect.size
-                                )
+                            .clipShape(RoundedRectangle(cornerRadius: layout.cardCornerRadius, style: .continuous))
+                            .overlay {
+                                // Keystroke caption in card space: pinned to its
+                                // edge, unaffected by the zoom transform.
+                                if let caption = model.keystrokeCaption(at: model.displayTime) {
+                                    StudioKeystrokeCaptionView(
+                                        caption: caption,
+                                        placement: model.keystrokePlacement,
+                                        cardSize: layout.cardRect.size
+                                    )
+                                }
                             }
-                        }
-                        .shadow(
-                            color: .black.opacity(model.style.background == .none ? 0 : 0.55 * model.style.shadow),
-                            radius: min(canvasSize.width, canvasSize.height) * 0.045 * model.style.shadow,
-                            y: min(canvasSize.width, canvasSize.height) * 0.016 * model.style.shadow
-                        )
-                        .position(x: layout.cardRect.midX, y: layout.cardRect.midY)
+                            .shadow(
+                                color: .black.opacity(model.style.background == .none ? 0 : 0.55 * model.style.shadow),
+                                radius: min(canvasSize.width, canvasSize.height) * 0.045 * model.style.shadow,
+                                y: min(canvasSize.width, canvasSize.height) * 0.016 * model.style.shadow
+                            )
+                            .position(x: layout.cardRect.midX, y: layout.cardRect.midY)
+                    }
 
                     if model.isCameraVisible(at: model.displayTime), layout.bubbleRect.width > 0 {
                         StudioCameraBubble(model: model, layout: layout)
@@ -534,7 +536,7 @@ private struct StudioCanvas: View {
                         )
                     }
 
-                    if model.isCroppingVideo {
+                    if model.isCroppingVideo, layout.showsScreen {
                         CropAdjustmentOverlay(
                             imageFrame: layout.frameRect(for: .identity),
                             coordinateSpaceName: StudioCanvasCoordinateSpace.name,
@@ -549,7 +551,7 @@ private struct StudioCanvas: View {
                         )
                     }
 
-                    if model.isEditingMasks {
+                    if model.isEditingMasks, layout.showsScreen {
                         let imageFrame = layout.frameRect(for: .identity)
                         ForEach(model.maskSegments) { segment in
                             if segment.id != model.selectedMaskID,
@@ -1113,6 +1115,49 @@ private enum StudioCursorImageCache {
     }
 }
 
+struct StudioLayoutThumbnail: View {
+    let preset: RecordingLayoutPreset
+    var cameraOnLeft = false
+
+    var body: some View {
+        GeometryReader { proxy in
+            let style: RecordingStudioStyle = {
+                var style = RecordingStudioStyle()
+                style.layoutPreset = preset
+                style.cameraOnLeft = cameraOnLeft
+                if preset == .overlap {
+                    style.camera.aspectRatio = .vertical
+                    style.camera.size = 0.55
+                    style.camera.roundness = 0.08
+                }
+                return style
+            }()
+            let layout = RecordingStudioLayout.make(canvasSize: CGSize(width: 320, height: 180), style: style, includeBubble: true)
+            let scale = proxy.size.width / 320
+            ZStack(alignment: .topLeading) {
+                Color.primary.opacity(0.05)
+                if layout.showsScreen {
+                    RoundedRectangle(cornerRadius: layout.cardCornerRadius * scale)
+                        .fill(Color.primary.opacity(0.18))
+                        .overlay { Image(systemName: "macwindow").font(.system(size: 15)).foregroundStyle(.secondary) }
+                        .frame(width: layout.cardRect.width * scale, height: layout.cardRect.height * scale)
+                        .position(x: layout.cardRect.midX * scale, y: layout.cardRect.midY * scale)
+                }
+                if layout.bubbleRect.width > 0 {
+                    RoundedRectangle(cornerRadius: layout.bubbleCornerRadius * scale)
+                        .fill(Color.accentColor.opacity(0.45))
+                        .overlay { Image(systemName: "person.fill").font(.system(size: 15)).foregroundStyle(.primary) }
+                        .frame(width: layout.bubbleRect.width * scale, height: layout.bubbleRect.height * scale)
+                        .clipped()
+                        .position(x: layout.bubbleRect.midX * scale, y: layout.bubbleRect.midY * scale)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+        }
+        .accessibilityHidden(true)
+    }
+}
+
 private struct StudioCameraBubble: View {
     @Bindable var model: RecordingStudioModel
     let layout: RecordingStudioLayout
@@ -1125,10 +1170,10 @@ private struct StudioCameraBubble: View {
             .clipShape(RoundedRectangle(cornerRadius: layout.bubbleCornerRadius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: layout.bubbleCornerRadius, style: .continuous)
-                    .strokeBorder(.white.opacity(0.25), lineWidth: 1)
+                    .strokeBorder(.white.opacity(layout.decoratesCamera ? 0.25 : 0), lineWidth: 1)
             }
             .shadow(
-                color: .black.opacity(0.35),
+                color: .black.opacity(layout.decoratesCamera ? 0.35 : 0),
                 radius: min(layout.canvasSize.width, layout.canvasSize.height) * 0.022,
                 y: min(layout.canvasSize.width, layout.canvasSize.height) * 0.009
             )
@@ -1136,6 +1181,7 @@ private struct StudioCameraBubble: View {
             .gesture(
                 DragGesture()
                     .onChanged { value in
+                        guard model.style.layoutPreset == .bubble else { return }
                         if dragStartCenter == nil {
                             dragStartCenter = model.style.camera.center
                         }
@@ -2904,7 +2950,16 @@ struct StudioInspector: View {
                             title: "Camera",
                             systemImage: "web.camera",
                             accessory: {
-                                Toggle("Show camera", isOn: $model.style.camera.isVisible)
+                                Toggle("Show camera", isOn: Binding(
+                                    get: { model.style.camera.isVisible && model.style.layoutPreset != .screenOnly },
+                                    set: { visible in
+                                        if visible, model.style.layoutPreset == .screenOnly {
+                                            model.setLayoutPreset(.bubble)
+                                        } else {
+                                            model.style.camera.isVisible = visible
+                                        }
+                                    }
+                                ))
                                     .labelsHidden()
                                     .toggleStyle(.switch)
                                     .controlSize(.mini)
@@ -2965,7 +3020,7 @@ struct StudioInspector: View {
         }
         .buttonStyle(EditorButtonStyle())
         .controlSize(.large)
-        .disabled(!model.isLoaded)
+        .disabled(!model.isLoaded || !model.isScreenVisible)
         .padding(.horizontal, 12)
     }
 
@@ -3603,43 +3658,75 @@ struct StudioInspector: View {
 
     private var cameraControls: some View {
         VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
-            InspectorGroupLabel("Camera aspect ratio")
-            Picker("Camera aspect ratio", selection: Binding(
-                get: { model.style.camera.aspectRatio },
-                set: { model.setCameraAspectRatio($0) }
-            )) {
-                ForEach(RecordingCameraAspectRatio.allCases, id: \.self) { ratio in
-                    Text(ratio.rawValue).tag(ratio)
+            InspectorGroupLabel("Layout")
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                ForEach(RecordingLayoutPreset.allCases, id: \.self) { preset in
+                    Button { model.setLayoutPreset(preset) } label: {
+                        VStack(spacing: 5) {
+                            StudioLayoutThumbnail(preset: preset, cameraOnLeft: model.style.cameraOnLeft)
+                                .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                            Text(preset.title)
+                                .font(.system(size: 11, weight: .medium))
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
+                                .frame(height: 28)
+                        }
+                        .padding(6)
+                        .frame(maxWidth: .infinity)
+                        .background(model.style.layoutPreset == preset
+                            ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.04),
+                            in: RoundedRectangle(cornerRadius: 8))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(model.style.layoutPreset == preset
+                                    ? Color.accentColor : Color.primary.opacity(0.1), lineWidth: 1)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(preset.title)
+                    .accessibilityAddTraits(model.style.layoutPreset == preset ? .isSelected : [])
                 }
             }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .frame(maxWidth: .infinity)
-            .font(.inspectorLabel)
-            InspectorSlider(
-                "Size",
-                value: $model.style.camera.size,
-                range: 0.12...0.45,
-                format: .percent()
-            )
-            InspectorSlider(
-                "Rounding",
-                value: $model.style.camera.roundness,
-                range: 0...0.5,
-                format: .percent()
-            )
-
-            Text("Drag the camera directly on the canvas to place it.")
+            Text("Applies to the whole video.")
                 .font(.inspectorLabel)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Text("Use 1:1 with 50% rounding for a circle. Other ratios crop the camera to fill the frame.")
+            if model.style.layoutPreset.positionsCamera {
+                InspectorGroupLabel("Camera position")
+                Picker("Camera position", selection: Binding(
+                    get: { model.style.cameraOnLeft }, set: { model.setCameraOnLeft($0) }
+                )) {
+                    Text("Left").tag(true)
+                    Text("Right").tag(false)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
+            if model.style.layoutPreset.hasFloatingCamera {
+                InspectorGroupLabel("Camera aspect ratio")
+                Picker("Camera aspect ratio", selection: Binding(
+                    get: { model.style.camera.aspectRatio },
+                    set: { model.setCameraAspectRatio($0) }
+                )) {
+                    ForEach(RecordingCameraAspectRatio.allCases, id: \.self) { ratio in
+                        Text(ratio.rawValue).tag(ratio)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(maxWidth: .infinity)
                 .font(.inspectorLabel)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+                InspectorSlider("Size", value: $model.style.camera.size,
+                                range: 0.12...0.7, format: .percent())
+                InspectorSlider("Rounding", value: $model.style.camera.roundness,
+                                range: 0...0.5, format: .percent())
+                Text(model.style.layoutPreset == .bubble
+                    ? "Drag the camera on the canvas to place it. Use 1:1 with 50% rounding for a circle."
+                    : "The camera overlaps the screen edge. Adjust its size and shape here.")
+                    .font(.inspectorLabel)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .disabled(!model.style.camera.isVisible)
-        .opacity(model.style.camera.isVisible ? 1 : 0.48)
     }
 
     // MARK: Audio

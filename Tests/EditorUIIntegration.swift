@@ -579,11 +579,70 @@ private func checkCameraAspectRatios(movieURL: URL) async throws {
             }
         }
     }
+    model.exportAspect = .original
+    model.style.layoutPreset = .bubble
+    let previousStyle = model.style
+    model.setLayoutPreset(.overlap)
+    model.undo()
+    precondition(model.style == previousStyle, "Layout undo must restore camera shape and size too")
+    model.redo()
+    precondition(model.style.layoutPreset == .overlap && model.style.camera.aspectRatio == .vertical)
+    model.setCameraOnLeft(true)
+    model.undo()
+    precondition(!model.style.cameraOnLeft)
+    model.redo()
+    precondition(model.style.cameraOnLeft)
+    for preset in RecordingLayoutPreset.allCases {
+        model.setLayoutPreset(preset)
+        for videoRatio in ExportAspectPreset.allCases {
+            let canvas = videoRatio.canvasSize(for: sourceSize)
+            for mode in [RecordingStudioLayout.ContentMode.fill, .fit] {
+                model.style.cameraOnLeft = false
+                let right = RecordingStudioLayout.make(canvasSize: canvas, style: model.style,
+                    includeBubble: true, contentAspect: 16.0 / 9.0, contentMode: mode)
+                precondition(right.showsScreen == (preset != .cameraOnly))
+                precondition((right.bubbleRect.width > 0) == (preset != .screenOnly))
+                for rect in [right.cardRect, right.bubbleRect] where rect.width > 0 {
+                    precondition(rect.minX >= -1 && rect.minY >= -1
+                        && rect.maxX <= canvas.width + 1 && rect.maxY <= canvas.height + 1)
+                }
+                precondition(abs(right.contentFillSize.width / right.contentFillSize.height - 16.0 / 9.0) < 0.000001,
+                             "Screen footage must retain its aspect in every layout")
+                if preset == .sideBySide || preset == .presenter {
+                    precondition(right.cardRect.maxX <= right.bubbleRect.minX + 1,
+                                 "Separate screen and camera layouts must not overlap")
+                }
+                model.style.cameraOnLeft = true
+                let left = RecordingStudioLayout.make(canvasSize: canvas, style: model.style,
+                    includeBubble: true, contentAspect: 16.0 / 9.0, contentMode: mode)
+                if preset.positionsCamera {
+                    precondition(abs(left.bubbleRect.minX - (canvas.width - right.bubbleRect.maxX)) < 0.001)
+                    precondition(abs(left.cardRect.minX - (canvas.width - right.cardRect.maxX)) < 0.001)
+                }
+                let missing = RecordingStudioLayout.make(canvasSize: canvas, style: model.style,
+                    includeBubble: false)
+                precondition(missing.showsScreen && missing.bubbleRect == .zero,
+                             "A missing or hidden camera must fall back to the screen")
+            }
+        }
+        let stored = StoredRecordingStudioStyle(model.style)
+        let decoded = try JSONDecoder().decode(StoredRecordingStudioStyle.self, from: JSONEncoder().encode(stored))
+        precondition(decoded.value == model.style, "Layout and position must survive project/preset persistence")
+    }
+    model.setLayoutPreset(.cameraOnly)
+    model.beginVideoCrop()
+    model.toggleMaskTool(.blur)
+    precondition(!model.isCroppingVideo && !model.isEditingMasks,
+                 "Screen tools cannot start invisibly in Camera Only")
+    model.style = previousStyle
     var legacy = try JSONSerialization.jsonObject(
         with: JSONEncoder().encode(StoredRecordingStudioStyle(model.style))) as! [String: Any]
     legacy.removeValue(forKey: "cameraAspectRatio")
+    legacy.removeValue(forKey: "layoutPreset")
+    legacy.removeValue(forKey: "cameraOnLeft")
     let restored = try JSONDecoder().decode(StoredRecordingStudioStyle.self,
         from: JSONSerialization.data(withJSONObject: legacy))
+    precondition(restored.value.layoutPreset == .bubble && !restored.value.cameraOnLeft)
     precondition(restored.value.camera.aspectRatio == .square, "Older projects keep their square camera")
     precondition(restored == StoredRecordingStudioStyle(restored.value), "Legacy presets still match their style")
     model.style.camera.roundness = 0
@@ -612,6 +671,14 @@ private func checkCameraAspectRatios(movieURL: URL) async throws {
                 to: output.appendingPathComponent("video-ratios-\(scheme)-\(Int(width)).png"), height: 800)
         }
     }
+    for preset in RecordingLayoutPreset.allCases {
+        model.setLayoutPreset(preset)
+        for scheme in [ColorScheme.light, .dark] {
+            try snapshot(StudioInspector(model: model, initialTab: .camera), scheme: scheme, width: 260,
+                to: output.appendingPathComponent("camera-layout-\(preset.rawValue)-\(scheme).png"), height: 800)
+        }
+    }
+    print("PASS screen/camera layout geometry, mirrored positions, fallback, legacy persistence, undo, and compact inspectors")
     print("PASS camera/video ratios, bounds, preview/export scaling, project/preset compatibility, undo/redo, and compact camera inspectors")
 }
 

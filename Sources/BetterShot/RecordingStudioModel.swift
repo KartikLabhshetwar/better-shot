@@ -766,6 +766,34 @@ final class RecordingStudioModel {
         updatePreviewMaskComposition()
     }
 
+    func setLayoutPreset(_ preset: RecordingLayoutPreset) {
+        guard style.layoutPreset != preset else { return }
+        var next = style
+        next.layoutPreset = preset
+        if preset != .screenOnly { next.camera.isVisible = hasCameraVideo }
+        if preset == .overlap {
+            next.camera.aspectRatio = .vertical
+            next.camera.size = 0.55
+            next.camera.roundness = 0.08
+        }
+        setLayoutStyle(next)
+    }
+
+    func setCameraOnLeft(_ onLeft: Bool) {
+        guard style.cameraOnLeft != onLeft else { return }
+        var next = style
+        next.cameraOnLeft = onLeft
+        setLayoutStyle(next)
+    }
+
+    private func setLayoutStyle(_ next: RecordingStudioStyle) {
+        cancelVideoCrop()
+        if isEditingMasks { endMaskEditing() }
+        let previous = style
+        registerUndo("Change Video Layout") { $0.setLayoutStyle(previous) }
+        style = next
+    }
+
     func setCameraAspectRatio(_ ratio: RecordingCameraAspectRatio) {
         let previous = style.camera.aspectRatio
         guard previous != ratio else { return }
@@ -1593,10 +1621,14 @@ final class RecordingStudioModel {
         return CGSize(width: videoSize.width / scale, height: videoSize.height / scale)
     }
 
+    var isScreenVisible: Bool {
+        style.layoutPreset != .cameraOnly || !hasCameraVideo || !style.camera.isVisible
+    }
+
     func isCameraVisible(at time: TimeInterval) -> Bool {
         // No time gate: before cameraOffset the player is parked on the
         // camera's first frame, which beats the bubble popping in late.
-        hasCameraVideo && style.camera.isVisible
+        hasCameraVideo && style.camera.isVisible && style.layoutPreset != .screenOnly
     }
 
     // MARK: - Export
@@ -1700,7 +1732,7 @@ final class RecordingStudioModel {
     }
 
     func beginVideoCrop() {
-        guard isLoaded else { return }
+        guard isLoaded, isScreenVisible else { return }
         if isCroppingVideo {
             cropDraft = cropRect
             cancelVideoCrop()
@@ -1802,6 +1834,7 @@ final class RecordingStudioModel {
     }
 
     func toggleMaskTool(_ effect: RecordingMaskSegment.Effect) {
+        guard isScreenVisible else { return }
         if isEditingMasks, selectedMask?.effect == effect {
             endMaskEditing()
             return
@@ -1812,7 +1845,7 @@ final class RecordingStudioModel {
     }
 
     func beginMaskEditing() {
-        guard isLoaded, !isEditingMasks, !isCroppingVideo else { return }
+        guard isLoaded, isScreenVisible, !isEditingMasks, !isCroppingVideo else { return }
         pause()
         maskEditSnapshot = maskSegments
         isEditingMasks = true

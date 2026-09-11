@@ -130,6 +130,15 @@ create or update that export. Export opens an NSSavePanel for a new destination.
 General > Default Look supplies background, padding, corner radius, and shadow
 for new images and videos. Saved projects retain their own settings.
 
+Screen/camera layout presets live in `RecordingStudioLayout` and apply to the
+whole edited video. The Camera inspector exposes floating Bubble and Overlap,
+Side-by-Side, Presenter, Camera Only, and Screen Only. Paired layouts can place
+the camera on either side. Presenter fits the screen beside a full-height camera;
+Side-by-Side respects the video Fill/Fit setting. Floating camera ratio/size/
+rounding controls remain available. Missing layout fields retain the legacy
+bubble, and unavailable/hidden camera footage falls back to the screen. Preview,
+export, project persistence, render-cache invalidation, and undo share the style.
+
 ### Shortcuts
 
 `ShortcutCatalog.swift` is the source for action IDs, groups, scopes, and
@@ -195,7 +204,9 @@ For website changes, run `pnpm lint` and `pnpm build` from `bettershot-landing/`
 
 ## Submitting changes
 
-1. Create a focused branch and read the existing code before editing.
+1. Read the existing code before editing. For maintainer work, commit and push
+   directly to `main` as requested; do not create a PR unless explicitly asked.
+   External contributors should use a focused branch and PR.
 2. Follow [AGENTS.md](AGENTS.md). Preserve user data and native accessibility.
 3. Run `make test`. CI runs `make release` via `.github/workflows/build.yml`.
 4. For UI changes, include screenshots and describe the interactions tested.
