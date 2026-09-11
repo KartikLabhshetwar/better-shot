@@ -50,6 +50,7 @@ struct ExportIntegration {
             sharpContext.fill(CGRect(x: x, y: 0, width: 1, height: 31))
         }
         var sharpConfig = BeautifierConfig()
+        sharpConfig.style = .solid(SolidColor.presets[0])
         sharpConfig.cornerRadius = 0
         sharpConfig.shadowStrength = 0
         let sharpImage = BeautifierRenderer.render(image: sharpContext.makeImage()!, config: sharpConfig)!
@@ -61,6 +62,39 @@ struct ExportIntegration {
                          "Native pixels must not blur into gray during framing")
         }
         print("PASS native pixel dimensions and sharp screenshot framing")
+        var zeroPadding = sharpConfig
+        zeroPadding.padding = 0
+        let zeroImage = BeautifierRenderer.render(image: image, config: zeroPadding)!
+        let zeroSettings = zeroPadding.annotationBackgroundSettings
+        let editorImage = try AnnotationBackgroundRenderer.compose(contentImage: image,
+            settings: zeroSettings, colorSpace: colorSpace)
+        precondition(zeroImage.width == image.width && zeroImage.height == image.height)
+        precondition(editorImage.width == image.width && editorImage.height == image.height,
+                     "Zero padding must match between General capture rendering and the image editor")
+        var noBackground = BeautifierConfig()
+        noBackground.padding = 0.4
+        noBackground.cornerRadius = 0.1
+        noBackground.aspectRatio = .square
+        let bareImage = BeautifierRenderer.render(image: image, config: noBackground)!
+        precondition(bareImage === image, "No Background must preserve untouched pixels without hidden framing")
+        let bareLayout = AnnotationBackgroundLayout.make(contentSize: CGSize(width: image.width, height: image.height),
+            settings: noBackground.annotationBackgroundSettings)
+        precondition(bareLayout.canvasSize == CGSize(width: image.width, height: image.height) && bareLayout.padding == 0)
+        var cameraSettings = zeroSettings
+        cameraSettings.style = .none
+        cameraSettings.camera.rollDegrees = 10
+        precondition(AnnotationBackgroundLayout.make(contentSize: bareLayout.canvasSize,
+            settings: cameraSettings).padding == 0, "Camera effects must not impose an invisible padding minimum")
+        var bareVideoStyle = RecordingStudioStyle(background: .none, padding: 0.18, cornerRadius: 0.08, shadow: 1)
+        let bareVideo = RecordingStudioLayout.make(canvasSize: bareLayout.canvasSize, style: bareVideoStyle, includeBubble: false)
+        precondition(bareVideo.cardRect == CGRect(origin: .zero, size: bareLayout.canvasSize) && bareVideo.cardCornerRadius == 0,
+                     "No Background video must cover its original canvas without a decorative frame")
+        bareVideoStyle.background = .solid(.black)
+        precondition(RecordingStudioLayout.make(canvasSize: bareLayout.canvasSize,
+            style: bareVideoStyle, includeBubble: false).cardRect.width < bareVideo.cardRect.width,
+                     "Returning to a background restores the saved padding")
+        print("PASS zero padding, unframed No Background images/videos, and retained framing settings")
+
         let source = directory.appendingPathComponent("source.png")
         let destination = CGImageDestinationCreateWithURL(
             source as CFURL, UTType.png.identifier as CFString, 1, nil)!

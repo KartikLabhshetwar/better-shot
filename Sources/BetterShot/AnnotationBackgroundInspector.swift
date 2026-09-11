@@ -31,6 +31,16 @@ struct AnnotationBackgroundInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            Button {
+                onEditorAction()
+                settings.style = .none
+            } label: {
+                Label("No Background", systemImage: settings.style == .none ? "checkmark" : "rectangle.slash")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .accessibilityAddTraits(settings.style == .none ? .isSelected : [])
+
             VStack(alignment: .leading, spacing: InspectorMetrics.groupLabelSpacing) {
                 InspectorGroupLabel("Fill library")
 
@@ -61,7 +71,7 @@ struct AnnotationBackgroundInspector: View {
                     InspectorSlider(
                         "Padding",
                         value: $settings.padding,
-                        range: 0.04...0.45,
+                        range: 0...0.45,
                         format: .percent()
                     )
 
@@ -79,6 +89,7 @@ struct AnnotationBackgroundInspector: View {
                         format: .percent()
                     )
                 }
+                .disabled(!settings.requiresCanvasLayout)
             }
 
             VStack(alignment: .leading, spacing: InspectorMetrics.groupLabelSpacing) {

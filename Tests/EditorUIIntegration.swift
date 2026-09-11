@@ -108,7 +108,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     let legacyData = try JSONSerialization.data(withJSONObject: legacyStyle)
     let legacyCursor = try JSONDecoder().decode(StoredRecordingStudioStyle.self, from: legacyData).value.cursor
     precondition(legacyCursor == RecordingCursorOptions(), "Older projects retain the recorded cursor and existing motion")
-    for appearance in [RecordingCursorAppearance.dark, .light, .dot] {
+    for appearance in [RecordingCursorAppearance.macOS, .dark, .light, .dot] {
         let artwork = PointerArtworkCapture.styledArtwork(appearance)!
         let bitmap = NSBitmapImageRep(data: artwork.imageData)!
         precondition(bitmap.pixelsWide == 1024 && bitmap.pixelsHigh == 1280,
@@ -126,9 +126,14 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     precondition(hand == nativeHand, "Hand uses the actual macOS artwork, full raster, logical size, and hotspot")
     precondition(hand == PointerArtworkCapture.styledArtwork(.hand), "Native hand artwork is cached")
     let arrow = PointerArtworkCapture.styledArtwork(.macOS)!
-    precondition(arrow == PointerArtworkCapture.capture(NSCursor.arrow, id: "bettershot-cursor-macOS"),
-                 "macOS style uses only Apple's arrow, highest-resolution raster, and native hotspot")
-    precondition(arrow == PointerArtworkCapture.styledArtwork(.macOS), "Native arrow artwork is cached")
+    let arrowBitmap = NSBitmapImageRep(data: arrow.imageData)!
+    precondition(arrowBitmap.colorAt(x: 12 * 32, y: 16 * 32)!.redComponent < 0.01,
+                 "Outlined arrow has a black interior")
+    precondition(arrowBitmap.colorAt(x: 5 * 32, y: 4 * 32)!.redComponent > 0.9,
+                 "Outlined arrow has a contrasting white edge")
+    precondition(arrowBitmap.colorAt(x: 22 * 32, y: 32 * 32)!.alphaComponent == 0,
+                 "Arrow has no stem or cloud")
+    precondition(arrow == PointerArtworkCapture.styledArtwork(.macOS), "Outlined arrow artwork is cached")
     let cursorModel = RecordingStudioModel(url: movieURL)
     cursorModel.setCursorAppearance(.macOS)
     precondition(cursorModel.style.cursorScale == 2.5 && cursorModel.style.cursor.appearance == .macOS)
@@ -149,7 +154,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     precondition(delayFormat.parse("invalid") == nil && delayFormat.parse("NaN") == nil)
     precondition(InspectorValueFormat.points.parse("24 pt") == 24 && InspectorValueFormat.points.step == 4)
     precondition(InspectorValueFormat.percent(step: 0.05).step == 0.05)
-    print("PASS native macOS arrow, large sizing, and legacy hand capture/cache, cursor persistence, and settings slider input")
+    print("PASS outlined arrow, large sizing, and legacy hand capture/cache, cursor persistence, and settings slider input")
     let multiResolutionCursor = NSImage(size: NSSize(width: 16, height: 20))
     for scale in [1, 4] {
         let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 16 * scale, pixelsHigh: 20 * scale,
@@ -386,6 +391,8 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     }.padding(), scheme: .light, width: 900, to: output.appendingPathComponent("shared-gradients.png"), height: 360)
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
+        try snapshot(PreferencesView(selection: .general), scheme: scheme, width: 780,
+            to: output.appendingPathComponent("general-background-\(name).png"), height: 1700)
         try snapshot(PreferencesView(selection: .sharing), scheme: scheme, width: 780,
                      to: output.appendingPathComponent("sharing-buttons-\(name).png"), height: 720)
         try snapshot(VStack(alignment: .leading, spacing: 16) {
@@ -724,8 +731,11 @@ private func checkGeneralEditorDefaults(movieURL: URL) async throws {
     custom.padding = 0.15
     custom.cornerRadius = 0.04
     custom.shadowStrength = 0.7
-    for config in [BeautifierConfig.default, custom] {
+    var zeroPadding = custom
+    zeroPadding.padding = 0
+    for config in [BeautifierConfig.default, custom, zeroPadding] {
         AppPreferences.defaultBeautifierConfig = config
+        precondition(AppPreferences.defaultBeautifierConfig == config, "General must persist zero padding exactly")
         let session = RecordingSession(directoryURL: FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString + ".bettershotrec"))
         try FileManager.default.createDirectory(at: session.directoryURL, withIntermediateDirectories: true)

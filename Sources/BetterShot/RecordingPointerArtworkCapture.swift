@@ -16,8 +16,8 @@ enum PointerArtworkCapture {
     static func styledArtwork(_ appearance: RecordingCursorAppearance) -> PointerArtwork? {
         guard appearance != .recorded else { return nil }
         if let cached = styledCache[appearance] { return cached }
-        if appearance == .macOS || appearance == .hand {
-            let artwork = capture(appearance == .macOS ? NSCursor.arrow : NSCursor.pointingHand,
+        if appearance == .hand {
+            let artwork = capture(NSCursor.pointingHand,
                                   id: "bettershot-cursor-" + appearance.rawValue)
             if let artwork { styledCache[appearance] = artwork }
             return artwork
@@ -37,6 +37,13 @@ enum PointerArtworkCapture {
         let path = CGMutablePath()
         if isDot {
             path.addEllipse(in: CGRect(x: 5, y: 9, width: 22, height: 22))
+        } else if appearance == .macOS {
+            // Stemless arrow from the editor reference; tip is the click hotspot.
+            path.move(to: CGPoint(x: 5, y: 4))
+            path.addLine(to: CGPoint(x: 29, y: 17))
+            path.addLine(to: CGPoint(x: 16, y: 21))
+            path.addLine(to: CGPoint(x: 11, y: 32))
+            path.closeSubpath()
         } else {
             path.move(to: CGPoint(x: 5, y: 4))
             for point in [CGPoint(x: 26, y: 23), CGPoint(x: 17, y: 24),
@@ -46,9 +53,9 @@ enum PointerArtworkCapture {
             }
             path.closeSubpath()
         }
-        context.setFillColor(CGColor(gray: appearance == .dark ? 0 : 1, alpha: 1))
-        context.setStrokeColor(CGColor(gray: appearance == .dark ? 1 : 0, alpha: 1))
-        context.setLineWidth(1.5)
+        context.setFillColor(CGColor(gray: (appearance == .dark || appearance == .macOS) ? 0 : 1, alpha: 1))
+        context.setStrokeColor(CGColor(gray: (appearance == .dark || appearance == .macOS) ? 1 : 0, alpha: 1))
+        context.setLineWidth(appearance == .macOS ? 1.8 : 1.5)
         context.setLineJoin(.round)
         context.addPath(path)
         context.drawPath(using: .fillStroke)

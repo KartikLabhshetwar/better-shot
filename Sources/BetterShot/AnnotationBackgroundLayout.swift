@@ -39,10 +39,8 @@ nonisolated struct AnnotationBackgroundLayout {
             height: contentSize.height + borderThickness * 2
         )
         let normalizedPadding: CGFloat
-        if settings.isEnabled {
+        if settings.usesCanvasLayout {
             normalizedPadding = settings.padding
-        } else if settings.usesCanvasLayout {
-            normalizedPadding = max(settings.padding, 0.18)
         } else {
             // A border-only export should grow by exactly the outer ring, not
             // inherit the transparent breathing room used by camera effects.

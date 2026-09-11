@@ -238,9 +238,12 @@ struct GeneralSettingsTab: View {
 
                 DefaultBackgroundPicker(selectedStyle: $defaultConfig.style)
 
-                InspectorSlider("Padding", value: $defaultConfig.padding, range: 0...0.45, format: .percent())
-                InspectorSlider("Corner Radius", value: $defaultConfig.cornerRadius, range: 0...0.12, format: .percent(fractionDigits: 1))
-                InspectorSlider("Shadow", value: $defaultConfig.shadowStrength, range: 0...1, format: .percent())
+                Group {
+                    InspectorSlider("Padding", value: $defaultConfig.padding, range: 0...0.45, format: .percent())
+                    InspectorSlider("Corner Radius", value: $defaultConfig.cornerRadius, range: 0...0.12, format: .percent(fractionDigits: 1))
+                    InspectorSlider("Shadow", value: $defaultConfig.shadowStrength, range: 0...1, format: .percent())
+                }
+                .disabled(defaultConfig.style == .none)
 
                 Button("Reset Default Look") {
                     defaultConfig = .default
@@ -349,7 +352,7 @@ struct GeneralSettingsTab: View {
 
     private func backgroundLabel(for style: BackgroundStyle) -> String {
         switch style {
-        case .none: "Transparent"
+        case .none: "No Background"
         case .solid(let c): c.name
         case .gradient(let g): g.name
         case .wallpaper: "Custom Image"
@@ -375,8 +378,8 @@ private struct DefaultBackgroundPicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            noneButton
             LazyVGrid(columns: swatchColumns, spacing: 5) {
-                noneButton
                 ForEach(SolidColor.presets) { color in
                     solidButton(color)
                 }
@@ -402,24 +405,11 @@ private struct DefaultBackgroundPicker: View {
         Button {
             selectedStyle = .none
         } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(Color.white)
-                    .frame(width: 24, height: 24)
-                Path { path in
-                    path.move(to: CGPoint(x: 22, y: 2))
-                    path.addLine(to: CGPoint(x: 2, y: 22))
-                }
-                .stroke(Color.red.opacity(0.6), lineWidth: 1.5)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .strokeBorder(selectedStyle == .none ? Color.accentColor : Color.primary.opacity(0.12), lineWidth: selectedStyle == .none ? 2 : 0.5)
-            )
+            Label("No Background", systemImage: selectedStyle == .none ? "checkmark" : "rectangle.slash")
         }
-        .buttonStyle(.plain)
-        .help("No background")
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .accessibilityAddTraits(selectedStyle == .none ? .isSelected : [])
     }
 
     private func solidButton(_ color: SolidColor) -> some View {
@@ -549,12 +539,12 @@ private struct DefaultConfigPreview: View {
             let mockImageW: CGFloat = 160
             let mockImageH: CGFloat = 100
             let shortEdge = min(mockImageW, mockImageH)
-            let pad = shortEdge * config.padding
+            let pad = config.style == .none ? 0 : shortEdge * config.padding
 
             var canvasW = mockImageW + pad * 2
             var canvasH = mockImageH + pad * 2
             let _ = {
-                if let ratio = config.aspectRatio.numericValue {
+                if config.style != .none, let ratio = config.aspectRatio.numericValue {
                     let current = canvasW / canvasH
                     if current < ratio { canvasW = canvasH * ratio }
                     else { canvasH = canvasW / ratio }
@@ -571,7 +561,7 @@ private struct DefaultConfigPreview: View {
             let imgW = mockImageW / canvasW * fitted.width
             let imgH = mockImageH / canvasH * fitted.height
 
-            let cornerRadius = config.cornerRadius * shortEdge * min(fitted.width / canvasW, fitted.height / canvasH)
+            let cornerRadius = (config.style == .none ? 0 : config.cornerRadius) * shortEdge * min(fitted.width / canvasW, fitted.height / canvasH)
             let m = config.alignment.cornerMultipliers
 
             ZStack {
@@ -593,10 +583,10 @@ private struct DefaultConfigPreview: View {
                         style: .continuous
                     ))
                     .shadow(
-                        color: config.shadowStrength > 0 ? .black.opacity(Double(config.shadowStrength * 0.3)) : .clear,
-                        radius: config.shadowStrength > 0 ? max(2, shortEdge * 0.02 * (1 + config.shadowStrength)) : 0,
+                        color: config.style != .none && config.shadowStrength > 0 ? .black.opacity(Double(config.shadowStrength * 0.3)) : .clear,
+                        radius: config.style != .none && config.shadowStrength > 0 ? max(2, shortEdge * 0.02 * (1 + config.shadowStrength)) : 0,
                         x: 0,
-                        y: config.shadowStrength > 0 ? shortEdge * 0.01 * (1 + config.shadowStrength) : 0
+                        y: config.style != .none && config.shadowStrength > 0 ? shortEdge * 0.01 * (1 + config.shadowStrength) : 0
                     )
                     .frame(width: imgW, height: imgH)
                     .position(x: imgX + imgW / 2, y: imgY + imgH / 2)

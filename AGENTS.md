@@ -108,13 +108,13 @@ a PR unless explicitly requested.
   explicit Save/Export or capture-and-save writes a deliverable. Editor Save
   must work for untouched screenshots, and clipboard file references must
   survive dismissing the capture card.
-- The macOS cursor style uses `NSCursor.arrow`, cached with its native hotspot. Hand is no longer offered, but
+- The Arrow cursor style uses the shared high-resolution, white-outlined stemless vector artwork with an arrow-tip hotspot. Keep the legacy `macOS` storage key. Hand is no longer offered, but
   legacy projects still render it with `NSCursor.pointingHand`. Preserve native
   hotspots and highest-resolution representations through `PointerArtworkCapture`.
 - Custom cursor raster resolution is independent of its logical size and hotspot.
   Preserve transparent backgrounds, contrasting outlines, the highest-resolution
   recorded representation, and cached decoding. Do not regenerate cursor PNGs per frame.
-- Keep Recorded/macOS/Dark/Light/Dot (and legacy Hand), visibility, Natural/Smooth motion, press/ripple,
+- Keep Recorded/Arrow/Dark/Light/Dot (and legacy Hand), visibility, Natural/Smooth motion, press/ripple,
   and idle hiding consistent in preview, export, and saved projects. Imported
   footage with a baked-in cursor cannot be restyled; explain that in the UI.
 - Camera frame ratios are independent of the video canvas ratio. Use

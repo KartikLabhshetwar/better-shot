@@ -16,7 +16,7 @@ nonisolated enum RecordingCursorAppearance: String, Codable, CaseIterable, Senda
     case recorded, macOS, dark, light, dot, hand
     // Hand remains decodable for existing projects, but is no longer offered.
     static let selectableCases: [Self] = [.recorded, .macOS, .dark, .light, .dot]
-    var title: String { self == .macOS ? "macOS" : rawValue.capitalized }
+    var title: String { self == .macOS ? "Arrow" : rawValue.capitalized }
 }
 
 nonisolated struct RecordingCursorOptions: Codable, Equatable, Sendable {

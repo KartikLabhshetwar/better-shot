@@ -13,11 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Video export frame-rate controls (30 or 60 fps) in Export Options and Recording settings. Existing projects retain 60 fps.
 - **Faster video exports and sharing**: GPU compositing uses shared IOSurface/NV12 buffers and a three-frame pipeline to overlap decoding, rendering, and hardware encoding. The two-minute heavy-effects benchmark improved from 101.2 s to 32.6 s at 1080p60 (about 3.1× faster); plain export improved from 28.4 s to 26.7 s. The optional 30 fps mode took 16.1 s. Single-run measurements and workload details are in [Export performance](docs/export-performance.md).
-- Native macOS arrow cursor style using Apple's highest-resolution artwork and hotspot, starting at 2.5× size. It replaces Hand in the style picker; older Hand projects retain their appearance.
+- White-outlined stemless Arrow cursor style, matching the requested reference, with a high-resolution raster and arrow-tip hotspot, starting at 2.5× size. It replaces Hand in the style picker; older Hand projects retain their appearance.
 - Face-camera aspect ratios: 1:1, 4:3, 3:4, 16:9, 9:16, and 4:5, with adjustable rounding, undo/redo, and matching preview/export geometry. Older projects retain their square frame.
 - Whole-video 16:10 and 4:3 presets alongside existing ratios, in a compact native menu under Background.
 
 ### Fixed
+
+- Image editor padding now accepts 0% instead of clamping to 4%; camera effects no longer impose hidden minimum padding. General retains zero exactly.
+- Explicit No Background controls in General and both editors. Captures and previews agree on an unframed image/video; returning to a fill restores saved framing values.
 
 - Stabilized color-copy toast window sizing to prevent recursive SwiftUI constraint updates. Color picking retains the sampler until completion, safely converts browser/wide-gamut colors to clamped sRGB hex, and reports unsupported samples without crashing.
 

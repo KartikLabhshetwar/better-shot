@@ -7,6 +7,8 @@ enum BeautifierRenderer {
 
     static func render(image source: CGImage, config: BeautifierConfig) -> CGImage? {
         let image = config.grade.applied(to: source)
+        // No background keeps the source frame, matching the image editor.
+        guard config.style != .none else { return image }
         let imgW = CGFloat(image.width)
         let imgH = CGFloat(image.height)
         let shortEdge = min(imgW, imgH)

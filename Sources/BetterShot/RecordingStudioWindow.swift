@@ -1208,7 +1208,7 @@ private struct StudioBackgroundView: View {
     var body: some View {
         switch style {
         case .none:
-            Color(white: 0.04)
+            Color.black
         case .solid(let color):
             color.color
         case .gradient(let gradient):
@@ -2818,12 +2818,15 @@ struct StudioInspector: View {
                             backgroundControls
                         }
 
-                        StudioAmountEffect(title: "Padding", systemImage: "rectangle.inset.filled",
-                            value: $model.style.padding, range: 0...0.18, defaultValue: 0.06)
-                        StudioAmountEffect(title: "Rounded Corners", systemImage: "rectangle.roundedtop",
-                            value: $model.style.cornerRadius, range: 0...0.08, defaultValue: 0.02)
-                        StudioAmountEffect(title: "Shadow", systemImage: "square.3.layers.3d",
-                            value: $model.style.shadow, range: 0...1, defaultValue: 0.45)
+                        Group {
+                            StudioAmountEffect(title: "Padding", systemImage: "rectangle.inset.filled",
+                                value: $model.style.padding, range: 0...0.18, defaultValue: 0.06)
+                            StudioAmountEffect(title: "Rounded Corners", systemImage: "rectangle.roundedtop",
+                                value: $model.style.cornerRadius, range: 0...0.08, defaultValue: 0.02)
+                            StudioAmountEffect(title: "Shadow", systemImage: "square.3.layers.3d",
+                                value: $model.style.shadow, range: 0...1, defaultValue: 0.45)
+                        }
+                        .disabled(model.style.background == .none)
 
                     }
 
@@ -3092,6 +3095,20 @@ struct StudioInspector: View {
                 .font(.inspectorLabel)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Button {
+                model.style.background = .none
+            } label: {
+                Label("No Background", systemImage: model.style.background == .none ? "checkmark" : "rectangle.slash")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .accessibilityAddTraits(model.style.background == .none ? .isSelected : [])
+            if model.style.background == .none {
+                Text("No decorative frame. Uncovered areas in MP4 remain black.")
+                    .font(.inspectorLabel)
+                    .foregroundStyle(.secondary)
             }
 
             InspectorGroupLabel("Style")
@@ -3382,7 +3399,7 @@ struct StudioInspector: View {
                         }
                     }
                     if model.style.cursor.appearance == .macOS {
-                        Text("Native macOS arrow. Adjust Size above to enlarge it further.")
+                        Text("Outlined arrow. Adjust Size above to enlarge it further.")
                             .font(.inspectorLabel).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }

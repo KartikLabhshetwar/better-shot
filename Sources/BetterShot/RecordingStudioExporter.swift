@@ -1316,7 +1316,7 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
 
         switch style.background {
         case .none:
-            context.setFillColor(CGColor(gray: 0.04, alpha: 1))
+            context.setFillColor(CGColor(gray: 0, alpha: 1))
             context.fill(canvasRect)
         case .solid(let color):
             context.setFillColor(CGColor(

@@ -130,9 +130,15 @@ create or update that export. Export opens an NSSavePanel for a new destination.
 General > Default Look supplies background, padding, corner radius, and shadow
 for new images and videos. Saved projects retain their own settings.
 
-The macOS cursor choice uses `NSCursor.arrow` with a 2.5× starting size.
-`PointerArtworkCapture` caches the highest-resolution native artwork and hotspot
-for preview/export.
+The Arrow cursor choice uses a stemless black arrow with a white outline and a
+2.5× starting size. `PointerArtworkCapture` caches the 32× raster and arrow-tip
+hotspot for preview/export; the `macOS` storage key remains compatible.
+
+Padding accepts 0% in General and both editors. No Background removes decorative
+framing without erasing saved padding/corner/shadow values, so selecting a fill
+restores them. Untouched screenshots keep their pixels; explicit image effects
+still render on transparency. MP4 has no alpha channel: any areas uncovered by
+reframing or camera layouts remain black, consistently in preview and export.
 
 Color picking uses a retained `NSColorSampler`. Convert to sRGB before reading
 components, reject unsupported/non-finite colors, and clamp to six-digit hex.
