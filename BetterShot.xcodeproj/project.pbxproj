@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C8F7324C19E049508F1EAAF1 /* AnnotationImageTransform.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8F7324C19E049508F1EAAF2 /* AnnotationImageTransform.swift */; };
 		002ADCD3F8C769B398471F92 /* AnnoEditorInteraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB86758B02F912A3E117CC99 /* AnnoEditorInteraction.swift */; };
 		01CE948684943DFF96B077F7 /* AppUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BADFC6B5CCEDC123DF696D8 /* AppUpdater.swift */; };
 		02404D9AD03DCC77348C50CF /* MathUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9CAA6D017C7FB19CD3466D7 /* MathUtils.swift */; };
@@ -211,6 +212,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		C8F7324C19E049508F1EAAF2 /* AnnotationImageTransform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationImageTransform.swift; sourceTree = "<group>"; };
 		016FCFAE69ED3C0FD92C5D3B /* AfterCaptureActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AfterCaptureActions.swift; sourceTree = "<group>"; };
 		018AB35D9E9F15364DD94E9E /* ShareImageCompressor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareImageCompressor.swift; sourceTree = "<group>"; };
 		036620C86E40600826E3930C /* PreviewWindowCaptureExclusion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewWindowCaptureExclusion.swift; sourceTree = "<group>"; };
@@ -542,6 +544,7 @@
 				293EA45B51DD6073E49641F4 /* AnnotationEditorWindow.swift */,
 				2FC217457F424CFCD7667853 /* AnnotationEditorZoom.swift */,
 				BD2210BD486C338B11D6608E /* AnnotationImageCropper.swift */,
+				C8F7324C19E049508F1EAAF2 /* AnnotationImageTransform.swift */,
 				35712AC357C535000CF633D8 /* AnnotationInspector.swift */,
 				CC94C1BE0CE4840EE91F1A8C /* AnnotationInspectorSlider.swift */,
 				CEF466A0DB404559DBF22E36 /* AnnotationInspectorStyle.swift */,
@@ -843,6 +846,7 @@
 				61E7E40D2B4D4891ABCC8C98 /* AnnotationEditorWindow.swift in Sources */,
 				3DFD0AFCC40248A410ACC8BD /* AnnotationEditorZoom.swift in Sources */,
 				7C520C2C439706A42786379C /* AnnotationImageCropper.swift in Sources */,
+				C8F7324C19E049508F1EAAF1 /* AnnotationImageTransform.swift in Sources */,
 				6E19D91F47B4566546BF95C7 /* AnnotationInspector.swift in Sources */,
 				08438912627871CAC2592D71 /* AnnotationInspectorSlider.swift in Sources */,
 				85FA3C0AC731BFFCF9840E69 /* AnnotationInspectorStyle.swift in Sources */,

@@ -58,7 +58,8 @@ final class AnnoCanvasNSView: NSView {
     /// engine lives in SwiftUI, and it only fires if this view declines the event.
     override func hitTest(_ point: NSPoint) -> NSView? {
         guard let textOverlay else { return nil }
-        return textOverlay.frame.contains(convert(point, from: superview)) ? textOverlay : nil
+        let localPoint = textOverlay.convert(point, from: superview)
+        return textOverlay.bounds.contains(localPoint) ? textOverlay : nil
     }
 
     func configure(

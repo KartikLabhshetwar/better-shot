@@ -12,6 +12,7 @@ import Foundation
 final class AnnoTextEditorOverlay: NSTextView {
     private weak var editor: AnnoEditor?
     private var shapeId: AnnoShapeID?
+    private var isMirrored = false
 
     /// Which shape this caret belongs to, so the canvas can tell a retarget from a no-op.
     var editedShapeId: AnnoShapeID? { shapeId }
@@ -124,10 +125,26 @@ final class AnnoTextEditorOverlay: NSTextView {
         }
 
         frameRotation = 0
+        if isMirrored { scaleUnitSquare(to: NSSize(width: -1, height: 1)) }
         frame = CGRect(x: origin.x, y: origin.y, width: width, height: height)
+        self.bounds.origin = .zero
+        let transform = shape.pageTransform.cgAffineTransform.concatenating(editor.viewport.pageToView)
+        isMirrored = transform.a * transform.d - transform.b * transform.c < 0
+        if isMirrored {
+            scaleUnitSquare(to: NSSize(width: -1, height: 1))
+            self.bounds.origin = .zero
+        }
         // The canvas is flipped, so a positive rotation reads clockwise on screen - the same
         // direction a positive `shape.rotation` turns the drawn shape.
-        frameRotation = shape.rotation * 180 / .pi
+        let direction: CGFloat = isMirrored ? -1 : 1
+        frameRotation = atan2(transform.b * direction, transform.a * direction) * 180 / .pi
+        if let superview {
+            let actualOrigin = convert(CGPoint.zero, to: superview)
+            setFrameOrigin(CGPoint(
+                x: frame.origin.x + origin.x - actualOrigin.x,
+                y: frame.origin.y + origin.y - actualOrigin.y
+            ))
+        }
     }
 
     func loadText() {

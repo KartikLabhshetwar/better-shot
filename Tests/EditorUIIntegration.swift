@@ -8,6 +8,8 @@ import SwiftUI
 /// AVPlayer layers and window toolbars require live UI testing and are not captured here.
 @MainActor
 func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
+    try AnnotationTransformIntegration.checkEditor()
+    try AnnotationTransformIntegration.checkModel(sourceURL: imageURL)
     try await checkPreviewOverlay(imageURL: imageURL)
     try await checkMediaGallery(imageURL: imageURL, movieURL: movieURL)
     checkTransferToastPresentation(movieURL: movieURL)

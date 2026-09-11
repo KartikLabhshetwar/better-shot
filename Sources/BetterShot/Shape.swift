@@ -172,6 +172,7 @@ struct AnnoShape: Codable, Equatable, Identifiable {
     var x: Double
     var y: Double
     var rotation: Double = 0
+    var isMirrored: Bool?
     /// 0...1, applied to the whole shape when drawn.
     var opacity: Double = 1
     var kind: AnnoShapeKind
@@ -193,7 +194,20 @@ struct AnnoShape: Codable, Equatable, Identifiable {
     }
 
     var pageTransform: Mat {
-        Mat.compose(x: x, y: y, rotation: rotation)
+        let transform = Mat.compose(x: x, y: y, rotation: rotation)
+        return isMirrored == true ? Mat.multiply(transform, .scale(-1, 1)) : transform
+    }
+
+    func applyingImageTransform(_ imageTransform: AnnotationImageTransform, imageSize: CGSize) -> AnnoShape {
+        let transform = pageTransform.cgAffineTransform.concatenating(imageTransform.affineTransform(for: imageSize))
+        let mirrored = transform.a * transform.d - transform.b * transform.c < 0
+        let direction: CGFloat = mirrored ? -1 : 1
+        var result = self
+        result.x = transform.tx
+        result.y = transform.ty
+        result.rotation = atan2(transform.b * direction, transform.a * direction)
+        result.isMirrored = mirrored ? true : nil
+        return result
     }
 
     var strokeWidth: Double {

@@ -12,7 +12,7 @@ for object in .build/Build/Intermediates.noindex/BetterShot.build/"$configuratio
     [[ "$object" == */BetterShotApp.o ]] || objects+=("$object")
 done
 swiftc -parse-as-library -module-cache-path .build/ExportCheckModules \
-    -I ".build/Build/Products/$configuration" Tests/ExportIntegration.swift Tests/EditorUIIntegration.swift \
+    -I ".build/Build/Products/$configuration" Tests/ExportIntegration.swift Tests/EditorUIIntegration.swift Tests/AnnotationTransformIntegration.swift \
     "${objects[@]}" ".build/Build/Products/$configuration/DockProgress.o" \
     -o "$out/ExportIntegration"
 # The snapshots instantiate sharing UI; do not read the real R2 Keychain from this test binary.
