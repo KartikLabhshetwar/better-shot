@@ -1,4 +1,5 @@
 import React from 'react'
+import { FeatureDemo, featureDemos, featureFrames } from './feature-demos'
 import { AbsoluteFill, Composition, Easing, Img, interpolate, registerRoot, Sequence, staticFile, useCurrentFrame } from 'remotion'
 
 // Editorial motion around genuine app captures; never simulate clicks or redraw controls.
@@ -42,4 +43,7 @@ function Demo() {
     </div>
   </AbsoluteFill>
 }
-registerRoot(() => <Composition id="BetterShotDemo" component={Demo} width={1280} height={800} fps={30} durationInFrames={720} />)
+registerRoot(() => <>
+  <Composition id="BetterShotDemo" component={Demo} width={1280} height={800} fps={30} durationInFrames={720} />
+  {(Object.keys(featureDemos) as Array<keyof typeof featureDemos>).map(feature => <Composition key={feature} id={feature} component={FeatureDemo} defaultProps={{feature}} width={1280} height={900} fps={30} durationInFrames={featureFrames} />)}
+</>)
