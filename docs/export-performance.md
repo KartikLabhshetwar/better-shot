@@ -57,6 +57,30 @@ were checked for the expected duration. Final sizes were 1.47, 15.89, 15.67,
 and 9.08 MB, respectively. Upload preparation reused each MP4; no credentials,
 R2 requests, or network transfers were used.
 
+### Why more GPU kernels do not explain the remaining plain-export time
+
+A follow-up run measured plain/Fast/60 fps at 27.0 s, effects/Fast/60 fps at
+37.2 s, effects/Ultrafast/60 fps at 37.0 s, and effects/Fast/30 fps at 21.6 s.
+All four exports completed and passed the duration checks. These repeat results
+reinforce the system-load variability noted above. During the plain-export
+pass, a three-second process sample showed the VideoToolbox compression thread
+inside `VTCompressionSessionEncodeFrame` in 2,033 of its 2,062 samples; 2,020
+were waiting for a synchronous reply from the system encoding service. The
+trace also contains Core Image's Metal rendering and completion queues.
+The local trace is retained at `.build/export-profiles/plain-1080p60.txt`.
+
+This points to the encoding/service path as the next place to investigate for
+plain exports. It is not a measurement of GPU utilization or proof of the
+hardware encoder's maximum throughput. Increasing shader parallelism alone
+would not remove those service waits. The existing three-frame queue already
+overlaps decode, GPU rendering, and encoding; deeper queues or multiple
+compression sessions would need a measured benefit before adoption.
+
+Apple silicon's [unified memory](https://developer.apple.com/videos/play/tech-talks/10580/)
+lets the CPU and GPU share memory. The exporter already uses shared IOSurface
+buffers and pools to avoid video/overlay copies. More available RAM does not
+remove the work of decoding and encoding the 7,200 output frames in this case.
+
 ### Verification
 
 `make test` passed on the final implementation, as did the focused export checks

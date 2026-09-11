@@ -568,6 +568,7 @@ struct ExportIntegration {
                 exportSettings: settings, audioReplacementURL: soundtrack,
                 crop: effects ? CGRect(x: 0.05, y: 0.05, width: 0.9, height: 0.9) : RecordingVideoCrop.unit,
                 masks: effects ? masks : [])
+            print("BENCH starting \(label)")
             let start = Date()
             let output = try await RecordingStudioExporter().export(configuration) { _ in }
             defer { try? FileManager.default.removeItem(at: output) }
