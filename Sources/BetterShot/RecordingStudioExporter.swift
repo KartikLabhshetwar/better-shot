@@ -5,13 +5,13 @@
 //  Offline compositor for studio exports: decodes the screen (and camera)
 //  recordings frame by frame, draws each frame through the same
 //  RecordingStudioLayout / ViewportTimeline math the live preview
-//  uses, and writes a new HEVC movie. Audio tracks (system + microphone)
+//  uses, and writes a new H.264 or HEVC movie. Audio tracks (system + microphone)
 //  are mixed and passed through on the unchanged timeline, unless the
 //  project imported a soundtrack to replace them.
 //
-//  Everything static - the background fill and the card shadow - is
-//  rendered once into a backdrop image; per frame the work is one backdrop
-//  blit plus the clipped video draws.
+//  Static backgrounds, clipping masks, and camera decoration are cached.
+//  Core Image composites media directly into the encoder buffer; Quartz
+//  supplies only cursor and text artwork.
 //
 
 import AppKit
@@ -26,11 +26,6 @@ import SwiftUI
 import VideoToolbox
 
 nonisolated final class RecordingStudioExporter: @unchecked Sendable {
-    /// Fixed output cadence for both the writer's frame clock and the
-    /// compositor's motion-blur shutter - kept as one constant so they can
-    /// never drift apart.
-    private static let outputFrameRate: Double = 60
-
     struct Configuration: Sendable {
         let screenURL: URL
         let cameraURL: URL?
@@ -154,6 +149,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         }
     }
 
+    @concurrent
     private func run(
         _ configuration: Configuration,
         cancelFlag: CancelFlag,
@@ -193,7 +189,10 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         let screenReader = try AVAssetReader(asset: screenAsset)
         let videoOutput = AVAssetReaderTrackOutput(
             track: videoTrack,
-            outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+            outputSettings: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+                kCVPixelBufferIOSurfacePropertiesKey as String: [:]
+            ]
         )
         videoOutput.alwaysCopiesSampleData = false
         screenReader.add(videoOutput)
@@ -257,13 +256,18 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             ],
             AVVideoWidthKey: canvasWidth,
             AVVideoHeightKey: canvasHeight,
+            AVVideoColorPropertiesKey: [
+                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+                AVVideoTransferFunctionKey: AVVideoTransferFunction_IEC_sRGB,
+                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2
+            ],
             AVVideoCompressionPropertiesKey: [
                 AVVideoAverageBitRateKey: Self.averageBitRate(
                     width: canvasWidth,
                     height: canvasHeight,
                     quality: configuration.exportSettings.quality
                 ),
-                AVVideoExpectedSourceFrameRateKey: 60
+                AVVideoExpectedSourceFrameRateKey: configuration.exportSettings.effectiveFrameRate.framesPerSecond
             ] as [String: Any]
         ]
         let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
@@ -273,9 +277,11 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         let adaptor = AVAssetWriterInputPixelBufferAdaptor(
             assetWriterInput: videoInput,
             sourcePixelBufferAttributes: [
-                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
                 kCVPixelBufferWidthKey as String: canvasWidth,
-                kCVPixelBufferHeightKey as String: canvasHeight
+                kCVPixelBufferHeightKey as String: canvasHeight,
+                kCVPixelBufferIOSurfacePropertiesKey as String: [:],
+                kCVPixelBufferMetalCompatibilityKey as String: true
             ]
         )
 
@@ -316,7 +322,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             subtitleStyle: configuration.subtitleStyle,
             karaokeTimeline: configuration.karaokeTimeline,
             includeBubble: cameraFeed != nil,
-            outputFrameInterval: 1 / Self.outputFrameRate,
+            outputFrameInterval: 1 / Double(configuration.exportSettings.effectiveFrameRate.framesPerSecond),
             reframe: configuration.reframe,
             fitContentAspect: configuration.fitContentAspect,
             crop: configuration.crop,
@@ -335,6 +341,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
                 compositor: compositor,
                 cameraFeed: cameraFeed,
                 clipTimeline: clipTimeline,
+                frameRate: Double(configuration.exportSettings.effectiveFrameRate.framesPerSecond),
                 writer: writer,
                 cancelFlag: cancelFlag,
                 progress: progress
@@ -387,6 +394,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         compositor: StudioFrameCompositor,
         cameraFeed: CameraFrameFeed?,
         clipTimeline: RecordingClipTimeline,
+        frameRate: Double,
         writer: AVAssetWriter,
         cancelFlag: CancelFlag,
         progress: @escaping @Sendable (Double) -> Void
@@ -398,7 +406,6 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         // the last click). Each tick re-renders the newest source frame at
         // or before it; only writing on source arrivals would hold the last
         // zoomed frame through the move and then visibly jump.
-        let frameRate = Self.outputFrameRate
         let duration = clipTimeline.duration
         let frameCount = max(1, Int((duration * frameRate).rounded()))
 
@@ -413,6 +420,28 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         var currentBuffer: CVPixelBuffer?
         var pending = nextSourceFrame()
         var previousClipID: UUID?
+
+        // Three retained frames overlap decode, GPU work, and hardware encoding
+        // without allowing a long export to accumulate full-resolution buffers.
+        var pendingFrames: [(task: CIRenderTask, image: CIImage, buffer: CVPixelBuffer, time: CMTime)] = []
+        defer {
+            for frame in pendingFrames {
+                withExtendedLifetime(frame.image) { _ = try? frame.task.waitUntilCompleted() }
+            }
+        }
+        func appendFirstFrame() async throws {
+            while !input.isReadyForMoreMediaData {
+                if cancelFlag.isCancelled { throw ExportError.cancelled }
+                try Task.checkCancellation()
+                guard writer.status == .writing else { throw ExportError.writerFailed(writer.error) }
+                try await Task.sleep(nanoseconds: 2_000_000)
+            }
+            let frame = pendingFrames.removeFirst()
+            try withExtendedLifetime(frame.image) { try frame.task.waitUntilCompleted() }
+            if !adaptor.append(frame.buffer, withPresentationTime: frame.time) {
+                throw ExportError.writerFailed(writer.error)
+            }
+        }
 
         for frame in 0..<frameCount {
             if cancelFlag.isCancelled { throw ExportError.cancelled }
@@ -440,13 +469,6 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             // render.
             guard let sourceBuffer = currentBuffer ?? pending?.buffer else { break }
 
-            while !input.isReadyForMoreMediaData {
-                if cancelFlag.isCancelled { throw ExportError.cancelled }
-                try Task.checkCancellation()
-                guard writer.status == .writing else { throw ExportError.writerFailed(writer.error) }
-                try await Task.sleep(nanoseconds: 2_000_000)
-            }
-
             guard let pool = adaptor.pixelBufferPool else {
                 throw ExportError.writerFailed(nil)
             }
@@ -456,9 +478,14 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
                 throw ExportError.writerFailed(nil)
             }
 
+            CVBufferSetAttachments(destinationBuffer, [
+                kCVImageBufferColorPrimariesKey: kCVImageBufferColorPrimaries_ITU_R_709_2,
+                kCVImageBufferTransferFunctionKey: kCVImageBufferTransferFunction_sRGB,
+                kCVImageBufferYCbCrMatrixKey: kCVImageBufferYCbCrMatrix_ITU_R_709_2
+            ] as CFDictionary, .shouldPropagate)
             try autoreleasepool {
                 let cameraBuffer = cameraFeed?.latestFrame(at: sourceTime)
-                try compositor.render(
+                let render = try compositor.startRender(
                     screenFrame: sourceBuffer,
                     cameraFrame: cameraBuffer,
                     editorTime: editorTime,
@@ -467,14 +494,17 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
                 )
 
                 let pts = CMTime(seconds: editorTime, preferredTimescale: 600)
-                if !adaptor.append(destinationBuffer, withPresentationTime: pts) {
-                    throw ExportError.writerFailed(nil)
-                }
-
+                pendingFrames.append((render.task, render.image, destinationBuffer, pts))
             }
+            if pendingFrames.count == 3 { try await appendFirstFrame() }
             if frame % 10 == 0 {
                 progress(min(0.98, Double(frame) / Double(frameCount)))
             }
+        }
+        while !pendingFrames.isEmpty {
+            if cancelFlag.isCancelled { throw ExportError.cancelled }
+            try Task.checkCancellation()
+            try await appendFirstFrame()
         }
         input.markAsFinished()
     }
@@ -570,7 +600,10 @@ nonisolated private final class CameraFrameFeed: @unchecked Sendable {
         let reader = try AVAssetReader(asset: asset)
         let output = AVAssetReaderTrackOutput(
             track: track,
-            outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+            outputSettings: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+                kCVPixelBufferIOSurfacePropertiesKey as String: [:]
+            ]
         )
         output.alwaysCopiesSampleData = false
         reader.add(output)
@@ -630,13 +663,43 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
     private let renderContext = CIContext(options: [.cacheIntermediates: false])
     private var artworkImageCache: [String: CGImage] = [:]
     // Retain the buffer: decoder pools may recycle its address after release.
-    // Only source-dependent work is reused; overlays and mask timing still run at 60 fps.
+    // Only source-dependent work is reused; overlays and mask timing run at the output cadence.
     private var cachedSource: CVPixelBuffer?
-    private var cachedScreen: CGImage?
+    private var cachedScreen: CIImage?
     private var cachedSampleRects: [CGRect] = []
-    private var cachedMasks: [Int: CGImage] = [:]
+    private var cachedMasks: [Int: CIImage] = [:]
     private var cachedMaskBytes = 0
-    private lazy var cameraShadow: CGImage? = makeCameraShadow()
+    private lazy var overlayPool: CVPixelBufferPool? = {
+        var pool: CVPixelBufferPool?
+        CVPixelBufferPoolCreate(nil, nil, [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+            kCVPixelBufferWidthKey as String: Int(canvasSize.width),
+            kCVPixelBufferHeightKey as String: Int(canvasSize.height),
+            kCVPixelBufferIOSurfacePropertiesKey as String: [:],
+            kCVPixelBufferMetalCompatibilityKey as String: true
+        ] as CFDictionary, &pool)
+        return pool
+    }()
+    private lazy var backgroundImage = backdrop.map { CIImage(cgImage: $0) }
+        ?? CIImage(color: .black).cropped(to: CGRect(origin: .zero, size: canvasSize))
+    private lazy var cardMask = try? raster { context in
+        context.addPath(roundedPath(for: layout.cardRect, radius: layout.cardCornerRadius))
+        context.setFillColor(CGColor(gray: 1, alpha: 1))
+        context.fillPath()
+    }
+    private lazy var cameraMask = try? raster { context in
+        context.addPath(roundedPath(for: layout.bubbleRect, radius: layout.bubbleCornerRadius))
+        context.setFillColor(CGColor(gray: 1, alpha: 1))
+        context.fillPath()
+    }
+    private lazy var cameraShadow = try? raster { drawCameraShadow(in: $0) }
+    private lazy var cameraBorder = try? raster { context in
+        context.addPath(roundedPath(for: layout.bubbleRect.insetBy(dx: 0.5, dy: 0.5),
+                                    radius: layout.bubbleCornerRadius))
+        context.setStrokeColor(CGColor(gray: 1, alpha: 0.25))
+        context.setLineWidth(max(1, min(canvasSize.width, canvasSize.height) * 0.0018))
+        context.strokePath()
+    }
     private let pointerScale: CGFloat
     private let colorSpace: CGColorSpace
     private let backdrop: CGImage?
@@ -717,30 +780,18 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
         sourceTime: TimeInterval,
         into destination: CVPixelBuffer
     ) throws {
-        CVPixelBufferLockBaseAddress(destination, [])
-        defer { CVPixelBufferUnlockBaseAddress(destination, []) }
+        let render = try startRender(screenFrame: screenFrame, cameraFrame: cameraFrame,
+                                     editorTime: editorTime, sourceTime: sourceTime, into: destination)
+        try withExtendedLifetime(render.image) { try render.task.waitUntilCompleted() }
+    }
 
-        guard let base = CVPixelBufferGetBaseAddress(destination),
-              let context = CGContext(
-                data: base,
-                width: CVPixelBufferGetWidth(destination),
-                height: CVPixelBufferGetHeight(destination),
-                bitsPerComponent: 8,
-                bytesPerRow: CVPixelBufferGetBytesPerRow(destination),
-                space: colorSpace,
-                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
-              ) else {
-            throw RecordingStudioExporter.ExportError.writerFailed(nil)
-        }
-        context.interpolationQuality = .high
-
-        if let backdrop {
-            context.draw(backdrop, in: CGRect(origin: .zero, size: canvasSize))
-        } else {
-            context.setFillColor(CGColor(gray: 0, alpha: 1))
-            context.fill(CGRect(origin: .zero, size: canvasSize))
-        }
-
+    func startRender(
+        screenFrame: CVPixelBuffer,
+        cameraFrame: CVPixelBuffer?,
+        editorTime: TimeInterval,
+        sourceTime: TimeInterval,
+        into destination: CVPixelBuffer
+    ) throws -> (task: CIRenderTask, image: CIImage) {
         if cachedSource !== screenFrame {
             cachedSource = screenFrame
             cachedScreen = nil
@@ -776,116 +827,108 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
                     averaged = transformed
                 }
             }
-            guard let averaged, let image = renderContext.createCGImage(
-                averaged, from: cardRect, format: .BGRA8, colorSpace: colorSpace
-            ) else {
+            guard let averaged else {
                 throw RecordingStudioExporter.ExportError.writerFailed(nil)
             }
-            cachedScreen = image
+            cachedScreen = averaged.cropped(to: cardRect).insertingIntermediate(cache: true)
             cachedSampleRects = sampleRects
         }
-        guard let screenImage = cachedScreen else {
+        guard var screenImage = cachedScreen, let cardMask else {
             throw RecordingStudioExporter.ExportError.writerFailed(nil)
         }
-        context.saveGState()
-        context.addPath(roundedPath(for: layout.cardRect, radius: layout.cardCornerRadius))
-        context.clip()
-        // Scaling and temporal sampling happen together on the GPU. Quartz
-        // only copies the card-sized result and draws the small overlays.
-        context.draw(screenImage, in: cardRect)
-        if !masks.isEmpty {
-            context.setAlpha(1)
-            let content = contentRect(at: editorTime)
-            for (index, segment) in masks.enumerated() {
-                guard segment.isActive(at: editorTime) else { continue }
-                let regionImage: CGImage
-                if let cached = cachedMasks[index] {
-                    regionImage = cached
-                } else {
-                    guard let region = RecordingMaskRenderer.filteredRegion(
-                        source: sourceImage, segment: segment
-                    ), let image = renderContext.createCGImage(region, from: region.extent) else {
-                        throw RecordingStudioExporter.ExportError.writerFailed(nil)
-                    }
-                    regionImage = image
-                    let bytes = image.bytesPerRow * image.height
-                    // Large mask sets still render normally without retaining unbounded rasters.
-                    if cachedMaskBytes + bytes <= 32 * 1024 * 1024 {
-                        cachedMasks[index] = image
-                        cachedMaskBytes += bytes
-                    }
+        let content = flipped(contentRect(at: editorTime))
+        let transform = CGAffineTransform(
+            a: content.width / sourceImage.extent.width, b: 0,
+            c: 0, d: content.height / sourceImage.extent.height,
+            tx: content.minX, ty: content.minY
+        )
+        for (index, segment) in masks.enumerated() where segment.isActive(at: editorTime) {
+            let region: CIImage
+            if let cached = cachedMasks[index] {
+                region = cached
+            } else {
+                guard let filtered = RecordingMaskRenderer.filteredRegion(source: sourceImage, segment: segment) else {
+                    throw RecordingStudioExporter.ExportError.writerFailed(nil)
                 }
-                let drawRect = CGRect(
-                    x: content.minX + segment.rect.minX * content.width,
-                    y: content.minY + segment.rect.minY * content.height,
-                    width: segment.rect.width * content.width,
-                    height: segment.rect.height * content.height
-                )
-                context.draw(regionImage, in: flipped(drawRect))
+                let bytes = Int(filtered.extent.width.rounded(.up) * filtered.extent.height.rounded(.up)) * 8
+                // Bound retained half-float GPU mask rasters to 32 MiB per source frame.
+                if cachedMaskBytes + bytes <= 32 * 1024 * 1024 {
+                    region = filtered.insertingIntermediate(cache: true)
+                    cachedMasks[index] = region
+                    cachedMaskBytes += bytes
+                } else {
+                    region = filtered
+                }
             }
+            screenImage = region.transformed(by: transform).composited(over: screenImage)
         }
-        context.restoreGState()
+        var result = screenImage.applyingFilter("CISourceInCompositing", parameters: [
+            kCIInputBackgroundImageKey: cardMask
+        ]).composited(over: backgroundImage)
 
         // Pointer motion is resolved independently from viewport shutter
         // blur. Its interaction magnification and tilt stay anchored at the
         // recorded artwork anchor point, while the final point still passes
         // through the same viewport transform and rounded-card clip as the
         // source pixels.
-        drawPointer(editorTime: editorTime, in: context)
-
-        // The keystroke caption stays in card space - pinned to its edge and
-        // unaffected by the zoom transform, like a broadcast lower third.
-        drawKeystrokeCaption(at: sourceTime, in: context)
-
-        if let cameraFrame,
-           layout.bubbleRect.width > 0,
-           let cameraImage = Self.makeImage(from: cameraFrame, colorSpace: colorSpace) {
-            let bubble = layout.bubbleRect
-            let imageSize = CGSize(width: cameraImage.width, height: cameraImage.height)
-            let scale = max(bubble.width / imageSize.width, bubble.height / imageSize.height)
-            let fillSize = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
-            let fillRect = CGRect(
-                x: bubble.midX - fillSize.width / 2,
-                y: bubble.midY - fillSize.height / 2,
-                width: fillSize.width,
-                height: fillSize.height
-            )
-
-            let minDimension = min(canvasSize.width, canvasSize.height)
-            if let cameraShadow {
-                context.draw(cameraShadow, in: CGRect(origin: .zero, size: canvasSize))
-            } else {
-                drawCameraShadow(in: context)
-            }
-
-            context.saveGState()
-            context.addPath(roundedPath(for: bubble, radius: layout.bubbleCornerRadius))
-            context.clip()
-            context.draw(cameraImage, in: flipped(fillRect))
-            context.restoreGState()
-
-            context.saveGState()
-            context.addPath(roundedPath(for: bubble.insetBy(dx: 0.5, dy: 0.5), radius: layout.bubbleCornerRadius))
-            context.setStrokeColor(CGColor(gray: 1, alpha: 0.25))
-            context.setLineWidth(max(1, minDimension * 0.0018))
-            context.strokePath()
-            context.restoreGState()
+        if pointerTimeline != nil || keystrokeTimeline != nil {
+            result = try raster { context in
+                drawPointer(editorTime: editorTime, in: context)
+                drawKeystrokeCaption(at: sourceTime, in: context)
+            }.composited(over: result)
         }
 
-        // The subtitle bar lives in canvas space - over the background too,
-        // not just the card - and above everything else, camera included.
-        drawSubtitleBar(at: sourceTime, in: context)
+        if let cameraFrame, layout.bubbleRect.width > 0 {
+            guard let cameraMask, let cameraShadow, let cameraBorder else {
+                throw RecordingStudioExporter.ExportError.writerFailed(nil)
+            }
+            let camera = CIImage(cvPixelBuffer: cameraFrame)
+            let bubble = flipped(layout.bubbleRect)
+            let scale = max(bubble.width / camera.extent.width, bubble.height / camera.extent.height)
+            let transformed = camera.transformed(by: CGAffineTransform(
+                a: scale, b: 0, c: 0, d: scale,
+                tx: bubble.midX - camera.extent.width * scale / 2,
+                ty: bubble.midY - camera.extent.height * scale / 2
+            ))
+            result = cameraShadow.composited(over: result)
+            result = transformed.applyingFilter("CISourceInCompositing", parameters: [
+                kCIInputBackgroundImageKey: cameraMask
+            ]).composited(over: result)
+            result = cameraBorder.composited(over: result)
+        }
+
+        if subtitleTimeline != nil {
+            result = try raster { drawSubtitleBar(at: sourceTime, in: $0) }.composited(over: result)
+        }
+        // Keep media on the GPU through the encoder's IOSurface-backed buffer.
+        // Only cursor/text artwork is rasterized with Quartz; no video readback.
+        let destination = CIRenderDestination(pixelBuffer: destination)
+        destination.colorSpace = colorSpace
+        // Retain the graph (including pooled source/overlay buffers) until GPU completion.
+        return (try renderContext.startTask(toRender: result, to: destination), result)
     }
 
-    private func makeCameraShadow() -> CGImage? {
-        guard layout.bubbleRect.width > 0,
-              let context = CGContext(
-                data: nil, width: Int(canvasSize.width), height: Int(canvasSize.height),
-                bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace,
-                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
-              ) else { return nil }
-        drawCameraShadow(in: context)
-        return context.makeImage()
+    private func raster(_ draw: (CGContext) -> Void) throws -> CIImage {
+        guard let pool = overlayPool else {
+            throw RecordingStudioExporter.ExportError.writerFailed(nil)
+        }
+        var buffer: CVPixelBuffer?
+        CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer)
+        guard let buffer else { throw RecordingStudioExporter.ExportError.writerFailed(nil) }
+        guard CVPixelBufferLockBaseAddress(buffer, []) == kCVReturnSuccess else {
+            throw RecordingStudioExporter.ExportError.writerFailed(nil)
+        }
+        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+        guard let base = CVPixelBufferGetBaseAddress(buffer), let context = CGContext(
+            data: base,
+            width: Int(canvasSize.width), height: Int(canvasSize.height),
+            bitsPerComponent: 8, bytesPerRow: CVPixelBufferGetBytesPerRow(buffer), space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        ) else { throw RecordingStudioExporter.ExportError.writerFailed(nil) }
+        context.clear(CGRect(origin: .zero, size: canvasSize))
+        context.interpolationQuality = .high
+        draw(context)
+        return CIImage(cvPixelBuffer: buffer, options: [.colorSpace: colorSpace])
     }
 
     private func drawCameraShadow(in context: CGContext) {
@@ -1246,25 +1289,6 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
             cornerHeight: boundedRadius,
             transform: nil
         )
-    }
-
-    private static func makeImage(from pixelBuffer: CVPixelBuffer, colorSpace: CGColorSpace) -> CGImage? {
-        CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
-        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
-
-        guard let base = CVPixelBufferGetBaseAddress(pixelBuffer),
-              let context = CGContext(
-                data: base,
-                width: CVPixelBufferGetWidth(pixelBuffer),
-                height: CVPixelBufferGetHeight(pixelBuffer),
-                bitsPerComponent: 8,
-                bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer),
-                space: colorSpace,
-                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
-              ) else {
-            return nil
-        }
-        return context.makeImage()
     }
 
     private static func renderBackdrop(

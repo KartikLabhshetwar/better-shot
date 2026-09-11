@@ -13,12 +13,15 @@ unless you share it, and shares go to storage you own.
 ## Features
 
 - **Screenshots:** region, fullscreen, and window capture with macOS's native selector. OCR text extraction and hex color picker included.
+- **Screenshot saving:** Copy is clipboard-only for every capture mode and in the editor. Screenshots stay in private working storage until you choose Save or Export; editor Save also works before making edits.
 - **Screen recording:** capture a display, window, or adjustable region with system audio, microphone, camera overlay, and teleprompter.
 - **Image editor:** arrows, shapes, text, numbered markers, highlight, blur, pixelate, and crop. Background framing with padding, corners, shadow, wallpapers, and ten soft gradients.
-- **Video editor:** cuts, clip speeds (0.25x to 8x), transitions, crop, zoom, masks (blur/pixelate with Crop Only or Full Frame), captions, and camera controls.
+- **Video editor:** cuts, clip speeds (0.25x to 8x), transitions, crop, zoom, masks (blur/pixelate with Crop Only or Full Frame), captions, and camera controls. Camera offers 1:1, 4:3, 3:4, 16:9, 9:16, and 4:5 frames; set 1:1 with 50% rounding for a circle. Background > Video aspect ratio controls the whole video independently, with Original, 16:9, 16:10, 4:3, 9:16, 1:1, and 4:5 plus Fill/Fit.
+- **Cursor styles:** Recorded, macOS (Apple's native arrow), Dark, Light, and Dot. Older projects using Hand keep their saved appearance.
 - **Cursor styling:** choose Recorded, Dark, Light, Dot, or native Hand with size, motion, press/ripple effects, and idle hiding. High-resolution artwork preserved in exports.
 - **Capture deck:** keep up to five captures in a floating stack with Copy, Save, Pin, Edit, cloud share, and drag-out. Configurable layouts, tool positions, and dismissal timing.
 - **Media Gallery:** browse captures, edits, and recordings with search, filters, and cloud link management. Delete locally (Trash) or remotely (R2) with confirmation.
+- **Video export:** GPU compositing and hardware encoding, with 30/60 fps, resolution, quality, and MP4/MOV controls. Export and sharing reuse unchanged saved renders.
 - **Cloud sharing:** upload to your own Cloudflare R2 bucket. Optimized image compression, MP4 video, native progress, and retry on failure.
 - **75 customizable shortcuts:** configure global capture, recording controls, deck actions, image tools, and video editing keys. Conflict detection per scope.
 - **URL scheme:** trigger actions from Raycast, Shortcuts, Alfred, or scripts: `bettershot://capture/region`, `bettershot://record`, `bettershot://ocr`, and more.

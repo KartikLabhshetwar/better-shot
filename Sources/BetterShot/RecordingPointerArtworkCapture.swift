@@ -16,8 +16,9 @@ enum PointerArtworkCapture {
     static func styledArtwork(_ appearance: RecordingCursorAppearance) -> PointerArtwork? {
         guard appearance != .recorded else { return nil }
         if let cached = styledCache[appearance] { return cached }
-        if appearance == .hand {
-            let artwork = capture(NSCursor.pointingHand, id: "bettershot-cursor-hand")
+        if appearance == .macOS || appearance == .hand {
+            let artwork = capture(appearance == .macOS ? NSCursor.arrow : NSCursor.pointingHand,
+                                  id: "bettershot-cursor-" + appearance.rawValue)
             if let artwork { styledCache[appearance] = artwork }
             return artwork
         }

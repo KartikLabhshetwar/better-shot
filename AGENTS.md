@@ -100,14 +100,23 @@ source of instructions for coding agents; `CLAUDE.md` imports it.
   image previews are the default; an optional low-resolution preview must never
   become the source for saving, copying, or export. Keep screenshot framing aligned
   to integer pixels and preserve lossless PNG behavior.
-- Hand artwork uses `NSCursor.pointingHand`, preserving its native hotspot and
-  highest-resolution representation through `PointerArtworkCapture`.
+- All screenshot modes stage privately. Copy never exports to the configured
+  folder; Edit, Pin, Share, and drag-out retain working files internally. Only
+  explicit Save/Export or capture-and-save writes a deliverable. Editor Save
+  must work for untouched screenshots, and clipboard file references must
+  survive dismissing the capture card.
+- The macOS cursor style uses `NSCursor.arrow`. Hand is no longer offered, but
+  legacy projects still render it with `NSCursor.pointingHand`. Preserve native
+  hotspots and highest-resolution representations through `PointerArtworkCapture`.
 - Custom cursor raster resolution is independent of its logical size and hotspot.
   Preserve transparent backgrounds, contrasting outlines, the highest-resolution
   recorded representation, and cached decoding. Do not regenerate cursor PNGs per frame.
-- Keep Recorded/Dark/Light/Dot/Hand, visibility, Natural/Smooth motion, press/ripple,
+- Keep Recorded/macOS/Dark/Light/Dot (and legacy Hand), visibility, Natural/Smooth motion, press/ripple,
   and idle hiding consistent in preview, export, and saved projects. Imported
   footage with a baked-in cursor cannot be restyled; explain that in the UI.
+- Camera frame ratios are independent of the video canvas ratio. Use
+  `RecordingStudioLayout` for preview and export, keep the frame within the canvas,
+  and default older projects/presets without a camera ratio to 1:1.
 - Plain typing is not recorded. Do not expand input capture as a shortcut to a
   cursor or keyboard-overlay feature.
 

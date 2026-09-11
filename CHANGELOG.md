@@ -5,6 +5,21 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] - 2026-09-11
+
+### Added
+
+- Video export frame-rate controls (30 or 60 fps) in Export Options and Recording settings. Existing projects retain 60 fps.
+- GPU video compositing into shared hardware-encoder buffers for exports and sharing, avoiding per-frame video readbacks and CPU camera scaling.
+- Native macOS arrow cursor style using Apple's artwork and hotspot. It replaces Hand in the style picker; older Hand projects retain their appearance.
+- Face-camera aspect ratios: 1:1, 4:3, 3:4, 16:9, 9:16, and 4:5, with adjustable rounding, undo/redo, and matching preview/export geometry. Older projects retain their square frame.
+- Whole-video 16:10 and 4:3 presets alongside existing ratios, in a compact native menu under Background.
+
+### Fixed
+
+- **Screenshot Copy stays clipboard-only (#134, follow-up to #138)**: All screenshot capture paths now stage privately instead of saving to the configured folder before the preview appears. Opening the editor, pinning, sharing, and dragging keep working copies inside BetterShot. Only explicit Save/Export (including the capture-and-save shortcut) writes a deliverable to the save folder.
+- **Save untouched screenshots from the editor**: Save now works before any edits, writes to the configured folder, and updates the associated file on subsequent saves. Copy preserves a private file reference for paste targets after the preview is dismissed.
+
 ## [0.5.2] - 2026-09-10
 
 More control over startup, keyboard shortcuts, and the capture overlay, with a clearer installer and simpler onboarding.

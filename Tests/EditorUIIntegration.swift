@@ -12,6 +12,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     try await checkMediaGallery(imageURL: imageURL, movieURL: movieURL)
     checkTransferToastPresentation(movieURL: movieURL)
     try await checkGeneralEditorDefaults(movieURL: movieURL)
+    try await checkCameraAspectRatios(movieURL: movieURL)
     for appearanceName in [NSAppearance.Name.aqua, .darkAqua] {
         NSAppearance(named: appearanceName)!.performAsCurrentDrawingAppearance {
             let neutral = StudioChrome.accentNSColor.usingColorSpace(.deviceRGB)!
@@ -96,7 +97,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     print("PASS tool deselection and ten shared gradient definitions / saved highlights")
 
     var cursorStyle = RecordingStudioStyle()
-    cursorStyle.cursor.appearance = .hand
+    cursorStyle.cursor.appearance = .macOS
     cursorStyle.cursor.hideWhenIdle = true
     let cursorData = try JSONEncoder().encode(StoredRecordingStudioStyle(cursorStyle))
     let restoredStyle = try JSONDecoder().decode(StoredRecordingStudioStyle.self, from: cursorData)
@@ -123,6 +124,14 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     let nativeHand = PointerArtworkCapture.capture(NSCursor.pointingHand, id: "bettershot-cursor-hand")!
     precondition(hand == nativeHand, "Hand uses the actual macOS artwork, full raster, logical size, and hotspot")
     precondition(hand == PointerArtworkCapture.styledArtwork(.hand), "Native hand artwork is cached")
+    let arrow = PointerArtworkCapture.styledArtwork(.macOS)!
+    precondition(arrow == PointerArtworkCapture.capture(NSCursor.arrow, id: "bettershot-cursor-macOS"),
+                 "macOS style uses Apple's full-resolution arrow artwork and native hotspot")
+    precondition(arrow == PointerArtworkCapture.styledArtwork(.macOS), "Native arrow artwork is cached")
+    precondition(RecordingCursorAppearance.selectableCases.contains(.macOS)
+                 && !RecordingCursorAppearance.selectableCases.contains(.hand))
+    let legacyHand = try JSONDecoder().decode(RecordingCursorAppearance.self, from: Data("\"hand\"".utf8))
+    precondition(legacyHand == .hand, "Existing Hand projects remain readable")
     let delayFormat = InspectorValueFormat.seconds(never: CGFloat(AppPreferences.overlayDismissNever))
     precondition(delayFormat.displayString(for: 5) == "5s")
     precondition(delayFormat.displayString(for: 16) == "Never")
@@ -130,7 +139,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     precondition(delayFormat.parse("invalid") == nil && delayFormat.parse("NaN") == nil)
     precondition(InspectorValueFormat.points.parse("24 pt") == 24 && InspectorValueFormat.points.step == 4)
     precondition(InspectorValueFormat.percent(step: 0.05).step == 0.05)
-    print("PASS native hand capture/cache, cursor project persistence, and settings slider units / Never input")
+    print("PASS native macOS arrow and legacy hand capture/cache, cursor persistence, and settings slider input")
     let multiResolutionCursor = NSImage(size: NSSize(width: 16, height: 20))
     for scale in [1, 4] {
         let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 16 * scale, pixelsHigh: 20 * scale,
@@ -165,7 +174,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         PointerTravelSample(time: 0, x: 0.1, y: 0.1),
         PointerTravelSample(time: 0.5, x: 0.8, y: 0.6)
     ], presses: [PointerPressEvent(time: 0.6, x: 0.8, y: 0.6, button: 0, phase: .down)])
-    let styledArtwork = PointerArtworkCapture.styledArtwork(.hand)!
+    let styledArtwork = PointerArtworkCapture.styledArtwork(.macOS)!
     let naturalPointer = PointerTimeline.build(capture: clickCapture, duration: 1, options: cursorOptions,
                                                overrideArtwork: styledArtwork)
     let clickFrame = naturalPointer.frame(at: 0.65)!
@@ -386,6 +395,9 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         }.buttonStyle(EditorButtonStyle(bordered: true)).padding(20),
             scheme: scheme, width: 480,
             to: output.appendingPathComponent("button-states-\(name).png"), height: 180)
+        try snapshot(RecordingExportOptionsPopover(initialSettings: VideoCompressionSettings(), onConfirm: { _ in }),
+                     scheme: scheme, width: 312,
+                     to: output.appendingPathComponent("export-options-\(name).png"), height: 580)
         try snapshot(RecordingSettingsTab(), scheme: scheme, width: 580,
                      to: output.appendingPathComponent("recording-settings-\(name).png"), height: 1100)
         for group in ShortcutService.Group.allCases {
@@ -394,11 +406,13 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         }
         try snapshot(GeneralSettingsTab(), scheme: scheme, width: 580,
                      to: output.appendingPathComponent("general-settings-\(name).png"), height: 1300)
+        try snapshot(CaptureSettingsTab(), scheme: scheme, width: 580,
+                     to: output.appendingPathComponent("capture-settings-\(name).png"), height: 720)
         try snapshot(MenuBarContentView(dismissPopover: {}), scheme: scheme, width: 296,
                      to: output.appendingPathComponent("tray-recording-\(name).png"), height: 640)
     }
     try snapshot(HStack(spacing: 24) {
-        ForEach([RecordingCursorAppearance.dark, .light, .dot, .hand], id: \.self) { appearance in
+        ForEach([RecordingCursorAppearance.macOS, .dark, .light, .dot], id: \.self) { appearance in
             VStack {
                 HStack(spacing: 0) {
                     ForEach([Color.white, Color.black], id: \.self) { background in
@@ -504,6 +518,101 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
                  "Recent capture navigation must not delete files")
     print("PASS combined recent menu without bulk deletion")
     print("PASS editor zoom bounds, fit, and light/dark view snapshots: \(output.path)")
+}
+
+@MainActor
+private func checkCameraAspectRatios(movieURL: URL) async throws {
+    let sourceSize = CGSize(width: 1920, height: 1080)
+    precondition(ExportAspectPreset.wide16x10.canvasSize(for: sourceSize) == CGSize(width: 1728, height: 1080))
+    precondition(ExportAspectPreset.standard4x3.canvasSize(for: sourceSize) == CGSize(width: 1440, height: 1080))
+    let session = RecordingSession(directoryURL: FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString + ".bettershotrec"))
+    try FileManager.default.createDirectory(at: session.directoryURL, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: session.directoryURL) }
+    try FileManager.default.copyItem(at: movieURL, to: session.screenURL)
+    try FileManager.default.copyItem(at: movieURL, to: session.cameraURL)
+    var manifest = CaptureManifest()
+    manifest.pointerSynthesized = true
+    try session.writeCaptureManifest(manifest)
+    try session.writePointerCapture(PointerCaptureFile(travel: [
+        PointerTravelSample(time: 0, x: 0.5, y: 0.5)
+    ]))
+    let model = RecordingStudioModel(url: session.directoryURL)
+    await model.load()
+    defer { model.teardown() }
+    precondition(model.hasCameraVideo)
+    model.setCameraAspectRatio(.vertical)
+    model.undo()
+    precondition(model.style.camera.aspectRatio == .square)
+    model.redo()
+    precondition(model.style.camera.aspectRatio == .vertical)
+
+    for cameraRatio in RecordingCameraAspectRatio.allCases {
+        model.style.camera.aspectRatio = cameraRatio
+        for videoRatio in ExportAspectPreset.allCases {
+            model.exportAspect = videoRatio
+            for mode in ExportAspectContentMode.allCases {
+                model.exportAspectMode = mode
+                for center in [CGPoint(x: 0.5, y: 0.5), .zero, CGPoint(x: 1, y: 1)] {
+                    model.style.camera.center = center
+                    let canvas = model.previewCanvasSize
+                    let layout = RecordingStudioLayout.make(canvasSize: canvas, style: model.style,
+                        includeBubble: true, contentAspect: model.previewContentAspect,
+                        contentMode: model.previewContentMode)
+                    let rect = layout.bubbleRect
+                    precondition(abs(rect.width / rect.height - cameraRatio.ratio) < 0.000001)
+                    precondition(rect.minX >= 0 && rect.minY >= 0
+                        && rect.maxX <= canvas.width + 0.000001 && rect.maxY <= canvas.height + 0.000001,
+                        "Every camera ratio must stay inside every video canvas")
+                    let preview = RecordingStudioLayout.make(
+                        canvasSize: CGSize(width: canvas.width / 2, height: canvas.height / 2),
+                        style: model.style, includeBubble: true)
+                    precondition(abs(preview.bubbleRect.width * 2 - rect.width) < 0.000001,
+                                 "Preview and export use the same proportional camera frame")
+                }
+                let document = RecordingEditDocument(style: model.style, zoomEnabled: false,
+                    zoomCues: [], exportAspect: videoRatio, exportAspectMode: mode)
+                let restored = try JSONDecoder().decode(RecordingEditDocument.self,
+                    from: JSONEncoder().encode(document))
+                precondition(restored.style.value == model.style && restored.exportAspectPreset == videoRatio
+                             && restored.exportAspectContentMode == mode)
+            }
+        }
+    }
+    var legacy = try JSONSerialization.jsonObject(
+        with: JSONEncoder().encode(StoredRecordingStudioStyle(model.style))) as! [String: Any]
+    legacy.removeValue(forKey: "cameraAspectRatio")
+    let restored = try JSONDecoder().decode(StoredRecordingStudioStyle.self,
+        from: JSONSerialization.data(withJSONObject: legacy))
+    precondition(restored.value.camera.aspectRatio == .square, "Older projects keep their square camera")
+    precondition(restored == StoredRecordingStudioStyle(restored.value), "Legacy presets still match their style")
+    model.style.camera.roundness = 0
+    let squareCorners = RecordingStudioLayout.make(canvasSize: model.previewCanvasSize,
+        style: model.style, includeBubble: true)
+    precondition(squareCorners.bubbleCornerRadius == 0)
+    model.style.camera.roundness = 0.5
+    let rounded = RecordingStudioLayout.make(canvasSize: model.previewCanvasSize,
+        style: model.style, includeBubble: true)
+    precondition(rounded.bubbleCornerRadius == min(rounded.bubbleRect.width, rounded.bubbleRect.height) / 2)
+    model.style.camera.isVisible = false
+    precondition(RecordingStudioLayout.make(canvasSize: model.previewCanvasSize,
+        style: model.style, includeBubble: true).bubbleRect == .zero)
+    model.style.camera.isVisible = true
+    model.style.cursor.appearance = .macOS
+    let output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        .appendingPathComponent(".build/editor-snapshots")
+    try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+    for scheme in [ColorScheme.light, .dark] {
+        for width: CGFloat in [260, 340] {
+            try snapshot(StudioInspector(model: model, initialTab: .camera), scheme: scheme, width: width,
+                to: output.appendingPathComponent("camera-ratios-\(scheme)-\(Int(width)).png"), height: 520)
+            try snapshot(StudioInspector(model: model, initialTab: .cursor), scheme: scheme, width: width,
+                to: output.appendingPathComponent("native-cursor-\(scheme)-\(Int(width)).png"), height: 520)
+            try snapshot(StudioInspector(model: model), scheme: scheme, width: width,
+                to: output.appendingPathComponent("video-ratios-\(scheme)-\(Int(width)).png"), height: 800)
+        }
+    }
+    print("PASS camera/video ratios, bounds, preview/export scaling, project/preset compatibility, undo/redo, and compact camera inspectors")
 }
 
 @MainActor

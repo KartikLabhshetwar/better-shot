@@ -77,21 +77,7 @@ final class CaptureOrchestrator {
 
             ScreenCapture.shared.playShutterSound()
 
-            if AppPreferences.keepInDeckUntilSaved, !AppPreferences.openEditorAfterCapture, action == .region || action == .timedRegion {
-                await stageForDeck(url)
-                return
-            }
-
-            guard let record = HistoryStore.shared.importCapture(from: url) else {
-                // Keep this capture available even when the history directory is unwritable.
-                lastCaptureURL = url
-                PreviewOverlay.shared.show(url: url, on: captureScreen)
-                ToastWindow.shared.show(title: "Couldn’t save capture", message: "The screenshot is still available in the preview.", systemIcon: "exclamationmark.triangle", on: captureScreen)
-                return
-            }
-            let capturedURL = HistoryStore.shared.urlForRecord(record)
-            lastCaptureURL = capturedURL
-            await applyAndSave(capturedURL, recordID: record.id, action: action)
+            await processCapturedImage(url, action: action)
         } catch {
             print("Capture failed: \(error.localizedDescription)")
         }
@@ -131,9 +117,37 @@ final class CaptureOrchestrator {
         }
     }
 
-    private func stageForDeck(_ url: URL) async {
-        let config = AppPreferences.defaultBeautifierConfig
+    /// Every screenshot starts in private staging; only an explicit Save exports it.
+    func processCapturedImage(_ url: URL, action: ShortcutService.Action = .region) async {
+        let stagedURL = await stageCapture(url)
+        let displayURL = AppPreferences.keepInDeckUntilSaved ? stagedURL : DeckStaging.retain(stagedURL)
+        if displayURL != stagedURL { DeckStaging.discard(stagedURL) }
+        lastCaptureURL = displayURL
 
+        if action == .regionCopy || (action != .regionSave && AppPreferences.copyAfterSave) {
+            do {
+                try ScreenshotFileActions.copyImageToClipboard(from: displayURL)
+            } catch {
+                ToastWindow.shared.show(title: "Copy Failed", message: error.localizedDescription,
+                    systemIcon: "exclamationmark.triangle", on: captureScreen)
+            }
+        }
+
+        PreviewOverlay.shared.show(url: displayURL, on: captureScreen)
+        if action == .regionSave {
+            PreviewOverlay.shared.save(displayURL)
+        } else if action == .regionPin {
+            let retainedURL = DeckStaging.retain(displayURL)
+            guard !DeckStaging.isStaged(retainedURL) else { return }
+            PinnedScreenshotController.shared.pin(url: retainedURL, on: captureScreen)
+            PreviewOverlay.shared.remove(displayURL)
+        } else if action == .regionEdit || (AppPreferences.openEditorAfterCapture && action != .regionCopy) {
+            PreviewOverlay.shared.openAnnotateEditor(for: displayURL)
+        }
+    }
+
+    private func stageCapture(_ url: URL) async -> URL {
+        let config = AppPreferences.defaultBeautifierConfig
         let stagedURL = await Task.detached { () -> URL? in
             guard (try? DeckStaging.prepareDirectory()) != nil,
                   let source = CGImageSourceCreateWithURL(url as CFURL, nil),
@@ -143,69 +157,17 @@ final class CaptureOrchestrator {
         }.value
 
         guard let stagedURL else {
-            lastCaptureURL = url
-            PreviewOverlay.shared.show(url: url, on: captureScreen)
-            ToastWindow.shared.show(title: "Couldn’t prepare capture", message: "The original screenshot is still available in the preview.", systemIcon: "exclamationmark.triangle", on: captureScreen)
-            return
+            ToastWindow.shared.show(title: "Couldn’t prepare capture",
+                message: "The original screenshot is still available in the preview.",
+                systemIcon: "exclamationmark.triangle", on: captureScreen)
+            return url
         }
-
         do {
             try FileManager.default.moveItem(at: url, to: DeckStaging.rawURL(for: stagedURL))
+            return stagedURL
         } catch {
-            // Preserve the original if staging its editable source fails.
             try? FileManager.default.removeItem(at: stagedURL)
-            lastCaptureURL = url
-            PreviewOverlay.shared.show(url: url, on: captureScreen)
-            return
-        }
-        lastCaptureURL = stagedURL
-        PreviewOverlay.shared.show(url: stagedURL, on: captureScreen)
-    }
-
-    private func applyAndSave(_ url: URL, recordID: UUID, action: ShortcutService.Action) async {
-        let config = AppPreferences.defaultBeautifierConfig
-        let saveDirectory = AppPreferences.saveDirectory
-
-        let savedURL = await Task.detached { () -> URL? in
-            guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-                  let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil),
-                  let rendered = BeautifierRenderer.render(image: cgImage, config: config) else { return nil }
-            return Self.saveImage(rendered, in: saveDirectory)
-        }.value
-
-        // A deleted capture must not reappear after a delayed render, even if saving failed.
-        guard HistoryStore.shared.records.contains(where: { $0.id == recordID }) else {
-            if let savedURL { try? FileManager.default.removeItem(at: savedURL) }
-            return
-        }
-        if let savedURL {
-            HistoryStore.shared.setBeautifiedPath(savedURL.path, for: recordID)
-        } else {
-            ToastWindow.shared.show(title: "Couldn’t save the edited image", message: "The original screenshot is still available in the preview.", systemIcon: "exclamationmark.triangle", on: captureScreen)
-        }
-
-        let shouldCopy = action == .regionCopy || (action != .regionSave && AppPreferences.copyAfterSave)
-        if shouldCopy, let savedURL {
-            copyToClipboard(savedURL)
-        }
-
-        let displayURL = savedURL ?? url
-
-        if savedURL != nil {
-            let appIcon = NSImage(named: "AppIcon") ?? NSApp.applicationIconImage
-            ToastWindow.shared.show(
-                message: shouldCopy ? "Screenshot saved & copied!" : "Screenshot saved!",
-                icon: appIcon,
-                on: captureScreen
-            )
-        }
-
-        if action == .regionPin {
-            PinnedScreenshotController.shared.pin(url: displayURL, on: captureScreen)
-        } else if action == .regionEdit || (AppPreferences.openEditorAfterCapture && action != .regionCopy && action != .regionSave) {
-            PreviewPanelPresenter.shared.openEditor(for: displayURL)
-        } else {
-            PreviewOverlay.shared.show(url: displayURL, on: captureScreen)
+            return url
         }
     }
 
@@ -272,12 +234,4 @@ final class CaptureOrchestrator {
         return url
     }
 
-    private func copyToClipboard(_ url: URL) {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return }
-        let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-        let pb = NSPasteboard.general
-        pb.clearContents()
-        pb.writeObjects([nsImage])
-    }
 }

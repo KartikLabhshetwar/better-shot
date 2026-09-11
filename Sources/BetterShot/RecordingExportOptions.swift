@@ -61,7 +61,16 @@ struct RecordingExportOptionsPopover: View {
                 .padding(.bottom, 2)
 
             segmented("Render Speed", options: VideoCompressionSpeed.allCases, selection: $settings.speed)
-            Text("Fast keeps 60 fps with lighter motion blur. Slow uses more blur samples during zooms.")
+            Text("Fast uses lighter motion blur. Slow uses more blur samples during zooms.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            segmented("Frame Rate", options: VideoExportFrameRate.allCases, selection: Binding(
+                get: { settings.effectiveFrameRate },
+                set: { settings.frameRate = $0 }
+            ))
+            Text("30 fps renders fewer frames. 60 fps keeps cursor movement and zooms smoother.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

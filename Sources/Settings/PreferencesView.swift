@@ -201,7 +201,7 @@ struct GeneralSettingsTab: View {
                     }
                 }
 
-                Toggle("Copy to the clipboard after saving", isOn: $copyAfterSave)
+                Toggle("Copy screenshots to the clipboard automatically", isOn: $copyAfterSave)
                 Toggle("Play a shutter sound", isOn: $playSound)
             } header: {
                 Text("Saving")
@@ -731,11 +731,11 @@ struct CaptureSettingsTab: View {
             Section {
                 Toggle(isOn: $openEditorAfterCapture) {
                     Text("Open the editor straight away")
-                    Text("Off, the screenshot is saved and copied at once, and the thumbnail is there if you want to edit it.")
+                    Text("Off, show a preview card. Screenshots reach your save folder only when you choose Save or Export.")
                 }
                 Toggle(isOn: $keepInDeckUntilSaved) {
-                    Text("Keep screenshots in the deck until saved")
-                    Text("Nothing reaches your save folder or Recent Captures until you save, copy, drag, pin, share or annotate a card. Cards stay up until you act on them, and clearing the deck deletes what is left.")
+                    Text("Keep screenshot previews open")
+                    Text("Turn off automatic dismissal. Copy never saves to your save folder.")
                 }
                 .disabled(openEditorAfterCapture)
             } header: {
@@ -850,6 +850,12 @@ struct RecordingSettingsTab: View {
             }
 
             Section {
+                Picker("Frame rate", selection: Binding(
+                    get: { exportSettings.effectiveFrameRate },
+                    set: { exportSettings.frameRate = $0 }
+                )) {
+                    ForEach(VideoExportFrameRate.allCases) { Text($0.rawValue).tag($0) }
+                }
                 Picker("Render speed", selection: $exportSettings.speed) {
                     ForEach(VideoCompressionSpeed.allCases) { Text($0.rawValue).tag($0) }
                 }
@@ -862,7 +868,7 @@ struct RecordingSettingsTab: View {
             } header: {
                 Text("Default Video Export")
             } footer: {
-                Text("Used for new projects. Fast keeps 60 fps with fewer motion blur samples. Smaller resolutions take less time to render.")
+                Text("Used for new projects. 30 fps renders fewer frames; 60 fps keeps motion smoother. Smaller resolutions take less time to render.")
             }
             .onChange(of: exportSettings) { RecordingExportPreferences.lastSettings = exportSettings }
 

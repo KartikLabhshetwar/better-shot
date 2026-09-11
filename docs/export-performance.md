@@ -1,4 +1,76 @@
-# Export performance check — 2026-09-10
+# Export performance
+
+## Cap comparison — 2026-09-11
+
+Inspected the local Cap checkout at `e23d4c619`, particularly
+`crates/export/src/mp4.rs`, `apps/desktop/src/routes/editor/ExportPage.tsx`,
+and its screenshot export paths. Cap's MP4 pipeline uses NV12 GPU frames,
+IOSurface input to VideoToolbox, and bounded queues between rendering and
+encoding. Its checked-in export UI defaults to **720p, 30 fps**; BetterShot's
+existing default is original resolution at 60 fps. Default-setting comparisons
+therefore mix rendering speed with very different workloads. Cap itself was
+not benchmarked in this comparison.
+
+BetterShot now applies that architecture through native Core Image and
+AVFoundation, with no additional dependencies:
+
+- Screen, camera, scaling, temporal blur, and redaction stay on the GPU through
+  an IOSurface-backed NV12 encoder buffer.
+- Cursor/text overlays use pooled shared buffers. A sampled intermediate
+  implementation spent most of its active compositor CPU time uploading and
+  compressing full-canvas CGImage textures; shared overlays remove that copy.
+- Three frames can be in flight, overlapping decoding, GPU work, and encoding.
+  Input images remain retained until their GPU task completes, including on
+  cancellation. Static decoration and source-dependent mask work are cached.
+- Export and share keep using the same compositor and saved-render cache.
+  Native Export Options and Recording settings expose 30/60 fps; missing
+  fields in older projects still mean 60 fps. The frame clock and shutter use
+  the same setting.
+- Rendered buffers and encoded movies explicitly agree on sRGB transfer and
+  Rec. 709 primaries/matrix. Export tests compare decoded colors with the
+  source after color conversion, allowing for lossy encoding.
+
+The native render destination and pixel-buffer APIs are documented by
+[Apple's Core Image reference](https://developer.apple.com/documentation/coreimage/cicontext).
+
+### Two-minute benchmark
+
+Apple M5, 32 GB RAM; optimized Release objects, H.264 MP4, 1920×1080 output,
+with audio. Before/after use the existing synthetic 30 fps moving-block source.
+The heavy workload includes 12 zooms, camera, cursor/click effects, crop,
+gradient, rounded corners, shadows, and four masks (two blur, two pixelate).
+
+| Workload | Before | After | Speedup | Upload preparation after |
+| --- | ---: | ---: | ---: | ---: |
+| Plain, Fast, 60 fps | 28.4 s | 26.7 s | 1.07× | 0.09 s |
+| Effects, Fast, 60 fps | 101.2 s | 32.6 s | 3.10× | 0.10 s |
+| Effects, Ultrafast, 60 fps | 124.8 s | 29.7 s | 4.20× | 0.11 s |
+| Effects, Fast, 30 fps (new option) | — | 16.1 s | — | 0.07 s |
+
+The 30 fps result exports half as many frames; it is a separate quality/cadence
+choice, not the basis of the 60 fps speedup. Plain video improved only slightly.
+These are single runs, with other work active in the workspace and variable
+system load; the unusually slow Ultrafast baseline illustrates that variability.
+The source is highly compressible and does not represent every real recording.
+No build was deliberately run alongside the final benchmark. All four outputs
+were checked for the expected duration. Final sizes were 1.47, 15.89, 15.67,
+and 9.08 MB, respectively. Upload preparation reused each MP4; no credentials,
+R2 requests, or network transfers were used.
+
+### Verification
+
+The focused production checks cover source colors/orientation, timed masks,
+all six camera ratios, fresh versus cached GPU frames (one 8-bit rounding level
+allowed), encoded colors, 30/60 fps frame counts, audio, fractional clip timing,
+legacy settings, render-cache invalidation, and cancellation before export and
+with GPU frames in flight. Export options were inspected in light/dark snapshots
+at compact width. Snapshots do not verify native popover placement or live
+AVPlayer rendering.
+
+Commands for full checks, focused video checks, and the benchmark are in
+[CONTRIBUTING.md](../CONTRIBUTING.md).
+
+## Previous measurement — 2026-09-10
 
 Measured on an Apple M5 with 32 GB RAM using optimized Release objects
 (`SWIFT_COMPILATION_MODE=incremental` for the standalone test runner). Each

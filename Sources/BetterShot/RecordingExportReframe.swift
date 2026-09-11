@@ -21,6 +21,8 @@ import Foundation
 nonisolated enum ExportAspectPreset: String, Codable, CaseIterable, Sendable {
     case original
     case wide16x9
+    case wide16x10
+    case standard4x3
     case vertical9x16
     case square
     case portrait4x5
@@ -29,6 +31,8 @@ nonisolated enum ExportAspectPreset: String, Codable, CaseIterable, Sendable {
         switch self {
         case .original: "Original"
         case .wide16x9: "16:9"
+        case .wide16x10: "16:10"
+        case .standard4x3: "4:3"
         case .vertical9x16: "9:16"
         case .square: "1:1"
         case .portrait4x5: "4:5"
@@ -39,6 +43,8 @@ nonisolated enum ExportAspectPreset: String, Codable, CaseIterable, Sendable {
         switch self {
         case .original: "Keep the recording's own aspect ratio"
         case .wide16x9: "Landscape 16:9 - YouTube"
+        case .wide16x10: "Landscape 16:10 - Mac displays"
+        case .standard4x3: "Landscape 4:3 - presentations"
         case .vertical9x16: "Vertical 9:16 - Shorts, Reels, TikTok"
         case .square: "Square 1:1"
         case .portrait4x5: "Portrait 4:5 - feed posts"
@@ -50,6 +56,8 @@ nonisolated enum ExportAspectPreset: String, Codable, CaseIterable, Sendable {
         switch self {
         case .original: nil
         case .wide16x9: 16.0 / 9.0
+        case .wide16x10: 16.0 / 10.0
+        case .standard4x3: 4.0 / 3.0
         case .vertical9x16: 9.0 / 16.0
         case .square: 1
         case .portrait4x5: 4.0 / 5.0

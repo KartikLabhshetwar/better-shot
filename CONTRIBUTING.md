@@ -99,8 +99,12 @@ Region screenshots use `/usr/sbin/screencapture -i`. Source capture is PNG;
 the export-format setting controls saved deliverables. Full-resolution editor
 previews are the default.
 
-When deck staging is enabled, `DeckStaging` holds captures until Save, Pin,
-Share, Edit, or drag-out promotes them. Copy writes to the clipboard only.
+Every screenshot starts in `DeckStaging`, regardless of capture mode or editor
+preferences. Copy writes to the clipboard only, retaining a private temporary
+file for file-based paste targets. Edit, Pin, Share, and drag-out retain source
+pixels and previews inside BetterShot. Only Save/Export (or the explicit
+capture-and-save shortcut) writes to the configured save folder. The deck
+retention preference controls dismissal, not automatic saving.
 
 ### Recordings
 
@@ -118,9 +122,10 @@ between the canvas and export. Recording packages contain `screen.mov`, optional
 `camera.mov`, input/capture/edit JSON, and a flattened deliverable. Source movies
 are never modified.
 
-Saving annotations (Cmd+S) commits to internal history and updates the
-previously exported file on disk via atomic replace. Export opens an NSSavePanel
-for a new destination.
+Saving annotations (Cmd+S) works for untouched screenshots too. It commits to
+internal history, creates the first export in the configured folder, and updates
+the associated export via atomic replace on later saves. Copy and Share do not
+create or update that export. Export opens an NSSavePanel for a new destination.
 
 General > Default Look supplies background, padding, corner radius, and shadow
 for new images and videos. Saved projects retain their own settings.
@@ -148,6 +153,34 @@ make test
 
 Builds unsigned, runs `scripts/run-checks.sh`, then `Tests/run-exports.sh`.
 Tests use `BETTERSHOT_TESTING=1` to prevent real R2 Keychain access.
+
+For the screenshot capture/Copy/Save regression checks alone (plus the build and
+standalone checks), run `BETTERSHOT_CHECK_SCREENSHOT_SAVING=1 make test`. The
+fixture drives the production post-capture pipeline without requesting screen
+capture permission and isolates its history, deck, and save folder.
+
+After a Debug test build, run just the compositor and encoded-video checks with
+`BETTERSHOT_CHECK_VIDEO_EXPORTS=1 bash Tests/run-exports.sh`. This covers decoded
+colors, masks, camera ratios, cached frames, both frame rates, audio, saved-render
+invalidation, and cancellation with GPU frames in flight.
+
+For an export performance comparison, use optimized objects and run the benchmark
+without concurrent builds. It exports synthetic two-minute clips at 1080p60
+(plain and heavy effects) plus a heavy-effects 30 fps variant, with test-only audio
+and upload preparation. It does not upload or read R2 credentials.
+
+```bash
+xcodebuild -project BetterShot.xcodeproj -scheme BetterShot -configuration Release \
+  -derivedDataPath .build CODE_SIGNING_ALLOWED=NO ENABLE_TESTABILITY=YES \
+  SWIFT_COMPILATION_MODE=incremental build
+BETTERSHOT_BUILD_CONFIGURATION=Release BETTERSHOT_BENCHMARK=1 bash Tests/run-exports.sh
+```
+
+Export cadence and the motion-blur shutter use the same frame-rate setting.
+Missing frame-rate fields in older projects resolve to 60 fps. The shared
+compositor keeps decoded media and filtered masks on the GPU through NV12
+encoder buffers; Quartz supplies static decoration, cursor artwork, and text.
+See [export-performance.md](docs/export-performance.md) for measurements.
 
 For focused iteration, run the relevant standalone check directly. For a new
 geometry rule or nontrivial branch, add a small regression check against

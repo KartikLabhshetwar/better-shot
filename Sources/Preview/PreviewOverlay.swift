@@ -111,14 +111,8 @@ final class PreviewOverlay {
         for url in snapshot where shareIDs[url] == nil {
             if Self.isVideo(url) {
                 save(url)
-            } else if DeckStaging.isStaged(url) {
-                guard !DeckStaging.isStaged(DeckStaging.promote(url)) else {
-                    showSaveFailure(for: url)
-                    continue
-                }
+            } else if saveScreenshot(url) {
                 savedCount += 1
-                remove(url)
-            } else {
                 remove(url)
             }
         }
@@ -149,14 +143,37 @@ final class PreviewOverlay {
             }
             return
         }
-        if DeckStaging.isStaged(url) {
-            guard !DeckStaging.isStaged(DeckStaging.promote(url)) else {
-                showSaveFailure(for: url)
-                return
-            }
-            showSavedToast(count: 1)
-        }
+        guard saveScreenshot(url) else { return }
+        showSavedToast(count: 1)
         remove(url)
+    }
+
+    private func saveScreenshot(_ url: URL) -> Bool {
+        do {
+            if DeckStaging.isStaged(url) {
+                guard !DeckStaging.isStaged(DeckStaging.promote(url)) else {
+                    throw CocoaError(.fileWriteUnknown)
+                }
+            } else {
+                try ScreenshotFileActions.saveCapture(from: url)
+            }
+            return true
+        } catch {
+            showSaveFailure(for: url)
+            return false
+        }
+    }
+
+    func copy(_ url: URL) {
+        do {
+            if Self.isVideo(url) { try VideoFileActions.copyToClipboard(from: url) }
+            else { try ScreenshotFileActions.copyImageToClipboard(from: url) }
+            remove(url)
+        } catch {
+            cancelScheduledDismiss(for: url)
+            ToastWindow.shared.show(title: "Copy Failed", message: error.localizedDescription,
+                systemIcon: "exclamationmark.triangle", on: targetScreen)
+        }
     }
 
     fileprivate func showSaveFailure(for url: URL) {
@@ -211,10 +228,10 @@ final class PreviewOverlay {
                 message: "Add your cloud account in Settings → Sharing, then try again.", canRetry: true)
             return
         }
-        let savedURL = DeckStaging.promote(url)
+        let savedURL = DeckStaging.retain(url)
         guard !DeckStaging.isStaged(savedURL) else {
-            shareStatuses[url] = .failed(headline: "Couldn’t save capture",
-                message: "Check the save folder in General settings, then retry.", canRetry: true)
+            shareStatuses[url] = .failed(headline: "Couldn’t prepare capture",
+                message: "The screenshot is still in the deck. Check available disk space and retry.", canRetry: true)
             return
         }
         let id = UUID()
@@ -272,7 +289,11 @@ final class PreviewOverlay {
     // MARK: - Panel Setup
 
     func openAnnotateEditor(for url: URL) {
-        let savedURL = DeckStaging.promote(url)
+        let savedURL = DeckStaging.retain(url)
+        guard !DeckStaging.isStaged(savedURL) else {
+            showSaveFailure(for: url)
+            return
+        }
         remove(url)
         PreviewPanelPresenter.shared.openEditor(for: savedURL)
     }
@@ -329,7 +350,8 @@ final class PreviewOverlay {
         cancelScheduledDismiss(for: url)
         guard items.contains(url) else { return }
         guard AppPreferences.overlayDismisses(after: AppPreferences.overlayDismissDelay),
-              !DeckStaging.isStaged(url), shareStatuses[url] == nil else { return }
+              (!DeckStaging.isStaged(url) || !AppPreferences.keepInDeckUntilSaved),
+              shareStatuses[url] == nil else { return }
         dismissTasks[url] = Task {
             try? await Task.sleep(for: .seconds(AppPreferences.overlayDismissDelay))
             guard !Task.isCancelled else { return }
@@ -460,8 +482,8 @@ struct PreviewCardView: View {
                     overlay.openAnnotateEditor(for: url)
                 }
                 .onDrag {
-                    DeckStaging.promote(url)
-                    if let provider = NSItemProvider(contentsOf: url) {
+                    let retainedURL = DeckStaging.retain(url)
+                    if !DeckStaging.isStaged(retainedURL), let provider = NSItemProvider(contentsOf: retainedURL) {
                         provider.suggestedName = url.lastPathComponent
                         return provider
                     }
@@ -559,7 +581,7 @@ struct PreviewCardView: View {
     private func perform(_ tool: OverlayTool) {
         switch tool {
         case .pin:
-            let savedURL = DeckStaging.promote(url)
+            let savedURL = DeckStaging.retain(url)
             guard !DeckStaging.isStaged(savedURL) else {
                 overlay.showSaveFailure(for: url)
                 return
@@ -575,15 +597,7 @@ struct PreviewCardView: View {
         case .save:
             overlay.save(url)
         case .copy:
-            do {
-                if isVideo { try VideoFileActions.copyToClipboard(from: url) }
-                else { try ScreenshotFileActions.copyImageToClipboard(from: url) }
-                overlay.remove(url)
-            } catch {
-                overlay.cancelScheduledDismiss(for: url)
-                ToastWindow.shared.show(title: "Copy Failed", message: error.localizedDescription,
-                    systemIcon: "exclamationmark.triangle", on: overlay.currentScreen)
-            }
+            overlay.copy(url)
         }
     }
 }

@@ -47,7 +47,7 @@ enum VideoCompressionSpeed: String, CaseIterable, Identifiable, Codable, Sendabl
         rawValue.lowercased()
     }
 
-    /// Preserve 60 fps; only the temporal blur sampling budget changes.
+    /// Only the temporal blur sampling budget changes; cadence is set separately.
     var motionBlurSamples: Int {
         switch self {
         case .ultrafast: 1
@@ -56,6 +56,14 @@ enum VideoCompressionSpeed: String, CaseIterable, Identifiable, Codable, Sendabl
         case .slow: 24
         }
     }
+}
+
+enum VideoExportFrameRate: String, CaseIterable, Identifiable, Codable, Sendable {
+    case fps30 = "30 fps"
+    case fps60 = "60 fps"
+
+    var id: String { rawValue }
+    var framesPerSecond: Int { self == .fps30 ? 30 : 60 }
 }
 
 enum VideoCompressionCodec: String, CaseIterable, Identifiable, Codable, Sendable {
@@ -132,6 +140,10 @@ struct VideoCompressionSettings: Codable, Equatable, Sendable {
     /// on a missing key, and `loadEditDocument` swallows that with `try?` -
     /// a non-optional field here would silently discard the whole project.
     var container: VideoExportContainer?
+    /// Missing in older projects, whose output cadence stays at 60 fps.
+    var frameRate: VideoExportFrameRate?
+
+    var effectiveFrameRate: VideoExportFrameRate { frameRate ?? .fps60 }
 
     var effectiveContainer: VideoExportContainer { container ?? .default }
 }
