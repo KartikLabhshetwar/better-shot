@@ -1,3 +1,4 @@
+import { SocialProof } from "@/components/social-proof"
 import { DemoGallery } from "@/components/demo-gallery"
 import Image from "next/image"
 import { DownloadDropdown } from "@/components/download-dropdown"
@@ -74,22 +75,17 @@ export default async function Home() {
       />
       <SiteNav />
 
-      <main id="main">
-        <section className="pb-12 pt-28 sm:pt-36">
+      <main id="main" className="landing-page">
+        <section className="pb-12 pt-24 sm:pt-28">
           <div className="mx-auto max-w-[1100px] px-6 text-center">
-            <Reveal>
-              <h1 className="mx-auto max-w-[18ch] text-[clamp(2.5rem,6vw,4.5rem)] font-normal leading-[1.1] tracking-tight text-zinc-900">
-                One app for the whole screen.{" "}
-                <span className="text-zinc-400">Free and open source.</span>
-              </h1>
-            </Reveal>
-
-            <Reveal>
-              <p className="mx-auto mt-6 max-w-lg text-[17px] leading-relaxed text-zinc-600">
-                Screenshots, screen recording, image editor, and video editor, native on macOS.
-                No subscription, no account, no telemetry. Nothing leaves your Mac unless you share it.
-              </p>
-            </Reveal>
+            <p className="mb-5 text-sm font-medium text-brand">Screenshots &amp; screen recording for Mac</p>
+            <h1 className="hero-title">
+              Capture clearly.<br />Share beautifully.
+            </h1>
+            <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-zinc-600">
+              Record a walkthrough, polish a screenshot, and share your best work.
+              One native Mac app. Free and open source.
+            </p>
 
             <Reveal>
               <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -104,7 +100,7 @@ export default async function Home() {
             </Reveal>
 
             <Reveal>
-              <p className="mt-6 text-[13px] text-zinc-500">Free and open source · No watermark · macOS 26.0+</p>
+              <div className="mt-8 flex justify-center"><SocialProof downloads={downloads} /></div>
             </Reveal>
 
           </div>

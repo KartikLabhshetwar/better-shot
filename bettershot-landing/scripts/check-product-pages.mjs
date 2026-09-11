@@ -24,7 +24,18 @@ for (const route of routes) {
     assets.add(`/features/${demo}-demo.mp4`)
     assets.add(`/features/${demo}-poster.webp`)
   }
-  if (route === '/') assert.ok(html.includes('One app for the whole screen.'), 'Restore the original hero')
+  const videos = [...html.matchAll(/<video\b[^>]*>/g)].map(match => match[0])
+  assert.equal(videos.length, demos.length, `${route} needs an individual video for each demo`)
+  for (const video of videos) {
+    assert.ok(!/\bcontrols(?:=|\s|>)/.test(video), 'Demos must not display player controls')
+    assert.ok(video.includes('loop=""') && video.includes('muted=""') && video.includes('playsInline=""'), 'Demos must loop silently inline')
+    assert.ok(video.includes('data-autoplay="visible"'), 'Demos autoplay only while visible')
+  }
+  assert.equal((html.match(/data-demo-row="true"/g) || []).length, demos.length - 1, 'Use alternating feature rows below the main demo')
+  if (route === '/') {
+    assert.ok(html.includes('Capture clearly.'), 'Home needs the revised hero')
+    assert.ok(html.includes('BetterShot contributor'), 'Home restores contributor avatars')
+  }
   else assert.ok(html.includes('editor-tools-backdrop'), `${route} needs its dark editor detail banner`)
 }
 for (const asset of assets) {

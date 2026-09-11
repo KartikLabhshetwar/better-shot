@@ -290,3 +290,15 @@
   .product-features { padding: 24px 12px 40px; }
   .feature-panel { padding: 24px 16px; border-radius: 16px; }
 }
+
+/* Shared Geist heading hierarchy across the home and product landing pages. */
+@layer utilities {
+  .hero-title {
+    @apply mx-auto max-w-[680px] text-4xl font-normal text-zinc-900 sm:text-6xl lg:text-7xl;
+    line-height: 1.12;
+  }
+  .landing-page h2 {
+    @apply text-3xl font-normal sm:text-4xl;
+    line-height: 1.12;
+  }
+}

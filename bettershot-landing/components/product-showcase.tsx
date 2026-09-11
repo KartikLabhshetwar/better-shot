@@ -38,7 +38,7 @@ export function EditorToolsBanner({ kind }: { kind: ProductKind }) {
       <Image src={`/features/${kind === "image" ? "screenshot-tools-dark" : "video-timeline-wide-dark"}.webp`}
         alt={kind === "image" ? "BetterShot’s actual annotation toolbar in dark mode" : "BetterShot’s actual timeline, playback controls, and zoom blocks in dark mode"}
         width={kind === "image" ? 665 : 1710} height={kind === "image" ? 53 : 290}
-        sizes="(max-width: 768px) 84vw, 1100px" className="h-auto w-full rounded-xl shadow-2xl" />
+        sizes="(max-width: 768px) 84vw, 1100px" className="h-auto w-full shadow-2xl" />
     </div>
     <figcaption className="mt-4 text-center text-sm text-zinc-600">{kind === "image" ? "Every annotation tool, close at hand." : "Your clips, zooms, and playback. One timeline."}</figcaption>
   </figure>
@@ -53,7 +53,7 @@ export function ProductFeatures({ kind }: { kind: ProductKind }) {
         <FeatureGallery title={title}>
           {features[kind].map(feature => <article key={feature.src} role="group" aria-roledescription="slide" aria-label={feature.title} className="feature-card min-w-0 shrink-0 grow-0 pl-4">
             <div className="feature-media relative flex items-center justify-center overflow-hidden rounded-2xl p-5 sm:p-6">
-              <Image src={`/features/${feature.src}`} alt={`BetterShot: ${feature.title.toLowerCase()}`} width={640} height={560} sizes="(min-width: 1280px) 24vw, (min-width: 640px) 42vw, 80vw" className="max-h-full w-auto max-w-full rounded-lg object-contain shadow-xl" />
+              <Image src={`/features/${feature.src}`} alt={`BetterShot: ${feature.title.toLowerCase()}`} width={640} height={560} sizes="(min-width: 1280px) 24vw, (min-width: 640px) 42vw, 80vw" className="max-h-full w-auto max-w-full object-contain shadow-xl" />
             </div>
             <h3 className="mt-5 px-1 text-[15px] font-semibold leading-snug">{feature.title}</h3>
             <p className="mt-2 px-1 text-[13px] leading-relaxed text-zinc-600">{feature.body}</p>

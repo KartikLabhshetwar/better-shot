@@ -42,11 +42,11 @@ export async function ProductPage({ kind }: { kind: ProductKind }) {
   const release = await getLatestRelease()
   return <div className="min-h-dvh bg-white text-zinc-900">
     <SiteNav />
-    <main id="main">
-      <header className="mx-auto max-w-[1100px] px-6 pb-12 pt-28 text-center sm:pt-36">
+    <main id="main" className="landing-page">
+      <header className="mx-auto max-w-[1100px] px-6 pb-12 pt-24 text-center sm:pt-28">
         <p className="mb-5 text-sm font-medium text-brand">{page.label} for macOS</p>
-        <h1 className="mx-auto max-w-[16ch] text-[clamp(2.75rem,6vw,4.75rem)] leading-[1.06]">{page.title}</h1>
-        <p className="mx-auto mt-6 max-w-xl text-[17px] leading-relaxed text-zinc-500">{page.description}</p>
+        <h1 className="hero-title">{page.title}</h1>
+        <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-zinc-600">{page.description}</p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-6"><DownloadDropdown release={release} source="hero" /><a href="#workflow" className="text-sm font-medium text-zinc-600 hover:text-brand">See the workflow ↓</a></div>
         <p className="mt-5 text-xs text-zinc-500">Free and open source · No watermark · macOS 26.0+</p>
       </header>
