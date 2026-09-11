@@ -13,8 +13,10 @@ import CoreGraphics
 import Foundation
 
 nonisolated enum RecordingCursorAppearance: String, Codable, CaseIterable, Sendable {
-    case recorded, dark, light, dot, hand
-    var title: String { rawValue.capitalized }
+    case recorded, macOS, dark, light, dot, hand
+    // Hand remains decodable for existing projects, but is no longer offered.
+    static let selectableCases: [Self] = [.recorded, .macOS, .dark, .light, .dot]
+    var title: String { self == .macOS ? "macOS" : rawValue.capitalized }
 }
 
 nonisolated struct RecordingCursorOptions: Codable, Equatable, Sendable {

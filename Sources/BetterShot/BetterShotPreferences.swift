@@ -272,6 +272,11 @@ enum ScreenshotFileActions {
 
     private static func copyImageToClipboard(from url: URL, dataType: NSPasteboard.PasteboardType) throws {
         let imageData = try Data(contentsOf: url, options: .mappedIfSafe)
+        // Keep a clipboard snapshot independent of later dismissal, edits, or Save.
+        let clipboardURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BetterShot-Clipboard-\(UUID().uuidString)")
+            .appendingPathExtension(url.pathExtension)
+        try imageData.write(to: clipboardURL, options: .atomic)
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
 
@@ -286,7 +291,7 @@ enum ScreenshotFileActions {
         // Only providing image data is why pasting worked in Gmail but not in
         // terminal apps - those read the file URL flavor instead.
         let item = NSPasteboardItem()
-        item.setString(url.absoluteString, forType: .fileURL)
+        item.setString(clipboardURL.absoluteString, forType: .fileURL)
         item.setData(imageData, forType: dataType)
         if let tiffData = NSBitmapImageRep(data: imageData)?.tiffRepresentation
             ?? NSImage(data: imageData)?.tiffRepresentation {
@@ -313,15 +318,25 @@ enum ScreenshotFileActions {
     }
     
     static func save(from sourceURL: URL, to destinationURL: URL) throws {
-        if BetterShotPreferences.exportFormat == .png {
-            if FileManager.default.fileExists(atPath: destinationURL.path) {
-                try FileManager.default.removeItem(at: destinationURL)
-            }
-            
-            try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+        try replaceExistingExport(from: sourceURL, at: destinationURL,
+                                  compressionQuality: BetterShotPreferences.compressionQuality)
+    }
+
+    /// Explicit Save from the deck or editor. Internal previews are never export destinations.
+    @discardableResult
+    static func saveCapture(from renderedURL: URL, for captureURL: URL? = nil, replacing exportURL: URL? = nil) throws -> URL {
+        let captureURL = captureURL ?? renderedURL
+        let record = HistoryStore.shared.record(matching: captureURL)
+        let destination: URL
+        if let existing = exportURL ?? HistoryStore.shared.annotationExportURL(for: captureURL) {
+            try replaceExistingExport(from: renderedURL, at: existing,
+                                      compressionQuality: BetterShotPreferences.compressionQuality)
+            destination = existing
         } else {
-            try exportImage(from: sourceURL, to: destinationURL, contentType: BetterShotPreferences.exportFormat.contentType, compressionQuality: BetterShotPreferences.compressionQuality)
+            destination = try saveToDefaultLocation(from: renderedURL)
         }
+        if let record { HistoryStore.shared.setBeautifiedPath(destination.path, for: record.id) }
+        return destination
     }
 
     /// Updates an already-associated export without changing its file format.

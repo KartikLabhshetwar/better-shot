@@ -302,8 +302,8 @@ struct AnnotationEditorWindow: View {
                     .labelStyle(.titleAndIcon)
             }
         }
-        .disabled(!model.hasUnsavedChanges || isSaving || isExporting)
-        .help(ShortcutService.shared.help("Save your edits in BetterShot", for: .imageSave))
+        .disabled(model.previewImage == nil || isSaving || isExporting || isCopying)
+        .help(ShortcutService.shared.help("Save screenshot to your save folder", for: .imageSave))
 
         Button(action: exportImage) {
             if isExporting {
@@ -515,9 +515,8 @@ struct AnnotationEditorWindow: View {
                     shapes: model.shapes,
                     backgroundSettings: model.backgroundSettings
                 )
-                // The render stays on disk: copyPNGToClipboard offers it as a file
-                // reference too, which is what lets terminals and Slack paste it,
-                // and that flavor is only good for as long as the file is.
+                // The clipboard helper keeps a private snapshot for terminals
+                // and apps that paste files, independent of future edits or Save.
                 try ScreenshotFileActions.copyPNGToClipboard(from: renderedURL)
                 flashCopyConfirmation()
             } catch {
@@ -668,7 +667,7 @@ struct AnnotationEditorWindow: View {
         let hadDocument = ScreenshotHistoryStore.shared.hasEditDocument(for: sourceURL)
 
         // Nothing drawn and nothing previously saved: there is no work to lose.
-        guard hasContent || hadDocument else {
+        guard hasContent || hadDocument || updatingExport else {
             model.markSaved()
             return nil
         }
@@ -693,31 +692,27 @@ struct AnnotationEditorWindow: View {
             )
             model.sourceURL = resultURL
             model.baseImageURL = ScreenshotHistoryStore.baseImageURL(for: resultURL)
-        } else {
+        } else if hadDocument {
             // All annotations were cleared on a previously-edited image:
             // restore the untouched original.
             resultURL = ScreenshotHistoryStore.shared.removeAnnotations(displayURL: sourceURL)
             model.baseImageURL = resultURL
+        } else {
+            resultURL = sourceURL
         }
 
-        if updatingExport, let exportURL {
-            let compressionQuality = BetterShotPreferences.compressionQuality
-            try await Task.detached(priority: .userInitiated) {
-                try ScreenshotFileActions.replaceExistingExport(
-                    from: resultURL, at: exportURL, compressionQuality: compressionQuality)
-            }.value
+        if updatingExport {
+            lastExportURL = try ScreenshotFileActions.saveCapture(
+                from: resultURL, for: sourceURL, replacing: exportURL)
         }
         model.markSaved()
         return resultURL
     }
 
-    /// Cmd-S. Commits without closing, so long editing sessions have a
-    /// checkpoint that isn't "press Done and start over".
+    /// Cmd-S saves even an untouched screenshot that has not been exported yet.
     private func saveEdits() {
         clearInspectorFocus()
-        // Committing re-renders the composite, so a Cmd-S with nothing
-        // changed should cost nothing.
-        guard model.sourceURL != nil, model.hasUnsavedChanges, !isSaving, !isExporting else { return }
+        guard model.sourceURL != nil, model.previewImage != nil, !isSaving, !isExporting, !isCopying else { return }
 
         isSaving = true
         Task {

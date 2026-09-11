@@ -44,7 +44,14 @@ extension ShortcutService {
                 return
             }
             if action == .pinLastCapture {
-                PinnedScreenshotController.shared.pin(url: DeckStaging.promote(url), on: screen)
+                let retainedURL = DeckStaging.retain(url)
+                guard !DeckStaging.isStaged(retainedURL) else {
+                    ToastWindow.shared.show(title: "Couldn’t prepare capture",
+                        message: "The screenshot is still available. Check disk space and try again.",
+                        systemIcon: "exclamationmark.triangle", on: screen)
+                    return
+                }
+                PinnedScreenshotController.shared.pin(url: retainedURL, on: screen)
             } else {
                 PreviewOverlay.shared.show(url: url, on: screen, automaticallyDismiss: false)
             }

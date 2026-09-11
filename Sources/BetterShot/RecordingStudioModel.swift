@@ -766,6 +766,13 @@ final class RecordingStudioModel {
         updatePreviewMaskComposition()
     }
 
+    func setCameraAspectRatio(_ ratio: RecordingCameraAspectRatio) {
+        let previous = style.camera.aspectRatio
+        guard previous != ratio else { return }
+        registerUndo("Change Camera Aspect Ratio") { $0.setCameraAspectRatio(previous) }
+        style.camera.aspectRatio = ratio
+    }
+
     private func registerUndo(
         _ actionName: String,
         operation: @escaping @MainActor (RecordingStudioModel) -> Void

@@ -13,13 +13,14 @@ final class HistoryStore {
     private let manifestURL: URL
 
     init(storageDirectory: URL? = nil) {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        storageDir = storageDirectory ?? appSupport.appendingPathComponent("BetterShot", isDirectory: true)
+        storageDir = storageDirectory ?? ScreenshotHistoryStore.applicationSupportDirectory
         manifestURL = storageDir.appendingPathComponent("history.json")
 
         try? FileManager.default.createDirectory(at: storageDir, withIntermediateDirectories: true)
         loadRecords()
-        if storageDirectory == nil { pruneOrphanedBases() }
+        if storageDirectory == nil, ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] != "1" {
+            pruneOrphanedBases()
+        }
     }
 
     // MARK: - Import
@@ -110,7 +111,8 @@ final class HistoryStore {
     @discardableResult
     func setBeautifiedPath(_ path: String, for recordID: UUID) -> Bool {
         guard let index = records.firstIndex(where: { $0.id == recordID }) else { return false }
-        if let superseded = records[index].beautifiedPath, superseded != path {
+        if let superseded = records[index].beautifiedPath, superseded != path,
+           URL(fileURLWithPath: superseded).standardizedFileURL.path.hasPrefix(storageDir.standardizedFileURL.path + "/") {
             try? FileManager.default.removeItem(atPath: superseded)
         }
         records[index].beautifiedPath = path
@@ -124,7 +126,8 @@ final class HistoryStore {
         guard let record = record(matching: url), record.kind == .screenshot,
               let path = record.beautifiedPath else { return nil }
         let exportURL = URL(fileURLWithPath: path).standardizedFileURL
-        guard exportURL != urlForRecord(record).standardizedFileURL else { return nil }
+        guard !exportURL.path.hasPrefix(storageDir.standardizedFileURL.path + "/"),
+              exportURL != urlForRecord(record).standardizedFileURL else { return nil }
         return exportURL
     }
 

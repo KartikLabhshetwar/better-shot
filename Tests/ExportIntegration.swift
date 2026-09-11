@@ -1,5 +1,6 @@
 import AVFoundation
 import AppKit
+import CoreImage
 import ImageIO
 import UniformTypeIdentifiers
 
@@ -34,6 +35,13 @@ struct ExportIntegration {
             try await benchmarkExports(image: image, directory: directory)
             return
         }
+        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_VIDEO_EXPORTS"] == "1" {
+            let movie = directory.appendingPathComponent("source.mov")
+            try await makeMovie(at: movie, image: image)
+            try checkFrameReuse(image: image)
+            try await checkVideoExports(movie: movie, directory: directory)
+            return
+        }
         // A one-pixel stripe image catches subpixel resampling of captured text edges.
         let sharpContext = CGContext(data: nil, width: 31, height: 31, bitsPerComponent: 8,
             bytesPerRow: 0, space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
@@ -60,6 +68,8 @@ struct ExportIntegration {
         precondition(CGImageDestinationFinalize(destination))
         try benchmarkImageExports(image: image, directory: directory)
         try await checkCaptureStorage(image: image, source: source, directory: directory)
+        try await checkScreenshotCopyAndSave(source: source, directory: directory)
+        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_SCREENSHOT_SAVING"] == "1" { return }
         try await checkAnnotationExport(image: image, source: source, directory: directory)
         let exported = directory.appendingPathComponent("export.png")
         let start = Date()
@@ -137,6 +147,10 @@ struct ExportIntegration {
         print("PASS recording thumbnails, cached posters, and unreadable-video fallback")
         try await checkEditorUI(imageURL: source, movieURL: movie)
         try checkFrameReuse(image: image)
+        try await checkVideoExports(movie: movie, directory: directory)
+    }
+
+    @MainActor static func checkVideoExports(movie: URL, directory: URL) async throws {
         let clips = RecordingClipTimeline.full(sourceDuration: 2)
         let viewport = ViewportTimeline.build(
             cues: [
@@ -165,10 +179,34 @@ struct ExportIntegration {
             directoryURL: directory.appendingPathComponent("Cache.bettershotrec"))
         try FileManager.default.createDirectory(
             at: session.directoryURL, withIntermediateDirectories: true)
-        for speed in [VideoCompressionSpeed.fast, .slow, .ultrafast] {
+        let colorContext = CIContext()
+        func color(_ buffer: CVPixelBuffer, x: Int) -> [Int] {
+            var rgba = [UInt8](repeating: 0, count: 4)
+            colorContext.render(CIImage(cvPixelBuffer: buffer), toBitmap: &rgba, rowBytes: 4,
+                                bounds: CGRect(x: x, y: 540, width: 1, height: 1), format: .RGBA8,
+                                colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+            return rgba.prefix(3).map(Int.init)
+        }
+        let referenceAsset = AVURLAsset(url: movie)
+        let referenceReader = try AVAssetReader(asset: referenceAsset)
+        let referenceTrack = try await referenceAsset.loadTracks(withMediaType: .video).first!
+        let referenceOutput = AVAssetReaderTrackOutput(track: referenceTrack, outputSettings: [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+        ])
+        referenceReader.add(referenceOutput)
+        precondition(referenceReader.startReading())
+        let referenceBuffer = CMSampleBufferGetImageBuffer(referenceOutput.copyNextSampleBuffer()!)!
+        let referenceColors = [480, 1440].map { color(referenceBuffer, x: $0) }
+        referenceReader.cancelReading()
+        let legacySettings = Data(#"{"quality":"Medium","speed":"Fast","codec":"H.264","resolution":"Original","removeAudio":false}"#.utf8)
+        let decodedSettings = try JSONDecoder().decode(VideoCompressionSettings.self, from: legacySettings)
+        precondition(decodedSettings.effectiveFrameRate == .fps60)
+        for (speed, frameRate) in [(VideoCompressionSpeed.fast, VideoExportFrameRate.fps60),
+                                   (.slow, .fps60), (.ultrafast, .fps60), (.fast, .fps30)] {
             let withOverlays = speed == .ultrafast
             var settings = VideoCompressionSettings()
             settings.speed = speed
+            settings.frameRate = frameRate
             settings.container = withOverlays ? .mp4 : .mov
             settings.codec = withOverlays ? .hevc : .h264
             var mask = RecordingMaskSegment()
@@ -220,18 +258,27 @@ struct ExportIntegration {
                         bytes[row + 1440 * 4] > bytes[row + 1440 * 4 + 2] + 50,
                         "Right half must stay blue")
                     CVPixelBufferUnlockBaseAddress(buffer, .readOnly)
+                    for (x, expected) in zip([480, 1440], referenceColors) {
+                        let actual = color(buffer, x: x)
+                        precondition(zip(actual, expected).allSatisfy { abs($0 - $1) <= 12 },
+                                     "Encoded colors changed at \(x): \(actual), expected \(expected)")
+                    }
                 }
                 count += 1
             }
             precondition(
-                reader.status == .completed && count == 120, "60 fps cadence changed: \(count)")
-            print("PASS \(speed.rawValue) video: 120 frames, 1080p, 2s in \(elapsed)s")
+                reader.status == .completed && count == frameRate.framesPerSecond * 2, "Export cadence changed: \(count)")
+            print("PASS \(speed.rawValue) video: \(count) frames, 1080p, 2s in \(elapsed)s")
             let document = RecordingEditDocument(
                 style: style, zoomEnabled: true, zoomCues: [], clipTimeline: clips,
                 exportSettings: settings
             )
             let cached = try session.installFinalVideo(movingFrom: url, renderedFrom: document)
             precondition(session.freshFinalURL(matching: document) == cached)
+            var differentCadence = document
+            differentCadence.exportSettings?.frameRate = frameRate == .fps30 ? .fps60 : .fps30
+            precondition(session.freshFinalURL(matching: differentCadence) == nil,
+                         "Changing frame rate must invalidate the cached deliverable")
             if withOverlays {
                 for (rate, expectedDuration) in [(0.5, 4.0), (1.25, 1.6), (1.5, 4.0 / 3), (2.5, 0.8)] {
                     let timeline = RecordingClipTimeline(segments: [
@@ -278,6 +325,14 @@ struct ExportIntegration {
                 _ = try await cancelled.value
                 preconditionFailure("Cancelled export succeeded")
             } catch is CancellationError {} catch RecordingStudioExporter.ExportError.cancelled {}
+            if frameRate == .fps30 {
+                do {
+                    _ = try await RecordingStudioExporter().export(configuration) { _ in
+                        withUnsafeCurrentTask { $0?.cancel() }
+                    }
+                    preconditionFailure("Export cancelled with GPU frames in flight succeeded")
+                } catch is CancellationError {} catch RecordingStudioExporter.ExportError.cancelled {}
+            }
         }
         print("PASS camera + audio + crop + mask, cache invalidation, and cancellation")
     }
@@ -295,7 +350,11 @@ struct ExportIntegration {
                 bytesPerRow: CVPixelBufferGetBytesPerRow(resultBuffer),
                 space: CGColorSpace(name: CGColorSpace.sRGB)!,
                 bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue)!
-            if let image { context.draw(image, in: CGRect(origin: .zero, size: size)) }
+            if let image {
+                context.draw(image, in: CGRect(origin: .zero, size: size))
+                context.setFillColor(CGColor(gray: 1, alpha: 1))
+                context.fill(CGRect(x: 12, y: 12, width: 20, height: 20))
+            }
             CVPixelBufferUnlockBaseAddress(resultBuffer, [])
             return resultBuffer
         }
@@ -310,7 +369,54 @@ struct ExportIntegration {
             return data
         }
         let source = buffer(image: image)
+        var plainStyle = RecordingStudioStyle()
+        plainStyle.background = .none
+        plainStyle.padding = 0
+        plainStyle.cornerRadius = 0
+        plainStyle.shadow = 0
+        var timedMask = RecordingMaskSegment()
+        timedMask.rect = CGRect(x: 0.3, y: 0.1, width: 0.4, height: 0.8)
+        timedMask.amount = 80
+        timedMask.start = 0.5
+        timedMask.end = 1
+        let timedCompositor = StudioFrameCompositor(canvasSize: size, style: plainStyle,
+            viewportTimeline: .identity, pointerTimeline: nil, showsPressEffects: false,
+            keystrokeTimeline: nil, keystrokePlacement: .bottomCenter,
+            subtitleTimeline: nil, includeBubble: false, masks: [timedMask])
+        let sourcePixels = pixels(source)
+        for time in [0.0, 0.75, 1.25] {
+            let rendered = buffer()
+            try timedCompositor.render(screenFrame: source, cameraFrame: nil,
+                                       editorTime: time, sourceTime: time, into: rendered)
+            let renderedPixels = pixels(rendered)
+            if time == 0.75 {
+                precondition(renderedPixels != sourcePixels, "An active blur must change the exported pixels")
+            } else {
+                precondition(zip(renderedPixels, sourcePixels).allSatisfy { abs(Int($0) - Int($1)) <= 2 },
+                             "GPU output must preserve source colors, orientation, and inactive mask timing")
+            }
+        }
+        print("PASS GPU colors/orientation and timed redaction pixels")
         let changedSource = buffer(image: image.cropping(to: CGRect(x: 960, y: 0, width: 960, height: 1080))!)
+        var cameraRenders = Set<Data>()
+        for ratio in RecordingCameraAspectRatio.allCases {
+            var style = RecordingStudioStyle()
+            style.camera.aspectRatio = ratio
+            style.camera.center = CGPoint(x: 0.25, y: 0.5)
+            style.camera.size = 0.45
+            let compositor = StudioFrameCompositor(canvasSize: size, style: style,
+                viewportTimeline: .build(cues: [], capture: PointerCaptureFile(),
+                    clipTimeline: .full(sourceDuration: 2)),
+                pointerTimeline: nil, showsPressEffects: false,
+                keystrokeTimeline: nil, keystrokePlacement: .bottomCenter,
+                subtitleTimeline: nil, includeBubble: true)
+            let rendered = buffer()
+            try compositor.render(screenFrame: source, cameraFrame: changedSource,
+                                  editorTime: 0, sourceTime: 0, into: rendered)
+            precondition(cameraRenders.insert(pixels(rendered)).inserted,
+                         "Each camera ratio must produce a distinct exported frame")
+        }
+        print("PASS all six face-camera ratios through the production export compositor")
         let clips = RecordingClipTimeline.full(sourceDuration: 2)
         let viewport = ViewportTimeline.build(cues: [ZoomCue(start: 0.4, end: 1.1, zoom: 2)],
             capture: PointerCaptureFile(), clipTimeline: clips)
@@ -318,7 +424,7 @@ struct ExportIntegration {
             PointerTravelSample(time: 0, x: 0.2, y: 0.5),
             PointerTravelSample(time: 2, x: 0.8, y: 0.5)
         ]), duration: 2, clipTimeline: clips,
-            overrideArtwork: PointerArtworkCapture.styledArtwork(.light))
+            overrideArtwork: PointerArtworkCapture.styledArtwork(.macOS))
         var blur = RecordingMaskSegment()
         blur.rect = CGRect(x: 0.3, y: 0.1, width: 0.4, height: 0.8)
         blur.start = 0.05; blur.end = 0.9
@@ -342,7 +448,9 @@ struct ExportIntegration {
                 editorTime: time, sourceTime: time, into: actual)
             try compositor().render(screenFrame: screen, cameraFrame: camera,
                 editorTime: time, sourceTime: time, into: expected)
-            precondition(pixels(actual) == pixels(expected),
+            // Cached half-float GPU intermediates can round one 8-bit level
+            // differently from a freshly fused graph at filtered edges.
+            precondition(zip(pixels(actual), pixels(expected)).allSatisfy { abs(Int($0) - Int($1)) <= 1 },
                 "Reused frames differ from fresh rendering at \(time): source, zoom, mask timing, or overlays went stale")
         }
         print("PASS reused/fresh frame pixels across source, zoom, mask timing, pointer, and camera changes")
@@ -440,12 +548,14 @@ struct ExportIntegration {
         audio.frameLength = audio.frameCapacity
         audio.floatChannelData![0].initialize(repeating: 0, count: Int(audio.frameLength))
         try AVAudioFile(forWriting: soundtrack, settings: format.settings).write(from: audio)
-        for (label, effects, speed) in [("plain-fast", false, VideoCompressionSpeed.fast),
-                                        ("effects-fast", true, .fast), ("effects-ultrafast", true, .ultrafast)] {
+        for (label, effects, speed, frameRate) in [("plain-fast", false, VideoCompressionSpeed.fast, VideoExportFrameRate.fps60),
+            ("effects-fast", true, .fast, .fps60), ("effects-ultrafast", true, .ultrafast, .fps60),
+            ("effects-fast-30fps", true, .fast, .fps30)] {
             var style = RecordingStudioStyle()
             if !effects { style.background = .none; style.padding = 0; style.cornerRadius = 0; style.shadow = 0 }
             var settings = VideoCompressionSettings()
             settings.speed = speed
+            settings.frameRate = frameRate
             settings.resolution = .p1080
             settings.container = .mp4
             let configuration = RecordingStudioExporter.Configuration(
@@ -458,6 +568,7 @@ struct ExportIntegration {
                 exportSettings: settings, audioReplacementURL: soundtrack,
                 crop: effects ? CGRect(x: 0.05, y: 0.05, width: 0.9, height: 0.9) : RecordingVideoCrop.unit,
                 masks: effects ? masks : [])
+            print("BENCH starting \(label)")
             let start = Date()
             let output = try await RecordingStudioExporter().export(configuration) { _ in }
             defer { try? FileManager.default.removeItem(at: output) }
@@ -467,7 +578,7 @@ struct ExportIntegration {
             let preparationStart = Date()
             let upload = await CloudUploader.compressedVideo(at: output, into: directory)
             let preparationSeconds = Date().timeIntervalSince(preparationStart)
-            print("BENCH \(label): 120s 1080p60; render=\(renderSeconds)s; upload-preparation=\(preparationSeconds)s; render-bytes=\(ShareImageCompressor.byteCount(output)); upload-bytes=\(ShareImageCompressor.byteCount(upload))")
+            print("BENCH \(label): 120s 1080p\(frameRate.framesPerSecond); render=\(renderSeconds)s; upload-preparation=\(preparationSeconds)s; render-bytes=\(ShareImageCompressor.byteCount(output)); upload-bytes=\(ShareImageCompressor.byteCount(upload))")
         }
     }
 
@@ -555,6 +666,120 @@ private func checkAnnotationExport(image: CGImage, source: URL, directory: URL) 
 }
 
 /// Exercises production persistence in an isolated directory; never alters the user's captures.
+@MainActor
+private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throws {
+    let originalData = try Data(contentsOf: source)
+    let saveFolder = directory.appendingPathComponent("explicit-saves")
+    try FileManager.default.createDirectory(at: saveFolder, withIntermediateDirectories: true)
+    let oldFolder = AppPreferences.saveDirectory
+    let oldCopy = AppPreferences.copyAfterSave
+    let oldEditor = AppPreferences.openEditorAfterCapture
+    let oldKeep = AppPreferences.keepInDeckUntilSaved
+    let oldHandler = PreviewPanelPresenter.shared.onAnnotate
+    let oldRecords = Set(HistoryStore.shared.records.map(\.id))
+    var editorURL: URL?
+    PreviewPanelPresenter.shared.onAnnotate = { editorURL = ScreenshotHistoryStore.shared.annotationEditorURL(for: $0) }
+    AppPreferences.saveDirectory = saveFolder.path
+    AppPreferences.copyAfterSave = true
+    defer {
+        PreviewOverlay.shared.clearAll()
+        DeckStaging.purge()
+        for record in HistoryStore.shared.records where !oldRecords.contains(record.id) {
+            HistoryStore.shared.deleteRecord(record)
+        }
+        AppPreferences.saveDirectory = oldFolder
+        AppPreferences.copyAfterSave = oldCopy
+        AppPreferences.openEditorAfterCapture = oldEditor
+        AppPreferences.keepInDeckUntilSaved = oldKeep
+        PreviewPanelPresenter.shared.onAnnotate = oldHandler
+    }
+    func capture(_ action: ShortcutService.Action = .region) async throws -> URL {
+        let temporary = directory.appendingPathComponent("capture-\(UUID().uuidString).png")
+        try originalData.write(to: temporary)
+        await CaptureOrchestrator.shared.processCapturedImage(temporary, action: action)
+        return CaptureOrchestrator.shared.lastCaptureURL!
+    }
+    func savedFiles() -> [URL] {
+        try! FileManager.default.contentsOfDirectory(at: saveFolder, includingPropertiesForKeys: nil)
+    }
+    for keep in [false, true] {
+        AppPreferences.keepInDeckUntilSaved = keep
+        for opensEditor in [false, true] {
+            AppPreferences.openEditorAfterCapture = opensEditor
+            for action in [ShortcutService.Action.region, .timedRegion, .fullscreen, .window, .regionCopy, .regionEdit] {
+                editorURL = nil
+                let staged = try await capture(action)
+                precondition(savedFiles().isEmpty, "Capture and opening the editor must never export automatically")
+                if let editorURL {
+                    precondition((try? Data(contentsOf: editorURL)) == originalData, "The editor opens untouched source pixels")
+                    precondition(HistoryStore.shared.annotationExportURL(for: editorURL) == nil)
+                } else {
+                    precondition(DeckStaging.isStaged(staged) == keep)
+                    let previewData = try Data(contentsOf: staged)
+                    PreviewOverlay.shared.copy(staged)
+                    precondition(NSPasteboard.general.data(forType: .png) == previewData)
+                    let clipboardURL = URL(string: NSPasteboard.general.string(forType: .fileURL)!)!
+                    precondition(!DeckStaging.isStaged(clipboardURL)
+                        && (try? Data(contentsOf: clipboardURL)) == previewData,
+                        "Clipboard file pastes must survive dismissing the card")
+                    precondition(FileManager.default.fileExists(atPath: staged.path) != keep,
+                                 "Normal captures stay available for Restore Last Capture; staged cards are discarded")
+                    try FileManager.default.removeItem(at: clipboardURL)
+                }
+                PreviewOverlay.shared.clearAll()
+                precondition(savedFiles().isEmpty, "Deck Copy is clipboard-only")
+            }
+        }
+    }
+    AppPreferences.openEditorAfterCapture = false
+    AppPreferences.copyAfterSave = false
+    let clipboardChangeCount = NSPasteboard.general.changeCount
+    let staged = try await capture()
+    precondition(NSPasteboard.general.changeCount == clipboardChangeCount, "Disabling automatic Copy preserves the clipboard")
+    let retained = DeckStaging.retain(staged)
+    precondition(!DeckStaging.isStaged(retained) && savedFiles().isEmpty,
+                 "Edit/Pin/Share/drag-out retain privately without exporting")
+    PreviewOverlay.shared.remove(staged)
+    precondition(FileManager.default.fileExists(atPath: retained.path), "Retained media survives card dismissal")
+    let raw = ScreenshotHistoryStore.shared.annotationEditorURL(for: retained)
+    let saved = try ScreenshotFileActions.saveCapture(from: raw)
+    precondition(saved.deletingLastPathComponent().resolvingSymlinksInPath().path == saveFolder.resolvingSymlinksInPath().path
+                 && savedFiles().count == 1,
+                 "Explicit editor Save expected \(saveFolder.path), got \(saved.path); files: \(savedFiles().map(\.lastPathComponent))")
+    let savedData = try Data(contentsOf: saved)
+    let rendered = directory.appendingPathComponent("editor-render.png")
+    var background = AnnotationBackgroundSettings()
+    background.style = .solid(.black)
+    try AnnotationRenderer.render(sourceURL: raw, shapes: [], backgroundSettings: background,
+                                  destinationURL: rendered, contentType: .png)
+    let editedData = try Data(contentsOf: rendered)
+    precondition(editedData != savedData, "The editor fixture must actually change the image")
+    try ScreenshotFileActions.copyPNGToClipboard(from: rendered)
+    precondition(savedFiles().count == 1 && (try? Data(contentsOf: saved)) == savedData,
+                 "Editor Copy must not create or update an export")
+    let savedAgain = try ScreenshotFileActions.saveCapture(from: rendered, for: raw)
+    precondition(savedAgain == saved && savedFiles().count == 1)
+    precondition((try? Data(contentsOf: saved)) == editedData)
+    precondition((try? Data(contentsOf: raw)) == originalData, "Saving preserves the editable source")
+
+    let toSave = try await capture()
+    PreviewOverlay.shared.save(toSave)
+    precondition(savedFiles().count == 2 && !PreviewOverlay.shared.items.contains(toSave))
+    _ = try await capture(.regionSave)
+    precondition(savedFiles().count == 3, "Capture-and-save remains an explicit Save action")
+    let retry = try await capture()
+    let blockedFolder = directory.appendingPathComponent("not-a-directory")
+    try Data("block".utf8).write(to: blockedFolder)
+    AppPreferences.saveDirectory = blockedFolder.path
+    PreviewOverlay.shared.save(retry)
+    precondition(PreviewOverlay.shared.items.contains(retry)
+                 && FileManager.default.fileExists(atPath: retry.path), "Failed Save preserves the card for retry")
+    AppPreferences.saveDirectory = saveFolder.path
+    PreviewOverlay.shared.save(retry)
+    precondition(savedFiles().count == 4 && !PreviewOverlay.shared.items.contains(retry))
+    print("PASS all screenshot capture modes, clipboard-only deck/editor Copy, private retention, explicit Save, and retry")
+}
+
 @MainActor
 private func checkCaptureStorage(image: CGImage, source: URL, directory: URL) async throws {
     let history = HistoryStore(storageDirectory: directory.appendingPathComponent("history"))

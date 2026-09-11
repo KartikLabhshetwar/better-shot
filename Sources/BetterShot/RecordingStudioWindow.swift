@@ -2716,7 +2716,7 @@ private enum StudioTranscriptTab: CaseIterable, Identifiable {
     }
 }
 
-private struct StudioInspector: View {
+struct StudioInspector: View {
     @Bindable var model: RecordingStudioModel
     @State private var selectedTab: StudioInspectorTab = .background
     @State private var wallpaperStore = AnnotationWallpaperStore.shared
@@ -2725,6 +2725,11 @@ private struct StudioInspector: View {
     @Environment(\.colorScheme) private var colorScheme
 
     private let swatchColumns = [GridItem(.adaptive(minimum: 30, maximum: 44), spacing: 6)]
+
+    init(model: RecordingStudioModel, initialTab: StudioInspectorTab = .background) {
+        self.model = model
+        _selectedTab = State(initialValue: initialTab)
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -3004,17 +3009,16 @@ private struct StudioInspector: View {
 
     private var backgroundControls: some View {
         VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
-            InspectorGroupLabel("Aspect")
-            InspectorSegmented(
-                options: ExportAspectPreset.allCases,
-                isSelected: { $0 == model.exportAspect },
-                onTap: { model.exportAspect = $0 },
-                label: { preset in
-                    Text(preset.title)
-                        .font(.inspectorLabel)
-                        .help(preset.help)
+            InspectorGroupLabel("Video aspect ratio")
+            Picker("Video aspect ratio", selection: $model.exportAspect) {
+                ForEach(ExportAspectPreset.allCases, id: \.self) { preset in
+                    Text(preset.title).tag(preset).help(preset.help)
                 }
-            )
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .frame(maxWidth: .infinity)
+            .font(.inspectorLabel)
             if model.exportAspect != .original {
                 InspectorSegmented(
                     options: ExportAspectContentMode.allCases,
@@ -3304,8 +3308,8 @@ private struct StudioInspector: View {
                                 format: .magnification(fractionDigits: 1))
                 VStack(alignment: .leading, spacing: 8) {
                     InspectorGroupLabel("Style")
-                    HStack(spacing: 6) {
-                        ForEach(RecordingCursorAppearance.allCases, id: \.self) { appearance in
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 56), spacing: 6)], spacing: 6) {
+                        ForEach(RecordingCursorAppearance.selectableCases, id: \.self) { appearance in
                             Button { model.style.cursor.appearance = appearance } label: {
                                 VStack(spacing: 4) {
                                     if let artwork = PointerArtworkCapture.styledArtwork(appearance)
@@ -3322,6 +3326,11 @@ private struct StudioInspector: View {
                             .accessibilityLabel("\(appearance.title) cursor")
                             .accessibilityAddTraits(model.style.cursor.appearance == appearance ? .isSelected : [])
                         }
+                    }
+                    if model.style.cursor.appearance == .hand {
+                        Text("This project uses the legacy Hand cursor. Choose a style above to replace it.")
+                            .font(.inspectorLabel).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 VStack(alignment: .leading, spacing: 8) {
@@ -3594,6 +3603,19 @@ private struct StudioInspector: View {
 
     private var cameraControls: some View {
         VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
+            InspectorGroupLabel("Camera aspect ratio")
+            Picker("Camera aspect ratio", selection: Binding(
+                get: { model.style.camera.aspectRatio },
+                set: { model.setCameraAspectRatio($0) }
+            )) {
+                ForEach(RecordingCameraAspectRatio.allCases, id: \.self) { ratio in
+                    Text(ratio.rawValue).tag(ratio)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .frame(maxWidth: .infinity)
+            .font(.inspectorLabel)
             InspectorSlider(
                 "Size",
                 value: $model.style.camera.size,
@@ -3603,11 +3625,15 @@ private struct StudioInspector: View {
             InspectorSlider(
                 "Rounding",
                 value: $model.style.camera.roundness,
-                range: 0.05...0.5,
+                range: 0...0.5,
                 format: .percent()
             )
 
             Text("Drag the camera directly on the canvas to place it.")
+                .font(.inspectorLabel)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Use 1:1 with 50% rounding for a circle. Other ratios crop the camera to fill the frame.")
                 .font(.inspectorLabel)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
