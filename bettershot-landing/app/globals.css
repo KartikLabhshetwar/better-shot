@@ -268,3 +268,25 @@
 .feature-card:nth-child(4n + 4) .feature-media {
   background: radial-gradient(ellipse at 5% 90%, #9bcac8 0%, transparent 64%), radial-gradient(ellipse at 95% 5%, #c3b3e6 0%, transparent 66%), #d2e1e3;
 }
+
+/* A wide editorial row: two landscape bookends and three portrait details. */
+.product-features { padding: 48px 24px 64px; background: radial-gradient(ellipse at 50% 100%, #ead8f0, transparent 68%), #faf9fb; }
+.feature-panel { max-width: 1680px; margin: 0 auto; padding: clamp(24px, 3.5vw, 56px); border: 1px solid #f0edf2; border-radius: 20px; background: white; box-shadow: 0 14px 44px #3821460b; }
+.feature-card { flex-basis: 88%; }
+.feature-media { height: 290px; }
+.feature-card:nth-child(5n) .feature-media { background: radial-gradient(ellipse at 0% 95%, #ff9b85, transparent 65%), radial-gradient(ellipse at 100% 100%, #9c8cb8, transparent 70%), #e7e5eb; }
+.landing-hero { background: radial-gradient(ellipse at 50% 0%, #f2eafa, transparent 68%); }
+@media (min-width: 640px) {
+  .feature-card { flex-basis: 44%; }
+  .feature-card:first-child, .feature-card:last-child { flex-basis: 60%; }
+  .feature-media { height: 310px; }
+}
+@media (min-width: 1280px) {
+  .feature-card { flex-basis: 16.666667%; }
+  .feature-card:first-child, .feature-card:last-child { flex-basis: 25%; }
+  .feature-media { height: clamp(250px, 19vw, 310px); }
+}
+@media (max-width: 639px) {
+  .product-features { padding: 24px 12px 40px; }
+  .feature-panel { padding: 24px 16px; border-radius: 16px; }
+}

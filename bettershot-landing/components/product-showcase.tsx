@@ -8,15 +8,18 @@ export type ProductKind = "video" | "image"
 
 const features = {
   video: [
-    { src: "video-background-detail.webp", title: "Make it yours", body: "Choose a background, then adjust padding, corners, and shadow in the video inspector." },
-    { src: "video-timeline-detail.webp", title: "Keep the good parts", body: "Split and trim clips, change their speed, and refine your zooms in the built-in timeline." },
-    { src: "video-effects-detail.webp", title: "Focus on what matters", body: "Crop the frame or blur and pixelate selected areas before sharing." },
-    { src: "video-export.webp", title: "Ready for its next screen", body: "Export MP4 or MOV with resolution, quality, and 30 or 60 fps controls. No watermark." },
+    { src: "video-editor.jpg", title: "Your recording, refined", body: "Open your take in the native editor. Your preview, inspector, and timeline stay together." },
+    { src: "video-background-detail.webp", title: "Add your look", body: "Choose a gradient and adjust padding, corners, and shadow for a polished frame." },
+    { src: "video-timeline-detail.webp", title: "Find the right pace", body: "Trim pauses, split clips, and adjust speed without changing your source recording." },
+    { src: "video-effects-detail.webp", title: "Keep details private", body: "Crop the frame, or blur and pixelate selected areas before you share." },
+    { src: "video-export.webp", title: "MP4 or MOV", body: "Choose your format, resolution, and quality. Export at 30 or 60 fps, with no watermark." },
   ],
   image: [
-    { src: "screenshot-tools-detail.webp", title: "Point out the important bit", body: "Use the native toolbar for arrows, text, shapes, numbered markers, blur, and pixelation." },
-    { src: "screenshot-background-detail.webp", title: "Give it some breathing room", body: "Choose a soft gradient and adjust padding, corners, and shadow. Or keep it unframed." },
-    { src: "screenshot-canvas-detail.webp", title: "A clearer picture", body: "Keep full-resolution image previews while you annotate, frame, and prepare your screenshot to share." },
+    { src: "screenshot-editor.jpg", title: "A home for your screenshots", body: "Capture the important bit, then finish it in a native editor with full-resolution previews." },
+    { src: "screenshot-tools-detail.webp", title: "Make your point", body: "Add arrows, text, shapes, and numbered markers from one compact toolbar." },
+    { src: "screenshot-background-detail.webp", title: "Give it a background", body: "Choose a soft gradient, then dial in padding, corners, and shadow. Or keep it unframed." },
+    { src: "screenshot-canvas-detail.webp", title: "Keep the detail", body: "Work with your original capture pixels while you annotate and adjust the framing." },
+    { src: "screenshot-copy-detail.webp", title: "Ready to send", body: "Copy your finished screenshot straight into another app. Save or export when you need a file." },
   ],
 } as const
 
@@ -45,23 +48,21 @@ export function ProductPreview({ kind, priority = false, className }: { kind: Pr
 }
 
 export function ProductFeatures({ kind }: { kind: ProductKind }) {
-  const title = kind === "video" ? "Inside your video editor." : "Everything a screenshot needs."
+  const title = kind === "video" ? "Everything your recording needs" : "Everything your screenshot needs"
   return (
-    <section className="mx-auto max-w-[1280px] px-6 py-16 sm:py-24" aria-label={title}>
-      <div className="mb-10 max-w-xl">
-        <p className="mb-3 text-sm font-medium text-brand">{kind === "video" ? "Made for your next take" : "Made for your next screenshot"}</p>
-        <h2 className="text-[32px] sm:text-[40px]">{title}</h2>
-        <p className="mt-4 text-sm leading-relaxed text-zinc-500">A closer look at the controls in BetterShot.</p>
+    <section className="product-features" aria-label={title}>
+      <div className="feature-panel">
+        <h2 className="mb-7 text-2xl font-semibold sm:mb-8 sm:text-[28px]">{title}</h2>
+        <FeatureGallery title={title}>
+          {features[kind].map(feature => <article key={feature.src} role="group" aria-roledescription="slide" aria-label={feature.title} className="feature-card min-w-0 shrink-0 grow-0 pl-4">
+            <div className="feature-media relative flex items-center justify-center overflow-hidden rounded-2xl p-5 sm:p-6">
+              <Image src={`/features/${feature.src}`} alt={`BetterShot: ${feature.title.toLowerCase()}`} width={640} height={560} sizes="(min-width: 1280px) 24vw, (min-width: 640px) 42vw, 80vw" className="max-h-full w-auto max-w-full rounded-lg object-contain shadow-xl" />
+            </div>
+            <h3 className="mt-5 px-1 text-[15px] font-semibold leading-snug">{feature.title}</h3>
+            <p className="mt-2 px-1 text-[13px] leading-relaxed text-zinc-600">{feature.body}</p>
+          </article>)}
+        </FeatureGallery>
       </div>
-      <FeatureGallery title={title}>
-        {features[kind].map(feature => <article key={feature.src} role="group" aria-roledescription="slide" aria-label={feature.title} className="feature-card min-w-0 shrink-0 grow-0 basis-[88%] pl-4 sm:basis-[48%] lg:basis-[32%]">
-          <div className="feature-media relative flex aspect-[1.12] items-center justify-center overflow-hidden rounded-2xl p-7 sm:p-8">
-            <Image src={`/features/${feature.src}`} alt={`BetterShot ${feature.title.toLowerCase()} controls`} width={640} height={560} sizes="(max-width: 640px) 80vw, 380px" className="max-h-full w-auto max-w-full rounded-lg object-contain shadow-xl" />
-          </div>
-          <h3 className="mt-5 px-1 text-lg font-semibold leading-snug">{feature.title}</h3>
-          <p className="mt-2 px-1 text-sm leading-relaxed text-zinc-500">{feature.body}</p>
-        </article>)}
-      </FeatureGallery>
     </section>
   )
 }

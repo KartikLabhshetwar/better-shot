@@ -7,8 +7,6 @@ import { Reveal } from "@/components/reveal"
 import { CopyCommand } from "@/components/copy-command"
 import { Comparison } from "@/components/home/comparison"
 import { FaqSection, faqs } from "@/components/home/faq"
-import { SocialProof } from "@/components/social-proof"
-import { CountUp } from "@/components/count-up"
 import { ProductFeatures, ProductLink, ProductPreview } from "@/components/product-showcase"
 
 const faqJsonLd = {
@@ -63,8 +61,8 @@ export default async function Home() {
 
   const stats = [
     { value: "$0", label: "Forever. No tiers, no trial" },
-    { value: downloads > 0 ? formatCount(downloads) : "14K+", label: "Downloads and counting" },
-    { value: "25 MB", label: "Lightweight native app" },
+    { value: downloads > 0 ? formatCount(downloads) : "Open source", label: downloads > 0 ? "GitHub release downloads" : "Built in the open" },
+    { value: "macOS", label: "Native from capture to export" },
   ]
 
   return (
@@ -76,18 +74,18 @@ export default async function Home() {
       <SiteNav />
 
       <main id="main">
-        <section className="pb-12 pt-28 sm:pt-36">
+        <section className="landing-hero pb-12 pt-28 sm:pb-16 sm:pt-40">
           <div className="mx-auto max-w-[1100px] px-6 text-center">
             <Reveal>
-              <h1 className="mx-auto max-w-[18ch] text-[clamp(2.5rem,6vw,4.5rem)] font-normal leading-[1.1] tracking-tight text-zinc-900">
-                Your screen. A better story.{" "}
-                <span className="text-zinc-400">Every little detail.</span>
+              <p className="mb-6 text-sm font-medium text-brand">Screenshots. Recordings. A little more polish.</p>
+              <h1 className="mx-auto max-w-[15ch] text-[clamp(3rem,7vw,5.5rem)] font-semibold leading-[1.04] text-zinc-950">
+                Make your screen<br className="hidden sm:block" /> worth sharing.
               </h1>
             </Reveal>
 
             <Reveal>
               <p className="mx-auto mt-6 max-w-lg text-[17px] leading-relaxed text-zinc-600">
-                Beautiful screenshots. Clearer walkthroughs. Capture, edit, and share with one native Mac app. Free, open source, and entirely yours.
+                Capture a screenshot. Record a walkthrough. Make it clear, make it yours, and send it on. One free, native Mac app.
               </p>
             </Reveal>
 
@@ -95,34 +93,32 @@ export default async function Home() {
               <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
                 <DownloadDropdown release={release} source="hero" />
                 <a
-                  href="#features"
+                  href="#demo"
                   className="text-[15px] font-medium text-zinc-600 transition-colors hover:text-zinc-900"
                 >
-                  See what it does &rsaquo;
+                  Watch the demo &rsaquo;
                 </a>
               </div>
             </Reveal>
 
             <Reveal>
-              <div className="mt-8 flex justify-center">
-                <SocialProof />
-              </div>
+              <p className="mt-6 text-[13px] text-zinc-500">Free and open source · No watermark · macOS 26.0+</p>
             </Reveal>
 
           </div>
         </section>
 
-        <div className="mx-auto max-w-[1100px] px-6">
+        <div id="demo" className="mx-auto max-w-[1360px] scroll-mt-20 px-6">
           <ProductPreview kind="video" priority />
           <div className="mt-6 flex flex-wrap justify-center gap-x-8 gap-y-4"><ProductLink kind="video" /><ProductLink kind="image" /></div>
         </div>
 
         <Reveal as="section" className="mx-auto max-w-[1100px] px-6 py-14" aria-label="Better Shot in numbers">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
+          <div className="grid grid-cols-1 gap-7 text-center sm:grid-cols-3 sm:divide-x sm:divide-zinc-200">
             {stats.map((stat) => (
-              <div key={stat.value} className="rounded-2xl border border-zinc-200 p-5 sm:p-6">
-                <p className="text-[clamp(28px,3vw,42px)] font-semibold leading-[1.1] tracking-tight text-brand">
-                  <CountUp value={stat.value} />
+              <div key={stat.value} className="px-5 py-2">
+                <p className="text-[clamp(28px,3vw,42px)] font-semibold leading-[1.1] tracking-tight text-zinc-900">
+                  {stat.value}
                 </p>
                 <p className="mt-2 text-[13px] leading-[18px] text-zinc-600">{stat.label}</p>
               </div>
@@ -130,17 +126,17 @@ export default async function Home() {
           </div>
         </Reveal>
 
-        <section id="features" className="mx-auto max-w-[1100px] scroll-mt-20 px-6 pb-8 pt-16">
-          <div className="grid items-end gap-8 md:grid-cols-[1.2fr_1fr]">
-            <div><p className="mb-4 text-sm font-medium text-brand">Video recording</p><h2 className="max-w-[17ch] text-[36px] sm:text-[48px]">Show how it works.<br />Make it easy to follow.</h2></div>
-            <div><p className="mb-6 text-base leading-relaxed text-zinc-500">A quick update or a careful walkthrough. Record your screen and camera, guide the eye with cursor effects, and cut straight to the good part.</p><ProductLink kind="video" /></div>
-          </div>
+        <section id="features" className="mx-auto max-w-[740px] scroll-mt-20 px-6 pb-4 pt-16 text-center sm:pt-24">
+          <p className="mb-4 text-sm font-medium text-brand">Video recording</p>
+          <h2 className="text-[38px] font-semibold leading-[1.08] sm:text-[56px]">A quick take.<br />A better walkthrough.</h2>
+          <p className="mx-auto mb-6 mt-6 max-w-xl text-[17px] leading-relaxed text-zinc-600">Record your screen and camera, guide the eye with cursor effects, and cut straight to the good part.</p>
+          <ProductLink kind="video" />
         </section>
         <ProductFeatures kind="video" />
 
-        <section className="bg-zinc-50 py-16 sm:py-24">
-          <div className="mx-auto grid max-w-[1100px] items-center gap-12 px-6 md:grid-cols-[0.8fr_1.2fr]">
-            <div><p className="mb-4 text-sm font-medium text-brand">Screenshots</p><h2 className="text-[36px] sm:text-[48px]">Say it with<br />a screenshot.</h2><p className="mb-6 mt-5 text-base leading-relaxed text-zinc-500">An arrow in the right place. A detail kept private. A little room around your image. Small edits that make your message land.</p><ProductLink kind="image" /></div>
+        <section className="py-16 sm:py-24">
+          <div className="mx-auto grid max-w-[1360px] items-center gap-12 px-6 md:grid-cols-[0.7fr_1.3fr]">
+            <div><p className="mb-4 text-sm font-medium text-brand">Screenshots</p><h2 className="text-[38px] font-semibold leading-[1.08] sm:text-[56px]">Small capture.<br />Clear message.</h2><p className="mb-6 mt-5 text-base leading-relaxed text-zinc-500">An arrow in the right place. A detail kept private. A little room around your image. Small edits that make your message land.</p><ProductLink kind="image" /></div>
             <ProductPreview kind="image" />
           </div>
         </section>
