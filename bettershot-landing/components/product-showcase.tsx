@@ -24,13 +24,13 @@ export function ProductPreview({ kind, priority = false, className }: { kind: Pr
   if (kind === "video") return (
     <figure className={cn("product-preview preview-lilac", className)}>
       <video controls playsInline preload="none" poster="/features/recording-demo-poster.jpg"
-        width={1280} height={900} aria-label="Play the 20-second tour of BetterShot’s real editors"
-        className="aspect-[64/45] w-full rounded-xl bg-zinc-900 shadow-lg">
+        width={1280} height={800} aria-label="Play the 24-second animated tour of BetterShot’s real editors"
+        className="aspect-[8/5] w-full rounded-xl bg-zinc-900 shadow-lg">
         <source src="/features/recording-demo.mp4" type="video/mp4" />
         Your browser cannot play this video. Use the video link below.
       </video>
-      <figcaption className="mt-5 text-center text-xs leading-relaxed text-zinc-600">
-        A tour of BetterShot’s real editors, made from app screenshots with Remotion.
+      <figcaption className="mt-5 text-center text-xs leading-relaxed text-zinc-950">
+        A closer look at BetterShot’s real editors. Animated from actual app captures.
         {" "}<a href="/features/recording-demo.mp4" className="underline underline-offset-2">Open video</a>
       </figcaption>
     </figure>
@@ -39,7 +39,7 @@ export function ProductPreview({ kind, priority = false, className }: { kind: Pr
     <figure className={cn("product-preview preview-peach", className)}>
       <Image src="/features/screenshot-editor.jpg" alt="BetterShot’s screenshot editor with its annotation toolbar, left background inspector, and a framed coastal image"
         width={1214} height={768} priority={priority} sizes="(max-width: 768px) 92vw, 1100px" className="h-auto w-full rounded-xl shadow-lg" />
-      <figcaption className="mt-5 text-center text-xs text-zinc-600">The actual BetterShot screenshot editor, shown with bundled practice media.</figcaption>
+      <figcaption className="mt-5 text-center text-xs text-zinc-950">The actual BetterShot screenshot editor, shown with bundled practice media.</figcaption>
     </figure>
   )
 }
@@ -54,9 +54,9 @@ export function ProductFeatures({ kind }: { kind: ProductKind }) {
         <p className="mt-4 text-sm leading-relaxed text-zinc-500">A closer look at the controls in BetterShot.</p>
       </div>
       <FeatureGallery title={title}>
-        {features[kind].map(feature => <article key={feature.src} role="group" aria-roledescription="slide" aria-label={feature.title} className="min-w-0 shrink-0 grow-0 basis-[88%] pl-4 sm:basis-[48%] lg:basis-[32%]">
-          <div className="relative flex aspect-[1.12] items-center justify-center overflow-hidden rounded-2xl bg-zinc-100 p-5">
-            <Image src={`/features/${feature.src}`} alt={`BetterShot ${feature.title.toLowerCase()} controls`} width={640} height={560} sizes="(max-width: 640px) 80vw, 380px" className="max-h-full w-auto max-w-full rounded-lg object-contain shadow-sm" />
+        {features[kind].map(feature => <article key={feature.src} role="group" aria-roledescription="slide" aria-label={feature.title} className="feature-card min-w-0 shrink-0 grow-0 basis-[88%] pl-4 sm:basis-[48%] lg:basis-[32%]">
+          <div className="feature-media relative flex aspect-[1.12] items-center justify-center overflow-hidden rounded-2xl p-7 sm:p-8">
+            <Image src={`/features/${feature.src}`} alt={`BetterShot ${feature.title.toLowerCase()} controls`} width={640} height={560} sizes="(max-width: 640px) 80vw, 380px" className="max-h-full w-auto max-w-full rounded-lg object-contain shadow-xl" />
           </div>
           <h3 className="mt-5 px-1 text-lg font-semibold leading-snug">{feature.title}</h3>
           <p className="mt-2 px-1 text-sm leading-relaxed text-zinc-500">{feature.body}</p>

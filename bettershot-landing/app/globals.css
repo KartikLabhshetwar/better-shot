@@ -253,6 +253,18 @@
 }
 
 /* Backgrounds frame genuine app captures without recreating editor controls. */
-.product-preview { border-radius: 24px; padding: clamp(12px, 3vw, 36px); overflow: hidden; }
-.preview-lilac { background: radial-gradient(at 12% 5%, #e9ddf5, transparent 65%), radial-gradient(at 95% 95%, #b7b8ee, transparent 70%), #d4cced; }
-.preview-peach { background: radial-gradient(at 5% 95%, #efcdbf, transparent 65%), radial-gradient(at 100% 0%, #ede4da, transparent 60%), #efded7; }
+.product-preview { border-radius: 24px; padding: clamp(20px, 4vw, 54px); overflow: hidden; }
+.preview-lilac,
+.feature-card:nth-child(4n + 2) .feature-media {
+  background: radial-gradient(ellipse at 8% 12%, #e1d6fb 0%, transparent 60%), radial-gradient(ellipse at 100% 100%, #8170d9 0%, transparent 68%), #beb1ee;
+}
+.preview-peach,
+.feature-card:nth-child(4n + 1) .feature-media {
+  background: radial-gradient(ellipse at 5% 20%, #d5a2ca 0%, transparent 62%), radial-gradient(ellipse at 92% 85%, #aaa2e4 0%, transparent 64%), #e5c0d8;
+}
+.feature-card:nth-child(4n + 3) .feature-media {
+  background: radial-gradient(ellipse at 0% 0%, #ff8d70 0%, transparent 62%), radial-gradient(ellipse at 100% 100%, #d4b9dc 0%, transparent 66%), #ffd1ad;
+}
+.feature-card:nth-child(4n + 4) .feature-media {
+  background: radial-gradient(ellipse at 5% 90%, #9bcac8 0%, transparent 64%), radial-gradient(ellipse at 95% 5%, #c3b3e6 0%, transparent 66%), #d2e1e3;
+}
