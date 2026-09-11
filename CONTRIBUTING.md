@@ -130,6 +130,12 @@ create or update that export. Export opens an NSSavePanel for a new destination.
 General > Default Look supplies background, padding, corner radius, and shadow
 for new images and videos. Saved projects retain their own settings.
 
+The macOS cursor choice uses the classic Apple Poof artwork in `Resources/Cursors`
+with a 2.5× starting size. Current AppKit returns an X badge for that system cursor,
+so the bundled original preserves the cloud design. `PointerArtworkCapture` caches
+the transparent source and click hotspot for preview/export. The standalone
+integration runner copies the same resources beside its executable.
+
 Screen/camera layout presets live in `RecordingStudioLayout` and apply to the
 whole edited video. The Camera inspector exposes floating Bubble and Overlap,
 Side-by-Side, Presenter, Camera Only, and Screen Only. Paired layouts can place

@@ -3364,7 +3364,7 @@ struct StudioInspector: View {
                     InspectorGroupLabel("Style")
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 56), spacing: 6)], spacing: 6) {
                         ForEach(RecordingCursorAppearance.selectableCases, id: \.self) { appearance in
-                            Button { model.style.cursor.appearance = appearance } label: {
+                            Button { model.setCursorAppearance(appearance) } label: {
                                 VStack(spacing: 4) {
                                     if let artwork = PointerArtworkCapture.styledArtwork(appearance)
                                         ?? model.artwork(id: nil),
@@ -3380,6 +3380,11 @@ struct StudioInspector: View {
                             .accessibilityLabel("\(appearance.title) cursor")
                             .accessibilityAddTraits(model.style.cursor.appearance == appearance ? .isSelected : [])
                         }
+                    }
+                    if model.style.cursor.appearance == .macOS {
+                        Text("Classic macOS Poof cursor. Adjust Size above to enlarge it further.")
+                            .font(.inspectorLabel).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     if model.style.cursor.appearance == .hand {
                         Text("This project uses the legacy Hand cursor. Choose a style above to replace it.")

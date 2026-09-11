@@ -16,9 +16,17 @@ enum PointerArtworkCapture {
     static func styledArtwork(_ appearance: RecordingCursorAppearance) -> PointerArtwork? {
         guard appearance != .recorded else { return nil }
         if let cached = styledCache[appearance] { return cached }
-        if appearance == .macOS || appearance == .hand {
-            let artwork = capture(appearance == .macOS ? NSCursor.arrow : NSCursor.pointingHand,
-                                  id: "bettershot-cursor-" + appearance.rawValue)
+        if appearance == .macOS {
+            guard let url = Bundle.main.url(forResource: "macOSPoof", withExtension: "png", subdirectory: "Cursors"),
+                  let data = try? Data(contentsOf: url),
+                  let bitmap = NSBitmapImageRep(data: data), let image = bitmap.cgImage else { return nil }
+            let artwork = encode(image, size: CGSize(width: 36, height: 45),
+                                 hotSpot: CGPoint(x: 8.5, y: 4.5), id: "bettershot-cursor-macOS-poof-v1")
+            if let artwork { styledCache[appearance] = artwork }
+            return artwork
+        }
+        if appearance == .hand {
+            let artwork = capture(NSCursor.pointingHand, id: "bettershot-cursor-hand")
             if let artwork { styledCache[appearance] = artwork }
             return artwork
         }

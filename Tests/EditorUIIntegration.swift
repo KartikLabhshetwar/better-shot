@@ -124,10 +124,25 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     let nativeHand = PointerArtworkCapture.capture(NSCursor.pointingHand, id: "bettershot-cursor-hand")!
     precondition(hand == nativeHand, "Hand uses the actual macOS artwork, full raster, logical size, and hotspot")
     precondition(hand == PointerArtworkCapture.styledArtwork(.hand), "Native hand artwork is cached")
-    let arrow = PointerArtworkCapture.styledArtwork(.macOS)!
-    precondition(arrow == PointerArtworkCapture.capture(NSCursor.arrow, id: "bettershot-cursor-macOS"),
-                 "macOS style uses Apple's full-resolution arrow artwork and native hotspot")
-    precondition(arrow == PointerArtworkCapture.styledArtwork(.macOS), "Native arrow artwork is cached")
+    let poof = PointerArtworkCapture.styledArtwork(.macOS)!
+    let poofBitmap = NSBitmapImageRep(data: poof.imageData)!
+    precondition(poofBitmap.pixelsWide == 72 && poofBitmap.pixelsHigh == 90,
+                 "Keep Apple's original classic Poof raster without upsampling it")
+    precondition(poofBitmap.colorAt(x: 0, y: 0)!.alphaComponent == 0)
+    precondition(poofBitmap.colorAt(x: 35, y: 50)!.alphaComponent > 0.99,
+                 "The Poof cursor includes the visible cloud")
+    precondition(poof.normalizedAnchor == CGPoint(x: 17.0 / 72, y: 9.0 / 90),
+                 "The arrow tip remains the click hotspot when enlarged")
+    precondition(poof == PointerArtworkCapture.styledArtwork(.macOS), "Poof artwork is cached")
+    let cursorModel = RecordingStudioModel(url: movieURL)
+    cursorModel.setCursorAppearance(.macOS)
+    precondition(cursorModel.style.cursorScale == 2.5 && cursorModel.style.cursor.appearance == .macOS)
+    cursorModel.style.cursorScale = 3.5
+    cursorModel.setCursorAppearance(.macOS)
+    precondition(cursorModel.style.cursorScale == 3.5, "Keep a larger user-selected cursor size")
+    cursorModel.setCursorAppearance(.dark)
+    precondition(cursorModel.style.cursorScale == 3.5, "Other styles retain the Size setting")
+    cursorModel.teardown()
     precondition(RecordingCursorAppearance.selectableCases.contains(.macOS)
                  && !RecordingCursorAppearance.selectableCases.contains(.hand))
     let legacyHand = try JSONDecoder().decode(RecordingCursorAppearance.self, from: Data("\"hand\"".utf8))
@@ -139,7 +154,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     precondition(delayFormat.parse("invalid") == nil && delayFormat.parse("NaN") == nil)
     precondition(InspectorValueFormat.points.parse("24 pt") == 24 && InspectorValueFormat.points.step == 4)
     precondition(InspectorValueFormat.percent(step: 0.05).step == 0.05)
-    print("PASS native macOS arrow and legacy hand capture/cache, cursor persistence, and settings slider input")
+    print("PASS classic macOS Poof, large sizing, and legacy hand capture/cache, cursor persistence, and settings slider input")
     let multiResolutionCursor = NSImage(size: NSSize(width: 16, height: 20))
     for scale in [1, 4] {
         let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 16 * scale, pixelsHigh: 20 * scale,

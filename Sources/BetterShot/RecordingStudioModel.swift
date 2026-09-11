@@ -795,6 +795,11 @@ final class RecordingStudioModel {
         style = next
     }
 
+    func setCursorAppearance(_ appearance: RecordingCursorAppearance) {
+        style.cursor.appearance = appearance
+        if appearance == .macOS { style.cursorScale = max(style.cursorScale, 2.5) }
+    }
+
     func setCameraAspectRatio(_ ratio: RecordingCameraAspectRatio) {
         let previous = style.camera.aspectRatio
         guard previous != ratio else { return }

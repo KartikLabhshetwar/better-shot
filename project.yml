@@ -30,6 +30,8 @@ targets:
       - Sources
       - path: Resources/Assets.xcassets
         buildPhase: resources
+      - path: Resources/Cursors
+        type: folder
       - path: Resources/Backgrounds
         type: folder
         buildPhase: resources
