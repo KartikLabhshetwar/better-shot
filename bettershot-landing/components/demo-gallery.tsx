@@ -51,12 +51,22 @@ function DemoVideo({ demo }: { demo: Demo }) {
   </video>
 }
 
-export function DemoGallery({ kind }: { kind?: "image" | "video" }) {
+export function DemoGallery({ kind, showLaunchVideo = false }: { kind?: "image" | "video"; showLaunchVideo?: boolean }) {
   const [hero, ...features] = demos.filter(demo => !kind || demo.kind === kind)
   return <div>
     <figure className="demo-stage editor-tools-backdrop overflow-hidden rounded-2xl p-4 sm:p-12">
-      <DemoVideo demo={hero} />
-      <figcaption className="sr-only">{hero.caption}</figcaption>
+      {showLaunchVideo ? (
+        <video controls playsInline preload="none"
+          poster="/videos/bettershot-launch-poster.webp" width={1920} height={1080}
+          aria-label="BetterShot launch video" aria-describedby="launch-video-description"
+          className="block aspect-video w-full rounded-lg bg-white object-contain shadow-2xl">
+          <source src="/videos/bettershot-launch.mp4" type="video/mp4" />
+          <a href="/videos/bettershot-launch.mp4">Download the BetterShot launch video</a>
+        </video>
+      ) : <DemoVideo demo={hero} />}
+      <figcaption id={showLaunchVideo ? "launch-video-description" : undefined} className="sr-only">
+        {showLaunchVideo ? "A 72-second walkthrough of screenshot capture, annotations, backgrounds, text and color capture, recording, video editing, camera layouts, export, and cloud sharing in BetterShot." : hero.caption}
+      </figcaption>
     </figure>
     <section className="mx-auto max-w-[1100px] py-16 sm:py-24" aria-label="BetterShot in action">
       <div className="mb-10 text-center">

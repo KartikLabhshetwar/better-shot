@@ -21,7 +21,7 @@ for (const route of routes) {
   assert.ok(sources.length > 0, `${route} needs product imagery`)
   sources.forEach(source => assets.add(source))
   const demos = [...html.matchAll(/data-demo="([^"]+)"/g)].map(match => match[1])
-  assert.equal(demos.length, route === '/' ? 5 : route === '/screenshots' ? 2 : 3, `${route} must show its relevant demos`)
+  assert.equal(demos.length, route === '/' ? 4 : route === '/screenshots' ? 2 : 3, `${route} must show its relevant demos`)
   assert.ok(html.includes('preload="none"'), `${route} must defer video downloads`)
   assert.ok(!html.includes('/features/recording-demo'), `${route} must not use the retired slideshow`)
   for (const demo of demos) {
@@ -29,14 +29,24 @@ for (const route of routes) {
     assets.add(`/features/${demo}-poster.webp`)
   }
   const videos = [...html.matchAll(/<video\b[^>]*>/g)].map(match => match[0])
-  assert.equal(videos.length, demos.length, `${route} needs an individual video for each demo`)
-  for (const video of videos) {
+  const launchVideos = videos.filter(video => video.includes('aria-label="BetterShot launch video"'))
+  assert.equal(launchVideos.length, route === '/' ? 1 : 0, 'Only the homepage features the launch film')
+  assert.equal(videos.length, demos.length + launchVideos.length, `${route} needs an individual video for each demo`)
+  for (const video of videos.filter(video => !launchVideos.includes(video))) {
     assert.ok(!/\bcontrols(?:=|\s|>)/.test(video), 'Demos must not display player controls')
     assert.ok(video.includes('loop=""') && video.includes('muted=""') && video.includes('playsInline=""'), 'Demos must loop silently inline')
     assert.ok(video.includes('data-autoplay="visible"'), 'Demos autoplay only while visible')
   }
-  assert.equal((html.match(/data-demo-row="true"/g) || []).length, demos.length - 1, 'Use alternating feature rows below the main demo')
+  assert.equal((html.match(/data-demo-row="true"/g) || []).length, demos.length - (route === '/' ? 0 : 1), 'Use alternating feature rows below the main demo')
   if (route === '/') {
+    const launch = launchVideos[0]
+    assert.ok(launch.includes('controls=""') && launch.includes('playsInline=""'), 'Launch video needs native inline playback controls')
+    assert.ok(launch.includes('preload="none"'), 'Defer downloading the launch video until playback')
+    assert.ok(!/\b(?:autoPlay|loop|muted)(?:=|\s|>)/.test(launch), 'Play the launch soundtrack only after a user starts it')
+    assert.ok(html.includes('src="/videos/bettershot-launch.mp4"'), 'Use the approved launch film')
+    assert.ok(html.includes('href="#demo"') && html.includes('Watch the launch video'), 'Hero CTA leads to the launch video')
+    assets.add('/videos/bettershot-launch.mp4')
+    assets.add('/videos/bettershot-launch-poster.webp')
     assert.ok(html.includes('Capture clearly.'), 'Home needs the revised hero')
     assert.ok(html.includes('BetterShot contributor'), 'Home restores contributor avatars')
   }

@@ -94,7 +94,7 @@ export default async function Home() {
                   href="#demo"
                   className="text-[15px] font-medium text-zinc-600 transition-colors hover:text-zinc-900"
                 >
-                  Watch the demo &rsaquo;
+                  Watch the launch video &rsaquo;
                 </a>
               </div>
             </Reveal>
@@ -107,7 +107,7 @@ export default async function Home() {
         </section>
 
         <div id="demo" className="mx-auto max-w-[1360px] scroll-mt-20 px-6">
-          <DemoGallery />
+          <DemoGallery showLaunchVideo />
           <div className="mt-6 flex flex-wrap justify-center gap-x-8 gap-y-4"><ProductLink kind="video" /><ProductLink kind="image" /></div>
         </div>
 
