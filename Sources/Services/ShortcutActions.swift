@@ -36,9 +36,18 @@ extension ShortcutService {
         case .openSettings:
             SettingsWindowController.shared.open(on: screen)
         case .restoreLastCapture, .pinLastCapture, .editClipboard:
-            if action == .editClipboard, let url = Self.clipboardImageURL() {
-                PreviewPanelPresenter.shared.openEditor(for: url)
-                return
+            if action == .editClipboard {
+                do {
+                    if let url = try ClipboardImage.fileURL() {
+                        PreviewPanelPresenter.shared.openEditor(for: url)
+                        return
+                    }
+                } catch {
+                    ToastWindow.shared.show(title: "Couldn’t open clipboard image",
+                        message: "The image is still on the clipboard. Check disk space and try again.",
+                        systemIcon: "exclamationmark.triangle", on: screen)
+                    return
+                }
             }
             let latest = CaptureOrchestrator.shared.lastCaptureURL
             let url = latest.flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil }
@@ -93,35 +102,5 @@ extension ShortcutService {
             overlay.clearAll()
         default: break // Editor actions are dispatched only by their own window.
         }
-    }
-
-    /// An image file or image data on the pasteboard, as a file the editor can open.
-    static func clipboardImageURL(from pasteboard: NSPasteboard = .general) -> URL? {
-        let fileOptions: [NSPasteboard.ReadingOptionKey: Any] = [
-            .urlReadingFileURLsOnly: true,
-            .urlReadingContentsConformToTypes: [UTType.image.identifier]
-        ]
-        if let url = (pasteboard.readObjects(forClasses: [NSURL.self], options: fileOptions) as? [URL])?.first,
-           FileManager.default.fileExists(atPath: url.path) {
-            return url
-        }
-
-        // Keep the source encoding; TIFF is only the fallback most apps add alongside it.
-        guard let item = pasteboard.pasteboardItems?.first else { return nil }
-        let images = item.types.filter { UTType($0.rawValue)?.conforms(to: .image) == true }
-        guard let type = images.first(where: { $0 != .tiff }) ?? images.first,
-              let contentType = UTType(type.rawValue),
-              var data = item.data(forType: type) else { return nil }
-        var ext = contentType.preferredFilenameExtension ?? "png"
-        if type == .tiff {
-            guard let png = NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:]) else { return nil }
-            data = png
-            ext = "png"
-        }
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("BetterShot-Clipboard-\(UUID().uuidString)")
-            .appendingPathExtension(ext)
-        do { try data.write(to: url, options: .atomic) } catch { return nil }
-        return url
     }
 }
