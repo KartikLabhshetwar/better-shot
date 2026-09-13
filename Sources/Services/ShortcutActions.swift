@@ -35,12 +35,19 @@ extension ShortcutService {
             MediaGalleryWindowController.shared.open(on: screen)
         case .openSettings:
             SettingsWindowController.shared.open(on: screen)
-        case .restoreLastCapture, .pinLastCapture:
+        case .restoreLastCapture, .pinLastCapture, .editClipboard:
+            if action == .editClipboard, let url = Self.clipboardImageURL() {
+                PreviewPanelPresenter.shared.openEditor(for: url)
+                return
+            }
             let latest = CaptureOrchestrator.shared.lastCaptureURL
             let url = latest.flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil }
                 ?? HistoryStore.shared.records.first.map { HistoryStore.shared.displayURLForRecord($0) }
             guard let url, FileManager.default.fileExists(atPath: url.path) else {
-                ToastWindow.shared.show(title: "No capture available", message: "Take a screenshot or open Media Gallery to find a saved capture.", systemIcon: "photo", on: screen)
+                let message = action == .editClipboard
+                    ? "Copy an image or take a screenshot first."
+                    : "Take a screenshot or open Media Gallery to find a saved capture."
+                ToastWindow.shared.show(title: "No capture available", message: message, systemIcon: "photo", on: screen)
                 return
             }
             if action == .pinLastCapture {
@@ -52,6 +59,8 @@ extension ShortcutService {
                     return
                 }
                 PinnedScreenshotController.shared.pin(url: retainedURL, on: screen)
+            } else if action == .editClipboard {
+                PreviewPanelPresenter.shared.openEditor(for: url)
             } else {
                 PreviewOverlay.shared.show(url: url, on: screen, automaticallyDismiss: false)
             }
@@ -84,5 +93,35 @@ extension ShortcutService {
             overlay.clearAll()
         default: break // Editor actions are dispatched only by their own window.
         }
+    }
+
+    /// An image file or image data on the pasteboard, as a file the editor can open.
+    static func clipboardImageURL(from pasteboard: NSPasteboard = .general) -> URL? {
+        let fileOptions: [NSPasteboard.ReadingOptionKey: Any] = [
+            .urlReadingFileURLsOnly: true,
+            .urlReadingContentsConformToTypes: [UTType.image.identifier]
+        ]
+        if let url = (pasteboard.readObjects(forClasses: [NSURL.self], options: fileOptions) as? [URL])?.first,
+           FileManager.default.fileExists(atPath: url.path) {
+            return url
+        }
+
+        // Keep the source encoding; TIFF is only the fallback most apps add alongside it.
+        guard let item = pasteboard.pasteboardItems?.first else { return nil }
+        let images = item.types.filter { UTType($0.rawValue)?.conforms(to: .image) == true }
+        guard let type = images.first(where: { $0 != .tiff }) ?? images.first,
+              let contentType = UTType(type.rawValue),
+              var data = item.data(forType: type) else { return nil }
+        var ext = contentType.preferredFilenameExtension ?? "png"
+        if type == .tiff {
+            guard let png = NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:]) else { return nil }
+            data = png
+            ext = "png"
+        }
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BetterShot-Clipboard-\(UUID().uuidString)")
+            .appendingPathExtension(ext)
+        do { try data.write(to: url, options: .atomic) } catch { return nil }
+        return url
     }
 }

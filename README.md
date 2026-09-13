@@ -24,7 +24,7 @@ unless you share it, and shares go to storage you own.
 - **Media Gallery:** browse captures, edits, and recordings with search, filters, and cloud link management. Delete locally (Trash) or remotely (R2) with confirmation.
 - **Video export:** GPU compositing and hardware encoding, with 30/60 fps, resolution, quality, and MP4/MOV controls. Export and sharing reuse unchanged saved renders.
 - **Cloud sharing:** upload to your own Cloudflare R2 bucket. Optimized image compression, MP4 video, native progress, and retry on failure.
-- **75 customizable shortcuts:** configure global capture, recording controls, deck actions, image tools, and video editing keys. Conflict detection per scope.
+- **76 customizable shortcuts:** configure global capture, recording controls, deck actions, image tools, and video editing keys. Conflict detection per scope.
 - **URL scheme:** trigger actions from Raycast, Shortcuts, Alfred, or scripts: `bettershot://capture/region`, `bettershot://record`, `bettershot://ocr`, and more.
 
 Both editors use a left inspector with compact controls and frosted chrome. Action
