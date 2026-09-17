@@ -35,9 +35,11 @@ final class DockExportProgressCoordinator {
 enum VideoFileActions {
     static var directory = FileManager.default.temporaryDirectory
     static var calls = 0
-    static func saveToDefaultLocation(from source: URL) async throws -> URL {
+    static var lastSuggestedFileName: String?
+    static func saveToDefaultLocation(from source: URL, suggestedFileName: String? = nil) async throws -> URL {
         calls += 1
-        let destination = directory.appendingPathComponent("saved-\(calls).mp4")
+        lastSuggestedFileName = suggestedFileName
+        let destination = directory.appendingPathComponent("saved-\(calls)-\(suggestedFileName ?? "unnamed.mp4")")
         try FileManager.default.copyItem(at: source, to: destination)
         return destination
     }
@@ -76,6 +78,12 @@ struct RecordingSaveCheck {
         try Data("standalone".utf8).write(to: standalone)
         let copied = try await RecordingDeliverable.saveToDefaultLocation(for: standalone)
         assert((try? Data(contentsOf: copied)) == Data("standalone".utf8))
-        print("RecordingSaveCheck: flattened output, concurrent saves, failure retry, and source preservation verified")
+        // A recording leaving for the save folder is named from the template,
+        // not from its package, which stays `Test.bettershotrec` in the gallery.
+        let suggested = VideoFileActions.lastSuggestedFileName
+        assert(suggested?.hasPrefix("BetterShot_") == true, "expected a template name, got \(suggested ?? "nil")")
+        assert(suggested?.hasSuffix(".mp4") == true, "the deliverable's container must survive, got \(suggested ?? "nil")")
+        assert(suggested?.contains("Test") == false, "the package name must not leak into the save folder")
+        print("RecordingSaveCheck: flattened output, concurrent saves, failure retry, template naming, and source preservation verified")
     }
 }

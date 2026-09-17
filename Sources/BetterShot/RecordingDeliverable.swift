@@ -21,7 +21,13 @@ enum RecordingDeliverable {
         if let task = saveTasks[key] { return try await task.value }
         let task = Task {
             let deliverable = try await resolve(for: mediaURL)
-            return try await VideoFileActions.saveToDefaultLocation(from: deliverable)
+            return try await VideoFileActions.saveToDefaultLocation(
+                from: deliverable,
+                suggestedFileName: ScreenshotFileNaming.currentFileName(
+                    extension: deliverable.pathExtension,
+                    kind: .recording
+                )
+            )
         }
         saveTasks[key] = task
         defer { saveTasks.removeValue(forKey: key) }

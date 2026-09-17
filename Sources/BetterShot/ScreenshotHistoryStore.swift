@@ -591,7 +591,11 @@ final class ScreenshotHistoryStore {
 
     private func uniqueHistoryURL(for sourceURL: URL) -> URL {
         let pathExtension = sourceURL.pathExtension.isEmpty ? "png" : sourceURL.pathExtension
-        let fileName = ScreenshotFileNaming.fileName(extension: pathExtension)
+        let isVideo = VideoExportContainer(fileExtension: pathExtension) != nil
+        let fileName = ScreenshotFileNaming.currentFileName(
+            extension: pathExtension,
+            kind: isVideo ? .recording : .screenshot
+        )
         let initialURL = Self.historyDirectory.appendingPathComponent(fileName)
 
         guard FileManager.default.fileExists(atPath: initialURL.path) else {

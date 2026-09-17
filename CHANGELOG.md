@@ -5,6 +5,12 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **File name templates**: Settings > General > Saving takes a template for saved screenshots and recordings. Type any text, and use the + button to add a date, a time, a random hex/base62/digit string, a UUID, a running counter, the capture type, or the file extension. An example of the finished name sits under the field, and a template that uses `{counter}` gets a Next number readout and a Reset button. Text BetterShot does not recognize is kept exactly as typed. Path separators, colons, leading dots, and over-long names are corrected before anything is written. The default template produces the same names as earlier versions, so upgrading leaves an existing save folder alone.
+
 ## [0.5.3] - 2026-09-11
 
 ### Added

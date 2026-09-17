@@ -2111,14 +2111,14 @@ final class RecordingStudioModel {
         return session.freshFinalURL(matching: currentDocument())
     }
 
+    /// The package keeps its own name because that name is the project's
+    /// identity in the gallery. What leaves for the save folder is a
+    /// deliverable, so it is named from the template like everything else.
     private var exportSuggestedFileName: String {
-        let container = exportSettings.effectiveContainer
-        return session.map {
-            $0.directoryURL
-                .deletingPathExtension()
-                .lastPathComponent
-                .appending(".\(container.fileExtension)")
-        } ?? VideoFileActions.exportFileName(for: screenURL, container: container)
+        ScreenshotFileNaming.currentFileName(
+            extension: exportSettings.effectiveContainer.fileExtension,
+            kind: .recording
+        )
     }
 
     /// Entry point for the export options popover. Assigning settings marks
@@ -2231,10 +2231,10 @@ final class RecordingStudioModel {
     }
 
     private var audioExportSuggestedFileName: String {
-        let base = session.map {
-            $0.directoryURL.deletingPathExtension().lastPathComponent
-        } ?? screenURL.deletingPathExtension().lastPathComponent
-        return "\(base).\(audioExportFormat.fileExtension)"
+        ScreenshotFileNaming.currentFileName(
+            extension: audioExportFormat.fileExtension,
+            kind: .recording
+        )
     }
 
     /// Writes the edited soundtrack on its own, for cleanup in a tool that

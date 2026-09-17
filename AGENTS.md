@@ -124,6 +124,11 @@ a PR unless explicitly requested.
   and fall back to the screen when camera footage is unavailable or hidden.
 - Plain typing is not recorded. Do not expand input capture as a shortcut to a
   cursor or keyboard-overlay feature.
+- `ScreenshotFileNaming` is the only source for deliverable file names. Keep its
+  renderer pure and Foundation-only, keep the default template rendering the
+  pre-0.5.0 name, and never let a template reach the file system without the
+  existing sanitizing. Recording package directory names are project identity,
+  not deliverable names; do not rename them.
 
 ## Backgrounds and persistence
 
