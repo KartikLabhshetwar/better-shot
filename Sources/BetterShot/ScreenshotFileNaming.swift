@@ -45,34 +45,37 @@ nonisolated enum ScreenshotFileNaming {
 
     /// The template every saved screenshot and recording is named from. The
     /// default renders exactly what pre-0.5.0 builds wrote, so upgrading leaves
-    /// an existing save folder's naming alone.
-    static var template: String {
-        get { UserDefaults.standard.string(forKey: templateKey) ?? defaultTemplate }
-        set { UserDefaults.standard.set(newValue, forKey: templateKey) }
+    /// an existing save folder's naming alone. Settings writes it through
+    /// `@AppStorage(templateKey)`.
+    static func template(in defaults: UserDefaults = .standard) -> String {
+        defaults.string(forKey: templateKey) ?? defaultTemplate
     }
 
-    /// The number `{counter}` renders next. Settings shows and resets it, which
-    /// is the only reason it is not private.
-    static var counter: Int {
-        get { max(UserDefaults.standard.object(forKey: counterKey) as? Int ?? 1, 1) }
-        set { UserDefaults.standard.set(max(newValue, 1), forKey: counterKey) }
+    /// The number `{counter}` renders next.
+    static func counter(in defaults: UserDefaults = .standard) -> Int {
+        max(defaults.object(forKey: counterKey) as? Int ?? 1, 1)
     }
 
-    /// Names one deliverable from the stored template. This is the only path
-    /// that advances the counter, so previewing in Settings never skips a number.
+    /// Names one deliverable from the stored template.
+    ///
+    /// Calling this SPENDS one `{counter}` number. It is the only path that
+    /// does, which is what lets Settings preview a template as often as it
+    /// likes. Call it once per file, and hold the result in a local rather
+    /// than calling it again for the same save.
     static func currentFileName(
         extension pathExtension: String,
         kind: Kind = .screenshot,
-        date: Date = Date()
+        date: Date = Date(),
+        in defaults: UserDefaults = .standard
     ) -> String {
-        let template = template
-        let counter = counter
+        let template = template(in: defaults)
+        let counter = counter(in: defaults)
         let name = fileName(
             template: template,
             extension: pathExtension,
             context: Context(date: date, kind: kind, counter: counter)
         )
-        if usesCounter(template) { self.counter = counter + 1 }
+        if usesCounter(template) { defaults.set(counter + 1, forKey: counterKey) }
         return name
     }
 

@@ -17,8 +17,51 @@ enum FileNamingCheck {
         checkEmptyTemplateFallsBack(date: date)
         checkCounter(context: context)
         checkKind(date: date)
+        checkCounterSpending()
 
-        print("file naming: 8 groups checked")
+        print("file naming: 9 groups checked")
+    }
+
+    /// `currentFileName` has a side effect, which is why it is a function and
+    /// not a property. Pin the contract: one call spends exactly one number,
+    /// and a template without `{counter}` spends none.
+    private static func checkCounterSpending() {
+        let suite = "FileNamingCheck-\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suite) else {
+            fatalError("could not open a scratch defaults suite")
+        }
+        defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+
+        assert(ScreenshotFileNaming.counter(in: defaults) == 1, "an untouched counter starts at 1")
+        assert(
+            ScreenshotFileNaming.template(in: defaults) == ScreenshotFileNaming.defaultTemplate,
+            "an untouched template is the default"
+        )
+
+        defaults.set("shot-{counter:3}", forKey: ScreenshotFileNaming.templateKey)
+        let first = ScreenshotFileNaming.currentFileName(extension: "png", in: defaults)
+        assert(first == "shot-001.png", "the first file takes number 1, got \(first)")
+        assert(ScreenshotFileNaming.counter(in: defaults) == 2, "one call must spend exactly one number")
+
+        let second = ScreenshotFileNaming.currentFileName(extension: "png", in: defaults)
+        assert(second == "shot-002.png", "the next file takes the next number, got \(second)")
+        assert(ScreenshotFileNaming.counter(in: defaults) == 3, "a second call spends a second number")
+
+        // Settings previews through `fileName`, which reads a counter it is
+        // handed and stores nothing.
+        _ = ScreenshotFileNaming.fileName(
+            template: "shot-{counter:3}",
+            extension: "png",
+            context: ScreenshotFileNaming.Context(counter: ScreenshotFileNaming.counter(in: defaults))
+        )
+        assert(ScreenshotFileNaming.counter(in: defaults) == 3, "previewing must not spend a number")
+
+        defaults.set("shot-{hex:8}", forKey: ScreenshotFileNaming.templateKey)
+        _ = ScreenshotFileNaming.currentFileName(extension: "png", in: defaults)
+        assert(ScreenshotFileNaming.counter(in: defaults) == 3, "a template without {counter} spends nothing")
+
+        defaults.set(0, forKey: ScreenshotFileNaming.counterKey)
+        assert(ScreenshotFileNaming.counter(in: defaults) == 1, "a stored 0 or negative reads as 1")
     }
 
     /// Upgrading must not rename anything. The default template has to render

@@ -266,6 +266,9 @@ struct GeneralSettingsTab: View {
             .onAppear(perform: refreshFileNamePreview)
             .onChange(of: fileNameTemplate) { _, _ in refreshFileNamePreview() }
             .onChange(of: exportFormatRaw) { _, _ in refreshFileNamePreview() }
+            // Reset, and any capture that lands while Settings is open, move the
+            // counter. Without this the example keeps showing the old number.
+            .onChange(of: fileNameCounter) { _, _ in refreshFileNamePreview() }
 
             Section {
                 Picker("Save as", selection: exportFormat) {

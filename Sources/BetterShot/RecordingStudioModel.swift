@@ -2114,7 +2114,10 @@ final class RecordingStudioModel {
     /// The package keeps its own name because that name is the project's
     /// identity in the gallery. What leaves for the save folder is a
     /// deliverable, so it is named from the template like everything else.
-    private var exportSuggestedFileName: String {
+    ///
+    /// A function rather than a property because each call spends one
+    /// `{counter}` number. Call it once per export and hold the result.
+    private func makeExportFileName() -> String {
         ScreenshotFileNaming.currentFileName(
             extension: exportSettings.effectiveContainer.fileExtension,
             kind: .recording
@@ -2142,7 +2145,7 @@ final class RecordingStudioModel {
         // both - so exporting becomes a plain copy into the save folder.
         if let cached = freshDeliverableURL {
             exportState = .exporting(progress: 0.98)
-            let suggestedFileName = exportSuggestedFileName
+            let suggestedFileName = makeExportFileName()
             exportTask = Task { [weak self] in
                 do {
                     let savedURL = try await VideoFileActions.saveToDefaultLocation(
@@ -2162,7 +2165,7 @@ final class RecordingStudioModel {
         exportState = .exporting(progress: 0)
 
         let configuration = makeExportConfiguration()
-        let suggestedFileName = exportSuggestedFileName
+        let suggestedFileName = makeExportFileName()
         let session = session
         let renderedDocument = currentDocument()
 
@@ -2230,7 +2233,8 @@ final class RecordingStudioModel {
         return abs(drift) > 0.25 ? drift : nil
     }
 
-    private var audioExportSuggestedFileName: String {
+    /// Spends one `{counter}` number per call, like `makeExportFileName`.
+    private func makeAudioExportFileName() -> String {
         ScreenshotFileNaming.currentFileName(
             extension: audioExportFormat.fileExtension,
             kind: .recording
@@ -2251,7 +2255,7 @@ final class RecordingStudioModel {
             replacementURL: replacementAudio?.url,
             format: audioExportFormat
         )
-        let suggestedFileName = audioExportSuggestedFileName
+        let suggestedFileName = makeAudioExportFileName()
         let dockProgressID = DockExportProgressCoordinator.shared.start()
 
         audioExportTask = Task { [weak self] in
