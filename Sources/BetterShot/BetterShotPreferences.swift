@@ -322,9 +322,15 @@ enum ScreenshotFileActions {
                                   compressionQuality: BetterShotPreferences.compressionQuality)
     }
 
-    /// Explicit Save from the deck or editor. Internal previews are never export destinations.
+    /// Save from the deck, editor, or opt-in automatic capture saving.
+    /// Internal previews are never export destinations.
     @discardableResult
     static func saveCapture(from renderedURL: URL, for captureURL: URL? = nil, replacing exportURL: URL? = nil) throws -> URL {
+        if DeckStaging.isStaged(renderedURL), captureURL == nil, exportURL == nil {
+            let saved = DeckStaging.promote(renderedURL)
+            guard !DeckStaging.isStaged(saved) else { throw CocoaError(.fileWriteUnknown) }
+            return saved
+        }
         let captureURL = captureURL ?? renderedURL
         let record = HistoryStore.shared.record(matching: captureURL)
         let destination: URL

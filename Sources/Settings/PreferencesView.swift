@@ -176,6 +176,7 @@ struct GeneralSettingsTab: View {
     @AppStorage("bs_appAppearance") private var appAppearanceRaw: String = AppAppearance.system.rawValue
     @AppStorage("bs_saveDirectory") private var saveDir = NSHomeDirectory() + "/Desktop"
     @AppStorage("bs_copyAfterSave") private var copyAfterSave = true
+    @AppStorage(AfterCaptureAction.save.storageKey(for: .screenshot)) private var automaticallySaveScreenshots = false
     @AppStorage("bs_playSound") private var playSound = true
     @AppStorage("bs_exportFormat") private var exportFormatRaw: String = ExportFormat.png.rawValue
     @AppStorage("bs_exportQuality") private var exportQuality: Double = 0.9
@@ -280,12 +281,13 @@ struct GeneralSettingsTab: View {
                     }
                 }
 
+                Toggle("Automatically save screenshots to this folder", isOn: $automaticallySaveScreenshots)
                 Toggle("Copy screenshots to the clipboard automatically", isOn: $copyAfterSave)
                 Toggle("Play a shutter sound", isOn: $playSound)
             } header: {
                 Text("Saving")
             } footer: {
-                Text("New screenshots and exported recordings both land here. The default is your Desktop.")
+                Text("Save and Export use this folder. Enable automatic saving to save normal screenshots immediately. Capture & Copy, Edit, and Pin shortcuts do not automatically save.")
             }
 
             Section {
@@ -420,6 +422,7 @@ struct GeneralSettingsTab: View {
         AppPreferences.applyAppearance()
         saveDir = NSHomeDirectory() + "/Desktop"
         copyAfterSave = true
+        automaticallySaveScreenshots = false
         playSound = true
         exportFormatRaw = ExportFormat.png.rawValue
         exportQuality = 0.9
@@ -800,7 +803,7 @@ struct CaptureSettingsTab: View {
             Section {
                 Toggle(isOn: $openEditorAfterCapture) {
                     Text("Open the editor straight away")
-                    Text("Off, show a preview card. Screenshots reach your save folder only when you choose Save or Export.")
+                    Text("Off, show a preview card. To save normal screenshots immediately, enable automatic saving in General.")
                 }
                 Toggle(isOn: $keepInDeckUntilSaved) {
                     Text("Keep screenshot previews open")

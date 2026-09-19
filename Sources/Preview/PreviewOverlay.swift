@@ -13,6 +13,7 @@ final class PreviewOverlay {
 
     private(set) var items: [URL] = []
     private(set) var savingItems: Set<URL> = []
+    private var failedSaves: Set<URL> = []
     private var panel: NSPanel?
     private var dismissTasks: [URL: Task<Void, Never>] = [:]
     private var targetScreen: NSScreen?
@@ -61,6 +62,7 @@ final class PreviewOverlay {
     }
 
     func remove(_ url: URL) {
+        failedSaves.remove(url)
         cancelShare(for: url)
         shareStatuses.removeValue(forKey: url)
         if toastURL == url { toastURL = nil }
@@ -75,6 +77,7 @@ final class PreviewOverlay {
     }
 
     func dismiss() {
+        failedSaves.removeAll()
         for url in Array(shareIDs.keys) { cancelShare(for: url) }
         shareStatuses.removeAll()
         toastURL = nil
@@ -150,13 +153,7 @@ final class PreviewOverlay {
 
     private func saveScreenshot(_ url: URL) -> Bool {
         do {
-            if DeckStaging.isStaged(url) {
-                guard !DeckStaging.isStaged(DeckStaging.promote(url)) else {
-                    throw CocoaError(.fileWriteUnknown)
-                }
-            } else {
-                try ScreenshotFileActions.saveCapture(from: url)
-            }
+            try ScreenshotFileActions.saveCapture(from: url)
             return true
         } catch {
             showSaveFailure(for: url)
@@ -176,7 +173,8 @@ final class PreviewOverlay {
         }
     }
 
-    fileprivate func showSaveFailure(for url: URL) {
+    func showSaveFailure(for url: URL) {
+        failedSaves.insert(url)
         cancelScheduledDismiss(for: url)
         ToastWindow.shared.show(title: "Couldn’t save capture", message: "The capture is still in the deck. Check the save folder in General settings and try Save again.", systemIcon: "exclamationmark.triangle", on: targetScreen)
     }
@@ -347,7 +345,7 @@ final class PreviewOverlay {
 
     func scheduleDismiss(for url: URL) {
         cancelScheduledDismiss(for: url)
-        guard items.contains(url) else { return }
+        guard items.contains(url), !failedSaves.contains(url) else { return }
         guard AppPreferences.overlayDismisses(after: AppPreferences.overlayDismissDelay),
               (!DeckStaging.isStaged(url) || !AppPreferences.keepInDeckUntilSaved),
               shareStatuses[url] == nil else { return }

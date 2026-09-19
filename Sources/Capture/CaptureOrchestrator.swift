@@ -120,11 +120,27 @@ final class CaptureOrchestrator {
         }
     }
 
-    /// Every screenshot starts in private staging; only an explicit Save exports it.
+    /// Every screenshot starts privately; normal captures can opt into automatic saving.
     func processCapturedImage(_ url: URL, action: ShortcutService.Action = .region) async {
         let stagedURL = await stageCapture(url)
-        let displayURL = AppPreferences.keepInDeckUntilSaved ? stagedURL : DeckStaging.retain(stagedURL)
+        var displayURL = AppPreferences.keepInDeckUntilSaved ? stagedURL : DeckStaging.retain(stagedURL)
         if displayURL != stagedURL { DeckStaging.discard(stagedURL) }
+        let allowsAutomaticSave: Bool = switch action {
+        case .region, .fullscreen, .window, .previousRegion, .timedRegion: true
+        default: false
+        }
+        var saveFailed = false
+        if allowsAutomaticSave && AfterCaptureActions.isEnabled(.save, for: .screenshot) {
+            do {
+                // A staging failure leaves only the original; keep it available for retry.
+                guard DeckStaging.isStaged(stagedURL) else { throw CocoaError(.fileWriteUnknown) }
+                let savedURL = try ScreenshotFileActions.saveCapture(from: displayURL)
+                DeckStaging.discard(displayURL)
+                displayURL = savedURL
+            } catch {
+                saveFailed = true
+            }
+        }
         lastCaptureURL = displayURL
 
         if action == .regionCopy || (action != .regionSave && AppPreferences.copyAfterSave) {
@@ -137,6 +153,10 @@ final class CaptureOrchestrator {
         }
 
         PreviewOverlay.shared.show(url: displayURL, on: captureScreen)
+        if saveFailed {
+            PreviewOverlay.shared.showSaveFailure(for: displayURL)
+            return
+        }
         if action == .regionSave {
             PreviewOverlay.shared.save(displayURL)
         } else if action == .regionPin {

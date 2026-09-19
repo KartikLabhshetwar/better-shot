@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.4] - 2026-09-19
 
+### Added
+
+- Optional automatic screenshot saving in General > Saving (#149). Normal captures can save immediately to the configured folder while keeping the preview or editor available. Defaults off, including on upgrade; explicit Copy, Edit, and Pin shortcuts remain private. Saved files stay linked to their editable originals, and failed saves remain in the deck for retry.
+
 ### Changed
 
 - Media Gallery and Settings now use native navigation columns with resizable, collapsible sidebars and section titles aligned with their content. Gallery icons use Finder-sized previews, more space between rows, and blue filename selection while retaining sortable list view and contextual actions.

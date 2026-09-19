@@ -744,6 +744,10 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
     let oldCopy = AppPreferences.copyAfterSave
     let oldEditor = AppPreferences.openEditorAfterCapture
     let oldKeep = AppPreferences.keepInDeckUntilSaved
+    let oldDismissDelay = AppPreferences.overlayDismissDelay
+    let autoSaveKey = AfterCaptureAction.save.storageKey(for: .screenshot)
+    let oldAutoSave = UserDefaults.standard.object(forKey: autoSaveKey)
+    let oldLegacyAutoSave = UserDefaults.standard.object(forKey: BetterShotPreferences.autoSaveKey)
     let oldHandler = PreviewPanelPresenter.shared.onAnnotate
     let oldRecords = Set(HistoryStore.shared.records.map(\.id))
     var editorURL: URL?
@@ -760,8 +764,17 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
         AppPreferences.copyAfterSave = oldCopy
         AppPreferences.openEditorAfterCapture = oldEditor
         AppPreferences.keepInDeckUntilSaved = oldKeep
+        AppPreferences.overlayDismissDelay = oldDismissDelay
+        UserDefaults.standard.set(oldAutoSave, forKey: autoSaveKey)
+        UserDefaults.standard.set(oldLegacyAutoSave, forKey: BetterShotPreferences.autoSaveKey)
+        PinnedScreenshotController.shared.unpinAll()
         PreviewPanelPresenter.shared.onAnnotate = oldHandler
     }
+    UserDefaults.standard.removeObject(forKey: autoSaveKey)
+    UserDefaults.standard.set(true, forKey: BetterShotPreferences.autoSaveKey)
+    precondition(!AfterCaptureActions.isEnabled(.save, for: .screenshot),
+                 "Fresh installs and dormant legacy auto-save values must not enable automatic exports")
+    UserDefaults.standard.set(false, forKey: autoSaveKey)
     func capture(_ action: ShortcutService.Action = .region) async throws -> URL {
         let temporary = directory.appendingPathComponent("capture-\(UUID().uuidString).png")
         try originalData.write(to: temporary)
@@ -775,7 +788,7 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
         AppPreferences.keepInDeckUntilSaved = keep
         for opensEditor in [false, true] {
             AppPreferences.openEditorAfterCapture = opensEditor
-            for action in [ShortcutService.Action.region, .timedRegion, .fullscreen, .window, .regionCopy, .regionEdit] {
+            for action in [ShortcutService.Action.region, .timedRegion, .fullscreen, .window, .previousRegion, .regionCopy, .regionEdit] {
                 editorURL = nil
                 let staged = try await capture(action)
                 precondition(savedFiles().isEmpty, "Capture and opening the editor must never export automatically")
@@ -847,6 +860,87 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
     PreviewOverlay.shared.save(retry)
     precondition(savedFiles().count == 4 && !PreviewOverlay.shared.items.contains(retry))
     print("PASS all screenshot capture modes, clipboard-only deck/editor Copy, private retention, explicit Save, and retry")
+
+    UserDefaults.standard.set(true, forKey: autoSaveKey)
+    for keep in [false, true] {
+        AppPreferences.keepInDeckUntilSaved = keep
+        for opensEditor in [false, true] {
+            AppPreferences.openEditorAfterCapture = opensEditor
+            for action in [ShortcutService.Action.region, .fullscreen, .window, .previousRegion, .timedRegion] {
+                let before = savedFiles().count
+                editorURL = nil
+                let saved = try await capture(action)
+                precondition(savedFiles().count == before + 1
+                    && saved.deletingLastPathComponent().standardizedFileURL == saveFolder.standardizedFileURL,
+                    "Automatic saving creates exactly one export in the configured folder")
+                let raw = ScreenshotHistoryStore.shared.annotationEditorURL(for: saved)
+                precondition((try? Data(contentsOf: raw)) == originalData && raw != saved)
+                precondition(HistoryStore.shared.annotationExportURL(for: raw) == saved,
+                             "Automatic exports stay associated with the untouched editor source")
+                if opensEditor {
+                    precondition(editorURL == raw && !PreviewOverlay.shared.items.contains(saved))
+                } else {
+                    precondition(PreviewOverlay.shared.items.contains(saved), "Auto-save keeps the preview")
+                    PreviewOverlay.shared.copy(saved)
+                    precondition(FileManager.default.fileExists(atPath: saved.path))
+                }
+                let beforeEdit = try Data(contentsOf: saved)
+                try ScreenshotFileActions.copyPNGToClipboard(from: rendered)
+                precondition((try? Data(contentsOf: saved)) == beforeEdit, "Editor Copy never changes an auto-save")
+                let updated = try ScreenshotFileActions.saveCapture(from: rendered, for: raw)
+                precondition(updated == saved && savedFiles().count == before + 1
+                    && (try? Data(contentsOf: saved)) == editedData
+                    && (try? Data(contentsOf: raw)) == originalData,
+                    "Editor Save updates the same auto-save and preserves source pixels")
+                PreviewOverlay.shared.clearAll()
+                precondition(FileManager.default.fileExists(atPath: CaptureOrchestrator.shared.lastCaptureURL!.path),
+                             "Restore Last Capture retains a valid URL after dismissal")
+            }
+        }
+        for action in [ShortcutService.Action.regionCopy, .regionEdit, .regionPin, .regionSave] {
+            let before = savedFiles().count
+            _ = try await capture(action)
+            precondition(savedFiles().count == before + (action == .regionSave ? 1 : 0),
+                         "Explicit capture shortcuts override automatic saving")
+            PreviewOverlay.shared.clearAll()
+            PinnedScreenshotController.shared.unpinAll()
+        }
+
+        // A failed automatic save must remain retryable even with automatic editor opening enabled.
+        AppPreferences.openEditorAfterCapture = true
+        AppPreferences.overlayDismissDelay = 2
+        AppPreferences.saveDirectory = blockedFolder.path
+        let before = savedFiles().count
+        editorURL = nil
+        let failed = try await capture()
+        PreviewOverlay.shared.refreshSettings()
+        PreviewOverlay.shared.scheduleDismiss(for: failed)
+        try await Task.sleep(for: .milliseconds(2200))
+        precondition(editorURL == nil && PreviewOverlay.shared.items.contains(failed)
+            && FileManager.default.fileExists(atPath: failed.path) && savedFiles().count == before,
+            "Failed auto-save preserves the capture and cancels preview dismissal")
+        AppPreferences.saveDirectory = saveFolder.path
+        PreviewOverlay.shared.save(failed)
+        precondition(savedFiles().count == before + 1 && !PreviewOverlay.shared.items.contains(failed))
+    }
+    PreviewOverlay.shared.clearAll()
+    DeckStaging.purge()
+    try Data("block staging".utf8).write(to: DeckStaging.directory)
+    let beforeStagingFailure = savedFiles().count
+    editorURL = nil
+    let original = try await capture()
+    precondition(savedFiles().count == beforeStagingFailure && editorURL == nil
+        && PreviewOverlay.shared.items.contains(original) && (try? Data(contentsOf: original)) == originalData,
+        "Staging failure preserves the original instead of opening an unassociated, potentially lossy export")
+    PreviewOverlay.shared.clearAll()
+    try FileManager.default.removeItem(at: DeckStaging.directory)
+    try DeckStaging.prepareDirectory()
+    UserDefaults.standard.set(false, forKey: autoSaveKey)
+    AppPreferences.openEditorAfterCapture = false
+    let beforeDisable = savedFiles().count
+    _ = try await capture()
+    precondition(savedFiles().count == beforeDisable, "Turning auto-save off restores private capture behavior")
+    print("PASS opt-in screenshot auto-save, legacy preference isolation, all normal modes, shortcut overrides, source/export associations, and failure retry")
 }
 
 @MainActor

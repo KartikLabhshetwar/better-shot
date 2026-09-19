@@ -105,7 +105,10 @@ a PR unless explicitly requested.
   to integer pixels and preserve lossless PNG behavior.
 - All screenshot modes stage privately. Copy never exports to the configured
   folder; Edit, Pin, Share, and drag-out retain working files internally. Only
-  explicit Save/Export or capture-and-save writes a deliverable. Editor Save
+  explicit Save/Export, capture-and-save, or opt-in automatic saving of normal
+  captures writes a deliverable. Automatic saving defaults off; explicit Copy,
+  Edit, and Pin shortcuts bypass it. Preserve preview/editor behavior and retain
+  failed automatic saves for retry. Editor Save
   must work for untouched screenshots, and clipboard file references must
   survive dismissing the capture card.
 - The Arrow cursor style uses the shared high-resolution, white-outlined stemless vector artwork with an arrow-tip hotspot. Keep the legacy `macOS` storage key. Hand is no longer offered, but

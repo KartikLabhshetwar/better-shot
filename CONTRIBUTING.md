@@ -102,8 +102,13 @@ previews are the default.
 Every screenshot starts in `DeckStaging`, regardless of capture mode or editor
 preferences. Copy writes to the clipboard only, retaining a private temporary
 file for file-based paste targets. Edit, Pin, Share, and drag-out retain source
-pixels and previews inside BetterShot. Only Save/Export (or the explicit
-capture-and-save shortcut) writes to the configured save folder. The deck
+pixels and previews inside BetterShot. Save/Export, the explicit capture-and-save
+shortcut, or opt-in automatic saving writes to the configured save folder.
+General > Saving enables automatic saving for normal captures; explicit Copy,
+Edit, and Pin shortcuts bypass it. The new `afterCapture.screenshot.save` key
+defaults off and deliberately ignores dormant legacy `autoSaveScreenshots` values.
+Successful automatic saves retain the preview/editor and associate the export
+with the untouched source; failures keep the card open for Save retry. The deck
 retention preference controls dismissal, not automatic saving.
 
 ### Recordings

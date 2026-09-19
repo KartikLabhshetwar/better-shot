@@ -4,8 +4,7 @@
 //
 //  Configurable "what happens after a capture" pipeline, per capture type
 //  (screenshot vs recording), mirroring CleanShot's General > After capture
-//  matrix. Copy/Save reuse the existing auto-copy/auto-save preferences so
-//  behaviour is preserved and the rest of the app stays in sync.
+//  matrix. Screenshot auto-save is an explicit opt-in starting in 0.5.4.
 //
 
 import Foundation
@@ -60,14 +59,14 @@ enum AfterCaptureAction: String, CaseIterable, Identifiable {
         }
     }
 
-    /// UserDefaults key for this action/type. Screenshot copy/save reuse the
-    /// long-standing auto-copy/auto-save keys so nothing else needs migrating.
+    /// Screenshot Save deliberately ignores the dormant legacy autoSaveScreenshots
+    /// key, so upgrading never silently re-enables exports to the save folder.
     func storageKey(for type: AfterCaptureType) -> String {
         switch (self, type) {
         case (.copy, .screenshot):
             return BetterShotPreferences.autoCopyKey
         case (.save, .screenshot):
-            return BetterShotPreferences.autoSaveKey
+            return "afterCapture.screenshot.save"
         default:
             return "afterCapture.\(type.rawValue).\(rawValue)"
         }
