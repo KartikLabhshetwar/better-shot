@@ -14,6 +14,7 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     let notch = NotchPresenter.shared
     let bar = RecordingBarPresenter.shared
     let overlay = PreviewOverlay.shared
+    ToastWindow.shared.dismiss(animated: false)
     let output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         .appendingPathComponent(".build/editor-snapshots")
     let saveFolder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -43,6 +44,8 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     notch.refreshMode()
     notch.show()
     precondition(notch.expanded, "An empty compact notch must open the New Capture action")
+    HistoryStore.shared.referenceCapture(at: imageURL, kind: .screenshot)
+    HistoryStore.shared.referenceCapture(at: movieURL, kind: .recording)
     bar.showPicker(activate: false)
     overlay.show(url: imageURL)
     overlay.show(url: movieURL)
@@ -94,10 +97,74 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
         bar.recordingConfirmation = nil
     }
     notch.show()
+    notch.updateHoverState(true)
+    notch.updateHoverState(false)
+    try await Task.sleep(for: .milliseconds(180))
+    precondition(!notch.expanded && notch.isVisible, "Leaving the notch must collapse without a click")
+    notch.updateHoverState(true)
+    notch.updateHoverState(false)
+    try await Task.sleep(for: .milliseconds(180))
+    precondition(!notch.expanded, "A brief pass across the notch must cancel pending open")
+    notch.updateHoverState(true)
+    try await Task.sleep(for: .milliseconds(180))
+    precondition(notch.expanded, "Hover must open the whole compact surface")
+    notch.updateHoverState(false)
+    notch.updateHoverState(true)
+    try await Task.sleep(for: .milliseconds(180))
+    precondition(notch.expanded, "Returning before close must cancel pending dismissal")
+    notch.menuTrackingCount = 2
+    notch.updateHoverState(false)
+    try await Task.sleep(for: .milliseconds(180))
+    precondition(notch.expanded, "Native menu tracking must keep the notch open")
+    notch.menuTrackingCount -= 1
+    notch.resumeHoverDismissal()
+    try await Task.sleep(for: .milliseconds(180))
+    precondition(notch.expanded, "Closing a submenu must preserve its parent menu")
+    notch.menuTrackingCount -= 1
+    notch.resumeHoverDismissal()
+    try await Task.sleep(for: .milliseconds(180))
+    precondition(!notch.expanded, "Dismiss after the menu closes with the pointer outside")
+    notch.show()
+    let child = NSPanel(contentRect: CGRect(x: 0, y: 0, width: 80, height: 80),
+        styleMask: .borderless, backing: .buffered, defer: false)
+    child.isReleasedWhenClosed = false
+    window.addChildWindow(child, ordered: .above)
+    child.orderFront(nil)
+    notch.updateHoverState(false)
+    try await Task.sleep(for: .milliseconds(180))
+    precondition(notch.expanded, "An attached popover must prevent premature collapse")
+    window.removeChildWindow(child)
+    child.close()
+    // Closing native windows can synthesize hover events at the real pointer.
+    // Send the intended leave after AppKit has finished removing the child.
+    try await Task.sleep(for: .milliseconds(80))
+    notch.updateHoverState(false)
+    try await Task.sleep(for: .milliseconds(180))
+    precondition(!notch.expanded, "Leaving after a popover closes must collapse the notch")
+    notch.updateHoverState(true)
+    notch.suspendForCapture()
+    try await Task.sleep(for: .milliseconds(180))
+    precondition(!notch.isVisible, "Capture suspension must cancel pending hover opens")
+    notch.resumeAfterCapture()
+    notch.show()
+    notch.updateHoverState(true)
+    print("PASS hover open/leave, cancelled open/close, menu/popover protection, and capture suspension")
+
+    let recentImages = NotchRecentCaptures.items(kind: .screenshot)
+    let recentVideos = NotchRecentCaptures.items(kind: .recording)
+    precondition(recentImages.contains { $0.previewURL == imageURL })
+    precondition(recentVideos.contains { $0.previewURL == movieURL })
+    precondition(recentImages.allSatisfy { $0.kind == .screenshot }
+        && recentVideos.allSatisfy { $0.kind == .recording })
+    overlay.remove(movieURL)
+    precondition(recentVideos.first(where: { $0.previewURL == movieURL })!.open(cloud: false) == nil)
+    precondition(overlay.items.contains(movieURL), "Recent saved media must reopen the existing preview/actions")
+    precondition(NotchRecentCaptures.items().count <= 4)
+    print("PASS recent screenshot/video filters and reopening saved media through shared gallery actions")
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
         try snapshot(NotchContent(), scheme: scheme, width: 660,
-                     to: output.appendingPathComponent("notch-captures-\(name).png"), height: 470)
+                     to: output.appendingPathComponent("notch-captures-\(name).png"), height: 700)
         try snapshot(PreferencesView(selection: .general), scheme: scheme, width: 780,
                      to: output.appendingPathComponent("notch-settings-\(name).png"), height: 620)
     }
@@ -106,6 +173,13 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
         let floating = DynamicNotch(hoverBehavior: [], style: .floating) { NotchContent() }
         floating.presentImmediately(on: screen)
         defer { floating.dismissImmediately() }
+        floating.presentImmediately(on: screen, expanded: false)
+        try await Task.sleep(for: .milliseconds(80))
+        let compactWidth = floating.contentFrame.width
+        floating.presentImmediately(on: screen)
+        try await Task.sleep(for: .milliseconds(80))
+        precondition(floating.contentFrame.width > compactWidth,
+                     "Non-notched displays must have a smaller compact surface")
         try await Task.sleep(for: .milliseconds(80))
         precondition(floating.windowController?.window?.isVisible == true)
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
@@ -148,7 +222,7 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     precondition(bar.mode == .recording && notch.isVisible)
     for scheme in [ColorScheme.light, .dark] {
         try snapshot(NotchContent(), scheme: scheme, width: 660,
-                     to: output.appendingPathComponent("notch-recording-\(scheme == .light ? "light" : "dark").png"), height: 430)
+                     to: output.appendingPathComponent("notch-recording-\(scheme == .light ? "light" : "dark").png"), height: 700)
     }
     bar.hide()
     precondition(overlay.items.count == 2)

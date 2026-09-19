@@ -12,6 +12,9 @@ final class NotchPresenter {
     private(set) var captureSuspended = false
     var countdown: Int?
     @ObservationIgnored private var enabledSession = false
+    @ObservationIgnored private var hoverTask: Task<Void, Never>?
+    @ObservationIgnored private var isHovering = false
+    @ObservationIgnored var menuTrackingCount = 0
     var notification: AnyView?
     var transfers: [UUID: TransferStatusCard] = [:]
     var transferOrder: [UUID] = []
@@ -57,6 +60,7 @@ final class NotchPresenter {
             } compactTrailing: {
                 NotchCompactTrailing()
             }
+            notch.onHoverChanged = { [weak self] in self?.updateHoverState($0) }
             notch.configureWindow = { panel in
                 panel.identifier = NSUserInterfaceItemIdentifier("BetterShot.Notch")
                 panel.title = "BetterShot notch"
@@ -72,12 +76,16 @@ final class NotchPresenter {
     }
 
     func collapse() {
-        guard screen?.safeAreaInsets.top ?? 0 > 0 else { return }
+        hoverTask?.cancel()
+        guard expanded else { return }
         expanded = false
         refresh()
     }
 
     func suspendForCapture() {
+        hoverTask?.cancel()
+        isHovering = false
+        menuTrackingCount = 0
         captureSuspended = true
         notch?.dismissImmediately()
     }
@@ -88,6 +96,9 @@ final class NotchPresenter {
     }
 
     func refreshMode() {
+        hoverTask?.cancel()
+        isHovering = false
+        menuTrackingCount = 0
         enabledSession = AppPreferences.presentationMode == .notch
         notch?.dismissImmediately()
         RecordingBarPresenter.shared.refreshPresentation()
@@ -95,6 +106,36 @@ final class NotchPresenter {
         PreviewOverlay.shared.refreshPresentation()
         TeleprompterOverlayPresenter.shared.refreshPresentation()
         refresh()
+    }
+
+    // Adapted from TheBoredTeam/boring.notch ContentView.handleHover at
+    // 99c26e418323d10e48886469fc9bd83900194bec (GPL-3.0).
+    // See Resources/Licenses/BoringNotch.txt and NOTICE.md.
+    func updateHoverState(_ hovering: Bool) {
+        hoverTask?.cancel()
+        isHovering = hovering
+        guard AppPreferences.presentationMode == .notch, !captureSuspended else { return }
+        hoverTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(100))
+            guard !Task.isCancelled, let self else { return }
+            if hovering {
+                guard self.isHovering, !self.expanded else { return }
+                self.show()
+            } else if !self.isHovering && self.canCollapseAfterHover {
+                self.collapse()
+            }
+        }
+    }
+
+    private var canCollapseAfterHover: Bool {
+        let bar = RecordingBarPresenter.shared
+        return countdown == nil && !bar.showsRecordingOptions && bar.recordingConfirmation == nil
+            && menuTrackingCount == 0 && NSApp.modalWindow == nil && window?.attachedSheet == nil
+            && !(window?.childWindows?.contains(where: \.isVisible) ?? false)
+    }
+
+    func resumeHoverDismissal() {
+        if !isHovering { updateHoverState(false) }
     }
 
     func runCountdown(seconds: Int, on screen: NSScreen?) async {
@@ -146,6 +187,28 @@ struct NotchContent: View {
         .frame(width: 620)
         .frame(maxHeight: max(240, (presenter.screen?.visibleFrame.height ?? 800) - 120))
         .fixedSize(horizontal: false, vertical: true)
+        .onReceive(NotificationCenter.default.publisher(for: NSMenu.didBeginTrackingNotification)) { _ in
+            presenter.menuTrackingCount += 1
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSMenu.didEndTrackingNotification)) { _ in
+            presenter.menuTrackingCount = max(0, presenter.menuTrackingCount - 1)
+            presenter.resumeHoverDismissal()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { _ in
+            presenter.resumeHoverDismissal()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEndSheetNotification)) { _ in
+            presenter.resumeHoverDismissal()
+        }
+        .onChange(of: bar.showsRecordingOptions) { _, open in
+            if !open { presenter.resumeHoverDismissal() }
+        }
+        .onChange(of: bar.recordingConfirmation) { _, action in
+            if action == nil { presenter.resumeHoverDismissal() }
+        }
+        .onChange(of: presenter.countdown) { _, countdown in
+            if countdown == nil { presenter.resumeHoverDismissal() }
+        }
         .onChange(of: overlay.items) { selectedURL = overlay.items.last }
         .onExitCommand {
             if bar.isVisible && bar.mode == .picker {
@@ -169,10 +232,8 @@ struct NotchContent: View {
                 if !bar.isVisible && !ScreenRecordingManager.shared.isActive {
                     Button("New Capture", systemImage: "viewfinder") { bar.showPicker() }
                 }
-                if presenter.screen?.safeAreaInsets.top ?? 0 > 0 {
-                    Button("Collapse notch", systemImage: "chevron.up") { presenter.collapse() }
-                        .labelStyle(.iconOnly)
-                }
+                Button("Collapse notch", systemImage: "chevron.up") { presenter.collapse() }
+                    .labelStyle(.iconOnly)
             }
             if let countdown = presenter.countdown {
                 Label("Starting in \(countdown)", systemImage: "timer")
@@ -221,6 +282,8 @@ struct NotchContent: View {
                         else { overlay.scheduleDismiss(for: url) }
                     }
                 }
+                Divider()
+                NotchRecentCaptures()
                 if let id = presenter.transferOrder.last, let card = presenter.transfers[id] { card }
                 if let notification = presenter.notification { notification }
             }
@@ -241,7 +304,6 @@ struct NotchCompactLeading: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Expand BetterShot notch")
-        .onHover { if $0 { NotchPresenter.shared.show() } }
     }
 }
 
@@ -257,6 +319,5 @@ struct NotchCompactTrailing: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Expand capture controls")
-        .onHover { if $0 { NotchPresenter.shared.show() } }
     }
 }

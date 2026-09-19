@@ -111,6 +111,7 @@ struct NotchView<Expanded, CompactLeading, CompactTrailing>: View where Expanded
         .padding(.horizontal, topCornerRadius)
         .fixedSize()
         .frame(minWidth: minWidth, minHeight: dynamicNotch.notchSize.height)
+        .contentShape(Rectangle())
         .onHover(perform: dynamicNotch.updateHoverState)
     }
 

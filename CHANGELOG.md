@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The notch opens on hover and collapses after the pointer leaves, using Boring Notch’s cancellable hover scheduling. Menus, recording options, and confirmations prevent premature closing; non-notched displays also have a compact state. Recent Captures shows saved screenshots and videos with type filters, thumbnails, and the existing gallery actions.
+
 - Expanded Notch Mode uses native macOS frosted glass, system-colored controls, and light/dark appearance. The compact notch stays black, and Reduce Transparency uses an opaque surface.
 
 ### Fixed

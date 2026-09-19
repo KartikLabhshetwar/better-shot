@@ -86,6 +86,8 @@ public final class DynamicNotch<Expanded, CompactLeading, CompactTrailing>: Obse
 
     /// BetterShot: configure capture visibility before the first visible frame.
     public var configureWindow: ((NSPanel) -> Void)?
+    /// BetterShot: route hover across the whole surface, including the compact camera gap.
+    public var onHoverChanged: ((Bool) -> Void)?
     public internal(set) var contentFrame: CGRect = .zero
 
     /// Immediate transitions avoid delayed hides racing capture and mode changes.
@@ -95,7 +97,7 @@ public final class DynamicNotch<Expanded, CompactLeading, CompactTrailing>: Obse
         if windowController?.window?.screen != screen || windowController == nil {
             initializeWindow(screen: screen, orderFront: false)
         }
-        state = expanded || effectiveStyle(for: screen).isFloating ? .expanded : .compact
+        state = expanded ? .expanded : .compact
         windowController?.window?.alphaValue = 1
         windowController?.window?.orderFrontRegardless()
     }
@@ -190,6 +192,7 @@ public final class DynamicNotch<Expanded, CompactLeading, CompactTrailing>: Obse
         guard state != .hidden, hovering != isHovering else { return }
 
         isHovering = hovering
+        onHoverChanged?(hovering)
 
         if hoverBehavior.contains(.hapticFeedback) {
             let performer = NSHapticFeedbackManager.defaultPerformer

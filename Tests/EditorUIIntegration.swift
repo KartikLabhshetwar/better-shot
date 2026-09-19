@@ -10,6 +10,15 @@ import TourKit
 /// AVPlayer layers and interactive capture still require manual testing.
 @MainActor
 func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
+    // A failed notch check may leave the test executable's defaults in notch mode.
+    // The general overlay/toast checks explicitly exercise normal presentation.
+    let defaults = UserDefaults.standard
+    let previousMode = defaults.object(forKey: AppPreferences.presentationModeKey)
+    defaults.set("normal", forKey: AppPreferences.presentationModeKey)
+    defer {
+        if let previousMode { defaults.set(previousMode, forKey: AppPreferences.presentationModeKey) }
+        else { defaults.removeObject(forKey: AppPreferences.presentationModeKey) }
+    }
     if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_EDITOR_WINDOWS"] == "1" {
         try await checkEditorWindowInteractions(imageURL: imageURL, movieURL: movieURL)
     }

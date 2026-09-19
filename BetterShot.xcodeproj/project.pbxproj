@@ -55,6 +55,7 @@
 		37000BC29C1251CAF994FE0F /* CameraRecordingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E8333B22E7E66B67D75E2D2 /* CameraRecordingManager.swift */; };
 		373BC289BF3F9A842CA12CF0 /* VideoTrimSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EB02705C403A4D300A1000F /* VideoTrimSelection.swift */; };
 		37CD2E69C23CF7BB962C2549 /* CapturePresentationMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46DAB0B314FDE73338171876 /* CapturePresentationMode.swift */; };
+		380EDC32A94F83B02916D6DD /* NotchRecentCaptures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D6C3162472265AFC3EF722B /* NotchRecentCaptures.swift */; };
 		387EB7D93F69E67AE33613AD /* CloudUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5B6D30AC545D7DFDE178FED /* CloudUploader.swift */; };
 		3933094B835D8EF2F5F1EABB /* RegionSelectionOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 868F0E1B6C8FC7DF50B4A79B /* RegionSelectionOverlay.swift */; };
 		3A14826DE9ED6F5F4C674ABD /* AnnotationSwatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CD064BBAE4EC5BF78867B77 /* AnnotationSwatch.swift */; };
@@ -344,6 +345,7 @@
 		7C129FF88ACF72C0544AC0D9 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		7C6D5B9A6634007DC09C4A81 /* StudioInspectorTabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioInspectorTabs.swift; sourceTree = "<group>"; };
 		7CF3030FEFF60A9E00ACF22C /* StrokeOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrokeOptions.swift; sourceTree = "<group>"; };
+		7D6C3162472265AFC3EF722B /* NotchRecentCaptures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchRecentCaptures.swift; sourceTree = "<group>"; };
 		7DB9ADF51148B7B593827415 /* CountdownOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountdownOverlay.swift; sourceTree = "<group>"; };
 		826D967E7F5D2962EFE34A29 /* AnnotationEditorModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationEditorModel.swift; sourceTree = "<group>"; };
 		861CE2F486701322F7B4FAD3 /* R2Uploader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = R2Uploader.swift; sourceTree = "<group>"; };
@@ -762,6 +764,7 @@
 			isa = PBXGroup;
 			children = (
 				613D2B1B74DE4BF67B4B1A2C /* NotchPresenter.swift */,
+				7D6C3162472265AFC3EF722B /* NotchRecentCaptures.swift */,
 			);
 			path = Notch;
 			sourceTree = "<group>";
@@ -989,6 +992,7 @@
 				BC811FEA82E635D6292A80FD /* MenuBarContentView.swift in Sources */,
 				5DC7C7A2CF426EEB84D10515 /* MenuBarPopoverController.swift in Sources */,
 				A66A0FE146E7C133382FD375 /* NotchPresenter.swift in Sources */,
+				380EDC32A94F83B02916D6DD /* NotchRecentCaptures.swift in Sources */,
 				0E620055B0FC6109771DC972 /* OnboardingDemoView.swift in Sources */,
 				22833BA0A9BCC6501CF14A1B /* OnboardingPermissionsView.swift in Sources */,
 				E5F46E4A80BB763B20FF325D /* OnboardingState.swift in Sources */,

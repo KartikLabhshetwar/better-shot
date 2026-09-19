@@ -229,7 +229,7 @@ If BetterShot helps you, you can [support its development](https://www.buymeacof
 ## License
 
 [BSD 3-Clause](LICENSE) for original BetterShot code; adapted Cap rendering uses
-AGPLv3. See [third-party notices](Resources/Licenses/NOTICE.md) for distribution
+AGPLv3, and the adapted Boring Notch hover handling uses GPLv3. See [third-party notices](Resources/Licenses/NOTICE.md) for distribution
 terms and the bundled TourKit MIT license.
 
 ### Optional notch mode (v0.5.5)
@@ -243,7 +243,11 @@ The image and video editors still open in their full editing windows.
 The expanded notch uses native macOS frosted glass and follows light/dark
 appearance, with an opaque background when Reduce Transparency is enabled.
 
-On a notched display, Collapse hides the expanded controls; hover or click either
-side to reopen them. Other displays use a floating panel at the top. Pending
+Hover over the notch to expand it; moving away collapses it after a short delay.
+Menus, recording options, and confirmations stay open while you use them. Click
+remains available for keyboard/accessibility use. Other displays use a floating
+panel that collapses to compact capture status. The Recent Captures section shows
+screenshots and videos from your library; filter by type and click a thumbnail
+to reopen its preview and actions. Open Gallery shows the full library. Pending
 captures remain until you act on them. Switching back restores your normal overlay
 layout and timing. Capture exclusion and private staging work in both modes.

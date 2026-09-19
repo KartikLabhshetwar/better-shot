@@ -12,3 +12,6 @@ no new motion or blur transitions are used. Expanded notch and floating surfaces
 use AppKit’s native popover material and respect Reduce Transparency. Expanded notch controls follow the app’s light/dark
 appearance; the compact notch and physical camera cutout remain black. The
 documentation-only plugin and media are omitted.
+
+Whole-surface hover callbacks route to BetterShot’s cancellable hover handling.
+The floating fallback supports the same compact leading/trailing controls.

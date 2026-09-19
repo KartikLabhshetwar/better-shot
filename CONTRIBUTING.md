@@ -448,6 +448,12 @@ snapshots of the ghost, tour pages, and release notes.
 
 ### Notch presentation
 
+Hover scheduling adapts Boring Notch’s cancellable delay; retain its GPL notice in
+Resources/Licenses. Whole-surface hover events come from DynamicNotchKit. Cancel
+pending hover work during capture/mode changes and keep menus/popovers open.
+Recent Captures reuses `MediaGalleryItem` resolution and `MediaGalleryCard` actions
+and thumbnail decoding; do not add a second media store.
+
 Settings > General > Capture Mode selects Normal Mode or Notch Mode and applies
 immediately. Overlay settings customize normal mode’s floating preview cards.
 
