@@ -37,6 +37,7 @@ scripts/
 !/scripts/run-checks.sh
 !/scripts/create-dmg.sh
 !/scripts/dmg-background.swift
+!/scripts/generate-cap-3d-reference.py
 
 # Claude Code local worktrees (shared CLAUDE.md is tracked)
 .claude/worktrees/

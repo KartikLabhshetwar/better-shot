@@ -8,6 +8,7 @@ struct BetterShotApp: App {
     init() {
         if ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] != "1" {
             OnboardingState.prepareForLaunch()
+            ReleaseNotes.prepareForLaunch(current: ReleaseNotesWindowController.currentVersion)
         }
     }
 

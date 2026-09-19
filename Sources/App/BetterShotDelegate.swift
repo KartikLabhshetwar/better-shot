@@ -30,6 +30,8 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async {
             if OnboardingState.shouldPresent() {
                 OnboardingWindowController.shared.show()
+            } else if ReleaseNotesWindowController.shared.show(onlyIfNew: true) {
+                // Keep the update notes in focus instead of also opening the capture bar.
             } else if UserDefaults.standard.object(forKey: AppPreferences.showCaptureBarAtLaunchKey) as? Bool ?? true {
                 RecordingBarPresenter.shared.showPicker(activate: false)
             }

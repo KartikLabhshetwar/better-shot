@@ -1372,6 +1372,8 @@ struct AboutTab: View {
 
                 section("Updates") {
                     updateContent
+                    Button("What’s New…") { ReleaseNotesWindowController.shared.show() }
+                    Button("Take the Tour…") { OnboardingWindowController.shared.show(replay: true) }
                 }
 
                 section("Project") {

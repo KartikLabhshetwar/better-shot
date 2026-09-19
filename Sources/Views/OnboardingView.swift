@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import SwiftUI
+import TourKit
 
 struct OnboardingView: View {
     enum Step: Int, CaseIterable {
@@ -30,7 +31,7 @@ struct OnboardingView: View {
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 24) {
                             switch step {
-                            case .welcome: welcome
+                            case .welcome: welcome(width: min(560, max(320, geometry.size.width - 48)))
                             case .permissions: permissionSetup
                             case .ready: ready
                             }
@@ -52,7 +53,7 @@ struct OnboardingView: View {
                     permissions.refresh()
                 }
             }
-            navigation
+            if step != .welcome { navigation }
         }
         .background(EditorChrome.workspace)
         .tint(EditorChrome.accent)
@@ -104,24 +105,24 @@ struct OnboardingView: View {
         }
     }
 
-    private var welcome: some View {
-        VStack(spacing: 16) {
-            HStack(alignment: .top, spacing: 14) {
-                Image(nsImage: resourceBundle.image(forResource: "AppIcon") ?? NSApp.applicationIconImage)
-                    .resizable().frame(width: 48, height: 48).accessibilityHidden(true)
-                heading("Welcome to BetterShot",
-                    detail: "Capture, edit, and share screenshots and screen recordings.")
-            }
-            Picker("Explore BetterShot", selection: $demo) {
-                ForEach(OnboardingDemo.allCases) { demo in
-                    Text(demo.title).tag(demo)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            OnboardingDemoView(demo: demo, resourceBundle: resourceBundle)
-                .id(demo)
-        }
+    private func welcome(width: CGFloat) -> some View {
+        TourSlideshowView(pages: Self.tourPages(in: resourceBundle), width: width,
+            finishButtonTitle: "Set Up Permissions",
+            onFinish: { step = .permissions }, onClose: { step = .permissions })
+    }
+
+    static func tourPages(in bundle: Bundle) -> [TourPage] {
+        [
+            TourPage(imageName: "Onboarding/screenshot-demo.png", imageBundle: bundle,
+                title: "Capture and make it clear",
+                description: "Add arrows, text, and a background. Copy privately, or save and share when you’re ready."),
+            TourPage(imageName: "Onboarding/recording-demo.png", imageBundle: bundle,
+                title: "Turn recordings into a story",
+                description: "Trim the timeline, then use + Add for Zoom or a 3D Shot. Hover over an empty 3D lane to preview where a shot will fit."),
+            TourPage(imageName: "Onboarding/3d-demo.png", imageBundle: bundle,
+                title: "Give your video depth",
+                description: "Select a 3D shot to explore Moves and Angles in Effects. Adjust Camera, Blur, and Keyframes, then play the shot to check the result.")
+        ]
     }
 
     private var permissionSetup: some View {
@@ -221,6 +222,12 @@ struct OnboardingView: View {
             }
             .buttonStyle(.plain)
             .accessibilityHint("Opens a separate copy in the image editor. No screen access needed.")
+            DisclosureGroup("Watch a short demo") {
+                Picker("Explore BetterShot", selection: $demo) {
+                    ForEach(OnboardingDemo.allCases) { demo in Text(demo.title).tag(demo) }
+                }.pickerStyle(.segmented)
+                OnboardingDemoView(demo: demo, resourceBundle: resourceBundle).id(demo)
+            }
             Text("Change your shortcuts anytime in Settings → Shortcuts.")
                 .font(.caption).foregroundStyle(.secondary)
         }

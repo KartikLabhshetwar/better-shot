@@ -2,6 +2,7 @@ import AppKit
 import AVFoundation
 import Carbon
 import SwiftUI
+import TourKit
 @testable import BetterShot
 
 /// Offscreen snapshots and model checks, plus a brief native transfer-toast lifecycle check.
@@ -357,7 +358,33 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
                      "The test runner must never request real permissions or persist setup attempts")
         precondition(permission.settingsURL.scheme == "x-apple.systempreferences")
     }
+    let releaseNotes = try ReleaseNotesWindowController.load(in: appBundle)
+    let releaseVersion = appBundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as! String
+    let currentNotes = releaseNotes.filter { $0.version == releaseVersion }
+    precondition(currentNotes.count == 1 && !currentNotes[0].body.isEmpty, "Every shipped version needs bundled release notes")
+    let tourPages = OnboardingView.tourPages(in: appBundle)
+    precondition(tourPages.count == 3)
+    for page in tourPages {
+        precondition(appBundle.url(forResource: page.imageName, withExtension: nil) != nil, "Tour artwork must ship in the app")
+    }
     for scheme in [ColorScheme.light, .dark] {
+        for width: CGFloat in [420, 640] {
+            try snapshot(ReleaseNotesView(version: releaseVersion, notes: currentNotes, onClose: {}),
+                scheme: scheme, width: width,
+                to: output.appendingPathComponent("release-notes-\(scheme)-\(Int(width)).png"), height: 660)
+        }
+        for index in tourPages.indices {
+            try snapshot(TourSlideshowView(pages: tourPages, width: 472, initialPageIndex: index,
+                finishButtonTitle: "Set Up Permissions", onFinish: {}, onClose: {})
+                .transaction { $0.disablesAnimations = true },
+                scheme: scheme, width: 472,
+                to: output.appendingPathComponent("tour-page-\(index)-\(scheme).png"), height: 510)
+        }
+        try snapshot(ZStack(alignment: .topLeading) {
+            Color.secondary.opacity(0.1)
+            Recording3DInsertionGhost(range: 1...4, pointsPerSecond: 100)
+        }.frame(height: 36).padding(12), scheme: scheme, width: 600,
+            to: output.appendingPathComponent("3d-insertion-ghost-\(scheme).png"), height: 60)
         for step in OnboardingView.Step.allCases {
             for width: CGFloat in [520, 760] {
                 try snapshot(OnboardingView(step: step, resourceBundle: appBundle, isPermissionPreview: false),
@@ -519,6 +546,44 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         try snapshot(RecordingStudioContent(model: videoModel), scheme: scheme, width: 1100,
                      to: output.appendingPathComponent("video-effects-\(name).png"))
     }
+    videoModel.add3DShot(at: 0)
+    for scheme in [ColorScheme.light, .dark] {
+        let name = scheme == .light ? "light" : "dark"
+        for width: CGFloat in [260, 320] {
+            for panel in Recording3DInspector.Panel.allCases {
+                try snapshot(ScrollView { Recording3DInspector(model: videoModel, panel: panel) }.scrollIndicators(.hidden),
+                    scheme: scheme, width: width,
+                    to: output.appendingPathComponent("video-3d-inspector-\(panel.rawValue)-\(name)-\(Int(width)).png"), height: 1000)
+            }
+        }
+        try snapshot(Recording3DAutoScenePicker(model: videoModel, dismiss: {}), scheme: scheme, width: 360,
+            to: output.appendingPathComponent("video-auto-scene-\(name).png"), height: 390)
+        try snapshot(RecordingStudioContent(model: videoModel), scheme: scheme, width: 1100,
+                     to: output.appendingPathComponent("video-3d-\(name).png"))
+    }
+    if var focusShot = videoModel.selected3DShot {
+        for mode in [Recording3DBlur.Mode.radial, .directional, .tiltShift] {
+            focusShot.blur?.mode = mode
+            videoModel.update3DShot(focusShot)
+            for scheme in [ColorScheme.light, .dark] {
+                let name = scheme == .light ? "light" : "dark"
+                try snapshot(Recording3DBlurInspector(model: videoModel).padding(12), scheme: scheme, width: 260,
+                    to: output.appendingPathComponent("video-3d-blur-\(mode.rawValue)-\(name).png"), height: 560)
+            }
+        }
+    }
+    if var animated = videoModel.selected3DShot {
+        animated.tracks = [.init(property: .panX, keyframes: [
+            .init(position: 0, value: -0.2), .init(position: 0.5, value: 0.1), .init(position: 1, value: 0.3)
+        ])]
+        videoModel.update3DShot(animated)
+        for scheme in [ColorScheme.light, .dark] {
+            let name = scheme == .light ? "light" : "dark"
+            try snapshot(Recording3DKeyframeEditor(model: videoModel).padding(12), scheme: scheme, width: 260,
+                         to: output.appendingPathComponent("video-3d-keyframes-\(name).png"), height: 750)
+        }
+    }
+    if let id = videoModel.selected3DShotID { videoModel.remove3DShot(id: id) }
     videoModel.splitClip(at: videoModel.duration / 2)
     var firstClip = videoModel.clipTimeline.segments[0]
     firstClip.sourceStart += 0.2

@@ -50,6 +50,16 @@ permissions and your first capture.
 - **Edit the recording.** Cut clips, adjust speed from 0.25× to 8×, add zooms,
   transitions, captions, and blur or pixelate masks. Arrange screen and camera
   in a bubble, overlapping frame, side-by-side layout, or presenter view.
+- **3D video shots.** Use the timeline’s **+ Add > 3D Shot** menu, then choose
+  from eight camera moves and five drifting angles in Effects. Adjust camera
+  orbit, screen fold, distance, and lens, or generate a scene. The same menu adds
+  zoom segments. **Auto Scene** previews a sequence before applying it, keeps
+  generated shots at least one second long, and snaps nearby boundaries to clip cuts.
+  The native **Edit** menu groups Look, Camera, Depth Blur, Keyframes, and Timing.
+  Controls include radial/directional/tilt-shift focus, bokeh highlights, and editable
+  Bézier curves. Preview and export share
+  the GPU compositor. Zoom enlarges the whole 3D card; separate entry/exit controls
+  ease the camera into and out of its shot.
 - **Make the cursor easier to follow.** Choose Recorded, Arrow, Dark, Light, or
   Dot, with size, smoothing, click effects, and idle hiding. Cursor restyling
   requires a recorded pointer track; it cannot replace a cursor baked into
@@ -173,11 +183,24 @@ open .build/Build/Products/Release/BetterShot.app
 
 `make release` builds unsigned and does not require the maintainer's signing
 identity. The app uses SwiftUI and AppKit, with
-[DockProgress](https://github.com/sindresorhus/DockProgress) as its Swift package
-dependency. The website is a separate Next.js project.
+[DockProgress](https://github.com/sindresorhus/DockProgress) and a locally adapted
+[TourKit](Vendor/TourKit/BETTERSHOT.md) Swift package. The website is a separate Next.js project.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for Xcode setup, the code map, tests, and
 submission guidance.
+
+### Guided setup and update notes
+
+New installs open a short TourKit guide, followed by optional permissions and a
+practice capture. Use **Settings → About → Take the Tour** to revisit it.
+After an update, **What’s New** shows the bundled changelog once, including releases
+you skipped. It also stays available in Settings → About. Closing update notes
+continues your usual capture-bar startup preference; completed setup is preserved.
+
+Hover over empty space in the video editor’s 3D timeline to see where a shot will
+fit before clicking. The dashed preview shows its duration; hovering never saves
+an effect. The **+ Add** menu remains available for Zoom and 3D Shot.
+
 
 ## Help and contribute
 
@@ -195,4 +218,6 @@ If BetterShot helps you, you can [support its development](https://www.buymeacof
 
 ## License
 
-[BSD 3-Clause](LICENSE).
+[BSD 3-Clause](LICENSE) for original BetterShot code; adapted Cap rendering uses
+AGPLv3. See [third-party notices](Resources/Licenses/NOTICE.md) for distribution
+terms and the bundled TourKit MIT license.

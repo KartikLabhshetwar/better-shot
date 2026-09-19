@@ -41,6 +41,7 @@ struct RecordingStudioWindow: View {
 struct RecordingStudioContent: View {
     @Bindable var model: RecordingStudioModel
     @State private var isInspectorPresented = true
+    @State private var confirms3DShotRemoval = false
     @State private var closeGuard = EditorCloseGuard()
 
     var body: some View {
@@ -124,6 +125,12 @@ struct RecordingStudioContent: View {
             }
             .sharedBackgroundVisibility(.hidden)
         }
+        .alert("Remove this 3D shot?", isPresented: $confirms3DShotRemoval) {
+            Button("Cancel", role: .cancel) { }
+            Button("Remove Shot", role: .destructive) {
+                if let id = model.selected3DShotID { model.remove3DShot(id: id) }
+            }
+        }
         .editorFullScreenByDefault()
         .navigationTitle(windowTitle)
         .onWindowChange { window in
@@ -154,7 +161,8 @@ struct RecordingStudioContent: View {
         case .videoDelete:
             if model.isEditingMasks { model.deleteSelectedMask() }
             else if !model.isCroppingVideo {
-                if let id = model.selectedCueID { model.removeZoomCue(id: id) }
+                if model.selected3DShotID != nil { confirms3DShotRemoval = true }
+                else if let id = model.selectedCueID { model.removeZoomCue(id: id) }
                 else { model.deleteSelectedClip() }
             }
         default:
@@ -465,63 +473,84 @@ private struct StudioCanvas: View {
                 let cropCenter = RecordingVideoCrop.point(CGPoint(x: 0.5, y: 0.5), in: crop)
 
                 ZStack {
+                    if !model.previewTimeline3D.shots.isEmpty && !model.isCroppingVideo && !model.isEditingMasks {
+                        Recording3DPreview(model: model, time: model.displayTime, revision: model.previewRenderRevision, timeline: model.previewTimeline3D)
+                            .frame(width: canvasSize.width, height: canvasSize.height)
+                        if model.isCameraVisible(at: model.displayTime), layout.bubbleRect.width > 0 {
+                            Color.clear
+                                .frame(width: layout.bubbleRect.width, height: layout.bubbleRect.height)
+                                .contentShape(Rectangle())
+                                .position(x: layout.bubbleRect.midX, y: layout.bubbleRect.midY)
+                                .modifier(StudioCameraDrag(model: model, canvasSize: canvasSize))
+                                .frame(width: canvasSize.width, height: canvasSize.height)
+                                .projectionEffect(ProjectionTransform(layout.camera3DProjection(model.preview3DPose(at: model.displayTime), viewport: state)))
+                        }
+                    } else {
                     // Fixed frame + clip so a scaledToFill wallpaper can never
                     // inflate the ZStack bounds and shift the card off-center.
                     StudioBackgroundView(style: model.style.background)
                         .frame(width: canvasSize.width, height: canvasSize.height)
                         .clipped()
 
-                    // The recording card: video with the virtual camera
-                    // transform, clipped to the rounded padded card. The
-                    // synthetic cursor overlays inside the same clip so it
-                    // pans, zooms, and crops exactly like the pixels below.
-                    if layout.showsScreen {
-                        StudioPlayerLayerView(player: model.screenPlayer, gravity: .resize)
-                            .frame(
-                                width: layout.contentFillSize.width / crop.width,
-                                height: layout.contentFillSize.height / crop.height
-                            )
-                            .scaleEffect(state.magnification)
-                            .offset(
-                                x: (cropCenter.x - state.anchor.x) * state.magnification * layout.contentFillSize.width,
-                                y: (cropCenter.y - state.anchor.y) * state.magnification * layout.contentFillSize.height
-                            )
-                            .frame(width: layout.cardRect.width, height: layout.cardRect.height)
-                            .overlay {
-                                if let pointer = model.previewPointerFrame(at: model.displayTime) {
-                                    StudioCursorOverlay(
-                                        pointer: pointer,
-                                        artwork: model.artwork(id: pointer.artworkID),
-                                        state: state,
-                                        cardSize: layout.cardRect.size,
-                                        contentSize: layout.contentFillSize,
-                                        cursorScale: model.style.cursorScale,
-                                        showsClickEffect: model.showsPressEffects
-                                    )
+                    ZStack {
+                        // The recording card: video with the virtual camera
+                        // transform, clipped to the rounded padded card. The
+                        // synthetic cursor overlays inside the same clip so it
+                        // pans, zooms, and crops exactly like the pixels below.
+                        if layout.showsScreen {
+                            StudioPlayerLayerView(player: model.screenPlayer, gravity: .resize)
+                                .frame(
+                                    width: layout.contentFillSize.width / crop.width,
+                                    height: layout.contentFillSize.height / crop.height
+                                )
+                                .scaleEffect(state.magnification)
+                                .offset(
+                                    x: (cropCenter.x - state.anchor.x) * state.magnification * layout.contentFillSize.width,
+                                    y: (cropCenter.y - state.anchor.y) * state.magnification * layout.contentFillSize.height
+                                )
+                                .frame(width: layout.cardRect.width, height: layout.cardRect.height)
+                                .overlay {
+                                    if let pointer = model.previewPointerFrame(at: model.displayTime) {
+                                        StudioCursorOverlay(
+                                            pointer: pointer,
+                                            artwork: model.artwork(id: pointer.artworkID),
+                                            state: state,
+                                            cardSize: layout.cardRect.size,
+                                            contentSize: layout.contentFillSize,
+                                            cursorScale: model.style.cursorScale,
+                                            showsClickEffect: model.showsPressEffects
+                                        )
+                                    }
                                 }
-                            }
-                            .clipShape(RoundedRectangle(cornerRadius: layout.cardCornerRadius, style: .continuous))
-                            .overlay {
-                                // Keystroke caption in card space: pinned to its
-                                // edge, unaffected by the zoom transform.
-                                if let caption = model.keystrokeCaption(at: model.displayTime) {
-                                    StudioKeystrokeCaptionView(
-                                        caption: caption,
-                                        placement: model.keystrokePlacement,
-                                        cardSize: layout.cardRect.size
-                                    )
+                                .clipShape(RoundedRectangle(cornerRadius: layout.cardCornerRadius, style: .continuous))
+                                .overlay {
+                                    // Keystroke caption in card space: pinned to its
+                                    // edge, unaffected by the zoom transform.
+                                    if let caption = model.keystrokeCaption(at: model.displayTime) {
+                                        StudioKeystrokeCaptionView(
+                                            caption: caption,
+                                            placement: model.keystrokePlacement,
+                                            cardSize: layout.cardRect.size
+                                        )
+                                    }
                                 }
-                            }
-                            .shadow(
-                                color: .black.opacity(model.style.background == .none ? 0 : 0.55 * model.style.shadow),
-                                radius: min(canvasSize.width, canvasSize.height) * 0.045 * model.style.shadow,
-                                y: min(canvasSize.width, canvasSize.height) * 0.016 * model.style.shadow
-                            )
-                            .position(x: layout.cardRect.midX, y: layout.cardRect.midY)
-                    }
+                                .shadow(
+                                    color: .black.opacity(model.style.background == .none ? 0 : 0.55 * model.style.shadow),
+                                    radius: min(canvasSize.width, canvasSize.height) * 0.045 * model.style.shadow,
+                                    y: min(canvasSize.width, canvasSize.height) * 0.016 * model.style.shadow
+                                )
+                                .position(x: layout.cardRect.midX, y: layout.cardRect.midY)
+                        }
 
-                    if model.isCameraVisible(at: model.displayTime), layout.bubbleRect.width > 0 {
-                        StudioCameraBubble(model: model, layout: layout)
+                        if model.isCameraVisible(at: model.displayTime), layout.bubbleRect.width > 0 {
+                            StudioCameraBubble(model: model, layout: layout)
+                        }
+
+                    }
+                    .frame(width: canvasSize.width, height: canvasSize.height)
+                    .clipped()
+                    .projectionEffect(ProjectionTransform(model.preview3DPose(at: model.displayTime).projection(in: canvasSize)))
+
                     }
 
                     // Subtitle bar in canvas space - it can sit over the
@@ -534,6 +563,15 @@ private struct StudioCanvas: View {
                             style: model.subtitleStyle,
                             canvasSize: canvasSize
                         )
+                    }
+
+                    if let error = model.preview3DError, !model.previewTimeline3D.shots.isEmpty {
+                        VStack(spacing: 8) {
+                            Text(error).font(.callout).multilineTextAlignment(.center)
+                            Button("Retry Preview") { model.retry3DPreview() }.buttonStyle(EditorButtonStyle())
+                        }
+                        .padding(16).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                        .frame(maxWidth: 340)
                     }
 
                     if model.isCroppingVideo, layout.showsScreen {
@@ -1161,8 +1199,6 @@ private struct StudioCameraBubble: View {
     @Bindable var model: RecordingStudioModel
     let layout: RecordingStudioLayout
 
-    @State private var dragStartCenter: CGPoint?
-
     var body: some View {
         StudioPlayerLayerView(player: model.cameraPlayer, gravity: .resizeAspectFill)
             .frame(width: layout.bubbleRect.width, height: layout.bubbleRect.height)
@@ -1177,6 +1213,17 @@ private struct StudioCameraBubble: View {
                 y: min(layout.canvasSize.width, layout.canvasSize.height) * 0.009
             )
             .position(x: layout.bubbleRect.midX, y: layout.bubbleRect.midY)
+            .modifier(StudioCameraDrag(model: model, canvasSize: layout.canvasSize))
+    }
+}
+
+private struct StudioCameraDrag: ViewModifier {
+    @Bindable var model: RecordingStudioModel
+    let canvasSize: CGSize
+    @State private var dragStartCenter: CGPoint?
+
+    func body(content: Content) -> some View {
+        content
             .gesture(
                 DragGesture()
                     .onChanged { value in
@@ -1186,8 +1233,8 @@ private struct StudioCameraBubble: View {
                         }
                         guard let dragStartCenter else { return }
                         let next = CGPoint(
-                            x: dragStartCenter.x + value.translation.width / layout.canvasSize.width,
-                            y: dragStartCenter.y + value.translation.height / layout.canvasSize.height
+                            x: dragStartCenter.x + value.translation.width / canvasSize.width,
+                            y: dragStartCenter.y + value.translation.height / canvasSize.height
                         )
                         model.style.camera.center = CGPoint(
                             x: min(max(next.x, 0), 1),
@@ -1280,6 +1327,7 @@ private struct StudioTimelineEditor: View {
     @State private var isSplitting = false
     @State private var viewportWidth: CGFloat = 1
     @State private var scrollPosition = ScrollPosition(edge: .leading)
+    @State private var confirms3DRemoval = false
 
     private var scrollX: CGFloat { CGFloat(viewport.position) * scale.pointsPerSecond }
     private var scale: StudioTimelineScale {
@@ -1299,6 +1347,12 @@ private struct StudioTimelineEditor: View {
         .padding(.bottom, 14)
         .background(Color(nsColor: .windowBackgroundColor))
         .background(EditorShortcutHandler(scope: .video, perform: performShortcut))
+        .alert("Remove this 3D shot?", isPresented: $confirms3DRemoval) {
+            Button("Cancel", role: .cancel) { }
+            Button("Remove Shot", role: .destructive) {
+                if let id = model.selected3DShotID { model.remove3DShot(id: id) }
+            }
+        }
         .overlay(alignment: .top) {
             Rectangle()
                 .fill(Color(nsColor: .separatorColor).opacity(0.45))
@@ -1423,7 +1477,7 @@ private struct StudioTimelineEditor: View {
                            origin: scale.time(forX: x + scrollX))
             }
         ))
-        .frame(height: StudioTimelineMetrics.lanesHeight(showsMaskLane: model.showsMaskLane))
+        .frame(height: StudioTimelineMetrics.lanesHeight(showsMaskLane: model.showsMaskLane, showsCutLane: !cutMarkers.isEmpty, shows3DLane: !model.previewTimeline3D.shots.isEmpty))
         .onChange(of: model.duration, initial: true) { old, duration in
             if old == 0 || old == duration { viewport.fit(duration: duration) }
             else {
@@ -1435,7 +1489,7 @@ private struct StudioTimelineEditor: View {
         .onChange(of: model.currentTime) { _, time in followPlayhead(to: time) }
     }
 
-    /// The two lanes that carry real edit targets live in a horizontal scroll
+    /// The lanes that carry real edit targets live in a horizontal scroll
     /// view sized to the zoomed timeline. The ruler, playhead and lane chrome
     /// stay viewport-sized and redraw against `scrollX` instead - a rounded
     /// rectangle or Canvas tens of thousands of points wide would be a single
@@ -1447,11 +1501,15 @@ private struct StudioTimelineEditor: View {
                     .frame(height: StudioTimelineMetrics.zoomLaneHeight)
                 Color.clear
                     .frame(height: StudioTimelineMetrics.clipLaneHeight)
-                Color.clear
-                    .frame(height: StudioTimelineMetrics.cutLaneHeight)
+                if !cutMarkers.isEmpty {
+                    Color.clear.frame(height: StudioTimelineMetrics.cutLaneHeight)
+                }
                 if model.showsMaskLane {
                     StudioZoomLaneBackground()
                         .frame(height: StudioTimelineMetrics.maskLaneHeight)
+                }
+                if !model.previewTimeline3D.shots.isEmpty {
+                    StudioZoomLaneBackground().frame(height: StudioTimelineMetrics.shotLaneHeight)
                 }
                 Color.clear
                     .frame(height: StudioTimelineMetrics.scrollerGutter)
@@ -1475,8 +1533,9 @@ private struct StudioTimelineEditor: View {
                             height: StudioTimelineMetrics.clipLaneHeight
                         )
                         .frame(width: scale.contentWidth, alignment: .leading)
-                    Color.clear
-                        .frame(height: StudioTimelineMetrics.cutLaneHeight)
+                    if !cutMarkers.isEmpty {
+                        Color.clear.frame(height: StudioTimelineMetrics.cutLaneHeight)
+                    }
 
                     if model.showsMaskLane {
                         StudioMaskLane(
@@ -1490,6 +1549,11 @@ private struct StudioTimelineEditor: View {
                         )
                     }
 
+                    if !model.previewTimeline3D.shots.isEmpty {
+                        Recording3DLane(model: model, pointsPerSecond: scale.pointsPerSecond,
+                                        visibleRange: scale.visibleRange(scrollX: scrollX))
+                            .frame(width: scale.contentWidth, height: StudioTimelineMetrics.shotLaneHeight)
+                    }
                     Color.clear
                         .frame(height: StudioTimelineMetrics.scrollerGutter)
                 }
@@ -1505,12 +1569,14 @@ private struct StudioTimelineEditor: View {
                 }
             }
         }
-        .frame(height: StudioTimelineMetrics.scrollingLanesHeight(showsMaskLane: model.showsMaskLane))
+        .frame(height: StudioTimelineMetrics.scrollingLanesHeight(showsMaskLane: model.showsMaskLane, showsCutLane: !cutMarkers.isEmpty, shows3DLane: !model.previewTimeline3D.shots.isEmpty))
         .mask(edgeFadeMask(scale: scale))
         .overlay(alignment: .top) {
-            cutMarkerLane
-                .padding(.top, StudioTimelineMetrics.zoomLaneHeight + StudioTimelineMetrics.clipLaneHeight
-                         + StudioTimelineMetrics.rowSpacing * 2)
+            if !cutMarkers.isEmpty {
+                cutMarkerLane
+                    .padding(.top, StudioTimelineMetrics.zoomLaneHeight + StudioTimelineMetrics.clipLaneHeight
+                             + StudioTimelineMetrics.rowSpacing * 2)
+            }
         }
     }
 
@@ -1633,6 +1699,25 @@ private struct StudioTimelineEditor: View {
 
     private var transport: some View {
         HStack(spacing: 12) {
+            Menu {
+                Button { addZoomAtPlayhead() } label: {
+                    Label("Zoom", systemImage: "plus.magnifyingglass")
+                }
+                .disabled(RecordingTimelineViewport.newZoomRange(at: model.currentTime,
+                    secondsPerPoint: scale.secondsPerPoint, duration: model.duration,
+                    occupied: model.zoomTimelineBlocks.map { $0.editorStart...$0.editorEnd }) == nil)
+                Button { model.add3DShot(at: model.currentTime) } label: {
+                    Label("3D Shot", systemImage: "cube.transparent")
+                }
+                .disabled(model.duration < Recording3DShot.minimumDuration)
+            } label: {
+                Label("Add", systemImage: "plus")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .accessibilityLabel("Add timeline effect")
+            .help("Add a Zoom or 3D Shot at the playhead")
+            .disabled(!model.isLoaded || model.isCroppingVideo || model.isEditingMasks)
             Toggle(isOn: $isSplitting) {
                 Label("Split", systemImage: "scissors").labelStyle(.iconOnly)
             }
@@ -1697,16 +1782,6 @@ private struct StudioTimelineEditor: View {
                 }
                 .disabled(!model.hasClipEdits)
 
-                Button {
-                    addZoomAtPlayhead()
-                } label: {
-                    Label("Add Zoom", systemImage: "plus")
-                }
-                .buttonStyle(EditorButtonStyle())
-                .help("Add a zoom segment at the playhead")
-                .disabled(RecordingTimelineViewport.newZoomRange(at: model.currentTime,
-                    secondsPerPoint: scale.secondsPerPoint, duration: model.duration,
-                    occupied: model.zoomTimelineBlocks.map { $0.editorStart...$0.editorEnd }) == nil)
             } label: {
                 Image(systemName: "ellipsis")
             }
@@ -1718,11 +1793,13 @@ private struct StudioTimelineEditor: View {
     }
 
     private var canDeleteSelection: Bool {
-        model.selectedCueID != nil || model.canDeleteSelectedClip
+        model.selected3DShotID != nil || model.selectedCueID != nil || model.canDeleteSelectedClip
     }
 
     private func deleteSelection() {
-        if let cueID = model.selectedCueID {
+        if model.selected3DShotID != nil {
+            confirms3DRemoval = true
+        } else if let cueID = model.selectedCueID {
             model.removeZoomCue(id: cueID)
         } else if model.selectedClipID != nil {
             model.deleteSelectedClip()
@@ -1857,7 +1934,7 @@ struct StudioTimelineCutPreview: View {
     }
 }
 
-private enum StudioTimelineMetrics {
+nonisolated enum StudioTimelineMetrics {
     static let rowSpacing: CGFloat = 8
     static let playheadLaneHeight: CGFloat = 14
     static let rulerHeight: CGFloat = 16
@@ -1873,14 +1950,18 @@ private enum StudioTimelineMetrics {
 
     static let maskLaneHeight = zoomLaneHeight
 
-    static func scrollingLanesHeight(showsMaskLane: Bool) -> CGFloat {
-        clipLaneHeight + zoomLaneHeight + cutLaneHeight + scrollerGutter + rowSpacing * 3
+    static let shotLaneHeight: CGFloat = 36
+
+    static func scrollingLanesHeight(showsMaskLane: Bool, showsCutLane: Bool, shows3DLane: Bool) -> CGFloat {
+        clipLaneHeight + zoomLaneHeight + scrollerGutter + rowSpacing * 2
+            + (showsCutLane ? cutLaneHeight + rowSpacing : 0)
             + (showsMaskLane ? maskLaneHeight + rowSpacing : 0)
+            + (shows3DLane ? shotLaneHeight + rowSpacing : 0)
     }
 
-    static func lanesHeight(showsMaskLane: Bool) -> CGFloat {
+    static func lanesHeight(showsMaskLane: Bool, showsCutLane: Bool, shows3DLane: Bool) -> CGFloat {
         playheadLaneHeight + rulerHeight
-            + scrollingLanesHeight(showsMaskLane: showsMaskLane)
+            + scrollingLanesHeight(showsMaskLane: showsMaskLane, showsCutLane: showsCutLane, shows3DLane: shows3DLane)
             + minimapHeight + rowSpacing * 3
     }
 }
@@ -2793,6 +2874,9 @@ struct StudioInspector: View {
         .onChange(of: model.selectedCueID, initial: true) { _, cue in
             if cue != nil { selectedTab = .zoom }
         }
+        .onChange(of: model.selected3DShotID, initial: true) { _, shot in
+            if shot != nil { selectedTab = .effects }
+        }
         .onChange(of: model.selectedClipID) { _, clip in
             if clip != nil { selectedTab = .zoom }
         }
@@ -2893,6 +2977,10 @@ struct StudioInspector: View {
                         ) {
                             cursorControls
                         }
+                    }
+
+                    if selectedTab == .effects {
+                        Recording3DInspector(model: model)
                     }
 
                     if selectedTab == .effects && model.hasKeystrokes {
@@ -3003,17 +3091,23 @@ struct StudioInspector: View {
     private var effectActions: some View {
         HStack(spacing: 8) {
             Button { model.beginVideoCrop() } label: {
-                Label("Crop", systemImage: "crop")
-                    .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
-                    .frame(maxWidth: .infinity)
+                ViewThatFits(in: .horizontal) {
+                    Label("Crop", systemImage: "crop").fixedSize()
+                    Text("Crop")
+                }
+                .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
+                .frame(maxWidth: .infinity)
             }
             .buttonStyle(EditorButtonStyle(selected: model.isCroppingVideo, horizontalPadding: 4))
             .help("Crop the recording; click again to cancel changes")
             ForEach([RecordingMaskSegment.Effect.blur, .pixelate], id: \.self) { effect in
                 Button { model.toggleMaskTool(effect) } label: {
-                    Label(effect == .blur ? "Blur" : "Pixelate",
-                                systemImage: effect == .blur ? "drop.fill" : "square.grid.3x3.fill")
-                        .frame(maxWidth: .infinity)
+                    ViewThatFits(in: .horizontal) {
+                        Label(effect == .blur ? "Blur" : "Pixelate",
+                              systemImage: effect == .blur ? "drop.fill" : "square.grid.3x3.fill").fixedSize()
+                        Text(effect == .blur ? "Blur" : "Pixelate")
+                    }
+                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(EditorButtonStyle(selected: model.isEditingMasks && model.selectedMask?.effect == effect,
                                                horizontalPadding: 4))
