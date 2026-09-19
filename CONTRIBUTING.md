@@ -169,6 +169,14 @@ create or update that export. Export opens an NSSavePanel for a new destination.
 General > Default Look supplies background, padding, corner radius, and shadow
 for new images and videos. Saved projects retain their own settings.
 
+`ScreenshotFileNaming` names every deliverable from the template stored under
+`bs_fileNameTemplate`. `currentFileName` is the only path that advances
+`{counter}`, so Settings can preview a template without spending a number.
+Recording packages keep their own `BetterShot_<timestamp>_<id>.bettershotrec`
+directory name because that name is the project's identity in the gallery; only
+the copy leaving for the save folder is renamed. The renderer is pure and
+Foundation-only so `Tests/FileNamingCheck.swift` can compile it on its own.
+
 The Arrow cursor choice uses a stemless black arrow with a white outline and a
 2.5× starting size. `PointerArtworkCapture` caches the 32× raster and arrow-tip
 hotspot for preview/export; the `macOS` storage key remains compatible.

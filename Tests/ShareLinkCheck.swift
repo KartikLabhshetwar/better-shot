@@ -73,6 +73,8 @@ enum ShareLinkCheck {
         expect(ShareBundle.validatePublicBaseURL("https://localhost") == .invalidHost, "a single label is not a public bucket domain")
         expect(ShareBundle.validatePublicBaseURL("https://cdn.example.com?x=1") == .hasQueryOrFragment, "a query would land in the middle of the key")
         expect(ShareBundle.validatePublicBaseURL("https://cdn.example.com#top") == .hasQueryOrFragment, "so would a fragment")
+        expect(ShareBundle.validatePublicBaseURL("https://user:pass@cdn.example.com") == .invalidHost, "credentials in the URL must be rejected")
+        expect(ShareBundle.validatePublicBaseURL("https://user@cdn.example.com") == .invalidHost, "userinfo without password must also be rejected")
 
         let valid = [
             "https://cdn.example.com",

@@ -181,6 +181,11 @@ struct GeneralSettingsTab: View {
     @AppStorage("bs_exportFormat") private var exportFormatRaw: String = ExportFormat.png.rawValue
     @AppStorage("bs_exportQuality") private var exportQuality: Double = 0.9
     @AppStorage("bs_historyRetentionLimit") private var historyRetentionLimit = 100
+    @AppStorage(ScreenshotFileNaming.templateKey) private var fileNameTemplate = ScreenshotFileNaming.defaultTemplate
+    @AppStorage(ScreenshotFileNaming.counterKey) private var fileNameCounter = 1
+    /// Held rather than computed in `body`: `{hex:8}` would otherwise reshuffle
+    /// on every unrelated redraw and read as a glitch.
+    @State private var fileNamePreview = ""
 
     @AppStorage(AppPreferences.editorOpensFullScreenKey) private var editorFullScreen = true
     @State private var defaultConfig = AppPreferences.defaultBeautifierConfig
@@ -282,13 +287,70 @@ struct GeneralSettingsTab: View {
                 }
 
                 Toggle("Automatically save screenshots to this folder", isOn: $automaticallySaveScreenshots)
+
+                LabeledContent("File name") {
+                    HStack(spacing: 6) {
+                        TextField("File name", text: $fileNameTemplate, prompt: Text(ScreenshotFileNaming.defaultTemplate))
+                            .labelsHidden()
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(.callout, design: .monospaced))
+                            .multilineTextAlignment(.leading)
+                            .frame(minWidth: 210)
+
+                        Menu {
+                            ForEach(ScreenshotFileNaming.menuGroups) { group in
+                                Section(group.title) {
+                                    ForEach(group.items) { item in
+                                        Button(item.title) { fileNameTemplate += item.token }
+                                    }
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                        .menuStyle(.borderlessButton)
+                        .menuIndicator(.hidden)
+                        .fixedSize()
+                        .help("Add a date, a random string, or a counter")
+                        .accessibilityLabel("Insert into the file name")
+                    }
+                }
+
+                LabeledContent("Example") {
+                    Text(fileNamePreview)
+                        .font(.system(.callout, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
+                }
+
+                if ScreenshotFileNaming.usesCounter(fileNameTemplate) {
+                    LabeledContent("Next number") {
+                        HStack(spacing: 8) {
+                            Text("\(fileNameCounter)")
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                            Button("Reset") { fileNameCounter = 1 }
+                                .controlSize(.small)
+                                .disabled(fileNameCounter == 1)
+                        }
+                    }
+                }
+
                 Toggle("Copy screenshots to the clipboard automatically", isOn: $copyAfterSave)
                 Toggle("Play a shutter sound", isOn: $playSound)
             } header: {
                 Text("Saving")
             } footer: {
-                Text("Save and Export use this folder. Enable automatic saving to save normal screenshots immediately. Capture & Copy, Edit, and Pin shortcuts do not automatically save.")
+                Text("Save and Export use this folder. Enable automatic saving to save normal screenshots immediately. Capture & Copy, Edit, and Pin shortcuts do not automatically save. The + button adds a date, a random string, or a counter to file names.")
             }
+            .onAppear(perform: refreshFileNamePreview)
+            .onChange(of: fileNameTemplate) { _, _ in refreshFileNamePreview() }
+            .onChange(of: exportFormatRaw) { _, _ in refreshFileNamePreview() }
+            // Reset, and any capture that lands while Settings is open, move the
+            // counter. Without this the example keeps showing the old number.
+            .onChange(of: fileNameCounter) { _, _ in refreshFileNamePreview() }
 
             Section {
                 Picker("Save as", selection: exportFormat) {
@@ -400,6 +462,14 @@ struct GeneralSettingsTab: View {
         refreshLoginStatus()
     }
 
+    private func refreshFileNamePreview() {
+        fileNamePreview = ScreenshotFileNaming.fileName(
+            template: fileNameTemplate,
+            extension: (ExportFormat(rawValue: exportFormatRaw) ?? .png).fileExtension,
+            context: .init(counter: fileNameCounter)
+        )
+    }
+
     private func chooseSaveDirectory() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
@@ -426,6 +496,9 @@ struct GeneralSettingsTab: View {
         playSound = true
         exportFormatRaw = ExportFormat.png.rawValue
         exportQuality = 0.9
+        fileNameTemplate = ScreenshotFileNaming.defaultTemplate
+        fileNameCounter = 1
+        refreshFileNamePreview()
         historyRetentionLimit = 100
         editorFullScreen = true
         defaultConfig = .default

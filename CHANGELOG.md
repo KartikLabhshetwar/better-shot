@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Optional automatic screenshot saving in General > Saving (#149). Normal captures can save immediately to the configured folder while keeping the preview or editor available. Defaults off, including on upgrade; explicit Copy, Edit, and Pin shortcuts remain private. Saved files stay linked to their editable originals, and failed saves remain in the deck for retry.
 
+- **File name templates**: Settings > General > Saving takes a template for saved screenshots and recordings. Type any text, and use the + button to add a date, a time, a random hex/base62/digit string, a UUID, a running counter, the capture type, or the file extension. `standup-{date}-{counter:3}` saves `standup-2026-09-17-004.png`, and `hello-{hex:8}` saves `hello-c1786d2a.png`. An example of the finished name sits under the field, and a template that uses `{counter}` gets a Next number readout and a Reset button. Text BetterShot does not recognize is kept exactly as typed. Path separators, colons, leading dots, and over-long names are corrected before anything is written. The default template produces the same names as earlier versions, so upgrading leaves an existing save folder alone.
+
 ### Changed
 
 - Media Gallery and Settings now use native navigation columns with resizable, collapsible sidebars and section titles aligned with their content. Gallery icons use Finder-sized previews, more space between rows, and blue filename selection while retaining sortable list view and contextual actions.

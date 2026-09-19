@@ -207,6 +207,7 @@ extension ShareBundle {
         guard trimmed.lowercased().hasPrefix("https://") else { return .notHTTPS }
         guard let components = URLComponents(string: trimmed) else { return .invalidHost }
         guard components.query == nil, components.fragment == nil else { return .hasQueryOrFragment }
+        guard components.user == nil, components.password == nil else { return .invalidHost }
         guard let host = components.host, isHostname(host) else { return .invalidHost }
         guard normalizedOrigin(trimmed) != nil else { return .invalidHost }
         return nil
