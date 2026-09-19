@@ -91,6 +91,46 @@ import QuartzCore
         precondition(badCamera.tiltX == 0 && badCamera.distance == 2 && badCamera.panX == 3)
         let badPose = Recording3DPose(tiltX: .infinity, scale: .nan, panX: 100).sanitized
         precondition(badPose.tiltX == 0 && badPose.scale == 1 && badPose.panX == 0.5)
+        let linear = Recording3DTrack(property: .panX, keyframes: [
+            .init(position: 0, value: -0.2, outgoing: .zero),
+            .init(position: 1, value: 0.4, incoming: CGPoint(x: 1, y: 1))
+        ]).normalized()
+        precondition(abs(linear.value(at: 0.25)! + 0.05) < 1e-8)
+        precondition(linear.value(at: -1) == -0.2 && linear.value(at: 2) == 0.4)
+        let slowStart = Recording3DTrack.ease(0.25, outgoing: CGPoint(x: 0.65, y: 0), incoming: CGPoint(x: 0.35, y: 1))
+        precondition(slowStart < 0.15 && slowStart > 0)
+        precondition(abs(Recording3DTrack.ease(0.5, outgoing: CGPoint(x: 1, y: 0), incoming: CGPoint(x: 0, y: 1)) - 0.5) < 0.000_01)
+        var invalidKeys = linear
+        invalidKeys.keyframes += [.init(position: .nan, value: 1), .init(position: 2, value: .infinity)]
+        precondition(invalidKeys.normalized() == linear)
+        var animated = Recording3DShot(start: 1, end: 5)
+        animated.apply(.center)
+        animated.tracks = [linear, .init(property: .strength, keyframes: [
+            .init(position: 0, value: 0, outgoing: .zero),
+            .init(position: 1, value: 20, incoming: CGPoint(x: 1, y: 1))
+        ])]
+        precondition(abs(animated.pose(at: 2).camera!.panX + 0.05) < 1e-8)
+        precondition(abs(animated.defocus(at: 2).strength - 5) < 1e-8)
+        precondition(animated.defocus(at: 5) == .none)
+        var faded = animated; faded.transition = 0.5; faded.isEnabled = false
+        precondition(abs(faded.keyframeValue(for: .panX, at: 0) + 0.2) < 1e-8)
+        precondition(abs(faded.keyframeValue(for: .strength, at: 1) - 20) < 1e-8,
+                     "Keyframe authoring must retain authored endpoints even when disabled or fading")
+        let animatedData = try JSONEncoder().encode(animated)
+        let decodedAnimation = try JSONDecoder().decode(Recording3DShot.self, from: animatedData)
+        precondition(decodedAnimation == animated)
+        var reversed = animated; reversed.reverse()
+        precondition(abs(reversed.pose(at: 4).camera!.panX - animated.pose(at: 2).camera!.panX) < 1e-8)
+        precondition(abs(reversed.defocus(at: 4).strength - animated.defocus(at: 2).strength) < 1e-8)
+        var mirrored = animated; mirrored.flip(horizontal: true)
+        precondition(abs(mirrored.pose(at: 2).camera!.panX + animated.pose(at: 2).camera!.panX) < 1e-8)
+        precondition(mirrored.blur?.focusX == 1 - animated.blur!.focusX)
+        var held = animated; held.holdCamera()
+        precondition(held.pose(at: 2) == held.startPose && held.tracks?.count == 1)
+        animated.end = 9
+        precondition(abs(animated.pose(at: 3).camera!.panX + 0.05) < 1e-8, "Resize preserves relative keyframe timing")
+        let boundedBlur = Recording3DBlur(mode: .tiltShift, strength: 100, focusSize: 2, angle: 900, bokeh: true).sanitized
+        precondition(boundedBlur.strength == 20 && boundedBlur.focusSize == 0.6 && boundedBlur.angle == 180)
         print("3D projection, scaling, near-plane bounds, presets, timing, transitions, sanitization, and Codable checks passed")
     }
 }

@@ -164,41 +164,59 @@ Reviewed Cap's repository structure and traced its 3D editor/rendering flow at
 shader in `crates/rendering`. This was a feature-focused review, not an audit of
 every file in Cap's web/backend/media monorepo.
 
-BetterShot uses a native Swift pinhole projection, with
-native [SwiftUI projection effects](https://developer.apple.com/documentation/swiftui/view/projectioneffect(_:))
-and [Core Image perspective transforms](https://developer.apple.com/documentation/coreimage/ciperspectivetransform).
-The eight move and five angle presets follow Cap’s camera parameters, endpoint
-motion, linear timing, and zero boundary transition. Camera orbit and content
-fold are independent; distance and vertical field of view determine apparent
-size. Named scenes retain their weighted timing, and Auto Scene uses the same
-shot ordering. The renderer uses native quaternion math and one homography;
-no Rust runtime, shaders, artwork, or web UI dependencies were imported.
-Legacy saved plane poses keep their previous geometry. The implementation covers
-timed start/end camera poses, scenes, easing, transitions, and timeline editing. Cap's per-property
-keyframe curve editor and depth-of-field/bokeh controls are outside this change.
+BetterShot uses native Swift quaternion/pinhole projection and Core Image perspective
+transforms. The eight moves and five angles follow Cap’s camera parameters,
+endpoint motion, linear timing, and zero boundary transition. Camera orbit and
+content fold are independent; distance and vertical field of view determine
+apparent size. Named scenes retain their weighted timing, and Auto Scene uses the
+same shot ordering. Legacy saved plane poses keep their previous geometry.
 
-The content plane includes the screen, source masks, cursor, keystrokes, shadows,
-and camera. Backgrounds and subtitles remain in canvas space. Export adds one
-GPU warp only on active frames; the existing flat path remains unchanged.
-Backgrounds/shadows are cached, source frames remain on the GPU, and shot lookup
-uses binary search without per-frame timeline construction.
+Camera and blur properties support individual keyframes with editable cubic Bézier
+curves. Keys use relative shot positions so resizing keeps animation proportional.
+Tracks normalize once when edited, then use binary search and bounded curve
+sampling during rendering. Undo, reverse, flips, persistence, and legacy decoding
+share the production model.
 
-On this Apple M5 / 32 GB Mac, optimized Release objects measured **1.47 ms/frame
-flat** and **1.83 ms/frame with a moving 3D shot** at 1920×1080: approximately
-**0.36 ms/frame** additional compositor time. These are medians of three warm
-120-frame runs after one warmup, with synchronous GPU completion, a reused
-synthetic source buffer, and no concurrent build. They measure GPU composition,
-not decoding, encoding, display frame rate, or every recording workload. The
-benchmark is reproducible through the command in CONTRIBUTING.md.
+Radial, directional, and tilt-shift focus modes include strength, falloff, focus
+position/size, angle, and bokeh controls. The native Metal implementation uses two
+fixed 17-tap Gaussian passes or one 32-sample highlight-weighted disc pass. These
+are native equivalents of the reference controls, not a pixel-identical port of
+Cap’s shader. No Rust runtime, third-party artwork, or web UI dependencies were
+imported. Kernels compile once. Inactive blur bypasses the filters entirely.
 
-Validation includes all presets, extreme-angle near-plane checks, resolution
-independence, masks/crop/cursor/camera alignment, random seeks over a reused source,
-encoded 30/60 fps output, persistence/undo/discard, and render-cache invalidation.
-Displayed production AVPlayer windows were captured in both appearances; compact
-inspector layouts are also covered by offscreen snapshots.
+Preview and export share the same GPU compositor. The content plane includes the
+screen, masks, cursor, keystrokes, shadows, and camera. Background stays in canvas
+space, depth blur applies to the composed scene, and subtitles remain sharp.
+The Metal preview takes decoded frames from the existing AVPlayers, keeps at most
+two GPU frames in flight, and retains backgrounds/overlays while camera or blur
+keyframes change. It performs no CPU bitmap readback. Crop and mask editing keep
+the existing native editing surface.
 
-The follow-up removes the empty cut-marker row from layout and height calculations
-and adds a native **+ Add** menu for Zoom and 3D Shot. Both compact appearances and
-live fixture playback/seeking were checked again. The live test window now joins
-the active Space so it can be captured while another app is full screen. Physical
-mouse gestures and menu selection were not automated by these checks.
+On this Apple M5 / 32 GB Mac, optimized Release objects measured:
+
+| GPU composition workload | 1920×1080 | 3840×2160 |
+| --- | ---: | ---: |
+| Flat | 1.51 ms/frame | 5.83 ms/frame |
+| Moving 3D shot | 1.85 ms/frame | 8.31 ms/frame |
+| Moving 3D + Gaussian strength 60 | 2.79 ms/frame | 12.30 ms/frame |
+| Moving 3D + bokeh strength 19 | 2.88 ms/frame | 12.76 ms/frame |
+
+These are medians of three warm 120-frame runs after one warmup, with synchronous
+GPU completion, a reused synthetic source buffer, and no concurrent build. They
+measure GPU composition, not decoding, encoding, display frame rate, cold shader
+compilation, or every recording workload. Reproduce with the command in
+CONTRIBUTING.md.
+
+Validation includes all 13 presets, extreme-angle/edge-on safety, resolution
+independence, focus-region pixel checks, bokeh output, masks/crop/cursor/camera
+alignment, random seeks over a reused source, encoded 30/60 fps output,
+persistence/undo/discard, and render-cache invalidation. Displayed production
+AVPlayer/Metal fixture windows were captured in both appearances. The live check
+requires completed GPU frames and verifies that a paused camera edit redraws
+without rebuilding the compositor. Compact blur and curve controls have light/dark
+offscreen snapshots.
+
+The timeline removes the empty cut-marker gutter from both layout and height
+calculations and adds a native **+ Add** menu for Zoom and 3D Shot. Existing cut
+badges remain visible when there are cuts. Physical mouse gestures and menu
+selection were not automated by these checks.

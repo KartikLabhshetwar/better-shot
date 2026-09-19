@@ -473,6 +473,19 @@ private struct StudioCanvas: View {
                 let cropCenter = RecordingVideoCrop.point(CGPoint(x: 0.5, y: 0.5), in: crop)
 
                 ZStack {
+                    if !model.timeline3D.shots.isEmpty && !model.isCroppingVideo && !model.isEditingMasks {
+                        Recording3DPreview(model: model, time: model.displayTime, revision: model.previewRenderRevision, timeline: model.timeline3D)
+                            .frame(width: canvasSize.width, height: canvasSize.height)
+                        if model.isCameraVisible(at: model.displayTime), layout.bubbleRect.width > 0 {
+                            Color.clear
+                                .frame(width: layout.bubbleRect.width, height: layout.bubbleRect.height)
+                                .contentShape(Rectangle())
+                                .position(x: layout.bubbleRect.midX, y: layout.bubbleRect.midY)
+                                .modifier(StudioCameraDrag(model: model, canvasSize: canvasSize))
+                                .frame(width: canvasSize.width, height: canvasSize.height)
+                                .projectionEffect(ProjectionTransform(model.preview3DPose(at: model.displayTime).projection(in: canvasSize)))
+                        }
+                    } else {
                     // Fixed frame + clip so a scaledToFill wallpaper can never
                     // inflate the ZStack bounds and shift the card off-center.
                     StudioBackgroundView(style: model.style.background)
@@ -538,6 +551,8 @@ private struct StudioCanvas: View {
                     .clipped()
                     .projectionEffect(ProjectionTransform(model.preview3DPose(at: model.displayTime).projection(in: canvasSize)))
 
+                    }
+
                     // Subtitle bar in canvas space - it can sit over the
                     // background below the card, not just over the video, so
                     // padded and portrait layouts keep their caption area.
@@ -548,6 +563,15 @@ private struct StudioCanvas: View {
                             style: model.subtitleStyle,
                             canvasSize: canvasSize
                         )
+                    }
+
+                    if let error = model.preview3DError, !model.timeline3D.shots.isEmpty {
+                        VStack(spacing: 8) {
+                            Text(error).font(.callout).multilineTextAlignment(.center)
+                            Button("Retry Preview") { model.retry3DPreview() }.buttonStyle(EditorButtonStyle())
+                        }
+                        .padding(16).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                        .frame(maxWidth: 340)
                     }
 
                     if model.isCroppingVideo, layout.showsScreen {
@@ -1175,8 +1199,6 @@ private struct StudioCameraBubble: View {
     @Bindable var model: RecordingStudioModel
     let layout: RecordingStudioLayout
 
-    @State private var dragStartCenter: CGPoint?
-
     var body: some View {
         StudioPlayerLayerView(player: model.cameraPlayer, gravity: .resizeAspectFill)
             .frame(width: layout.bubbleRect.width, height: layout.bubbleRect.height)
@@ -1191,6 +1213,17 @@ private struct StudioCameraBubble: View {
                 y: min(layout.canvasSize.width, layout.canvasSize.height) * 0.009
             )
             .position(x: layout.bubbleRect.midX, y: layout.bubbleRect.midY)
+            .modifier(StudioCameraDrag(model: model, canvasSize: layout.canvasSize))
+    }
+}
+
+private struct StudioCameraDrag: ViewModifier {
+    @Bindable var model: RecordingStudioModel
+    let canvasSize: CGSize
+    @State private var dragStartCenter: CGPoint?
+
+    func body(content: Content) -> some View {
+        content
             .gesture(
                 DragGesture()
                     .onChanged { value in
@@ -1200,8 +1233,8 @@ private struct StudioCameraBubble: View {
                         }
                         guard let dragStartCenter else { return }
                         let next = CGPoint(
-                            x: dragStartCenter.x + value.translation.width / layout.canvasSize.width,
-                            y: dragStartCenter.y + value.translation.height / layout.canvasSize.height
+                            x: dragStartCenter.x + value.translation.width / canvasSize.width,
+                            y: dragStartCenter.y + value.translation.height / canvasSize.height
                         )
                         model.style.camera.center = CGPoint(
                             x: min(max(next.x, 0), 1),

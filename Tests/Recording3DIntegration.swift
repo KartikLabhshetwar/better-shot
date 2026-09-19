@@ -14,6 +14,7 @@ func check3DShots(movie: URL, directory: URL) async throws {
     let session = RecordingSession(directoryURL: directory.appendingPathComponent("3D.bettershotrec"))
     try FileManager.default.createDirectory(at: session.directoryURL, withIntermediateDirectories: true)
     try FileManager.default.copyItem(at: movie, to: session.screenURL)
+    try FileManager.default.copyItem(at: movie, to: session.cameraURL)
     let creationModel = RecordingStudioModel(url: session.directoryURL)
     await creationModel.load()
     precondition(creationModel.isLoaded && creationModel.timeline3D.shots.isEmpty)
@@ -32,11 +33,18 @@ func check3DShots(movie: URL, directory: URL) async throws {
     let original = model.shots3D[0]
     model.select3DShot(id: original.id)
     model.begin3DShotEdit()
+    let backdropRevision = model.previewRenderRevision
     var edited = original
     edited.apply(.perspective)
     edited.transition = 0
+    edited.blur = .init(mode: .tiltShift, strength: 12, focusSize: 0.1, angle: 45, bokeh: true)
+    edited.tracks = [.init(property: .strength, keyframes: [
+        .init(position: 0, value: 2, outgoing: .zero),
+        .init(position: 1, value: 12, incoming: CGPoint(x: 1, y: 1))
+    ])]
     model.update3DShot(edited)
     model.end3DShotEdit()
+    precondition(model.previewRenderRevision == backdropRevision, "3D edits must reuse cached preview decoration")
     try await Task.sleep(for: .milliseconds(30))
     model.undo()
     precondition(model.shots3D == [original], "Pose drag is one undo operation")
@@ -154,6 +162,60 @@ func check3DShots(movie: URL, directory: URL) async throws {
     precondition(color(output, at: CGPoint(x: 5, y: 5))[1] > 240, "Background stays fixed")
     try renderer.render(screenFrame: source, cameraFrame: nil, editorTime: 1.9, sourceTime: 1.9, into: output)
     precondition(color(output, at: CGPoint(x: 5, y: 5))[0] > 240, "Frame reuse must not retain an expired warp")
+    let mutableRenderer = compositor(.empty)
+    var dynamic = Recording3DShot(start: 0, end: 2); dynamic.apply(.center)
+    mutableRenderer.update3DTimeline(.init(shots: [dynamic], duration: 2))
+    try mutableRenderer.render(screenFrame: source, cameraFrame: nil, editorTime: 1, sourceTime: 1, into: output)
+    precondition(color(output, at: CGPoint(x: 5, y: 5))[1] > 240)
+    mutableRenderer.update3DTimeline(.empty)
+    try mutableRenderer.render(screenFrame: source, cameraFrame: nil, editorTime: 1, sourceTime: 1, into: output)
+    precondition(color(output, at: CGPoint(x: 5, y: 5))[0] > 240, "Timeline edits must update reused GPU source/decorations")
+    let edgeOn = Recording3DShot(start: 0, end: 2,
+        startPose: .init(camera: .init(rotateX: 90)), endPose: .init(camera: .init(rotateX: 90)), transition: 0)
+    try compositor(.init(shots: [edgeOn], duration: 2)).render(screenFrame: source, cameraFrame: nil,
+        editorTime: 1, sourceTime: 1, into: output)
+    precondition(color(output, at: CGPoint(x: 160, y: 90))[1] > 240, "An edge-on plane renders only the background")
+    // A stripe fixture measures focus preservation and softness independently of camera geometry.
+    let stripes = buffer(width: 640, height: 360)
+    CVPixelBufferLockBaseAddress(stripes, [])
+    let stripeBytes = CVPixelBufferGetBaseAddress(stripes)!.assumingMemoryBound(to: UInt8.self)
+    let stride = CVPixelBufferGetBytesPerRow(stripes)
+    for y in 0..<360 {
+        for x in 0..<640 {
+            let value: UInt8 = ((x / 8 + y / 8) % 2 == 0) ? 255 : 0
+            let offset = y * stride + x * 4
+            stripeBytes[offset] = value; stripeBytes[offset + 1] = value; stripeBytes[offset + 2] = value
+            stripeBytes[offset + 3] = 255
+        }
+    }
+    CVPixelBufferUnlockBaseAddress(stripes, [])
+    let context = CIContext(), focusOutput = buffer(width: 640, height: 360)
+    let focusCanvas = CGRect(x: 0, y: 0, width: 640, height: 360)
+    func focusPixels(_ settings: Recording3DBlur) throws {
+        let image = try Recording3DBlurRenderer.apply(settings, to: CIImage(cvPixelBuffer: stripes), canvas: focusCanvas)
+        context.render(image, to: focusOutput, bounds: focusCanvas, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+    }
+    func contrast(_ x: CGFloat, _ y: CGFloat) -> Int {
+        abs(Int(color(focusOutput, at: CGPoint(x: x, y: y))[0]) - Int(color(focusOutput, at: CGPoint(x: x + 8, y: y))[0]))
+    }
+    var focus = Recording3DBlur(mode: .radial, strength: 60, falloff: 0, focusX: 0.5, focusY: 0.5, focusSize: 0.1)
+    try focusPixels(focus)
+    precondition(contrast(320, 180) > 240 && contrast(40, 180) < 140, "Radial focus keeps the center sharp and softens the edge")
+    let gaussianEdge = color(focusOutput, at: CGPoint(x: 40, y: 180))
+    focus.bokeh = true
+    try focusPixels(focus)
+    precondition(contrast(320, 180) > 240 && contrast(40, 180) < 220, "Bokeh retains focus while spreading highlights")
+    precondition(color(focusOutput, at: CGPoint(x: 40, y: 180)) != gaussianEdge, "Bokeh must use its disc filter")
+    focus.bokeh = false; focus.mode = .directional
+    try focusPixels(focus)
+    precondition(contrast(40, 180) > 240 && contrast(580, 180) < 140, "Directional blur affects only the chosen side")
+    focus.angle = 180
+    try focusPixels(focus)
+    precondition(contrast(580, 180) > 240 && contrast(40, 180) < 140, "Directional angle reverses the focus side")
+    focus.mode = .tiltShift; focus.angle = 0; focus.focusSize = 0.05
+    try focusPixels(focus)
+    precondition(contrast(320, 180) > 240 && contrast(320, 20) < 140, "Tilt shift keeps a sharp horizontal focus band")
+    print("PASS GPU radial/directional/tilt-shift focus, angle reversal, bokeh discs, and sharp-region preservation")
     print("PASS all 13 looks through GPU rendering, projected source colors, nonsequential seeks, fixed background, and frame reuse")
 
     // The entire composed plane must move together, including source-space masks/crop and overlays.
@@ -220,22 +282,31 @@ func check3DShots(movie: URL, directory: URL) async throws {
     print("PASS 3D encoded output at 30/60 fps and render-cache invalidation")
 
     if ProcessInfo.processInfo.environment["BETTERSHOT_BENCHMARK_3D"] == "1" {
-        let sourceHD = buffer(width: 1920, height: 1080, source: true)
-        let outputHD = buffer(width: 1920, height: 1080)
         var moving = still; moving.apply(.glide)
-        let movingTrack = Recording3DTimeline(shots: [moving], duration: 2)
-        for (label, track) in [("flat", Recording3DTimeline.empty), ("3D", movingTrack)] {
-            let renderer = compositor(track, size: CGSize(width: 1920, height: 1080))
-            var runs: [Double] = []
-            for pass in 0..<4 {
-                let start = Date()
-                for frame in 0..<120 {
-                    let time = 0.3 + Double(frame) / 120
-                    try renderer.render(screenFrame: sourceHD, cameraFrame: nil, editorTime: time, sourceTime: time, into: outputHD)
+        var geometry = moving; geometry.blur = nil
+        var gaussian = moving; gaussian.blur?.bokeh = false; gaussian.blur?.strength = 60
+        let workloads: [(String, Recording3DTimeline)] = [
+            ("flat", .empty),
+            ("3D", .init(shots: [geometry], duration: 2)),
+            ("3D + Gaussian 60", .init(shots: [gaussian], duration: 2)),
+            ("3D + bokeh 19", .init(shots: [moving], duration: 2))
+        ]
+        for (width, height) in [(1920, 1080), (3840, 2160)] {
+            let sourceHD = buffer(width: width, height: height, source: true)
+            let outputHD = buffer(width: width, height: height)
+            for (label, track) in workloads {
+                let renderer = compositor(track, size: CGSize(width: width, height: height))
+                var runs: [Double] = []
+                for pass in 0..<4 {
+                    let start = Date()
+                    for frame in 0..<120 {
+                        let time = 0.3 + Double(frame) / 120
+                        try renderer.render(screenFrame: sourceHD, cameraFrame: nil, editorTime: time, sourceTime: time, into: outputHD)
+                    }
+                    if pass > 0 { runs.append(Date().timeIntervalSince(start) / 120 * 1000) }
                 }
-                if pass > 0 { runs.append(Date().timeIntervalSince(start) / 120 * 1000) }
+                print("BENCH \(height)p \(label) GPU compositor median \(runs.sorted()[1]) ms/frame (120 frames, 3 warm runs)")
             }
-            print("BENCH 1080p \(label) GPU compositor median \(runs.sorted()[1]) ms/frame (120 frames, 3 warm runs)")
         }
     }
 }
@@ -268,6 +339,24 @@ private func check3DWindows(model: RecordingStudioModel) async throws {
         try await Task.sleep(for: .milliseconds(400))
         model.pause()
         try await Task.sleep(for: .milliseconds(300))
+        func metalPreview(in view: NSView) -> Recording3DMetalView? {
+            if let preview = view as? Recording3DMetalView { return preview }
+            return view.subviews.lazy.compactMap { metalPreview(in: $0) }.first
+        }
+        precondition(model.preview3DError == nil, "Displayed GPU preview failed: \(model.preview3DError ?? "")")
+        let preview = metalPreview(in: window.contentView!)!
+        precondition(preview.renderedFrameCount > 1,
+                     "Live check must render decoded frames, not capture an empty Metal view")
+        let beforeFrames = preview.renderedFrameCount, beforeCompositors = preview.compositorBuildCount
+        let original = model.selected3DShot!
+        var moved = original
+        moved.startPose.camera?.panX += 0.1; moved.endPose.camera?.panX += 0.1
+        model.update3DShot(moved)
+        try await Task.sleep(for: .milliseconds(250))
+        precondition(preview.renderedFrameCount > beforeFrames && preview.compositorBuildCount == beforeCompositors,
+                     "Paused 3D edits must redraw while reusing the compositor")
+        model.update3DShot(original)
+        try await Task.sleep(for: .milliseconds(150))
         let capture = Process()
         capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
         capture.arguments = ["-x", "-o", "-l", String(window.windowNumber), output.appendingPathComponent("video-3d-live-\(name).png").path]

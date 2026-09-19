@@ -53,7 +53,9 @@ permissions and your first capture.
 - **3D video shots.** Use the timeline’s **+ Add > 3D Shot** menu, then choose
   from eight camera moves and five drifting angles in Effects. Adjust camera
   orbit, screen fold, distance, and lens, or generate a scene. The same menu adds
-  zoom segments. Preview and export share perspective geometry.
+  zoom segments. Camera, Blur, and Keyframes tabs provide radial/directional/tilt-shift
+  focus, bokeh highlights, and editable Bézier curves. Preview and export share
+  the GPU compositor.
 - **Make the cursor easier to follow.** Choose Recorded, Arrow, Dark, Light, or
   Dot, with size, smoothing, click effects, and idle hiding. Cursor restyling
   requires a recorded pointer track; it cannot replace a cursor baked into

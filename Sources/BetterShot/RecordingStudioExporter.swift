@@ -18,6 +18,7 @@ import AppKit
 import AVFoundation
 import CoreGraphics
 import CoreImage
+import Metal
 import CoreImage.CIFilterBuiltins
 import CoreText
 import Foundation
@@ -313,26 +314,8 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         }
         writer.startSession(atSourceTime: exportStartTime)
 
-        let compositor = StudioFrameCompositor(
-            canvasSize: canvasSize,
-            style: configuration.style,
-            viewportTimeline: configuration.viewportTimeline,
-            pointerTimeline: configuration.pointerTimeline,
-            showsPressEffects: configuration.showsPressEffects,
-            keystrokeTimeline: configuration.keystrokeTimeline,
-            keystrokePlacement: configuration.keystrokePlacement,
-            subtitleTimeline: configuration.subtitleTimeline,
-            subtitleStyle: configuration.subtitleStyle,
-            karaokeTimeline: configuration.karaokeTimeline,
-            includeBubble: cameraFeed != nil,
-            outputFrameInterval: 1 / Double(configuration.exportSettings.effectiveFrameRate.framesPerSecond),
-            reframe: configuration.reframe,
-            fitContentAspect: configuration.fitContentAspect,
-            crop: configuration.crop,
-            masks: configuration.masks,
-            timeline3D: configuration.timeline3D,
-            maximumBlurSamples: configuration.exportSettings.speed.motionBlurSamples
-        )
+        let compositor = StudioFrameCompositor(configuration: configuration, canvasSize: canvasSize,
+                                               includeBubble: cameraFeed != nil)
 
         let screenAudioOutput = audioOutput
         let writerAudioInput = audioInput
@@ -664,8 +647,8 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
     private let reframe: ReframeTrack?
     private let crop: CGRect
     private let masks: [RecordingMaskSegment]
-    private let timeline3D: Recording3DTimeline
-    private let renderContext = CIContext(options: [.cacheIntermediates: false])
+    private var timeline3D: Recording3DTimeline
+    private lazy var renderContext = CIContext(options: [.cacheIntermediates: false])
     private var artworkImageCache: [String: CGImage] = [:]
     // Retain the buffer: decoder pools may recycle its address after release.
     // Only source-dependent work is reused; overlays and mask timing run at the output cadence.
@@ -785,6 +768,24 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
         )
     }
 
+    convenience init(configuration c: RecordingStudioExporter.Configuration, canvasSize: CGSize,
+                     includeBubble: Bool, preview: Bool = false) {
+        self.init(canvasSize: canvasSize, style: c.style, viewportTimeline: c.viewportTimeline,
+                  pointerTimeline: c.pointerTimeline, showsPressEffects: c.showsPressEffects,
+                  keystrokeTimeline: c.keystrokeTimeline, keystrokePlacement: c.keystrokePlacement,
+                  subtitleTimeline: preview ? nil : c.subtitleTimeline, subtitleStyle: c.subtitleStyle,
+                  karaokeTimeline: preview ? nil : c.karaokeTimeline, includeBubble: includeBubble,
+                  outputFrameInterval: 1 / Double(c.exportSettings.effectiveFrameRate.framesPerSecond),
+                  reframe: c.reframe, fitContentAspect: c.fitContentAspect, crop: c.crop,
+                  // The AVPlayerItem supplies masked pixels to its video output.
+                  masks: preview ? [] : c.masks, timeline3D: c.timeline3D,
+                  maximumBlurSamples: c.exportSettings.speed.motionBlurSamples)
+    }
+
+    /// The preview calls this on its serial render owner. Existing GPU graphs retain
+    /// their sampled values; backdrop/source caches do not depend on the 3D timeline.
+    func update3DTimeline(_ timeline: Recording3DTimeline) { timeline3D = timeline }
+
     /// The virtual camera for a frame: the reframe crop-and-follow track
     /// when exporting into a different aspect, the zoom viewport otherwise.
     private func viewportFrame(at editorTime: TimeInterval) -> ViewportFrame {
@@ -817,6 +818,15 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
         sourceTime: TimeInterval,
         into destination: CVPixelBuffer
     ) throws -> (task: CIRenderTask, image: CIImage) {
+        let result = try composedImage(screenFrame: screenFrame, cameraFrame: cameraFrame,
+                                       editorTime: editorTime, sourceTime: sourceTime)
+        let destination = CIRenderDestination(pixelBuffer: destination)
+        destination.colorSpace = colorSpace
+        return (try renderContext.startTask(toRender: result, to: destination), result)
+    }
+
+    func composedImage(screenFrame: CVPixelBuffer, cameraFrame: CVPixelBuffer?,
+                       editorTime: TimeInterval, sourceTime: TimeInterval) throws -> CIImage {
         if cachedSource !== screenFrame {
             cachedSource = screenFrame
             cachedScreen = nil
@@ -933,26 +943,29 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
         if is3D {
             // Map the composed transparent plane through the same projection as SwiftUI.
             // A single GPU warp retains source pixels, masks, cursor, and camera alignment.
-            func corner(_ x: CGFloat, _ y: CGFloat) -> CIVector {
-                let point = pose.project(CGPoint(x: x, y: y), in: canvasSize)
-                return CIVector(x: point.x, y: canvasSize.height - point.y)
+            let corners = [CGPoint.zero, CGPoint(x: canvasSize.width, y: 0),
+                           CGPoint(x: canvasSize.width, y: canvasSize.height), CGPoint(x: 0, y: canvasSize.height)]
+                .map { pose.project($0, in: canvasSize) }
+            let twiceArea = (0..<4).reduce(0.0) { sum, i in
+                let a = corners[i], b = corners[(i + 1) % 4]
+                return sum + a.x * b.y - a.y * b.x
             }
-            result = result.cropped(to: canvas).applyingFilter("CIPerspectiveTransform", parameters: [
-                "inputTopLeft": corner(0, 0),
-                "inputTopRight": corner(canvasSize.width, 0),
-                "inputBottomLeft": corner(0, canvasSize.height),
-                "inputBottomRight": corner(canvasSize.width, canvasSize.height)
-            ]).composited(over: cleanBackground).cropped(to: canvas)
+            if abs(twiceArea) < 0.001 {
+                // An edge-on plane has no visible area and no invertible homography.
+                result = cleanBackground
+            } else {
+                let vectors = corners.map { CIVector(x: $0.x, y: canvasSize.height - $0.y) }
+                result = result.cropped(to: canvas).applyingFilter("CIPerspectiveTransform", parameters: [
+                    "inputTopLeft": vectors[0], "inputTopRight": vectors[1],
+                    "inputBottomRight": vectors[2], "inputBottomLeft": vectors[3]
+                ]).composited(over: cleanBackground).cropped(to: canvas)
+            }
         }
+        result = try Recording3DBlurRenderer.apply(timeline3D.defocus(at: editorTime), to: result, canvas: canvas)
         if subtitleTimeline != nil {
             result = try raster { drawSubtitleBar(at: sourceTime, in: $0) }.composited(over: result)
         }
-        // Keep media on the GPU through the encoder's IOSurface-backed buffer.
-        // Only cursor/text artwork is rasterized with Quartz; no video readback.
-        let destination = CIRenderDestination(pixelBuffer: destination)
-        destination.colorSpace = colorSpace
-        // Retain the graph (including pooled source/overlay buffers) until GPU completion.
-        return (try renderContext.startTask(toRender: result, to: destination), result)
+        return result
     }
 
     private func raster(_ draw: (CGContext) -> Void) throws -> CIImage {

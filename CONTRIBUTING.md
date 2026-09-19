@@ -228,11 +228,25 @@ it and keep the previous projection. Preset selection writes both endpoints,
 linear timing, and zero boundary transition; angles include a slow drift, with
 Still available explicitly. Named scenes retain their relative shot durations.
 
-The live content group uses the shared projection through SwiftUI. Export applies
-one Core Image perspective warp to the composed screen, masks, cursor, keystrokes,
-and camera over a cached, fixed background. Subtitles remain in canvas space.
-The flat export path skips the warp. Crop and mask editing temporarily bypass 3D
-in the preview so their source-coordinate handles remain usable.
+`Recording3DAnimation` stores optional focus settings and per-property keyframes.
+Keyframe positions are fractions of a shot, so resizing preserves relative timing.
+Tracks are normalized at edit/load time and binary-searched while rendering;
+Bézier control points are bounded and inverted with a fixed iteration limit.
+Format 7 keeps all new fields optional for older projects. Reversing or flipping
+shots also transforms their curves and focus settings.
+
+For projects with 3D shots, `Recording3DPreview` reads AVPlayer video outputs and
+uses `StudioFrameCompositor.composedImage` directly in a Metal view. Keep at most
+two preview frames in flight and remove the outputs when the view disappears.
+The preview player supplies already-masked pixels; the compositor must not apply
+those masks a second time. Subtitles stay in SwiftUI, above the effect.
+
+Preview and export share one perspective warp plus `Recording3DBlurRenderer`’s
+bounded Gaussian/disc kernels. Kernels compile once, blur strength scales from
+1080p, and the None/flat paths skip the extra passes. The screen, masks, pointer,
+keystrokes, and camera share the transform; the background stays in canvas space
+and participates in focus blur. Crop and mask editing keep the native flat player
+so source-coordinate handles remain usable. No video pixels are read back to CPU.
 
 `make test` includes projection/normalization checks, model persistence/undo,
 compact light/dark snapshots, production compositor checks, and encoded 30/60 fps
@@ -242,7 +256,7 @@ video checks. For focused checks after a build:
 BETTERSHOT_CHECK_3D_ONLY=1 bash Tests/run-exports.sh
 # With existing Screen Recording permission, capture displayed player windows:
 BETTERSHOT_CHECK_3D_ONLY=1 BETTERSHOT_CHECK_3D_WINDOWS=1 bash Tests/run-exports.sh
-# With optimized Release objects, measure warm 1080p GPU frame times:
+# With optimized Release objects, measure warm 1080p/4K transform, Gaussian, and bokeh GPU frame times:
 BETTERSHOT_BUILD_CONFIGURATION=Release BETTERSHOT_CHECK_3D_ONLY=1 BETTERSHOT_BENCHMARK_3D=1 bash Tests/run-exports.sh
 ```
 

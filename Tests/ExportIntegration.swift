@@ -363,7 +363,7 @@ struct ExportIntegration {
                     let duration = try await fractionalAsset.load(.duration).seconds
                     let audio = try await fractionalAsset.loadTracks(withMediaType: .audio)
                     precondition(abs(duration - expectedDuration) < 0.04 && audio.count == 1,
-                                 "Export must preserve fractional timing and recorded audio")
+                                 "Export must preserve fractional timing and recorded audio: rate=\(rate), duration=\(duration), expected=\(expectedDuration), audioTracks=\(audio.count)")
                 }
                 print("PASS fractional playback/export timing for recorded video and audio")
             }

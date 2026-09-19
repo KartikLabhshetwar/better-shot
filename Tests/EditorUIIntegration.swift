@@ -529,6 +529,28 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         try snapshot(RecordingStudioContent(model: videoModel), scheme: scheme, width: 1100,
                      to: output.appendingPathComponent("video-3d-\(name).png"))
     }
+    if var focusShot = videoModel.selected3DShot {
+        for mode in [Recording3DBlur.Mode.radial, .directional, .tiltShift] {
+            focusShot.blur?.mode = mode
+            videoModel.update3DShot(focusShot)
+            for scheme in [ColorScheme.light, .dark] {
+                let name = scheme == .light ? "light" : "dark"
+                try snapshot(Recording3DBlurInspector(model: videoModel).padding(12), scheme: scheme, width: 260,
+                    to: output.appendingPathComponent("video-3d-blur-\(mode.rawValue)-\(name).png"), height: 560)
+            }
+        }
+    }
+    if var animated = videoModel.selected3DShot {
+        animated.tracks = [.init(property: .panX, keyframes: [
+            .init(position: 0, value: -0.2), .init(position: 0.5, value: 0.1), .init(position: 1, value: 0.3)
+        ])]
+        videoModel.update3DShot(animated)
+        for scheme in [ColorScheme.light, .dark] {
+            let name = scheme == .light ? "light" : "dark"
+            try snapshot(Recording3DKeyframeEditor(model: videoModel).padding(12), scheme: scheme, width: 260,
+                         to: output.appendingPathComponent("video-3d-keyframes-\(name).png"), height: 750)
+        }
+    }
     if let id = videoModel.selected3DShotID { videoModel.remove3DShot(id: id) }
     videoModel.splitClip(at: videoModel.duration / 2)
     var firstClip = videoModel.clipTimeline.segments[0]

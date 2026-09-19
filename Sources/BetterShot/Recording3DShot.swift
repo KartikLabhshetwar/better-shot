@@ -181,27 +181,123 @@ nonisolated struct Recording3DShot: Codable, Equatable, Identifiable, Sendable {
     var easing = Recording3DEasing.smooth
     var transition: Double = 0.25
     var isEnabled = true
+    var blur: Recording3DBlur?
+    var tracks: [Recording3DTrack]?
     static let minimumDuration = 0.2
 
     var title: String {
-        Recording3DPreset.allCases.first { $0.poses.0 == startPose && $0.poses.1 == endPose }?.rawValue
+        if tracks?.contains(where: { !$0.keyframes.isEmpty }) == true { return "Custom move" }
+        return Recording3DPreset.allCases.first { $0.poses.0 == startPose && $0.poses.1 == endPose }?.rawValue
             ?? (startPose == endPose ? "Custom angle" : "Custom move")
     }
 
     func pose(at time: Double) -> Recording3DPose {
         guard isEnabled, time >= start, time < end, end > start else { return .identity }
         let progress = easing.value(at: min(max((time - start) / (end - start), 0), 1))
-        let pose = startPose.interpolated(to: endPose, progress: progress)
+        var pose = startPose.interpolated(to: endPose, progress: progress)
+        for track in tracks ?? [] {
+            if let key = track.property.cameraKey, let value = track.value(at: (time - start) / (end - start)), pose.camera != nil {
+                pose.camera?[keyPath: key] = value
+            }
+        }
         let ramp = min(max(transition, 0), (end - start) / 2)
         guard ramp > 0 else { return pose }
         let edge = min(1, min(time - start, end - time) / ramp)
         return Recording3DPose.identity.interpolated(to: pose, progress: edge * edge * (3 - 2 * edge))
     }
 
+    /// Author keys before the boundary fade, so adding one cannot apply the fade twice.
+    func keyframeValue(for property: Recording3DProperty, at position: Double) -> Double {
+        var authored = self
+        authored.transition = 0; authored.isEnabled = true
+        let time = min(end.nextDown, start + min(max(position, 0), 1) * (end - start))
+        if let key = property.cameraKey {
+            return (authored.pose(at: time).camera ?? Recording3DCamera())[keyPath: key]
+        }
+        if let key = property.blurKey { return authored.defocus(at: time)[keyPath: key] }
+        return 0
+    }
+
     mutating func apply(_ preset: Recording3DPreset) {
         (startPose, endPose) = preset.poses
         easing = .linear
         transition = 0
+        tracks = nil
+        blur = preset.blur
+    }
+
+    mutating func reverse() {
+        swap(&startPose, &endPose)
+        tracks = tracks?.map { track in
+            var track = track
+            track.keyframes = track.keyframes.map { frame in
+                var next = frame
+                next.position = 1 - frame.position
+                next.incoming = CGPoint(x: 1 - frame.outgoing.x, y: 1 - frame.outgoing.y)
+                next.outgoing = CGPoint(x: 1 - frame.incoming.x, y: 1 - frame.incoming.y)
+                return next
+            }.sorted { $0.position < $1.position }
+            return track
+        }
+    }
+
+    mutating func holdCamera() {
+        endPose = startPose
+        tracks = tracks?.filter { $0.property.cameraKey == nil }
+    }
+
+    mutating func flip(horizontal: Bool) {
+        for isEnd in [false, true] {
+            var pose = isEnd ? endPose : startPose
+            if var camera = pose.camera {
+                if horizontal { camera.tiltY *= -1; camera.rotateY *= -1; camera.panX *= -1 }
+                else { camera.tiltX *= -1; camera.rotateX *= -1; camera.panY *= -1 }
+                camera.roll *= -1; pose.camera = camera
+            } else {
+                if horizontal { pose.tiltY *= -1; pose.panX *= -1 }
+                else { pose.tiltX *= -1; pose.panY *= -1 }
+                pose.roll *= -1
+            }
+            if isEnd { endPose = pose } else { startPose = pose }
+        }
+        func angle(_ value: Double) -> Double {
+            let period = blur?.mode == .tiltShift ? 180.0 : 360.0
+            let result = (horizontal ? 180 - value : -value).truncatingRemainder(dividingBy: period)
+            return result < 0 ? result + period : result
+        }
+        if var focus = blur {
+            if horizontal { focus.focusX = 1 - focus.focusX } else { focus.focusY = 1 - focus.focusY }
+            focus.angle = angle(focus.angle); blur = focus
+        }
+        let negated: Set<Recording3DProperty> = horizontal ? [.tiltY, .rotateY, .roll, .panX] : [.tiltX, .rotateX, .roll, .panY]
+        tracks = tracks?.map { track in
+            var track = track
+            track.keyframes = track.keyframes.map { frame in
+                var frame = frame
+                if negated.contains(track.property) { frame.value *= -1 }
+                if track.property == (horizontal ? .focusX : .focusY) { frame.value = 1 - frame.value }
+                if track.property == .angle { frame.value = angle(frame.value) }
+                return frame
+            }
+            return track
+        }
+    }
+
+    func defocus(at time: Double) -> Recording3DBlur {
+        guard isEnabled, time >= start, time < end, end > start else { return .none }
+        var result = blur ?? .none
+        for track in tracks ?? [] {
+            if let key = track.property.blurKey, let value = track.value(at: (time - start) / (end - start)) {
+                result[keyPath: key] = value
+            }
+        }
+        result = result.sanitized
+        let ramp = min(max(transition, 0), (end - start) / 2)
+        if ramp > 0 {
+            let edge = min(1, min(time - start, end - time) / ramp)
+            result.strength *= edge * edge * (3 - 2 * edge)
+        }
+        return result
     }
 }
 
@@ -213,6 +309,13 @@ nonisolated enum Recording3DPreset: String, CaseIterable, Sendable {
     case pullBack = "Pull back", topDown = "Top down", tiltAway = "Tilt away"
     case unfold = "Unfold", slide = "Slide by"
 
+    var blur: Recording3DBlur {
+        switch self {
+        case .closeUp: .init(mode: .radial, strength: 20, falloff: 0.76, focusX: 0.11, focusSize: 0.18, bokeh: true)
+        case .topDown: .init(mode: .radial, strength: 18, falloff: 0.72, focusX: 0.03, focusY: 0.36, focusSize: 0.55, bokeh: true)
+        default: .showcase
+        }
+    }
     var isMove: Bool {
         switch self {
         case .spotlight, .perspective, .center, .lowAngle, .closeUp: false
@@ -281,7 +384,7 @@ nonisolated enum Recording3DScene: String, CaseIterable {
 
 /// Sorted once per edit, binary searched per frame. Times belong to the edited movie,
 /// like mask ranges; clip edits never destructively rewrite authored shots.
-nonisolated struct Recording3DTimeline: Sendable {
+nonisolated struct Recording3DTimeline: Equatable, Sendable {
     let shots: [Recording3DShot]
     static let empty = Self(shots: [], duration: 0)
 
@@ -297,19 +400,26 @@ nonisolated struct Recording3DTimeline: Sendable {
             shot.startPose = shot.startPose.sanitized
             shot.endPose = shot.endPose.sanitized
             shot.transition = shot.transition.isFinite ? min(max(shot.transition, 0), 2) : 0.25
+            shot.blur = shot.blur?.sanitized
+            var properties = Set<Recording3DProperty>()
+            shot.tracks = shot.tracks?.filter { properties.insert($0.property).inserted }
+                .map { $0.normalized() }.filter { !$0.keyframes.isEmpty }
             normalized.append(shot)
         }
         self.shots = normalized
     }
 
-    func pose(at time: Double) -> Recording3DPose {
-        guard time.isFinite else { return .identity }
+    func pose(at time: Double) -> Recording3DPose { shot(at: time)?.pose(at: time) ?? .identity }
+    func defocus(at time: Double) -> Recording3DBlur { shot(at: time)?.defocus(at: time) ?? .none }
+
+    func shot(at time: Double) -> Recording3DShot? {
+        guard time.isFinite else { return nil }
         var low = 0, high = shots.count
         while low < high {
             let mid = (low + high) / 2
             if shots[mid].start <= time { low = mid + 1 } else { high = mid }
         }
-        return low > 0 ? shots[low - 1].pose(at: time) : .identity
+        return low > 0 && time < shots[low - 1].end ? shots[low - 1] : nil
     }
 
     static func scene(_ presets: [Recording3DPreset], in range: ClosedRange<Double>,
@@ -325,7 +435,10 @@ nonisolated struct Recording3DTimeline: Sendable {
             let end = index == presets.count - 1 ? range.upperBound : start + duration * weights[index] / sum
             var shot = Recording3DShot(start: start, end: end)
             shot.apply(preset)
-            if showcaseFinish && index == 2 { shot.endPose.camera?.distance = 1.6 }
+            if showcaseFinish && index == 2 {
+                shot.endPose.camera?.distance = 1.6
+                shot.blur = .init(mode: .radial, strength: 19, falloff: 0.67, focusY: 0.52, bokeh: true)
+            }
             start = end
             return shot
         }

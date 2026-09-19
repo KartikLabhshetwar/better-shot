@@ -4,6 +4,7 @@ struct Recording3DInspector: View {
     @Bindable var model: RecordingStudioModel
     @State private var showsMoves = true
     @State private var editsEnd = false
+    @State private var detail = 0
     @State private var autoCount = 3
     @State private var confirmsAutoScene = false
     @State private var confirmsRemoval = false
@@ -125,6 +126,13 @@ struct Recording3DInspector: View {
             .help("Replace this shot with three shots across the same time range")
 
             Divider()
+            Picker("3D controls", selection: $detail) {
+                Text("Camera").tag(0)
+                Text("Blur").tag(1)
+                Text("Keyframes").tag(2)
+            }
+            .pickerStyle(.segmented).labelsHidden()
+            if detail == 0 {
             Picker("Camera pose", selection: $editsEnd) {
                 Text("Start").tag(false)
                 Text("End").tag(true)
@@ -134,13 +142,17 @@ struct Recording3DInspector: View {
             HStack(spacing: 6) {
                 Recording3DPoseThumbnail(pose: editsEnd ? shot.endPose : shot.startPose)
                     .frame(width: 68, height: 44)
-                Button { change { swap(&$0.startPose, &$0.endPose) }; previewPose() } label: { Image(systemName: "arrow.left.arrow.right") }
+                Button { change { $0.reverse() }; previewPose() } label: { Image(systemName: "arrow.left.arrow.right") }
                     .accessibilityLabel("Swap start and end")
                     .help("Swap the start and end camera positions")
-                Button("Still") { change { $0.endPose = $0.startPose }; previewPose() }
+                Button("Still") { change { $0.holdCamera() }; previewPose() }
                     .help("Hold the start camera position for the whole shot")
             }
             .buttonStyle(EditorButtonStyle(horizontalPadding: 6))
+            if shot.tracks?.contains(where: { $0.property.cameraKey != nil }) == true {
+                Text("Animated camera properties are controlled by Keyframes below.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
             if (editsEnd ? shot.endPose : shot.startPose).camera != nil {
                 cameraSlider("Tilt X", key: \.tiltX, range: -70...70, format: .degrees(signed: true))
                 cameraSlider("Tilt Y", key: \.tiltY, range: -60...60, format: .degrees(signed: true))
@@ -164,11 +176,16 @@ struct Recording3DInspector: View {
                 Button("Flip H") { flip(horizontal: true) }.help("Mirror the camera move horizontally")
                 Button("Flip V") { flip(horizontal: false) }.help("Mirror the camera move vertically")
                 Spacer(minLength: 0)
-                Button("Reset") { change { if editsEnd { $0.endPose = .identity } else { $0.startPose = .identity } }; previewPose() }
-                    .help("Reset the selected camera position")
+                Button("Reset") { change { $0.tracks = $0.tracks?.filter { $0.property.cameraKey == nil }; if editsEnd { $0.endPose = .identity } else { $0.startPose = .identity } }; previewPose() }
+                    .help("Reset the selected camera position and remove camera keyframes")
             }
             .buttonStyle(EditorButtonStyle(horizontalPadding: 3))
             .font(.caption)
+            } else if detail == 1 {
+                Recording3DBlurInspector(model: model)
+            } else {
+                Recording3DKeyframeEditor(model: model)
+            }
             Divider()
             Picker("Motion", selection: Binding(get: { shot.easing }, set: { value in change { $0.easing = value } })) {
                 ForEach(Recording3DEasing.allCases, id: \.self) { Text($0.rawValue).tag($0) }
@@ -222,6 +239,7 @@ struct Recording3DInspector: View {
             if editing { model.begin3DShotEdit(); previewPose() }
             else { model.end3DShotEdit() }
         })
+        .disabled(model.selected3DShot?.tracks?.contains(where: { $0.property.cameraKey == key }) == true)
     }
 
     private func shotSlider(_ title: String, key: WritableKeyPath<Recording3DShot, Double>,
@@ -234,22 +252,7 @@ struct Recording3DInspector: View {
     }
 
     private func flip(horizontal: Bool) {
-        change { shot in
-            for isEnd in [false, true] {
-                var pose = isEnd ? shot.endPose : shot.startPose
-                if var camera = pose.camera {
-                    if horizontal { camera.tiltY *= -1; camera.rotateY *= -1; camera.panX *= -1 }
-                    else { camera.tiltX *= -1; camera.rotateX *= -1; camera.panY *= -1 }
-                    camera.roll *= -1
-                    pose.camera = camera
-                } else {
-                    if horizontal { pose.tiltY *= -1; pose.panX *= -1 }
-                    else { pose.tiltX *= -1; pose.panY *= -1 }
-                    pose.roll *= -1
-                }
-                if isEnd { shot.endPose = pose } else { shot.startPose = pose }
-            }
-        }
+        change { $0.flip(horizontal: horizontal) }
         previewPose()
     }
 }
@@ -273,5 +276,60 @@ struct Recording3DPoseThumbnail: View {
         }
         .clipped()
         .accessibilityHidden(true)
+    }
+}
+
+struct Recording3DBlurInspector: View {
+    @Bindable var model: RecordingStudioModel
+    private var blur: Recording3DBlur { model.selected3DShot?.blur ?? .none }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Depth Blur").font(.caption.weight(.semibold))
+            Picker("Focus", selection: Binding(get: { blur.mode }, set: { mode in
+                change { blur in
+                    blur.mode = mode
+                    switch mode {
+                    case .none: break
+                    case .radial: blur.focusX = 0.37; blur.focusY = 0.5; blur.focusSize = 0.5
+                    case .directional: blur.position = 0.5; blur.angle = 0
+                    case .tiltShift: blur.focusSize = 0.1; blur.focusY = 0.5; blur.angle = 45
+                    }
+                    if mode != .none && blur.strength == 0 { blur.strength = 19 }
+                }
+            })) {
+                ForEach(Recording3DBlur.Mode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            if blur.mode != .none {
+                Toggle("Bokeh highlights", isOn: Binding(get: { blur.bokeh }, set: { enabled in change { $0.bokeh = enabled } }))
+                    .toggleStyle(.switch).controlSize(.small)
+                slider("Strength", .strength, format: .decimal(fractionDigits: 1))
+                slider("Falloff", .falloff)
+                if blur.mode == .directional {
+                    slider("Position", .position)
+                } else {
+                    slider("Focus X", .focusX)
+                    slider("Focus Y", .focusY)
+                    slider("Focus size", .focusSize)
+                }
+                if blur.mode != .radial { slider("Angle", .angle, format: .degrees()) }
+                Text("Bokeh softens highlights into discs. Focus Y runs from bottom to top. Animated controls are edited in the Keyframes tab.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+    }
+    private func change(_ edit: (inout Recording3DBlur) -> Void) {
+        guard var shot = model.selected3DShot else { return }
+        var next = shot.blur ?? .none
+        edit(&next); shot.blur = next.sanitized
+        model.update3DShot(shot)
+    }
+    private func slider(_ title: String, _ property: Recording3DProperty, format: InspectorValueFormat = .percent()) -> some View {
+        let key = property.blurKey!, range = property.bounds(blur: blur)
+        return InspectorSlider(title, value: Binding(get: { CGFloat(self.blur[keyPath: key]) }, set: { value in change { $0[keyPath: key] = Double(value) } }),
+            range: CGFloat(range.lowerBound)...CGFloat(range.upperBound), format: format, onEditingChanged: { active in
+                if active { model.begin3DShotEdit() } else { model.end3DShotEdit() }
+            })
+            .disabled(model.selected3DShot?.tracks?.contains(where: { $0.property == property }) == true)
     }
 }

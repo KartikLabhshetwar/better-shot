@@ -72,6 +72,8 @@ final class RecordingStudioModel {
 
     let screenPlayer = AVPlayer()
     let cameraPlayer = AVPlayer()
+    private(set) var previewRenderRevision: UInt = 0
+    var preview3DError: String?
 
     var style = RecordingStudioDefaults.style {
         didSet {
@@ -929,7 +931,7 @@ final class RecordingStudioModel {
         registerUndo(actionName) { $0.set3DShots(previous, actionName: actionName) }
         shots3D = shots
         rebuild3DTimeline()
-        scheduleProjectSave()
+        scheduleProjectSave(renderChanged: false)
     }
 
     func begin3DShotEdit() {
@@ -985,7 +987,7 @@ final class RecordingStudioModel {
         if shot3DEditSnapshot != nil {
             shots3D = next
             rebuild3DTimeline()
-            scheduleProjectSave()
+            scheduleProjectSave(renderChanged: false)
         } else { set3DShots(next, actionName: "Edit 3D Shot") }
     }
 
@@ -1263,7 +1265,8 @@ final class RecordingStudioModel {
         rebuildPreviewReframe()
     }
 
-    private func scheduleProjectSave() {
+    private func scheduleProjectSave(renderChanged: Bool = true) {
+        if renderChanged { previewRenderRevision &+= 1 }
         guard isLoaded, !isApplyingDocument, session != nil else { return }
         hasUnsavedChanges = true
         projectSaveTask?.cancel()
@@ -1781,8 +1784,18 @@ final class RecordingStudioModel {
 
     // MARK: - Export
 
-    private func makeExportConfiguration() -> RecordingStudioExporter.Configuration {
-        let reframe = makeReframeTrack(crop: cropRect)
+    func retry3DPreview() {
+        preview3DError = nil
+        previewRenderRevision &+= 1
+    }
+
+    func make3DPreviewCompositor(canvasSize: CGSize) -> StudioFrameCompositor {
+        StudioFrameCompositor(configuration: makeExportConfiguration(preview: true), canvasSize: canvasSize,
+                              includeBubble: hasCameraVideo, preview: true)
+    }
+
+    private func makeExportConfiguration(preview: Bool = false) -> RecordingStudioExporter.Configuration {
+        let reframe = preview ? previewReframe : makeReframeTrack(crop: cropRect)
         let exportVideoSize = croppedVideoSize
         let fitContentAspect: CGFloat? =
             exportAspect != .original && exportAspectMode == .fit && exportVideoSize.height > 0
