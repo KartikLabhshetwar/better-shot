@@ -19,7 +19,7 @@ struct Recording3DInspector: View {
         }) {
             VStack(alignment: .leading, spacing: 12) {
                 if model.timeline3D.shots.isEmpty {
-                    Text("Give your recording depth with a camera move or a still angle.")
+                    Text("Give your recording depth with a camera move or a drifting angle.")
                         .font(.caption).foregroundStyle(.secondary)
                     Button("Add 3D Shot") { model.add3DShot(at: model.currentTime) }
                         .buttonStyle(EditorButtonStyle())
@@ -54,7 +54,7 @@ struct Recording3DInspector: View {
             }
         }
         .onChange(of: model.selected3DShotID, initial: true) { _, _ in
-            if let shot = model.selected3DShot { showsMoves = shot.startPose != shot.endPose }
+            if let shot = model.selected3DShot { showsMoves = Recording3DPreset.allCases.first(where: { $0.rawValue == shot.title })?.isMove ?? (shot.startPose != shot.endPose) }
             editsEnd = false
         }
         .disabled(!model.isLoaded || model.isCroppingVideo || model.isEditingMasks)
@@ -71,8 +71,8 @@ struct Recording3DInspector: View {
     }
 
     private func applyAutoScene() {
-        let pool: [Recording3DPreset] = [.glide, .topDown, .closeUp, .unfold, .perspective, .center]
-        model.apply3DScene(Array(pool.prefix(autoCount)), wholeMovie: true)
+        let pool: [Recording3DPreset] = autoCount == 1 ? [.glide] : [.closeUp, .topDown, .pullBack, .unfold, .perspective, .center]
+        model.apply3DScene(Array(pool.prefix(autoCount)), wholeMovie: true, showcaseFinish: autoCount >= 3)
     }
 
     private func selectedControls(_ shot: Recording3DShot) -> some View {
@@ -118,7 +118,7 @@ struct Recording3DInspector: View {
             }
             Menu {
                 ForEach(Recording3DScene.allCases, id: \.self) { scene in
-                    Button(scene.rawValue) { model.apply3DScene(scene.presets) }
+                    Button(scene.rawValue) { model.apply3DScene(scene.presets, weights: scene.weights, showcaseFinish: scene == .showcase) }
                 }
             } label: { Label("3-Shot Scene", systemImage: "square.stack.3d.up") }
             .disabled(shot.end - shot.start < 3 * Recording3DShot.minimumDuration)
@@ -141,6 +141,17 @@ struct Recording3DInspector: View {
                     .help("Hold the start camera position for the whole shot")
             }
             .buttonStyle(EditorButtonStyle(horizontalPadding: 6))
+            if (editsEnd ? shot.endPose : shot.startPose).camera != nil {
+                cameraSlider("Tilt X", key: \.tiltX, range: -70...70, format: .degrees(signed: true))
+                cameraSlider("Tilt Y", key: \.tiltY, range: -60...60, format: .degrees(signed: true))
+                cameraSlider("Roll", key: \.roll, range: -180...180, format: .degrees(signed: true))
+                cameraSlider("Fold X", key: \.rotateX, range: -90...90, format: .degrees(signed: true))
+                cameraSlider("Fold Y", key: \.rotateY, range: -50...50, format: .degrees(signed: true))
+                cameraSlider("Distance", key: \.distance, range: 0.5...10, format: .decimal(fractionDigits: 2))
+                cameraSlider("Field of view", key: \.fieldOfView, range: 10...100, format: .degrees())
+                cameraSlider("Horizontal", key: \.panX, range: -3...3, format: .decimal(fractionDigits: 2))
+                cameraSlider("Vertical", key: \.panY, range: -3...3, format: .decimal(fractionDigits: 2))
+            } else {
             poseSlider("Tilt X", key: \.tiltX, range: -65...65, format: .degrees(signed: true))
             poseSlider("Tilt Y", key: \.tiltY, range: -65...65, format: .degrees(signed: true))
             poseSlider("Roll", key: \.roll, range: -45...45, format: .degrees(signed: true))
@@ -148,6 +159,7 @@ struct Recording3DInspector: View {
             poseSlider("Horizontal", key: \.panX, range: -0.5...0.5, format: .percent(signed: true))
             poseSlider("Vertical", key: \.panY, range: -0.5...0.5, format: .percent(signed: true))
             poseSlider("Perspective", key: \.perspective, range: 20...70, format: .degrees())
+            }
             HStack(spacing: 4) {
                 Button("Flip H") { flip(horizontal: true) }.help("Mirror the camera move horizontally")
                 Button("Flip V") { flip(horizontal: false) }.help("Mirror the camera move vertically")
@@ -196,6 +208,22 @@ struct Recording3DInspector: View {
         })
     }
 
+    private func cameraSlider(_ title: String, key: WritableKeyPath<Recording3DCamera, Double>,
+                              range: ClosedRange<CGFloat>, format: InspectorValueFormat) -> some View {
+        InspectorSlider(title, value: Binding(get: {
+            guard let shot = model.selected3DShot else { return 0 }
+            return CGFloat((editsEnd ? shot.endPose : shot.startPose).camera?[keyPath: key] ?? 0)
+        }, set: { value in
+            change { shot in
+                if editsEnd { shot.endPose.camera?[keyPath: key] = value }
+                else { shot.startPose.camera?[keyPath: key] = value }
+            }
+        }), range: range, format: format, onEditingChanged: { editing in
+            if editing { model.begin3DShotEdit(); previewPose() }
+            else { model.end3DShotEdit() }
+        })
+    }
+
     private func shotSlider(_ title: String, key: WritableKeyPath<Recording3DShot, Double>,
                             range: ClosedRange<Double>) -> some View {
         InspectorSlider(title, value: Binding(get: { model.selected3DShot?[keyPath: key] ?? 0 },
@@ -209,9 +237,16 @@ struct Recording3DInspector: View {
         change { shot in
             for isEnd in [false, true] {
                 var pose = isEnd ? shot.endPose : shot.startPose
-                if horizontal { pose.tiltY *= -1; pose.panX *= -1 }
-                else { pose.tiltX *= -1; pose.panY *= -1 }
-                pose.roll *= -1
+                if var camera = pose.camera {
+                    if horizontal { camera.tiltY *= -1; camera.rotateY *= -1; camera.panX *= -1 }
+                    else { camera.tiltX *= -1; camera.rotateX *= -1; camera.panY *= -1 }
+                    camera.roll *= -1
+                    pose.camera = camera
+                } else {
+                    if horizontal { pose.tiltY *= -1; pose.panX *= -1 }
+                    else { pose.tiltX *= -1; pose.panY *= -1 }
+                    pose.roll *= -1
+                }
                 if isEnd { shot.endPose = pose } else { shot.startPose = pose }
             }
         }

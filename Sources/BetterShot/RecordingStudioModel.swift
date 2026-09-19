@@ -994,11 +994,12 @@ final class RecordingStudioModel {
     }
 
     /// A scene replaces only the selected range; Auto scene explicitly replaces the whole track.
-    func apply3DScene(_ presets: [Recording3DPreset], wholeMovie: Bool = false) {
+    func apply3DScene(_ presets: [Recording3DPreset], wholeMovie: Bool = false,
+                      weights: [Double]? = nil, showcaseFinish: Bool = false) {
         guard duration > 0 else { return }
         let replacesAll = wholeMovie || selected3DShot == nil
         let range = replacesAll ? 0...duration : selected3DShot.map { $0.start...$0.end } ?? 0...duration
-        let shots = Recording3DTimeline.scene(presets, in: range)
+        let shots = Recording3DTimeline.scene(presets, in: range, weights: weights, showcaseFinish: showcaseFinish)
         guard !shots.isEmpty else {
             shot3DError = "This range is too short. Allow at least 0.2 seconds per shot."
             return

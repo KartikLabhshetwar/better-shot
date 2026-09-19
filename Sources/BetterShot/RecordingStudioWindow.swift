@@ -1294,6 +1294,7 @@ private struct StudioTimelineEditor: View {
     @State private var isSplitting = false
     @State private var viewportWidth: CGFloat = 1
     @State private var scrollPosition = ScrollPosition(edge: .leading)
+    @State private var confirms3DRemoval = false
 
     private var scrollX: CGFloat { CGFloat(viewport.position) * scale.pointsPerSecond }
     private var scale: StudioTimelineScale {
@@ -1313,6 +1314,12 @@ private struct StudioTimelineEditor: View {
         .padding(.bottom, 14)
         .background(Color(nsColor: .windowBackgroundColor))
         .background(EditorShortcutHandler(scope: .video, perform: performShortcut))
+        .alert("Remove this 3D shot?", isPresented: $confirms3DRemoval) {
+            Button("Cancel", role: .cancel) { }
+            Button("Remove Shot", role: .destructive) {
+                if let id = model.selected3DShotID { model.remove3DShot(id: id) }
+            }
+        }
         .overlay(alignment: .top) {
             Rectangle()
                 .fill(Color(nsColor: .separatorColor).opacity(0.45))
@@ -1437,7 +1444,7 @@ private struct StudioTimelineEditor: View {
                            origin: scale.time(forX: x + scrollX))
             }
         ))
-        .frame(height: StudioTimelineMetrics.lanesHeight(showsMaskLane: model.showsMaskLane) + (model.timeline3D.shots.isEmpty ? 0 : 44))
+        .frame(height: StudioTimelineMetrics.lanesHeight(showsMaskLane: model.showsMaskLane, showsCutLane: !cutMarkers.isEmpty, shows3DLane: !model.timeline3D.shots.isEmpty))
         .onChange(of: model.duration, initial: true) { old, duration in
             if old == 0 || old == duration { viewport.fit(duration: duration) }
             else {
@@ -1449,7 +1456,7 @@ private struct StudioTimelineEditor: View {
         .onChange(of: model.currentTime) { _, time in followPlayhead(to: time) }
     }
 
-    /// The two lanes that carry real edit targets live in a horizontal scroll
+    /// The lanes that carry real edit targets live in a horizontal scroll
     /// view sized to the zoomed timeline. The ruler, playhead and lane chrome
     /// stay viewport-sized and redraw against `scrollX` instead - a rounded
     /// rectangle or Canvas tens of thousands of points wide would be a single
@@ -1461,14 +1468,15 @@ private struct StudioTimelineEditor: View {
                     .frame(height: StudioTimelineMetrics.zoomLaneHeight)
                 Color.clear
                     .frame(height: StudioTimelineMetrics.clipLaneHeight)
-                Color.clear
-                    .frame(height: StudioTimelineMetrics.cutLaneHeight)
+                if !cutMarkers.isEmpty {
+                    Color.clear.frame(height: StudioTimelineMetrics.cutLaneHeight)
+                }
                 if model.showsMaskLane {
                     StudioZoomLaneBackground()
                         .frame(height: StudioTimelineMetrics.maskLaneHeight)
                 }
                 if !model.timeline3D.shots.isEmpty {
-                    StudioZoomLaneBackground().frame(height: 36)
+                    StudioZoomLaneBackground().frame(height: StudioTimelineMetrics.shotLaneHeight)
                 }
                 Color.clear
                     .frame(height: StudioTimelineMetrics.scrollerGutter)
@@ -1492,8 +1500,9 @@ private struct StudioTimelineEditor: View {
                             height: StudioTimelineMetrics.clipLaneHeight
                         )
                         .frame(width: scale.contentWidth, alignment: .leading)
-                    Color.clear
-                        .frame(height: StudioTimelineMetrics.cutLaneHeight)
+                    if !cutMarkers.isEmpty {
+                        Color.clear.frame(height: StudioTimelineMetrics.cutLaneHeight)
+                    }
 
                     if model.showsMaskLane {
                         StudioMaskLane(
@@ -1510,7 +1519,7 @@ private struct StudioTimelineEditor: View {
                     if !model.timeline3D.shots.isEmpty {
                         Recording3DLane(model: model, pointsPerSecond: scale.pointsPerSecond,
                                         visibleRange: scale.visibleRange(scrollX: scrollX))
-                            .frame(width: scale.contentWidth, height: 36)
+                            .frame(width: scale.contentWidth, height: StudioTimelineMetrics.shotLaneHeight)
                     }
                     Color.clear
                         .frame(height: StudioTimelineMetrics.scrollerGutter)
@@ -1527,12 +1536,14 @@ private struct StudioTimelineEditor: View {
                 }
             }
         }
-        .frame(height: StudioTimelineMetrics.scrollingLanesHeight(showsMaskLane: model.showsMaskLane) + (model.timeline3D.shots.isEmpty ? 0 : 44))
+        .frame(height: StudioTimelineMetrics.scrollingLanesHeight(showsMaskLane: model.showsMaskLane, showsCutLane: !cutMarkers.isEmpty, shows3DLane: !model.timeline3D.shots.isEmpty))
         .mask(edgeFadeMask(scale: scale))
         .overlay(alignment: .top) {
-            cutMarkerLane
-                .padding(.top, StudioTimelineMetrics.zoomLaneHeight + StudioTimelineMetrics.clipLaneHeight
-                         + StudioTimelineMetrics.rowSpacing * 2)
+            if !cutMarkers.isEmpty {
+                cutMarkerLane
+                    .padding(.top, StudioTimelineMetrics.zoomLaneHeight + StudioTimelineMetrics.clipLaneHeight
+                             + StudioTimelineMetrics.rowSpacing * 2)
+            }
         }
     }
 
@@ -1655,6 +1666,25 @@ private struct StudioTimelineEditor: View {
 
     private var transport: some View {
         HStack(spacing: 12) {
+            Menu {
+                Button { addZoomAtPlayhead() } label: {
+                    Label("Zoom", systemImage: "plus.magnifyingglass")
+                }
+                .disabled(RecordingTimelineViewport.newZoomRange(at: model.currentTime,
+                    secondsPerPoint: scale.secondsPerPoint, duration: model.duration,
+                    occupied: model.zoomTimelineBlocks.map { $0.editorStart...$0.editorEnd }) == nil)
+                Button { model.add3DShot(at: model.currentTime) } label: {
+                    Label("3D Shot", systemImage: "cube.transparent")
+                }
+                .disabled(model.duration < Recording3DShot.minimumDuration)
+            } label: {
+                Label("Add", systemImage: "plus")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .accessibilityLabel("Add timeline effect")
+            .help("Add a Zoom or 3D Shot at the playhead")
+            .disabled(!model.isLoaded || model.isCroppingVideo || model.isEditingMasks)
             Toggle(isOn: $isSplitting) {
                 Label("Split", systemImage: "scissors").labelStyle(.iconOnly)
             }
@@ -1719,16 +1749,6 @@ private struct StudioTimelineEditor: View {
                 }
                 .disabled(!model.hasClipEdits)
 
-                Button {
-                    addZoomAtPlayhead()
-                } label: {
-                    Label("Add Zoom", systemImage: "plus")
-                }
-                .buttonStyle(EditorButtonStyle())
-                .help("Add a zoom segment at the playhead")
-                .disabled(RecordingTimelineViewport.newZoomRange(at: model.currentTime,
-                    secondsPerPoint: scale.secondsPerPoint, duration: model.duration,
-                    occupied: model.zoomTimelineBlocks.map { $0.editorStart...$0.editorEnd }) == nil)
             } label: {
                 Image(systemName: "ellipsis")
             }
@@ -1740,11 +1760,13 @@ private struct StudioTimelineEditor: View {
     }
 
     private var canDeleteSelection: Bool {
-        model.selectedCueID != nil || model.canDeleteSelectedClip
+        model.selected3DShotID != nil || model.selectedCueID != nil || model.canDeleteSelectedClip
     }
 
     private func deleteSelection() {
-        if let cueID = model.selectedCueID {
+        if model.selected3DShotID != nil {
+            confirms3DRemoval = true
+        } else if let cueID = model.selectedCueID {
             model.removeZoomCue(id: cueID)
         } else if model.selectedClipID != nil {
             model.deleteSelectedClip()
@@ -1879,7 +1901,7 @@ struct StudioTimelineCutPreview: View {
     }
 }
 
-private enum StudioTimelineMetrics {
+nonisolated enum StudioTimelineMetrics {
     static let rowSpacing: CGFloat = 8
     static let playheadLaneHeight: CGFloat = 14
     static let rulerHeight: CGFloat = 16
@@ -1895,14 +1917,18 @@ private enum StudioTimelineMetrics {
 
     static let maskLaneHeight = zoomLaneHeight
 
-    static func scrollingLanesHeight(showsMaskLane: Bool) -> CGFloat {
-        clipLaneHeight + zoomLaneHeight + cutLaneHeight + scrollerGutter + rowSpacing * 3
+    static let shotLaneHeight: CGFloat = 36
+
+    static func scrollingLanesHeight(showsMaskLane: Bool, showsCutLane: Bool, shows3DLane: Bool) -> CGFloat {
+        clipLaneHeight + zoomLaneHeight + scrollerGutter + rowSpacing * 2
+            + (showsCutLane ? cutLaneHeight + rowSpacing : 0)
             + (showsMaskLane ? maskLaneHeight + rowSpacing : 0)
+            + (shows3DLane ? shotLaneHeight + rowSpacing : 0)
     }
 
-    static func lanesHeight(showsMaskLane: Bool) -> CGFloat {
+    static func lanesHeight(showsMaskLane: Bool, showsCutLane: Bool, shows3DLane: Bool) -> CGFloat {
         playheadLaneHeight + rulerHeight
-            + scrollingLanesHeight(showsMaskLane: showsMaskLane)
+            + scrollingLanesHeight(showsMaskLane: showsMaskLane, showsCutLane: showsCutLane, shows3DLane: shows3DLane)
             + minimapHeight + rowSpacing * 3
     }
 }

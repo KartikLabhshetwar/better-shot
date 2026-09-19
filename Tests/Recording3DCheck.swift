@@ -34,11 +34,21 @@ import QuartzCore
         }
         var shot = Recording3DShot(start: 1, end: 4)
         shot.apply(.glide)
+        precondition(shot.transition == 0 && shot.easing == .linear)
+        shot.transition = 0.25
         precondition(shot.pose(at: 0) == .identity && shot.pose(at: 1) == .identity && shot.pose(at: 4) == .identity)
         let middle = shot.pose(at: 2.5)
-        precondition(abs(middle.tiltY) < 1e-8 && middle.scale == 0.8)
+        precondition(abs(middle.camera!.panX - (0.673 + 0.054) / 2) < 1e-8)
         let nearEnd = shot.pose(at: 4 - 1e-7)
         precondition(abs(nearEnd.scale - 1) < 1e-8)
+        let flatCamera = Recording3DPose(camera: .init(distance: 2))
+        let right = flatCamera.project(CGPoint(x: 1920, y: 540), in: size)
+        precondition(abs(right.x - (960 + 540 / tan(Double.pi / 8) / 2)) < 1e-8,
+                     "Camera distance and vertical FOV must determine apparent size")
+        let originalPose = Recording3DPose(tiltX: 12, tiltY: -18, roll: -4, scale: 0.85)
+        let legacyJSON = "{\"tiltX\":12,\"tiltY\":-18,\"roll\":-4,\"scale\":0.85,\"panX\":0,\"panY\":0,\"perspective\":45}"
+        let legacyPose = try JSONDecoder().decode(Recording3DPose.self, from: Data(legacyJSON.utf8))
+        precondition(legacyPose == originalPose)
         let data = try JSONEncoder().encode(shot)
         let restored = try JSONDecoder().decode(Recording3DShot.self, from: data)
         precondition(restored == shot)
@@ -55,11 +65,30 @@ import QuartzCore
             precondition(sample.title == preset.rawValue)
             precondition(sample.startPose == sample.startPose.sanitized)
             precondition(sample.endPose == sample.endPose.sanitized)
+            precondition(sample.startPose != sample.endPose, "Every reference look includes motion")
+            for canvas in [size, CGSize(width: 1080, height: 1920)] {
+                for time in [1.0, 1.7, 3.9] {
+                    let pose = sample.pose(at: time), matrix = pose.projection(in: canvas)
+                    for point in [CGPoint.zero, CGPoint(x: canvas.width, y: 0), CGPoint(x: 0, y: canvas.height), CGPoint(x: canvas.width, y: canvas.height)] {
+                        precondition(matrix.m14 * point.x + matrix.m24 * point.y + matrix.m44 > 0)
+                        let p = pose.project(point, in: canvas)
+                        let q = pose.project(CGPoint(x: point.x * 2, y: point.y * 2), in: CGSize(width: canvas.width * 2, height: canvas.height * 2))
+                        precondition(p.x.isFinite && p.y.isFinite && hypot(p.x - q.x / 2, p.y - q.y / 2) < 1e-8)
+                    }
+                }
+            }
         }
         let scene = Recording3DTimeline.scene(Recording3DScene.showcase.presets, in: 2...8)
         precondition(scene.count == 3 && scene[0].start == 2 && scene[2].end == 8)
         precondition(scene[0].end == scene[1].start && scene[1].end == scene[2].start)
         precondition(Recording3DTimeline.scene([.glide, .center], in: 0...0.1).isEmpty)
+        let showcase = Recording3DTimeline.scene(Recording3DScene.showcase.presets, in: 0...10,
+                                                weights: Recording3DScene.showcase.weights, showcaseFinish: true)
+        precondition(showcase.map { $0.end } == [2.7, 5.2, 10])
+        precondition(showcase[2].endPose.camera?.distance == 1.6)
+        precondition(Recording3DTimeline.scene([.center], in: 0...1, weights: [.nan]).isEmpty)
+        let badCamera = Recording3DCamera(tiltX: .infinity, distance: .nan, panX: 100).sanitized
+        precondition(badCamera.tiltX == 0 && badCamera.distance == 2 && badCamera.panX == 3)
         let badPose = Recording3DPose(tiltX: .infinity, scale: .nan, panX: 100).sanitized
         precondition(badPose.tiltX == 0 && badPose.scale == 1 && badPose.panX == 0.5)
         print("3D projection, scaling, near-plane bounds, presets, timing, transitions, sanitization, and Codable checks passed")

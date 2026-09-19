@@ -6,6 +6,11 @@ import SwiftUI
 
 @MainActor
 func check3DShots(movie: URL, directory: URL) async throws {
+    let compact = StudioTimelineMetrics.scrollingLanesHeight(showsMaskLane: false, showsCutLane: false, shows3DLane: true)
+    let withCuts = StudioTimelineMetrics.scrollingLanesHeight(showsMaskLane: false, showsCutLane: true, shows3DLane: true)
+    precondition(withCuts - compact == 36, "No cut-marker gutter may remain when there are no cuts")
+    let withMasks = StudioTimelineMetrics.scrollingLanesHeight(showsMaskLane: true, showsCutLane: false, shows3DLane: true)
+    precondition(withMasks - compact == 44, "Masks retain their own row without resurrecting the cut gutter")
     let session = RecordingSession(directoryURL: directory.appendingPathComponent("3D.bettershotrec"))
     try FileManager.default.createDirectory(at: session.directoryURL, withIntermediateDirectories: true)
     try FileManager.default.copyItem(at: movie, to: session.screenURL)
@@ -52,7 +57,7 @@ func check3DShots(movie: URL, directory: URL) async throws {
     model.beginVideoCrop()
     precondition(model.preview3DPose(at: 0.5) == .identity)
     model.cancelVideoCrop()
-    precondition(model.preview3DPose(at: 0.5) == edited.startPose)
+    precondition(model.preview3DPose(at: 0.5) == edited.pose(at: 0.5))
     model.toggleMaskTool(.blur)
     precondition(model.preview3DPose(at: 0.5) == .identity)
     model.endMaskEditing()
@@ -175,7 +180,7 @@ func check3DShots(movie: URL, directory: URL) async throws {
     try combined(timeline).render(screenFrame: source, cameraFrame: source, editorTime: 1, sourceTime: 1, into: warpedCombined)
     for point in [CGPoint(x: 160, y: 90), CGPoint(x: 150, y: 125), CGPoint(x: 264, y: 135)] {
         let expected = color(flatCombined, at: point)
-        let actual = color(warpedCombined, at: still.startPose.project(point, in: size))
+        let actual = color(warpedCombined, at: still.pose(at: 1).project(point, in: size))
         precondition(zip(expected, actual).allSatisfy { abs(Int($0) - Int($1)) < 24 },
                      "Cursor, mask, crop, and camera must share the content projection: \(expected), \(actual)")
     }
@@ -201,7 +206,7 @@ func check3DShots(movie: URL, directory: URL) async throws {
             if abs(time - 1) < 0.001 {
                 let pixels = CMSampleBufferGetImageBuffer(sample)!
                 precondition(color(pixels, at: CGPoint(x: 5, y: 5))[1] > 220, "Encoded video must include 3D framing")
-                let red = color(pixels, at: still.startPose.project(CGPoint(x: 115, y: 90), in: size))
+                let red = color(pixels, at: still.pose(at: 1).project(CGPoint(x: 115, y: 90), in: size))
                 precondition(Int(red[0]) > Int(red[2]) + 70, "Projected red footage must survive encoding")
             }
             count += 1
@@ -250,6 +255,8 @@ private func check3DWindows(model: RecordingStudioModel) async throws {
         window.appearance = NSAppearance(named: scheme == .light ? .aqua : .darkAqua)
         window.title = "BetterShot — 3D test fixture"
         window.styleMask = [.titled, .closable, .resizable]
+        window.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+        window.level = .floating
         window.setContentSize(CGSize(width: 1100, height: 800))
         window.isReleasedWhenClosed = false
         defer { window.contentViewController = nil; window.close() }

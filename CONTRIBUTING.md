@@ -218,6 +218,15 @@ ranges do; clip trims/speed changes clamp the effective track without deleting
 authored shots. Missing `shots3D` fields mean no effect in legacy projects.
 `RecordingStudioModel` handles undo, draft/save/discard, and render invalidation.
 `Recording3DInspector` and `Recording3DLane` use the existing inspector controls.
+The timeline’s **+ Add** menu creates Zoom and 3D Shot segments at the playhead.
+Only allocate the cut-marker row when there are cuts; lane backgrounds, edit
+content, and total height must use the same visibility rules.
+
+The optional `Recording3DPose.camera` stores independent camera orbit, screen
+fold, distance, vertical field of view, and camera-plane pan. Legacy poses omit
+it and keep the previous projection. Preset selection writes both endpoints,
+linear timing, and zero boundary transition; angles include a slow drift, with
+Still available explicitly. Named scenes retain their relative shot durations.
 
 The live content group uses the shared projection through SwiftUI. Export applies
 one Core Image perspective warp to the composed screen, masks, cursor, keystrokes,

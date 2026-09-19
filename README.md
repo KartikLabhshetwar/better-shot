@@ -50,9 +50,10 @@ permissions and your first capture.
 - **Edit the recording.** Cut clips, adjust speed from 0.25× to 8×, add zooms,
   transitions, captions, and blur or pixelate masks. Arrange screen and camera
   in a bubble, overlapping frame, side-by-side layout, or presenter view.
-- **3D video shots.** Add camera moves, angles, editable start/end poses, and
-  automatic scenes from Effects > 3D Shots. Preview and export share the same
-  perspective geometry.
+- **3D video shots.** Use the timeline’s **+ Add > 3D Shot** menu, then choose
+  from eight camera moves and five drifting angles in Effects. Adjust camera
+  orbit, screen fold, distance, and lens, or generate a scene. The same menu adds
+  zoom segments. Preview and export share perspective geometry.
 - **Make the cursor easier to follow.** Choose Recorded, Arrow, Dark, Light, or
   Dot, with size, smoothing, click effects, and idle hiding. Cursor restyling
   requires a recorded pointer track; it cannot replace a cursor baked into

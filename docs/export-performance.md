@@ -164,12 +164,17 @@ Reviewed Cap's repository structure and traced its 3D editor/rendering flow at
 shader in `crates/rendering`. This was a feature-focused review, not an audit of
 every file in Cap's web/backend/media monorepo.
 
-BetterShot uses original Swift presets and a shared pinhole projection, with
+BetterShot uses a native Swift pinhole projection, with
 native [SwiftUI projection effects](https://developer.apple.com/documentation/swiftui/view/projectioneffect(_:))
 and [Core Image perspective transforms](https://developer.apple.com/documentation/coreimage/ciperspectivetransform).
-No Cap code, shaders, assets, Rust runtime, or web UI dependencies were copied.
-The implementation covers timed start/end camera poses, eight moves, five still
-angles, scenes, easing, transitions, and timeline editing. Cap's per-property
+The eight move and five angle presets follow Cap’s camera parameters, endpoint
+motion, linear timing, and zero boundary transition. Camera orbit and content
+fold are independent; distance and vertical field of view determine apparent
+size. Named scenes retain their weighted timing, and Auto Scene uses the same
+shot ordering. The renderer uses native quaternion math and one homography;
+no Rust runtime, shaders, artwork, or web UI dependencies were imported.
+Legacy saved plane poses keep their previous geometry. The implementation covers
+timed start/end camera poses, scenes, easing, transitions, and timeline editing. Cap's per-property
 keyframe curve editor and depth-of-field/bokeh controls are outside this change.
 
 The content plane includes the screen, source masks, cursor, keystrokes, shadows,
@@ -178,9 +183,9 @@ GPU warp only on active frames; the existing flat path remains unchanged.
 Backgrounds/shadows are cached, source frames remain on the GPU, and shot lookup
 uses binary search without per-frame timeline construction.
 
-On this Apple M5 / 32 GB Mac, optimized Release objects measured **1.55 ms/frame
-flat** and **1.89 ms/frame with a moving 3D shot** at 1920×1080: approximately
-**0.34 ms/frame** additional compositor time. These are medians of three warm
+On this Apple M5 / 32 GB Mac, optimized Release objects measured **1.47 ms/frame
+flat** and **1.83 ms/frame with a moving 3D shot** at 1920×1080: approximately
+**0.36 ms/frame** additional compositor time. These are medians of three warm
 120-frame runs after one warmup, with synchronous GPU completion, a reused
 synthetic source buffer, and no concurrent build. They measure GPU composition,
 not decoding, encoding, display frame rate, or every recording workload. The
@@ -191,3 +196,9 @@ independence, masks/crop/cursor/camera alignment, random seeks over a reused sou
 encoded 30/60 fps output, persistence/undo/discard, and render-cache invalidation.
 Displayed production AVPlayer windows were captured in both appearances; compact
 inspector layouts are also covered by offscreen snapshots.
+
+The follow-up removes the empty cut-marker row from layout and height calculations
+and adds a native **+ Add** menu for Zoom and 3D Shot. Both compact appearances and
+live fixture playback/seeking were checked again. The live test window now joins
+the active Space so it can be captured while another app is full screen. Physical
+mouse gestures and menu selection were not automated by these checks.
