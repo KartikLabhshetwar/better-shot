@@ -12,7 +12,7 @@ final class NotchPresenter {
     private(set) var captureSuspended = false
     var countdown: Int?
     @ObservationIgnored private var enabledSession = false
-    @ObservationIgnored private var hoverTask: Task<Void, Never>?
+    @ObservationIgnored private var hoverDismissTimer: Timer?
     @ObservationIgnored private var isHovering = false
     @ObservationIgnored var menuTrackingCount = 0
     var notification: AnyView?
@@ -76,14 +76,14 @@ final class NotchPresenter {
     }
 
     func collapse() {
-        hoverTask?.cancel()
+        hoverDismissTimer?.invalidate()
         guard expanded else { return }
         expanded = false
         refresh()
     }
 
     func suspendForCapture() {
-        hoverTask?.cancel()
+        hoverDismissTimer?.invalidate()
         isHovering = false
         menuTrackingCount = 0
         captureSuspended = true
@@ -96,7 +96,7 @@ final class NotchPresenter {
     }
 
     func refreshMode() {
-        hoverTask?.cancel()
+        hoverDismissTimer?.invalidate()
         isHovering = false
         menuTrackingCount = 0
         enabledSession = AppPreferences.presentationMode == .notch
@@ -108,23 +108,22 @@ final class NotchPresenter {
         refresh()
     }
 
-    // Adapted from TheBoredTeam/boring.notch ContentView.handleHover at
-    // 99c26e418323d10e48886469fc9bd83900194bec (GPL-3.0).
-    // See Resources/Licenses/BoringNotch.txt and NOTICE.md.
     func updateHoverState(_ hovering: Bool) {
-        hoverTask?.cancel()
         isHovering = hovering
+        hoverDismissTimer?.invalidate()
         guard AppPreferences.presentationMode == .notch, !captureSuspended else { return }
-        hoverTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(100))
-            guard !Task.isCancelled, let self else { return }
-            if hovering {
-                guard self.isHovering, !self.expanded else { return }
-                self.show()
-            } else if !self.isHovering && self.canCollapseAfterHover {
+        if hovering {
+            if !expanded { show() }
+            return
+        }
+        let timer = Timer(timeInterval: 0.1, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, !self.isHovering, self.canCollapseAfterHover else { return }
                 self.collapse()
             }
         }
+        hoverDismissTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
 
     private var canCollapseAfterHover: Bool {
@@ -300,7 +299,11 @@ struct NotchContent: View {
 struct NotchCompactLeading: View {
     var body: some View {
         Button { NotchPresenter.shared.show() } label: {
-            Image("MenuBarIcon").resizable().scaledToFit().frame(width: 18, height: 18)
+            if (NotchPresenter.shared.screen?.safeAreaInsets.top ?? 0) == 0 {
+                Text("BetterShot").font(.caption)
+            } else {
+                Color.clear.frame(width: 1, height: 18)
+            }
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Expand BetterShot notch")
@@ -309,15 +312,13 @@ struct NotchCompactLeading: View {
 
 struct NotchCompactTrailing: View {
     var body: some View {
-        Button { NotchPresenter.shared.show() } label: {
-            if ScreenRecordingManager.shared.isActive {
+        if ScreenRecordingManager.shared.isActive {
+            Button { NotchPresenter.shared.show() } label: {
                 Label(ScreenRecordingManager.shared.formattedElapsedTime, systemImage: "record.circle")
                     .monospacedDigit()
-            } else {
-                Label("\(PreviewOverlay.shared.items.count)", systemImage: "photo.on.rectangle")
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Expand recording controls")
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Expand capture controls")
     }
 }

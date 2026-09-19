@@ -53,6 +53,8 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     precondition(overlay.items == [imageURL, movieURL])
     precondition(!NSApp.windows.contains { $0.identifier?.rawValue == "BetterShot.CaptureOverlay" && $0.isVisible })
     guard let window = notch.window else { preconditionFailure("Missing DynamicNotchKit panel") }
+    // Hover is driven explicitly below; keep the user's real pointer out of fixture state.
+    window.ignoresMouseEvents = true
     precondition(window.sharingType == (PreviewWindowCaptureExclusion.includesAppWindowsInCaptures ? .readOnly : .none))
     precondition(window.canBecomeKey, "Notch controls must accept keyboard focus")
     try await Task.sleep(for: .milliseconds(120))
@@ -90,6 +92,14 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
         window.appearance = originalAppearance
     }
     notch.collapse()
+    try await Task.sleep(for: .milliseconds(80))
+    if let hosting = window.contentView {
+        hosting.layoutSubtreeIfNeeded()
+        if let bitmap = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) {
+            hosting.cacheDisplay(in: hosting.bounds, to: bitmap)
+            try bitmap.representation(using: .png, properties: [:])?.write(to: output.appendingPathComponent("notch-compact.png"))
+        }
+    }
     if window.screen?.safeAreaInsets.top ?? 0 > 0 {
         precondition(!notch.expanded && notch.isVisible)
         bar.recordingConfirmation = .restartRecording
@@ -104,7 +114,7 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     notch.updateHoverState(true)
     notch.updateHoverState(false)
     try await Task.sleep(for: .milliseconds(180))
-    precondition(!notch.expanded, "A brief pass across the notch must cancel pending open")
+    precondition(!notch.expanded, "A brief pass across the notch must settle closed")
     notch.updateHoverState(true)
     try await Task.sleep(for: .milliseconds(180))
     precondition(notch.expanded, "Hover must open the whole compact surface")
@@ -144,11 +154,12 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     notch.updateHoverState(true)
     notch.suspendForCapture()
     try await Task.sleep(for: .milliseconds(180))
-    precondition(!notch.isVisible, "Capture suspension must cancel pending hover opens")
+    precondition(!notch.isVisible, "Capture suspension must hide the hovered notch")
     notch.resumeAfterCapture()
+    notch.window?.ignoresMouseEvents = true
     notch.show()
     notch.updateHoverState(true)
-    print("PASS hover open/leave, cancelled open/close, menu/popover protection, and capture suspension")
+    print("PASS native hover open/leave, cancelled dismissal, menu/popover protection, and capture suspension")
 
     let recentImages = NotchRecentCaptures.items(kind: .screenshot)
     let recentVideos = NotchRecentCaptures.items(kind: .recording)
@@ -208,6 +219,7 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     ToastWindow.shared.show(message: "Saved", duration: 30)
     precondition(!notch.isVisible)
     notch.resumeAfterCapture()
+    notch.window?.ignoresMouseEvents = true
     precondition(notch.isVisible)
     ToastWindow.shared.dismiss(animated: false)
 

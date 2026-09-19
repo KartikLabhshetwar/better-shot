@@ -229,7 +229,7 @@ If BetterShot helps you, you can [support its development](https://www.buymeacof
 ## License
 
 [BSD 3-Clause](LICENSE) for original BetterShot code; adapted Cap rendering uses
-AGPLv3, and the adapted Boring Notch hover handling uses GPLv3. See [third-party notices](Resources/Licenses/NOTICE.md) for distribution
+AGPLv3. See [third-party notices](Resources/Licenses/NOTICE.md) for distribution
 terms and the bundled TourKit MIT license.
 
 ### Optional notch mode (v0.5.5)

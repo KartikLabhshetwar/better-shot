@@ -448,9 +448,8 @@ snapshots of the ghost, tour pages, and release notes.
 
 ### Notch presentation
 
-Hover scheduling adapts Boring Notch’s cancellable delay; retain its GPL notice in
-Resources/Licenses. Whole-surface hover events come from DynamicNotchKit. Cancel
-pending hover work during capture/mode changes and keep menus/popovers open.
+Cancel pending hover dismissal during capture/mode changes and keep menus and
+popovers open while in use.
 Recent Captures reuses `MediaGalleryItem` resolution and `MediaGalleryCard` actions
 and thumbnail decoding; do not add a second media store.
 
@@ -463,10 +462,8 @@ add a second saving, copying, upload, or recording implementation. Normal mode i
 the fallback for missing or unknown `bs_presentationMode` values. Mode changes
 must preserve pending media, transfers, and active recording state.
 
-DynamicNotchKit is vendored at the revision in `Vendor/DynamicNotchKit/BETTERSHOT.md`
-with its MIT notice. Preserve the pre-presentation capture-exclusion hook,
-synchronous lifecycle, transparent-margin hit testing, display selection, and
-accessibility patches when updating it. Expanded surfaces use the kit’s native
+Preserve capture exclusion before presentation, immediate show/hide, transparent
+margin hit testing, display selection, and accessibility. Expanded surfaces use native
 `NSVisualEffectView` popover material with an opaque Reduce Transparency fallback;
 keep the compact notch black and expanded controls in system colors. `make test` exercises mode switching,
 capture suspension, preview actions, transfer cleanup, and both appearances;

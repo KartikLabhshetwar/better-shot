@@ -9,12 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Optional Notch Mode:** choose Normal Mode or Notch Mode in Settings > General > Capture Mode. Normal remains the default, including on upgrade. DynamicNotchKit hosts the shared screenshot tools (Area, Fullscreen, Window, OCR, Color, and timers), recording options and Stop/Pause/Restart/Discard controls, and image/video previews with Copy, Save, Edit, Pin, Cloud Share, and Dismiss. Browse pending captures without opening a separate overlay. Hardware notches can collapse to a compact capture/recording status; other displays use a top-center floating panel.
+- **Optional Notch Mode:** choose Normal Mode or Notch Mode in Settings > General > Capture Mode. Normal remains the default, including on upgrade. The notch hosts the shared screenshot tools (Area, Fullscreen, Window, OCR, Color, and timers), recording options and Stop/Pause/Restart/Discard controls, and image/video previews with Copy, Save, Edit, Pin, Cloud Share, and Dismiss. Browse pending captures without opening a separate overlay. Hardware notches can collapse to a compact capture/recording status; other displays use a top-center floating panel.
 - Notch mode also hosts countdowns, recording teleprompter text, saved/copied feedback, and export/share progress with existing recovery actions. Pending previews stay available until acted on. Switching modes preserves captures and recording state; the notch hides during selection/capture and follows capture-window exclusion settings.
 
 ### Changed
 
-- The notch opens on hover and collapses after the pointer leaves, using Boring Notch’s cancellable hover scheduling. Menus, recording options, and confirmations prevent premature closing; non-notched displays also have a compact state. Recent Captures shows saved screenshots and videos with type filters, thumbnails, and the existing gallery actions.
+- The notch opens on hover and collapses after the pointer leaves. Menus, recording options, and confirmations prevent premature closing; non-notched displays also have a compact state. Recent Captures shows saved screenshots and videos with type filters, thumbnails, and the existing gallery actions.
 
 - Expanded Notch Mode uses native macOS frosted glass, system-colored controls, and light/dark appearance. The compact notch stays black, and Reduce Transparency uses an opaque surface.
 
