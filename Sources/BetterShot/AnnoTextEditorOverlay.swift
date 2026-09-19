@@ -99,7 +99,10 @@ final class AnnoTextEditorOverlay: NSTextView {
         // The shape's box in view space. The frame origin is the shape's local origin, which is
         // also what `frameRotation` turns about.
         let bounds = editor.document.geometry(shape).bounds
-        let origin = editor.pageToScreen(Vec(shape.x, shape.y))
+        // Keep native text entry readable inside a reflected annotation's box.
+        // On commit the shared shape renderer reflects the glyphs with the image.
+        let localOrigin = Vec(shape.isMirrored ? bounds.w : 0, 0)
+        let origin = editor.pageToScreen(shape.pageTransform.applyToPoint(localOrigin))
         var width = Swift.max(bounds.w * zoom, Double(fontSize) * 0.6)
         var height = Swift.max(bounds.h * zoom, Double(TextMeasure.lineHeight(viewProps)))
 

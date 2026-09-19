@@ -12,6 +12,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_EDITOR_WINDOWS"] == "1" {
         try await checkEditorWindowInteractions(imageURL: imageURL, movieURL: movieURL)
     }
+    try checkImageTransforms(imageURL: imageURL)
     try await checkColorPickerAndToast()
     try await checkPreviewOverlay(imageURL: imageURL)
     try await checkMediaGallery(imageURL: imageURL, movieURL: movieURL)
@@ -497,6 +498,18 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     }
     try snapshot(AnnotationEditorWindow(url: .constant(nil), model: imageModel),
                  scheme: .light, width: 980, to: output.appendingPathComponent("image-compact.png"))
+    try snapshot(AnnotationEditorWindow(url: .constant(nil), model: imageModel),
+                 scheme: .dark, width: 980, to: output.appendingPathComponent("image-compact-dark.png"))
+    for tool in [AnnotationTool.text, .arrow, .blur] {
+        imageModel.selectTool(tool)
+        for scheme in [ColorScheme.light, .dark] {
+            let name = scheme == .light ? "light" : "dark"
+            try snapshot(AnnotationEditorWindow(url: .constant(nil), model: imageModel),
+                         scheme: scheme, width: 980,
+                         to: output.appendingPathComponent("image-compact-\(tool.rawValue)-\(name).png"))
+        }
+    }
+    imageModel.selectTool(.select)
     try snapshot(RecordingStudioContent(model: videoModel),
                  scheme: .light, width: 1100, to: output.appendingPathComponent("video-compact.png"))
     videoModel.selectedCueID = nil

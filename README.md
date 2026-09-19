@@ -15,7 +15,7 @@ unless you share it, and shares go to storage you own.
 - **Screenshots:** region, fullscreen, and window capture with macOS's native selector. OCR text extraction and hex color picker included.
 - **Screenshot saving:** Enable **General > Saving > Automatically save screenshots to this folder** to save normal captures immediately while keeping the preview or editor available. Off by default, including on upgrade. Capture & Copy, Edit, and Pin shortcuts stay private; Copy never creates or updates an export. Editor Save works before making edits and updates the associated export.
 - **Screen recording:** capture a display, window, or adjustable region with system audio, microphone, camera overlay, and teleprompter.
-- **Image editor:** arrows, shapes, text, numbered markers, highlight, blur, pixelate, and crop. Background framing with padding, corners, shadow, wallpapers, and ten soft gradients.
+- **Image editor:** arrows, shapes, text, numbered markers, highlight, blur, pixelate, crop, 90° rotation, and horizontal/vertical flips. Rotate and flip keep annotations editable and support undo/redo. Background framing with padding, corners, shadow, wallpapers, and ten soft gradients.
 - **Video editor:** cuts, clip speeds (0.25x to 8x), transitions, crop, zoom, masks (blur/pixelate with Crop Only or Full Frame), captions, and camera controls. Camera layout presets include Camera Bubble, Overlap, Side-by-Side, Presenter, Camera Only, and Screen Only, with left/right positioning for paired layouts. Layouts apply to the whole video and are saved with the project. Camera Bubble and Overlap start at the compact 0.5.2 size (1:1, 26%); selecting either preset restores that size. Floating cameras offer 1:1, 4:3, 3:4, 16:9, 9:16, and 4:5 frames; set 1:1 with 50% rounding for a circle. Background > Video aspect ratio controls the whole video independently, with Original, 16:9, 16:10, 4:3, 9:16, 1:1, and 4:5 plus Fill/Fit.
 - **Default Look:** choose No Background for unframed screenshots and videos, or set background padding down to 0%. Available in General and both editors.
 - **Cursor styles:** Recorded, Arrow (white outlined, starting at 2.5×), Dark, Light, and Dot. Older projects using Hand keep their saved appearance.
@@ -25,7 +25,7 @@ unless you share it, and shares go to storage you own.
 - **Native Settings:** resizable native navigation columns, sidebar search, compact neutral SF Symbols, a section title above the detail pane, and grouped controls follow the macOS System Settings layout. Both Settings and Media Gallery let you hide or show the sidebar from the toolbar.
 - **Video export:** GPU compositing and hardware encoding, with 30/60 fps, resolution, quality, and MP4/MOV controls. Export and sharing reuse unchanged saved renders.
 - **Cloud sharing:** upload to your own Cloudflare R2 bucket. Optimized image compression, MP4 video, native progress, and retry on failure.
-- **75 customizable shortcuts:** configure global capture, recording controls, deck actions, image tools, and video editing keys. Conflict detection per scope.
+- **79 customizable shortcuts:** configure global capture, recording controls, deck actions, image tools, and video editing keys. Conflict detection per scope.
 - **URL scheme:** trigger actions from Raycast, Shortcuts, Alfred, or scripts: `bettershot://capture/region`, `bettershot://record`, `bettershot://ocr`, and more.
 
 Both editors use a left inspector with compact controls and frosted chrome. Action

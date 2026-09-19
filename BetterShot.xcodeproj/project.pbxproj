@@ -111,6 +111,7 @@
 		8023C4C4CBE10CB12EDF5508 /* AnnotationEditorActivationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43F5541590A45676EFD6B276 /* AnnotationEditorActivationPolicy.swift */; };
 		802FA2BCA250E8FCCE8909BA /* RecordingClipTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 979BD0C592163200160BDC49 /* RecordingClipTimelineView.swift */; };
 		82252227C16A8C9208C7FF60 /* AnnotationBackgroundPreviewViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBB04739A2E2BF3D541F2161 /* AnnotationBackgroundPreviewViews.swift */; };
+		850AEF48C527482C262F8B7F /* AnnotationImageTransform.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2F04630C0BC05429FF7BF67 /* AnnotationImageTransform.swift */; };
 		85CCAB85BAAB94FBC1A9B5A9 /* RegionGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2B128F33D1CBF0CBB6A6852 /* RegionGeometry.swift */; };
 		85FA3C0AC731BFFCF9840E69 /* AnnotationInspectorStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF466A0DB404559DBF22E36 /* AnnotationInspectorStyle.swift */; };
 		8782829F9AD2E1BE2B796AC7 /* ShortcutService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAE1EE5C32D7D0D099A88951 /* ShortcutService.swift */; };
@@ -353,6 +354,7 @@
 		ADD96168EC491E4A46366640 /* ColorGrade.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorGrade.swift; sourceTree = "<group>"; };
 		AE1AF97C84324A8DA1B6948D /* PreviewOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewOverlay.swift; sourceTree = "<group>"; };
 		AE87F338892DCBFEA8FD7BDA /* MenuBarContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContentView.swift; sourceTree = "<group>"; };
+		B2F04630C0BC05429FF7BF67 /* AnnotationImageTransform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationImageTransform.swift; sourceTree = "<group>"; };
 		B350EE68E3E974004660FC0A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B3B649BF5B80698892056F6D /* StraightArrow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StraightArrow.swift; sourceTree = "<group>"; };
 		B5B3130EA7A7B0CA05DE3491 /* RecordingStudioModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStudioModel.swift; sourceTree = "<group>"; };
@@ -542,6 +544,7 @@
 				293EA45B51DD6073E49641F4 /* AnnotationEditorWindow.swift */,
 				2FC217457F424CFCD7667853 /* AnnotationEditorZoom.swift */,
 				BD2210BD486C338B11D6608E /* AnnotationImageCropper.swift */,
+				B2F04630C0BC05429FF7BF67 /* AnnotationImageTransform.swift */,
 				35712AC357C535000CF633D8 /* AnnotationInspector.swift */,
 				CC94C1BE0CE4840EE91F1A8C /* AnnotationInspectorSlider.swift */,
 				CEF466A0DB404559DBF22E36 /* AnnotationInspectorStyle.swift */,
@@ -843,6 +846,7 @@
 				61E7E40D2B4D4891ABCC8C98 /* AnnotationEditorWindow.swift in Sources */,
 				3DFD0AFCC40248A410ACC8BD /* AnnotationEditorZoom.swift in Sources */,
 				7C520C2C439706A42786379C /* AnnotationImageCropper.swift in Sources */,
+				850AEF48C527482C262F8B7F /* AnnotationImageTransform.swift in Sources */,
 				6E19D91F47B4566546BF95C7 /* AnnotationInspector.swift in Sources */,
 				08438912627871CAC2592D71 /* AnnotationInspectorSlider.swift in Sources */,
 				85FA3C0AC731BFFCF9840E69 /* AnnotationInspectorStyle.swift in Sources */,

@@ -143,6 +143,10 @@ struct AnnotationEditorWindow: View {
     }
 
     private func performShortcut(_ action: ShortcutService.Action) -> Bool {
+        if let transform = AnnotationImageTransform.allCases.first(where: { $0.shortcut == action }) {
+            transformImage(transform)
+            return true
+        }
         if let tool = action.annotationTool {
             clearInspectorFocus()
             model.selectTool(tool)
@@ -194,6 +198,22 @@ struct AnnotationEditorWindow: View {
             }
             .buttonStyle(EditorButtonStyle(selected: model.isCropping))
             .help("Crop Image — click again to cancel")
+
+            Menu {
+                ForEach(AnnotationImageTransform.allCases, id: \.self) { transform in
+                    Button(transform.title, systemImage: transform.systemImage) { transformImage(transform) }
+                }
+            } label: {
+                Label("Rotate Left", systemImage: "rotate.left").labelStyle(.iconOnly)
+            } primaryAction: {
+                transformImage(.rotateLeft)
+            }
+            .fixedSize()
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.visible)
+            .buttonStyle(.borderless)
+            .help(ShortcutService.shared.help("Rotate left 90°. Open the menu for Rotate Right and Flip.", for: .imageRotateLeft))
+            .disabled(isSaving || isExporting || isCopying || uploadPhase.isUploading || model.isSmartRedacting)
             Divider().frame(height: 24)
 
             ForEach(AnnotationTool.allCases) { tool in
@@ -233,6 +253,12 @@ struct AnnotationEditorWindow: View {
         .frame(height: 48)
         .studioGlass(cornerRadius: 0)
         .disabled(model.previewImage == nil || model.isCropping)
+    }
+
+    private func transformImage(_ transform: AnnotationImageTransform) {
+        guard !isSaving, !isExporting, !isCopying, !uploadPhase.isUploading else { return }
+        clearInspectorFocus()
+        model.transformImage(transform)
     }
 
     private var annotationStyleBar: some View {
@@ -663,7 +689,7 @@ struct AnnotationEditorWindow: View {
         let shapes = model.shapes
         let bindings = model.bindings
         let backgroundSettings = model.backgroundSettings
-        let hasContent = !shapes.isEmpty || backgroundSettings.hasRenderableContent || model.isCropped
+        let hasContent = !shapes.isEmpty || backgroundSettings.hasRenderableContent || model.hasImageEdits
         let hadDocument = ScreenshotHistoryStore.shared.hasEditDocument(for: sourceURL)
 
         // Nothing drawn and nothing previously saved: there is no work to lose.

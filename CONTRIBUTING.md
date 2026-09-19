@@ -148,8 +148,16 @@ tray monitors same-app and other-app clicks, passes editor clicks through, and
 closes synchronously before capture or recording-picker actions. Remove both
 event monitors when the tray closes.
 
-Image annotations live in source-pixel coordinates. `AnnoShapeDrawing` is shared
-between the canvas and export. Recording packages contain `screen.mov`, optional
+Image annotations live in source-pixel coordinates. Rotation and flips write a private
+full-resolution PNG through `AnnotationImageTransform`, preserving the capture.
+Reflect shapes through `pageTransform` so text, arrows, and redactions follow
+the same pixels; missing `mirrored` values in older documents mean no reflection.
+Image-change snapshots retain the engine’s undo/redo stacks, and new annotation
+edits invalidate image redo. Keep transform actions in the existing image toolbar
+and preserve the shared save/copy/export/share rendering path.
+
+`AnnoShapeDrawing` is shared between the canvas and export. Recording packages
+contain `screen.mov`, optional
 `camera.mov`, input/capture/edit JSON, and a flattened deliverable. Source movies
 are never modified.
 

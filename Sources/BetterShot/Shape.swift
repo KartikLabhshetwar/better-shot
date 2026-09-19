@@ -172,6 +172,9 @@ struct AnnoShape: Codable, Equatable, Identifiable {
     var x: Double
     var y: Double
     var rotation: Double = 0
+    /// Optional for compatibility with existing documents. Reflection is in local X.
+    var mirrored: Bool?
+    var isMirrored: Bool { mirrored == true }
     /// 0...1, applied to the whole shape when drawn.
     var opacity: Double = 1
     var kind: AnnoShapeKind
@@ -193,7 +196,7 @@ struct AnnoShape: Codable, Equatable, Identifiable {
     }
 
     var pageTransform: Mat {
-        Mat.compose(x: x, y: y, rotation: rotation)
+        Mat.multiply(Mat.compose(x: x, y: y, rotation: rotation), .scale(isMirrored ? -1 : 1, 1))
     }
 
     var strokeWidth: Double {

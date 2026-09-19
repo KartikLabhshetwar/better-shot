@@ -154,6 +154,24 @@ final class AnnoEditor {
 
     private var undoStack: [AnnoDocument.Snapshot] = []
     private var redoStack: [AnnoDocument.Snapshot] = []
+    var onNewEdit: (() -> Void)?
+
+    struct HistorySnapshot {
+        var document: AnnoDocument.Snapshot
+        var undo: [AnnoDocument.Snapshot]
+        var redo: [AnnoDocument.Snapshot]
+    }
+
+    func historySnapshot() -> HistorySnapshot {
+        HistorySnapshot(document: document.snapshot(), undo: undoStack, redo: redoStack)
+    }
+
+    func restoreHistory(_ snapshot: HistorySnapshot) {
+        replaceDocument(shapes: snapshot.document.shapes, bindings: snapshot.document.bindings)
+        undoStack = snapshot.undo
+        redoStack = snapshot.redo
+        notifyChanged()
+    }
 
     /// Called after every change, for the canvas to redraw itself.
     var onChange: (() -> Void)?
@@ -207,6 +225,7 @@ final class AnnoEditor {
     // MARK: - Undo
 
     func markUndo() {
+        onNewEdit?()
         undoStack.append(document.snapshot())
         if undoStack.count > 200 { undoStack.removeFirst() }
         redoStack.removeAll()

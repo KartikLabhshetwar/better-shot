@@ -28,6 +28,7 @@ final class AnnotationEditorModel {
     /// re-editing an existing document this is the preserved base image;
     /// otherwise it is the same as `sourceURL`.
     var baseImageURL: URL?
+    private var imageRevision = UUID()
     var previewImage: NSImage?
     /// The preview image's pixels, for the canvas's redaction passes to sample.
     @ObservationIgnored private(set) var previewCGImage: CGImage?
@@ -83,18 +84,18 @@ final class AnnotationEditorModel {
     var textIsUnderline = false
     var textAlignment: NSTextAlignment = .left
 
-    /// A full snapshot of the editor's image state, captured before a crop so
+    /// A full snapshot of the editor's image state, captured before a crop, rotation, or flip so
     /// the operation can be undone/redone.
-    private struct CropSnapshot {
+    private struct ImageSnapshot {
         var baseImageURL: URL?
         var imageSize: CGSize
-        var shapes: [AnnoShape]
-        var bindings: [ArrowBinding]
+        var history: AnnoEditor.HistorySnapshot
+        var imageRevision: UUID
     }
 
-    private var cropUndoStack: [CropSnapshot] = []
-    private var cropRedoStack: [CropSnapshot] = []
-    private var ownedCropURLs: Set<URL> = []
+    private var imageUndoStack: [ImageSnapshot] = []
+    private var imageRedoStack: [ImageSnapshot] = []
+    private var ownedImageURLs: Set<URL> = []
 
     /// Smallest crop dimension, in normalized units, derived from a pixel floor.
     private let minimumCropPixels: CGFloat = 24
@@ -103,6 +104,7 @@ final class AnnotationEditorModel {
     private let previewImageMaxPixelSize: CGFloat = 2880
 
     init() {
+        engine.onNewEdit = { [weak self] in self?.imageRedoStack.removeAll() }
         engine.onChange = { [weak self] in
             self?.revision &+= 1
         }
@@ -157,7 +159,11 @@ final class AnnotationEditorModel {
             return
         }
 
-        removeOwnedCropFiles()
+        load(url: url)
+    }
+
+    func load(url: URL) {
+        removeOwnedImageFiles()
         applyAnnotationPreset()
         resetZoom()
         sourceURL = url
@@ -179,6 +185,7 @@ final class AnnotationEditorModel {
             appliedBackgroundPresetID = document == nil ? activePreset?.id : nil
         }
 
+        imageRevision = UUID()
         baseImageURL = renderSourceURL
         imageSize = ScreenshotImageLoader.imageSize(at: renderSourceURL) ?? .zero
         previewImage = makePreviewImage(from: renderSourceURL)
@@ -194,8 +201,8 @@ final class AnnotationEditorModel {
         isCropping = false
         cropRect = CGRect(x: 0, y: 0, width: 1, height: 1)
         cropAspect = .freeform
-        cropUndoStack = []
-        cropRedoStack = []
+        imageUndoStack = []
+        imageRedoStack = []
         RedactionImageProcessor.removeAllCachedPreviewImages()
         errorMessage = nil
         smartRedactionMessage = nil
@@ -218,17 +225,16 @@ final class AnnotationEditorModel {
     }
 
     func releaseEditorResources() {
-        removeOwnedCropFiles()
+        removeOwnedImageFiles()
         RedactionImageProcessor.removeAllCachedPreviewImages()
     }
 
     // MARK: - Unsaved changes
 
-    /// Everything a commit would persist. The crop rides along as the base
-    /// image URL, since cropping replaces the image the annotations render on
-    /// rather than adding anything to the document.
+    /// Image revisions track pixel edits independently of private snapshot URLs, so undoing
+    /// back to the saved pixels restores the clean state even after Save replaces the base.
     private struct EditSnapshot: Equatable {
-        var baseImageURL: URL?
+        var imageRevision: UUID
         var shapes: [AnnoShape]
         var bindings: [ArrowBinding]
         var background: StoredBackground
@@ -238,7 +244,7 @@ final class AnnotationEditorModel {
 
     private func currentSnapshot() -> EditSnapshot {
         EditSnapshot(
-            baseImageURL: baseImageURL,
+            imageRevision: imageRevision,
             shapes: shapes,
             bindings: bindings,
             background: StoredBackground(backgroundSettings)
@@ -423,11 +429,11 @@ final class AnnotationEditorModel {
     }
 
     var canUndo: Bool {
-        !isCropping && (engine.canUndo || !cropUndoStack.isEmpty)
+        !isCropping && (engine.canUndo || !imageUndoStack.isEmpty)
     }
 
     var canRedo: Bool {
-        !isCropping && (engine.canRedo || !cropRedoStack.isEmpty)
+        !isCropping && (engine.canRedo || !imageRedoStack.isEmpty)
     }
 
     func undo() {
@@ -436,7 +442,7 @@ final class AnnotationEditorModel {
             engine.undo()
             return
         }
-        undoCrop()
+        undoImageChange()
     }
 
     func redo() {
@@ -445,7 +451,7 @@ final class AnnotationEditorModel {
             engine.redo()
             return
         }
-        redoCrop()
+        redoImageChange()
     }
 
     // MARK: - Smart redaction
@@ -573,11 +579,46 @@ final class AnnotationEditorModel {
     }
 }
 
-// MARK: - Crop
+// MARK: - Image transformations and crop
 
 extension AnnotationEditorModel {
-    /// Whether the image has been cropped in this editing session (and can be undone).
-    var isCropped: Bool { !cropUndoStack.isEmpty }
+    /// Includes an undone image change after saving: the private snapshot must replace the saved base.
+    var hasImageEdits: Bool {
+        !imageUndoStack.isEmpty || baseImageURL.map { ownedImageURLs.contains($0) } == true
+    }
+
+    func transformImage(_ transform: AnnotationImageTransform) {
+        guard !isCropping, !isSmartRedacting, previewImage != nil, let baseImageURL else { return }
+        commitTextEditing()
+        guard let result = transform.apply(to: baseImageURL) else {
+            errorMessage = "Unable to transform the image. Your image is unchanged. Try again."
+            return
+        }
+        guard var snapshot = currentImageSnapshot() else {
+            try? FileManager.default.removeItem(at: result.url)
+            errorMessage = "Unable to preserve the image for undo. Try again."
+            return
+        }
+        snapshot.history.redo.removeAll()
+        let transformed = engine.shapes.map { transform.applying(to: $0, imageSize: imageSize) }
+        installImage(url: result.url, size: result.pixelSize, shapes: transformed, undo: snapshot)
+    }
+
+    private func installImage(url: URL, size: CGSize, shapes: [AnnoShape], undo: ImageSnapshot) {
+        imageRevision = UUID()
+        baseImageURL = url
+        ownedImageURLs.insert(url)
+        imageSize = size
+        previewImage = makePreviewImage(from: url)
+        previewCGImage = previewImage?.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        engine.viewport = AnnoViewport(imageFrame: engine.viewport.imageFrame, imageSize: imageSize)
+        engine.replaceDocument(shapes: shapes, bindings: engine.document.bindings)
+        imageUndoStack.append(undo)
+        imageRedoStack.removeAll()
+        RedactionImageProcessor.removeAllCachedPreviewImages()
+        resetZoom()
+        errorMessage = nil
+    }
 
     /// Pixel dimensions of the current crop selection.
     var cropPixelSize: CGSize {
@@ -671,12 +712,13 @@ extension AnnotationEditorModel {
             return
         }
 
-        guard let snapshot = currentCropSnapshot() else {
+        guard var snapshot = currentImageSnapshot() else {
             try? FileManager.default.removeItem(at: result.url)
-            errorMessage = "Unable to preserve the image for crop undo."
+            errorMessage = "Unable to preserve the image for undo. Try again."
             return
         }
 
+        snapshot.history.redo.removeAll()
         let oldImageSize = imageSize
         let usedCrop = result.normalizedRect
         let newImageSize = result.pixelSize
@@ -695,19 +737,7 @@ extension AnnotationEditorModel {
             return shape
         }
 
-        baseImageURL = result.url
-        ownedCropURLs.insert(result.url)
-        imageSize = newImageSize
-        previewImage = makePreviewImage(from: result.url)
-        previewCGImage = previewImage?.cgImage(forProposedRect: nil, context: nil, hints: nil)
-        engine.viewport = AnnoViewport(imageFrame: engine.viewport.imageFrame, imageSize: imageSize)
-        engine.replaceDocument(shapes: moved, bindings: engine.document.bindings)
-
-        cropUndoStack.append(snapshot)
-        cropRedoStack.removeAll()
-
-        resetZoom()
-        errorMessage = nil
+        installImage(url: result.url, size: newImageSize, shapes: moved, undo: snapshot)
     }
 
     /// Scale a shape's own dimensions, so a crop that changes the image's resolution keeps
@@ -745,58 +775,58 @@ extension AnnotationEditorModel {
         }
     }
 
-    private func undoCrop() {
-        guard let previous = cropUndoStack.last else { return }
-        guard let current = currentCropSnapshot() else {
-            errorMessage = "Unable to preserve the image for crop redo."
+    private func undoImageChange() {
+        guard let previous = imageUndoStack.last else { return }
+        guard let current = currentImageSnapshot() else {
+            errorMessage = "Unable to preserve the image for redo. Try again."
             return
         }
-        cropUndoStack.removeLast()
-        cropRedoStack.append(current)
+        imageUndoStack.removeLast()
+        imageRedoStack.append(current)
         restore(previous)
     }
 
-    private func redoCrop() {
-        guard let next = cropRedoStack.last else { return }
-        guard let current = currentCropSnapshot() else {
-            errorMessage = "Unable to preserve the image for crop undo."
+    private func redoImageChange() {
+        guard let next = imageRedoStack.last else { return }
+        guard let current = currentImageSnapshot() else {
+            errorMessage = "Unable to preserve the image for undo. Try again."
             return
         }
-        cropRedoStack.removeLast()
-        cropUndoStack.append(current)
+        imageRedoStack.removeLast()
+        imageUndoStack.append(current)
         restore(next)
     }
 
-    private func currentCropSnapshot() -> CropSnapshot? {
+    private func currentImageSnapshot() -> ImageSnapshot? {
         let stableBaseURL: URL?
         if let baseImageURL {
-            guard let snapshotURL = stableCropSnapshotURL(for: baseImageURL) else { return nil }
+            guard let snapshotURL = stableImageSnapshotURL(for: baseImageURL) else { return nil }
             stableBaseURL = snapshotURL
         } else {
             stableBaseURL = nil
         }
 
-        return CropSnapshot(
+        return ImageSnapshot(
             baseImageURL: stableBaseURL,
             imageSize: imageSize,
-            shapes: engine.shapes,
-            bindings: engine.document.bindings
+            history: engine.historySnapshot(),
+            imageRevision: imageRevision
         )
     }
 
-    /// Crop history must never point at a History display URL, because annotation commits can
+    /// Image history must never point at a History display URL, because annotation commits can
     /// replace that file while this editor stays open.
-    private func stableCropSnapshotURL(for url: URL) -> URL? {
-        if ownedCropURLs.contains(url) { return url }
+    private func stableImageSnapshotURL(for url: URL) -> URL? {
+        if ownedImageURLs.contains(url) { return url }
 
         let fileExtension = url.pathExtension.isEmpty ? "png" : url.pathExtension
         let destinationURL = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("BetterShot_CropSnapshot_\(UUID().uuidString)")
+            .appendingPathComponent("BetterShot_ImageSnapshot_\(UUID().uuidString)")
             .appendingPathExtension(fileExtension)
 
         do {
             try FileManager.default.copyItem(at: url, to: destinationURL)
-            ownedCropURLs.insert(destinationURL)
+            ownedImageURLs.insert(destinationURL)
             return destinationURL
         } catch {
             try? FileManager.default.removeItem(at: destinationURL)
@@ -804,21 +834,22 @@ extension AnnotationEditorModel {
         }
     }
 
-    private func restore(_ snapshot: CropSnapshot) {
+    private func restore(_ snapshot: ImageSnapshot) {
         baseImageURL = snapshot.baseImageURL
         imageSize = snapshot.imageSize
         previewImage = snapshot.baseImageURL.flatMap(makePreviewImage(from:))
         previewCGImage = previewImage?.cgImage(forProposedRect: nil, context: nil, hints: nil)
         engine.viewport = AnnoViewport(imageFrame: engine.viewport.imageFrame, imageSize: imageSize)
-        engine.replaceDocument(shapes: snapshot.shapes, bindings: snapshot.bindings)
+        imageRevision = snapshot.imageRevision
+        engine.restoreHistory(snapshot.history)
         resetZoom()
     }
 
-    private func removeOwnedCropFiles() {
-        for url in ownedCropURLs {
+    private func removeOwnedImageFiles() {
+        for url in ownedImageURLs {
             try? FileManager.default.removeItem(at: url)
         }
-        ownedCropURLs.removeAll()
+        ownedImageURLs.removeAll()
     }
 
     private var minimumCropWidth: CGFloat {

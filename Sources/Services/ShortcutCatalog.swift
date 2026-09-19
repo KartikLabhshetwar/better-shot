@@ -87,6 +87,10 @@ extension ShortcutService {
         case imageActualSize = 131
         case imageIncreaseSize = 132
         case imageDecreaseSize = 133
+        case imageRotateLeft = 134
+        case imageRotateRight = 135
+        case imageFlipHorizontal = 136
+        case imageFlipVertical = 137
         case videoSave = 200
         case videoExport = 201
         case videoShare = 202
@@ -165,6 +169,10 @@ extension ShortcutService {
             case .imageActualSize: "Actual Size"
             case .imageIncreaseSize: "Increase Tool Size"
             case .imageDecreaseSize: "Decrease Tool Size"
+            case .imageRotateLeft: "Rotate Image Left"
+            case .imageRotateRight: "Rotate Image Right"
+            case .imageFlipHorizontal: "Flip Image Horizontal"
+            case .imageFlipVertical: "Flip Image Vertical"
             case .videoSave: "Save Project"
             case .videoExport: "Export Video"
             case .videoShare: "Share to Cloud"
@@ -195,7 +203,7 @@ extension ShortcutService {
             case .recordingOptions, .recordArea, .stopRecording, .pauseRecording, .restartRecording, .discardRecording: .recording
             case .togglePreviews, .savePreviews, .closePreviews: .preview
             case .imageBackground, .imageSelect, .imageCrop, .imageRectangle, .imageFilledRectangle, .imageEllipse, .imageLine, .imageArrow, .imageFreehand, .imageCounter, .imageText, .imageHighlight, .imagePixelate, .imageBlur: .imageTools
-            case .imageSave, .imageExport, .imageCopy, .imageShare, .imageUndo, .imageRedo, .imageSelectAll, .imageDelete, .imageZoomIn, .imageZoomOut, .imageFit, .imageActualSize, .imageIncreaseSize, .imageDecreaseSize: .imageEditing
+            case .imageSave, .imageExport, .imageCopy, .imageShare, .imageUndo, .imageRedo, .imageSelectAll, .imageDelete, .imageZoomIn, .imageZoomOut, .imageFit, .imageActualSize, .imageIncreaseSize, .imageDecreaseSize, .imageRotateLeft, .imageRotateRight, .imageFlipHorizontal, .imageFlipVertical: .imageEditing
             case .videoSave, .videoExport, .videoShare, .videoPlay, .videoStart, .videoEnd, .videoSplitTool, .videoCut, .videoDelete, .videoUndo, .videoRedo, .videoZoomIn, .videoZoomOut, .videoFit, .videoCrop, .videoBlur, .videoPixelate, .videoInspector, .videoAddZoom: .videoEditing
             }
         }
