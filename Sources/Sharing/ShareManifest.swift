@@ -169,11 +169,73 @@ extension ShareBundle {
 
     nonisolated static func objectPrefix(id: String) -> String { "s/\(id)/" }
 
-    nonisolated static func pageURL(id: String, publicBaseURL: String) -> URL? {
+    /// Tolerates a pasted trailing slash. Returns nil for anything that is not https.
+    nonisolated private static func normalizedOrigin(_ publicBaseURL: String) -> String? {
         let origin = publicBaseURL
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         guard origin.lowercased().hasPrefix("https://") else { return nil }
+        return origin
+    }
+
+    /// Why a pasted Public Bucket URL cannot be used, and what to tell the user.
+    enum PublicBaseURLProblem: Equatable {
+        case empty
+        case notHTTPS
+        case invalidHost
+        case hasQueryOrFragment
+
+        nonisolated var message: String {
+            switch self {
+            case .empty:
+                return "Add the public address of your bucket, like https://share.example.com."
+            case .notHTTPS:
+                return "The address has to start with https:// - a public bucket is served over HTTPS."
+            case .invalidHost:
+                return "That is not a complete address. Use the domain your bucket is served from, like https://share.example.com."
+            case .hasQueryOrFragment:
+                return "Remove everything after the address - a share link is built by adding to it."
+            }
+        }
+    }
+
+    /// Returns nil when the address is usable. A path is allowed: a bucket can be bound under a subfolder.
+    nonisolated static func validatePublicBaseURL(_ publicBaseURL: String) -> PublicBaseURLProblem? {
+        let trimmed = publicBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return .empty }
+        // Before normalizedOrigin, which trims a bare "https://" down to "https:" and would blame the scheme.
+        guard trimmed.lowercased().hasPrefix("https://") else { return .notHTTPS }
+        guard let components = URLComponents(string: trimmed) else { return .invalidHost }
+        guard components.query == nil, components.fragment == nil else { return .hasQueryOrFragment }
+        guard let host = components.host, isHostname(host) else { return .invalidHost }
+        guard normalizedOrigin(trimmed) != nil else { return .invalidHost }
+        return nil
+    }
+
+    /// A public bucket is always on a dotted domain, so a single label is a typo.
+    nonisolated private static func isHostname(_ host: String) -> Bool {
+        let labels = host.split(separator: ".", omittingEmptySubsequences: false)
+        guard labels.count >= 2 else { return false }
+        return labels.allSatisfy { label in
+            !label.isEmpty
+                && label.first != "-" && label.last != "-"
+                && label.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }
+        }
+    }
+
+    /// Drops "/" so a filename cannot open a new path segment.
+    private nonisolated static let pathSegmentAllowed = CharacterSet.urlPathAllowed
+        .subtracting(CharacterSet(charactersIn: "/"))
+
+    /// Links straight at the uploaded object instead of the viewer page.
+    nonisolated static func directURL(id: String, filename: String, publicBaseURL: String) -> URL? {
+        guard !filename.isEmpty, let origin = normalizedOrigin(publicBaseURL) else { return nil }
+        guard let segment = filename.addingPercentEncoding(withAllowedCharacters: pathSegmentAllowed) else { return nil }
+        return URL(string: "\(origin)/\(objectPrefix(id: id))\(segment)")
+    }
+
+    nonisolated static func pageURL(id: String, publicBaseURL: String) -> URL? {
+        guard let origin = normalizedOrigin(publicBaseURL) else { return nil }
 
         let encodedOrigin = Data(origin.utf8)
             .base64EncodedString()
