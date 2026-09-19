@@ -1,0 +1,126 @@
+import AppKit
+import SwiftUI
+@testable import BetterShot
+
+@MainActor
+func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
+    let defaults = UserDefaults.standard
+    let keys = [AppPreferences.presentationModeKey, BetterShotPreferences.recordingCameraDeviceIDKey,
+                "bs_overlayDismissDelay", "bs_saveDirectory", "bs_overlayFollowsMouse"]
+    let saved = keys.map { defaults.object(forKey: $0) }
+    let notch = NotchPresenter.shared
+    let bar = RecordingBarPresenter.shared
+    let overlay = PreviewOverlay.shared
+    let output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        .appendingPathComponent(".build/editor-snapshots")
+    let saveFolder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: saveFolder, withIntermediateDirectories: true)
+    defer {
+        overlay.dismiss()
+        bar.hide()
+        ToastWindow.shared.dismiss(animated: false)
+        defaults.set("normal", forKey: AppPreferences.presentationModeKey)
+        notch.refreshMode()
+        for (key, value) in zip(keys, saved) {
+            if let value { defaults.set(value, forKey: key) }
+            else { defaults.removeObject(forKey: key) }
+        }
+        try? FileManager.default.removeItem(at: saveFolder)
+    }
+    defaults.removeObject(forKey: AppPreferences.presentationModeKey)
+    precondition(AppPreferences.presentationMode == .normal, "Existing installs must keep normal mode")
+    defaults.set("future-mode", forKey: AppPreferences.presentationModeKey)
+    precondition(AppPreferences.presentationMode == .normal, "Unknown modes must safely fall back")
+    defaults.set("", forKey: BetterShotPreferences.recordingCameraDeviceIDKey)
+    AppPreferences.overlayFollowsMouse = false
+    AppPreferences.overlayDismissDelay = 0.05
+    AppPreferences.saveDirectory = saveFolder.path
+    defaults.set("notch", forKey: AppPreferences.presentationModeKey)
+    notch.refreshMode()
+    bar.showPicker(activate: false)
+    overlay.show(url: imageURL)
+    overlay.show(url: movieURL)
+    precondition(notch.isVisible && bar.isVisible && overlay.isPresented)
+    precondition(overlay.items == [imageURL, movieURL])
+    precondition(!NSApp.windows.contains { $0.identifier?.rawValue == "BetterShot.CaptureOverlay" && $0.isVisible })
+    guard let window = notch.window else { preconditionFailure("Missing DynamicNotchKit panel") }
+    precondition(window.sharingType == (PreviewWindowCaptureExclusion.includesAppWindowsInCaptures ? .readOnly : .none))
+    precondition(window.canBecomeKey, "Notch controls must accept keyboard focus")
+    try await Task.sleep(for: .milliseconds(120))
+    precondition(overlay.items.count == 2, "Notch previews stay available until acted on")
+    window.contentView?.layoutSubtreeIfNeeded()
+    if let frame = notch.contentFrame, let screen = window.screen {
+        precondition(frame.width < screen.frame.width && frame.height < screen.frame.height)
+        precondition(frame.midX > screen.frame.minX && frame.midX < screen.frame.maxX)
+    }
+    for scheme in [ColorScheme.light, .dark] {
+        let name = scheme == .light ? "light" : "dark"
+        try snapshot(NotchContent(), scheme: scheme, width: 660,
+                     to: output.appendingPathComponent("notch-captures-\(name).png"), height: 470)
+        try snapshot(NotchContent().environment(\.accessibilityReduceTransparency, true)
+            .environment(\.accessibilityReduceMotion, true), scheme: scheme, width: 660,
+                     to: output.appendingPathComponent("notch-accessibility-\(name).png"), height: 470)
+        try snapshot(PreferencesView(selection: .overlay), scheme: scheme, width: 780,
+                     to: output.appendingPathComponent("notch-settings-\(name).png"), height: 620)
+    }
+    defaults.set("normal", forKey: AppPreferences.presentationModeKey)
+    notch.refreshMode()
+    precondition(!notch.isVisible && overlay.items.count == 2 && bar.isVisible)
+    precondition(NSApp.windows.contains { $0.identifier?.rawValue == "BetterShot.CaptureOverlay" && $0.isVisible })
+    defaults.set("notch", forKey: AppPreferences.presentationModeKey)
+    notch.refreshMode()
+    precondition(notch.isVisible && overlay.items.count == 2)
+    notch.suspendForCapture()
+    precondition(!notch.isVisible && overlay.items.count == 2)
+    // Updates arriving during capture must not bring the notch back into the image.
+    ToastWindow.shared.show(message: "Saved", duration: 30)
+    precondition(!notch.isVisible)
+    notch.resumeAfterCapture()
+    precondition(notch.isVisible)
+    ToastWindow.shared.dismiss(animated: false)
+
+    // Exercise the actual shared recording presentation without opening capture devices.
+    bar.showRecording(displayID: window.screen.flatMap(ActiveDisplayResolver.displayID(for:)))
+    precondition(bar.mode == .recording && notch.isVisible)
+    defaults.set("normal", forKey: AppPreferences.presentationModeKey)
+    notch.refreshMode()
+    precondition(bar.mode == .recording && bar.isVisible && !notch.isVisible)
+    defaults.set("notch", forKey: AppPreferences.presentationModeKey)
+    notch.refreshMode()
+    precondition(bar.mode == .recording && notch.isVisible)
+    for scheme in [ColorScheme.light, .dark] {
+        try snapshot(NotchContent(), scheme: scheme, width: 660,
+                     to: output.appendingPathComponent("notch-recording-\(scheme == .light ? "light" : "dark").png"), height: 430)
+    }
+    bar.hide()
+    precondition(overlay.items.count == 2)
+    overlay.perform(.share, for: imageURL)
+    guard case .failed(_, _, true) = overlay.transferStatus(for: imageURL) else {
+        preconditionFailure("Unconfigured cloud sharing must retain the capture and offer recovery")
+    }
+    overlay.dismissShareStatus(for: imageURL)
+    overlay.perform(.save, for: imageURL)
+    precondition(!overlay.items.contains(imageURL) && overlay.items.contains(movieURL))
+    let savedFiles = try FileManager.default.contentsOfDirectory(atPath: saveFolder.path)
+    precondition(!savedFiles.isEmpty)
+    overlay.perform(.dismiss, for: movieURL)
+    precondition(overlay.items.isEmpty)
+
+    let owner = NSWindow(contentRect: CGRect(x: 30, y: 30, width: 320, height: 240),
+                         styleMask: [.titled], backing: .buffered, defer: false)
+    owner.isReleasedWhenClosed = false
+    owner.contentView = NSView()
+    owner.orderFrontRegardless()
+    let anchor = TransferToastAnchorView(frame: .zero)
+    owner.contentView!.addSubview(anchor)
+    let keyWindow = NSApp.keyWindow
+    anchor.update(card: TransferStatusCard(status: .working(stage: .exporting, progress: 0.5)))
+    precondition(notch.transfers.count == 1 && NSApp.keyWindow === keyWindow)
+    anchor.update(card: TransferStatusCard(status: .exported(url: movieURL)))
+    precondition(notch.transfers.count == 1, "Progress must update the existing transfer")
+    owner.close()
+    precondition(notch.transfers.isEmpty, "Closing the owner cleans up notch transfer feedback")
+    anchor.removeFromSuperview()
+    print("PASS notch defaults, mode migration, pending images/video, capture suspension, recording controls, save/share recovery, transfer cleanup, compact light/dark and accessibility snapshots")
+}

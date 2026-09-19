@@ -13,6 +13,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_EDITOR_WINDOWS"] == "1" {
         try await checkEditorWindowInteractions(imageURL: imageURL, movieURL: movieURL)
     }
+    try await checkNotchPresentation(imageURL: imageURL, movieURL: movieURL)
     try checkImageTransforms(imageURL: imageURL)
     try await checkColorPickerAndToast()
     try await checkPreviewOverlay(imageURL: imageURL)
@@ -860,7 +861,7 @@ private func checkGeneralEditorDefaults(movieURL: URL) async throws {
 }
 
 @MainActor
-private func snapshot<V: View>(
+func snapshot<V: View>(
     _ view: V, scheme: ColorScheme, width: CGFloat, to url: URL, height: CGFloat = 800,
     interact: () -> Void = {}
 ) throws {

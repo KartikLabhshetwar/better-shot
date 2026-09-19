@@ -26,6 +26,8 @@ final class RecordingBarPresenter {
     }
 
     private(set) var mode: Mode = .picker
+    private(set) var isVisible = false
+    private var displayID: CGDirectDisplayID?
 
     /// The bar's frame inside the panel's content view, reported by SwiftUI.
     /// The panel is deliberately much larger than the bar, so this is what
@@ -46,7 +48,7 @@ final class RecordingBarPresenter {
     // MARK: Picker
 
     func togglePicker() {
-        if let panel, panel.isVisible, mode == .picker {
+        if isVisible, mode == .picker {
             hide()
         } else {
             showPicker()
@@ -56,19 +58,19 @@ final class RecordingBarPresenter {
     func showPicker(activate: Bool = true, recordingOptions: Bool = false, on displayID: CGDirectDisplayID? = nil) {
         guard !ScreenRecordingManager.shared.isActive else { return }
         MenuBarPopoverController.shared.closePopover()
-        let panel = panel ?? makePanel()
-        PreviewWindowCaptureExclusion.shared.register(window: panel)
         mode = .picker
+        isVisible = true
         showsRecordingOptions = recordingOptions
-        position(panel, displayID: displayID ?? ActiveDisplayResolver.activeDisplayID(preferPointer: false))
-        panel.orderFrontRegardless()
+        self.displayID = displayID ?? ActiveDisplayResolver.activeDisplayID(preferPointer: false)
+        refreshPresentation()
         // The picker is driven from the keyboard too (Esc, A for the last
         // region), and key events only reach the panel while BetterShot is
         // the active app. Focus is handed back when the picker leaves.
         guard activate else { return }
         if !NSApp.isActive { previousApp = NSWorkspace.shared.frontmostApplication }
         NSApp.activate(ignoringOtherApps: true)
-        panel.makeKey()
+        if AppPreferences.presentationMode == .notch { NotchPresenter.shared.window?.makeKey() }
+        else { panel?.makeKey() }
         LastRegionGhostPresenter.shared.show()
         warmCameraPreviewIfEnabled()
     }
@@ -104,6 +106,17 @@ final class RecordingBarPresenter {
     /// the recording's display it morphs in place; otherwise it has to move,
     /// and there's nothing to morph from.
     func showRecording(displayID: CGDirectDisplayID?) {
+        isVisible = true
+        self.displayID = displayID
+        if AppPreferences.presentationMode == .notch {
+            panel?.orderOut(nil)
+            TeleprompterComposerPresenter.shared.hide()
+            LastRegionGhostPresenter.shared.hide()
+            restoreFocus()
+            mode = .recording
+            NotchPresenter.shared.show(on: ActiveDisplayResolver.screen(for: displayID))
+            return
+        }
         let panel = panel ?? makePanel()
         PreviewWindowCaptureExclusion.shared.register(window: panel)
         TeleprompterComposerPresenter.shared.hide()
@@ -124,6 +137,7 @@ final class RecordingBarPresenter {
     }
 
     func hide() {
+        isVisible = false
         // `orderOut` sends no exit events, so a hover that's live when the
         // bar hides has to be ended by hand - it holds the pointing hand.
         BarControlHoverView.endActiveHover()
@@ -134,6 +148,7 @@ final class RecordingBarPresenter {
         // Next appearance should always start as the picker, and without
         // animating out of a mode nobody can see.
         mode = .picker
+        NotchPresenter.shared.refresh()
     }
 
     /// The user backed out of the picker: hide it and give the keyboard
@@ -146,7 +161,7 @@ final class RecordingBarPresenter {
     }
 
     func containsScreenPoint(_ point: CGPoint) -> Bool {
-        guard let barFrame, panel?.isVisible == true else { return false }
+        guard let barFrame, isVisible else { return false }
         return barFrame.contains(point)
     }
 
@@ -158,6 +173,9 @@ final class RecordingBarPresenter {
     /// out with transparent slack for the tooltips and shadows, and anchoring
     /// to that would leave satellites floating clear of the bar.
     var barFrame: CGRect? {
+        if AppPreferences.presentationMode == .notch, isVisible {
+            return NotchPresenter.shared.contentFrame
+        }
         guard let panel, panel.isVisible, barFrameInPanel != .zero else { return nil }
         // SwiftUI reports a top-left origin; screen coordinates are bottom-up.
         return CGRect(
@@ -166,6 +184,18 @@ final class RecordingBarPresenter {
             width: barFrameInPanel.width,
             height: barFrameInPanel.height
         )
+    }
+
+    func refreshPresentation() {
+        panel?.orderOut(nil)
+        guard isVisible else { return }
+        if AppPreferences.presentationMode == .notch {
+            NotchPresenter.shared.show(on: ActiveDisplayResolver.screen(for: displayID))
+        } else {
+            let panel = panel ?? makePanel()
+            position(panel, displayID: displayID)
+            panel.orderFrontRegardless()
+        }
     }
 
     private func isPositioned(_ panel: NSPanel, onDisplayID displayID: CGDirectDisplayID?) -> Bool {

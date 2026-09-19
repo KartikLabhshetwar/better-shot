@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct OverlaySettingsTab: View {
+    @AppStorage(AppPreferences.presentationModeKey) private var mode = CapturePresentationMode.normal.rawValue
     var resourceBundle: Bundle = .main
     @AppStorage("bs_overlayPosition") private var position = OverlayPosition.bottomRight.rawValue
     @AppStorage("bs_overlayCardSize") private var size = OverlayCardSize.small.rawValue
@@ -15,71 +16,85 @@ struct OverlaySettingsTab: View {
     var body: some View {
         Form {
             Section {
-                Picker("Layout preset", selection: Binding(
-                    get: { layout.preset },
-                    set: { if let preset = $0.layout { layoutData = preset.data } }
-                )) {
-                    ForEach(OverlayLayoutPreset.allCases) { preset in
-                        Text(preset.title).tag(preset).disabled(preset == .custom)
-                    }
-                }
-                .pickerStyle(.segmented)
-                Picker("Screen position", selection: $position) {
-                    Text("Bottom Right").tag(OverlayPosition.bottomRight.rawValue)
-                    Text("Bottom Left").tag(OverlayPosition.bottomLeft.rawValue)
-                }
-                Picker("Card size", selection: $size) {
-                    ForEach(OverlayCardSize.allCases) { size in
-                        Text(size.label).tag(size.rawValue)
-                    }
+                Picker("Presentation", selection: $mode) {
+                    ForEach(CapturePresentationMode.allCases) { Text($0.title).tag($0.rawValue) }
                 }
                 .pickerStyle(.segmented)
             } header: {
-                Text("Quick Setup")
+                Text("Capture Mode")
             } footer: {
-                Text("Standard keeps every action. Sharing puts cloud sharing in the center. Minimal keeps Copy, Save, and Dismiss; click the image to edit.")
+                Text("Normal uses the floating capture bar and preview cards. Notch brings screenshot tools, recording controls, and image/video actions to the top of your display. Displays without a notch use a floating panel at the top.")
             }
 
-            Section {
-                VStack(spacing: 12) {
-                    OverlayLayoutEditor(layout: Binding(
-                        get: { layout }, set: { layoutData = $0.data }
-                    ), resourceBundle: resourceBundle)
-                    Text("Click a position to choose its tool")
-                        .font(.callout).foregroundStyle(.secondary)
+            if mode == CapturePresentationMode.normal.rawValue {
+                Section {
+                    Picker("Layout preset", selection: Binding(
+                        get: { layout.preset },
+                        set: { if let preset = $0.layout { layoutData = preset.data } }
+                    )) {
+                        ForEach(OverlayLayoutPreset.allCases) { preset in
+                            Text(preset.title).tag(preset).disabled(preset == .custom)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    Picker("Screen position", selection: $position) {
+                        Text("Bottom Right").tag(OverlayPosition.bottomRight.rawValue)
+                        Text("Bottom Left").tag(OverlayPosition.bottomLeft.rawValue)
+                    }
+                    Picker("Card size", selection: $size) {
+                        ForEach(OverlayCardSize.allCases) { size in
+                            Text(size.label).tag(size.rawValue)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("Quick Setup")
+                } footer: {
+                    Text("Standard keeps every action. Sharing puts cloud sharing in the center. Minimal keeps Copy, Save, and Dismiss; click the image to edit.")
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-            } header: {
-                Text("Tool Positions")
-            } footer: {
-                Text("Move Pin, Copy, Save, Edit, Cloud Share, or Dismiss to any of the six positions. Choosing a tool already on the card swaps positions. Choose Empty to hide a tool. Dismiss always stays available.")
-            }
 
-            Section {
-                Toggle("Always show actions", isOn: $alwaysShowActions)
-                InspectorSlider("Edge Margin", value: Binding(
-                    get: { CGFloat(margin) }, set: { margin = (Double($0) / 4).rounded() * 4 }
-                ), range: CGFloat(AppPreferences.overlayEdgeMarginRange.lowerBound)...CGFloat(AppPreferences.overlayEdgeMarginRange.upperBound),
-                   format: .points)
-                InspectorSlider("Hide After", value: Binding(
-                    get: { CGFloat(delay) }, set: { delay = Double($0.rounded()) }
-                ), range: CGFloat(AppPreferences.overlayDismissRange.lowerBound)...CGFloat(AppPreferences.overlayDismissRange.upperBound),
-                   format: .seconds(never: CGFloat(AppPreferences.overlayDismissNever)))
-            } header: {
-                Text("Advanced")
-            } footer: {
-                Text("Actions otherwise appear on hover or keyboard focus. Choose Never to keep previews visible. Unsaved captures, sharing progress, errors, and finished links stay available until you act on them. Changes apply immediately.")
-            }
+                Section {
+                    VStack(spacing: 12) {
+                        OverlayLayoutEditor(layout: Binding(
+                            get: { layout }, set: { layoutData = $0.data }
+                        ), resourceBundle: resourceBundle)
+                        Text("Click a position to choose its tool")
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                } header: {
+                    Text("Tool Positions")
+                } footer: {
+                    Text("Move Pin, Copy, Save, Edit, Cloud Share, or Dismiss to any of the six positions. Choosing a tool already on the card swaps positions. Choose Empty to hide a tool. Dismiss always stays available.")
+                }
 
-            Section {
-                Button("Restore Overlay Defaults…", role: .destructive) { confirmingReset = true }
-            } footer: {
-                Text("Resets only the overlay. Your captures, cloud links, and other settings are kept.")
+                Section {
+                    Toggle("Always show actions", isOn: $alwaysShowActions)
+                    InspectorSlider("Edge Margin", value: Binding(
+                        get: { CGFloat(margin) }, set: { margin = (Double($0) / 4).rounded() * 4 }
+                    ), range: CGFloat(AppPreferences.overlayEdgeMarginRange.lowerBound)...CGFloat(AppPreferences.overlayEdgeMarginRange.upperBound),
+                       format: .points)
+                    InspectorSlider("Hide After", value: Binding(
+                        get: { CGFloat(delay) }, set: { delay = Double($0.rounded()) }
+                    ), range: CGFloat(AppPreferences.overlayDismissRange.lowerBound)...CGFloat(AppPreferences.overlayDismissRange.upperBound),
+                       format: .seconds(never: CGFloat(AppPreferences.overlayDismissNever)))
+                } header: {
+                    Text("Advanced")
+                } footer: {
+                    Text("Actions otherwise appear on hover or keyboard focus. Choose Never to keep previews visible. Unsaved captures, sharing progress, errors, and finished links stay available until you act on them. Changes apply immediately.")
+                }
+
+                Section {
+                    Button("Restore Overlay Defaults…", role: .destructive) { confirmingReset = true }
+                } footer: {
+                    Text("Resets only the overlay. Your captures, cloud links, and other settings are kept.")
+                }
             }
         }
         .formStyle(.grouped)
         .scrollIndicators(.hidden)
+        .onChange(of: mode) { NotchPresenter.shared.refreshMode() }
         .onChange(of: position) { PreviewOverlay.shared.refreshSettings() }
         .onChange(of: size) { PreviewOverlay.shared.refreshSettings() }
         .onChange(of: margin) { PreviewOverlay.shared.refreshSettings() }

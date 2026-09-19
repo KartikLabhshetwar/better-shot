@@ -11,6 +11,7 @@ final class PreviewOverlay {
     private static let cardSpacing: CGFloat = 10
     private static let clearAllHeight: CGFloat = 26
 
+    private(set) var isPresented = false
     private(set) var items: [URL] = []
     private(set) var savingItems: Set<URL> = []
     private var failedSaves: Set<URL> = []
@@ -54,22 +55,8 @@ final class PreviewOverlay {
         }
         targetScreen = screen
 
-        // Always build a fresh panel rather than repositioning a reused
-        // one. A back-to-back capture (before the previous card's dismiss
-        // timer fires) used to reuse the existing NSPanel and just move it
-        // via setFrame -- moving an existing window between screens with
-        // different backing scale factors (Retina main vs. non-Retina
-        // externals) is a known AppKit trouble spot: it can repaint at the
-        // new position while its cached hit-testing state still points at
-        // the screen it was last shown on, so clicks land somewhere other
-        // than where the buttons are drawn. A panel created fresh on its
-        // final screen, before ever being ordered on-screen, never crosses
-        // that boundary.
-        teardownPanel()
-        createPanel()
-
-        positionPanel()
-        panel?.orderFrontRegardless()
+        isPresented = true
+        refreshPresentation()
 
         if automaticallyDismiss { scheduleDismiss(for: url) }
         startMouseTrackingIfNeeded()
@@ -91,6 +78,7 @@ final class PreviewOverlay {
     }
 
     func dismiss() {
+        isPresented = false
         failedSaves.removeAll()
         for url in Array(shareIDs.keys) { cancelShare(for: url) }
         shareStatuses.removeAll()
@@ -101,19 +89,36 @@ final class PreviewOverlay {
         stopMouseTracking()
         teardownPanel()
         items.removeAll()
+        NotchPresenter.shared.refresh()
     }
 
     func hide() {
+        isPresented = false
         panel?.orderOut(nil)
+        NotchPresenter.shared.refresh()
     }
 
     func toggleVisibility() {
         guard !items.isEmpty else { return }
-        if panel?.isVisible == true { hide() }
+        if isPresented { hide() }
         else {
-            if panel == nil { createPanel() }
+            isPresented = true
+            refreshPresentation()
+        }
+    }
+
+    func refreshPresentation() {
+        teardownPanel()
+        guard isPresented, !items.isEmpty else { return }
+        if AppPreferences.presentationMode == .notch {
+            NotchPresenter.shared.show(on: targetScreen ?? ActiveDisplayResolver.screenForScreenshotCapture())
+            startMouseTrackingIfNeeded()
+        } else {
+            // Create on the final display to preserve hit testing across mixed DPI screens.
+            createPanel()
             positionPanel()
             panel?.orderFrontRegardless()
+            startMouseTrackingIfNeeded()
         }
     }
 
@@ -333,12 +338,9 @@ final class PreviewOverlay {
               newScreen != targetScreen else { return }
         guard panelGeneration == generation else { return }
 
+        guard AppPreferences.presentationMode != .notch || !RecordingBarPresenter.shared.isVisible else { return }
         targetScreen = newScreen
-        teardownPanel()
-        createPanel()
-        positionPanel()
-        panel?.orderFront(nil)
-        startMouseTrackingIfNeeded()
+        refreshPresentation()
     }
 
     // MARK: - Panel Setup
@@ -351,6 +353,29 @@ final class PreviewOverlay {
         }
         remove(url)
         PreviewPanelPresenter.shared.openEditor(for: savedURL)
+    }
+
+    func perform(_ tool: OverlayTool, for url: URL) {
+        switch tool {
+        case .pin:
+            let savedURL = DeckStaging.retain(url)
+            guard !DeckStaging.isStaged(savedURL) else {
+                showSaveFailure(for: url)
+                return
+            }
+            PinnedScreenshotController.shared.pin(url: savedURL, on: currentScreen)
+            remove(url)
+        case .dismiss:
+            remove(url)
+        case .edit:
+            openAnnotateEditor(for: url)
+        case .share:
+            share(url)
+        case .save:
+            save(url)
+        case .copy:
+            copy(url)
+        }
     }
 
     private func createPanel() {
@@ -406,7 +431,7 @@ final class PreviewOverlay {
 
     func scheduleDismiss(for url: URL) {
         cancelScheduledDismiss(for: url)
-        guard items.contains(url), !failedSaves.contains(url) else { return }
+        guard AppPreferences.presentationMode == .normal, items.contains(url), !failedSaves.contains(url) else { return }
         guard AppPreferences.overlayDismisses(after: AppPreferences.overlayDismissDelay),
               (!DeckStaging.isStaged(url) || !AppPreferences.keepInDeckUntilSaved),
               shareStatuses[url] == nil else { return }
@@ -472,6 +497,7 @@ struct PreviewDeckView: View {
 struct PreviewCardView: View {
     let overlay: PreviewOverlay
     let url: URL
+    var usesNotchActions = false
     @State private var isHovered = false
     @FocusState private var hasFocus: Bool
     @FocusState private var focusedAction: String?
@@ -481,13 +507,14 @@ struct PreviewCardView: View {
     @State private var thumbnail: NSImage?
     @State private var isLoadingThumbnail = true
 
-    init(overlay: PreviewOverlay, url: URL, thumbnail: NSImage? = nil) {
+    init(overlay: PreviewOverlay, url: URL, thumbnail: NSImage? = nil, usesNotchActions: Bool = false) {
         self.overlay = overlay
         self.url = url
+        self.usesNotchActions = usesNotchActions
         _thumbnail = State(initialValue: thumbnail)
     }
 
-    private var size: OverlayCardSize { overlay.cardSize }
+    private var size: OverlayCardSize { usesNotchActions ? .large : overlay.cardSize }
     private var cardSize: CGSize { size.thumbnailSize }
     private var controlScale: CGFloat { size.controlScale }
 
@@ -538,9 +565,10 @@ struct PreviewCardView: View {
                             .shadow(radius: 4)
                     }
 
-                    hoverOverlay()
+                    if !usesNotchActions { hoverOverlay()
                         .opacity(isHovered || alwaysShowActions || hasFocus || focusedAction != nil ? 1 : 0)
                         .allowsHitTesting(isHovered || alwaysShowActions || hasFocus || focusedAction != nil)
+                    }
 
                 }
                 .frame(width: cardSize.width, height: cardSize.height)
@@ -644,7 +672,7 @@ struct PreviewCardView: View {
                 .onTapGesture { overlay.openAnnotateEditor(for: url) }
             OverlayToolArrangement(scale: controlScale) { slot in
                 if let tool = OverlayToolLayout(data: layoutData).assignments[slot] {
-                    Button { perform(tool) } label: {
+                    Button { overlay.perform(tool, for: url) } label: {
                         OverlayToolLabel(tool: tool, slot: slot, scale: controlScale)
                     }
                     .buttonStyle(.plain)
@@ -656,26 +684,4 @@ struct PreviewCardView: View {
         }
     }
 
-    private func perform(_ tool: OverlayTool) {
-        switch tool {
-        case .pin:
-            let savedURL = DeckStaging.retain(url)
-            guard !DeckStaging.isStaged(savedURL) else {
-                overlay.showSaveFailure(for: url)
-                return
-            }
-            PinnedScreenshotController.shared.pin(url: savedURL, on: overlay.currentScreen)
-            overlay.remove(url)
-        case .dismiss:
-            overlay.remove(url)
-        case .edit:
-            overlay.openAnnotateEditor(for: url)
-        case .share:
-            overlay.share(url)
-        case .save:
-            overlay.save(url)
-        case .copy:
-            overlay.copy(url)
-        }
-    }
 }

@@ -17,6 +17,18 @@ final class ToastWindow {
         panelGeneration &+= 1
 
         let toastView = ToastContentView(title: title, message: message, icon: icon, systemIcon: systemIcon)
+        #if canImport(DynamicNotchKit)
+        if AppPreferences.presentationMode == .notch {
+            NotchPresenter.shared.notification = AnyView(toastView)
+            NotchPresenter.shared.show(on: preferredScreen)
+            dismissTask = Task {
+                try? await Task.sleep(for: .seconds(duration))
+                guard !Task.isCancelled else { return }
+                dismiss(animated: false)
+            }
+            return
+        }
+        #endif
         let hostingView = NSHostingView(rootView: toastView)
 
         let panel = Self.makePanel(hostingView: hostingView)
@@ -77,6 +89,10 @@ final class ToastWindow {
     func dismiss(animated: Bool) {
         dismissTask?.cancel()
         dismissTask = nil
+        #if canImport(DynamicNotchKit)
+        NotchPresenter.shared.notification = nil
+        NotchPresenter.shared.refresh()
+        #endif
 
         guard let panel, panel.isVisible else {
             self.panel = nil

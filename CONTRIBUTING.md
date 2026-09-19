@@ -444,3 +444,18 @@ versions; Settings → About can reopen the notes or tour.
 ghost non-interactive and avoid project mutations/render-cache invalidation while
 skimming. Tests cover placement boundaries, undo/persistence, and compact light/dark
 snapshots of the ghost, tour pages, and release notes.
+
+### Notch presentation
+
+`NotchPresenter` hosts the existing capture/session controls, preview cards, and
+transfer cards. Keep actions in `RecordingBarPresenter` / `PreviewOverlay`; do not
+add a second saving, copying, upload, or recording implementation. Normal mode is
+the fallback for missing or unknown `bs_presentationMode` values. Mode changes
+must preserve pending media, transfers, and active recording state.
+
+DynamicNotchKit is vendored at the revision in `Vendor/DynamicNotchKit/BETTERSHOT.md`
+with its MIT notice. Preserve the pre-presentation capture-exclusion hook,
+synchronous lifecycle, transparent-margin hit testing, display selection, and
+accessibility patches when updating it. `make test` exercises mode switching,
+capture suspension, preview actions, transfer cleanup, and both appearances;
+live recording, selectors, and multi-display hardware still need manual checks.

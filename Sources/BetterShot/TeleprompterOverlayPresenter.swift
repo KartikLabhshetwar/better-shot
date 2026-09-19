@@ -136,6 +136,8 @@ final class TeleprompterOverlayPresenter {
 
     private let model = TeleprompterOverlayModel()
     private var panel: NSPanel?
+    private var displayID: CGDirectDisplayID?
+    private var isShown = false
     /// Invalidates a pending hide completion when a new show starts, so the
     /// old collapse can't orderOut the freshly shown overlay.
     private var hideGeneration = 0
@@ -145,6 +147,8 @@ final class TeleprompterOverlayPresenter {
     func show(script: String, displayID: CGDirectDisplayID?) {
         guard let screen = ActiveDisplayResolver.screen(for: displayID) ?? NSScreen.main else { return }
 
+        self.displayID = displayID
+        isShown = true
         hideGeneration += 1
         model.mode = Self.notchMode(for: screen) ?? .pill
         model.visibleLineCount = BetterShotPreferences.recordingTeleprompterLineCount
@@ -158,6 +162,13 @@ final class TeleprompterOverlayPresenter {
         model.isExpanded = false
         guard !model.layout.isEmpty else { return }
 
+        if AppPreferences.presentationMode == .notch {
+            panel?.orderOut(nil)
+            model.isExpanded = true
+            NotchPresenter.shared.script = model
+            NotchPresenter.shared.show(on: screen)
+            return
+        }
         let panel = panel ?? makePanel()
         PreviewWindowCaptureExclusion.shared.register(window: panel)
         position(panel, on: screen)
@@ -173,7 +184,25 @@ final class TeleprompterOverlayPresenter {
         }
     }
 
+    func refreshPresentation() {
+        guard isShown else { return }
+        guard let screen = ActiveDisplayResolver.screen(for: displayID) ?? NSScreen.main else { return }
+        if AppPreferences.presentationMode == .notch {
+            panel?.orderOut(nil)
+            NotchPresenter.shared.script = model
+            NotchPresenter.shared.show(on: screen)
+        } else {
+            NotchPresenter.shared.script = nil
+            let panel = panel ?? makePanel()
+            position(panel, on: screen)
+            panel.orderFrontRegardless()
+        }
+    }
+
     func hide() {
+        isShown = false
+        NotchPresenter.shared.script = nil
+        NotchPresenter.shared.refresh()
         guard let panel, panel.isVisible else { return }
         guard model.isExpanded else {
             panel.orderOut(nil)
@@ -280,7 +309,7 @@ private final class TeleprompterOverlayHostingView<Content: View>: NSHostingView
 
 // MARK: - View
 
-private struct TeleprompterOverlayView: View {
+struct TeleprompterOverlayView: View {
     let model: TeleprompterOverlayModel
 
     var body: some View {
@@ -348,7 +377,7 @@ private struct TeleprompterOverlayView: View {
         return min(max(activeLine, 0), maximumTop)
     }
 
-    private var textArea: some View {
+    var textArea: some View {
         let lineHeight = TeleprompterOverlayModel.lineHeight
         return VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(model.layout.lines.enumerated()), id: \.offset) { entry in

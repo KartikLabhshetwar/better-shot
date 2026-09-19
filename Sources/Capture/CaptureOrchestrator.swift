@@ -19,6 +19,7 @@ final class CaptureOrchestrator {
             pendingCaptures.append((action, screen))
             return
         }
+        NotchPresenter.shared.suspendForCapture()
         captureInProgress = true
         captureScreen = screen
         await executeCapture(action)
@@ -33,10 +34,12 @@ final class CaptureOrchestrator {
         }
         captureScreen = nil
         captureInProgress = false
+        NotchPresenter.shared.resumeAfterCapture()
     }
 
     func captureLastRegion(on screen: NSScreen? = nil) async {
         guard !captureInProgress, AppPreferences.lastRegionRect != nil else { return }
+        NotchPresenter.shared.suspendForCapture()
         captureInProgress = true
         captureScreen = screen
         await RecordingBarPresenter.shared.hidePickerForCapture()

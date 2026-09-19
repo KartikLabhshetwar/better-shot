@@ -226,3 +226,17 @@ If BetterShot helps you, you can [support its development](https://www.buymeacof
 [BSD 3-Clause](LICENSE) for original BetterShot code; adapted Cap rendering uses
 AGPLv3. See [third-party notices](Resources/Licenses/NOTICE.md) for distribution
 terms and the bundled TourKit MIT license.
+
+### Optional notch mode (v0.5.5)
+
+In **Settings > Overlay > Capture Mode**, choose **Normal Mode** (the default)
+or **Notch Mode**. Notch mode puts the capture tools, recording controls,
+image/video previews, and transfer status at the top of the capture display.
+Use the preview actions to Copy, Save, Edit, Pin, Cloud Share, or Dismiss; arrow
+buttons browse pending captures. New Capture opens the shared capture tools.
+The image and video editors still open in their full editing windows.
+
+On a notched display, Collapse hides the expanded controls; hover or click either
+side to reopen them. Other displays use a floating panel at the top. Pending
+captures remain until you act on them. Switching back restores your normal overlay
+layout and timing. Capture exclusion and private staging work in both modes.

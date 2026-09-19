@@ -76,7 +76,7 @@ final class TeleprompterComposerPresenter {
         if let barFrame = RecordingPickerPresenter.shared.barFrame {
             panel.setFrameOrigin(CGPoint(
                 x: barFrame.midX - size.width / 2,
-                y: barFrame.maxY + 12
+                y: AppPreferences.presentationMode == .notch ? max((panel.screen ?? NSScreen.main)?.visibleFrame.minY ?? 0, barFrame.minY - size.height - 12) : barFrame.maxY + 12
             ))
             return
         }
