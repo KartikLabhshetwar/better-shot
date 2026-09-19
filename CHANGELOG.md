@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Edit Clipboard Image or Last Capture shortcut (unassigned by default): opens an image from the clipboard in the editor, or the most recent capture when the clipboard has no image.
 
+- **Direct file links** toggle in Settings > Sharing (#133). Self-hosting users can copy the raw R2 object URL instead of the bettershot.site viewer page, so links work as `<img src>`, in markdown, and in chat unfurling. Off by default; the viewer page remains the default for everyone else. Public bucket URL validation now rejects embedded credentials.
+
+- **Preview follows mouse across displays** (#128). The preview card tracks whichever display the mouse is on, or pins to a chosen display in Settings > Capture. Fixes fullscreen capture grabbing the wrong display on multi-monitor setups, drag/tap gesture interference on preview buttons, and panel reuse across mixed-DPI boundaries.
+
 ### Changed
 
 - Media Gallery and Settings now use native navigation columns with resizable, collapsible sidebars and section titles aligned with their content. Gallery icons use Finder-sized previews, more space between rows, and blue filename selection while retaining sortable list view and contextual actions.

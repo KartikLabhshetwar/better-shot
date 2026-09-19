@@ -52,7 +52,7 @@ final class CaptureOrchestrator {
         case .region, .timedRegion, .regionCopy, .regionSave, .regionEdit, .regionPin:
             await captureAndProcess(action: action) { try await ScreenCapture.shared.captureRegion() }
         case .fullscreen:
-            await captureAndProcess { try await ScreenCapture.shared.captureFullscreen() }
+            await captureAndProcess { try await ScreenCapture.shared.captureFullscreen(on: captureScreen) }
         case .window:
             await captureAndProcess { try await ScreenCapture.shared.captureWindow() }
         case .ocr, .ocrSingleLine:

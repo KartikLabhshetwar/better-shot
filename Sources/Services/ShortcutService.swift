@@ -207,7 +207,6 @@ final class ShortcutService {
 
         for (action, shortcut) in cachedShortcuts {
             if keyCode == shortcut.keyCode && carbonMods == shortcut.modifiers {
-                // Holding a shortcut must not queue repeated captures or confirmations.
                 if event.getIntegerValueField(.keyboardEventAutorepeat) == 0 {
                     Task { @MainActor in await ShortcutService.shared.performGlobal(action) }
                 }

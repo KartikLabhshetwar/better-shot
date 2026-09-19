@@ -201,7 +201,7 @@ struct MenuBarContentView: View {
     }
 
     private func dismissAndRun(_ action: ShortcutService.Action) {
-        let screen = originScreen
+        let screen = ActiveDisplayResolver.screenForScreenshotCapture() ?? originScreen
         dismissPopover()
         Task { @MainActor in
             await CaptureOrchestrator.shared.performCapture(action, on: screen)

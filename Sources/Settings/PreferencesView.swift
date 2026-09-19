@@ -835,6 +835,8 @@ private struct DefaultConfigPreview: View {
 
 struct CaptureSettingsTab: View {
     @AppStorage("bs_selfTimerDelay") private var selfTimerRaw: Int = 0
+    @AppStorage("bs_overlayFollowsMouse") private var overlayFollowsMouse: Bool = true
+    @AppStorage("bs_overlayPinnedDisplayID") private var overlayPinnedDisplayIDRaw: Int = 0
     @AppStorage("bs_openEditorAfterCapture") private var openEditorAfterCapture = false
     @AppStorage("bs_keepInDeckUntilSaved") private var keepInDeckUntilSaved = false
     @AppStorage("bs_captureRegionOnRelease") private var captureRegionOnRelease = false
@@ -844,6 +846,22 @@ struct CaptureSettingsTab: View {
         Binding(
             get: { SelfTimerDelay(rawValue: selfTimerRaw) ?? .off },
             set: { selfTimerRaw = $0.rawValue }
+        )
+    }
+
+    private var connectedScreens: [(id: CGDirectDisplayID, screen: NSScreen)] {
+        NSScreen.screens.compactMap { screen in
+            guard let id = ActiveDisplayResolver.displayID(for: screen) else { return nil }
+            return (id, screen)
+        }
+    }
+
+    private var overlayPinnedDisplayID: Binding<CGDirectDisplayID?> {
+        Binding(
+            get: {
+                overlayPinnedDisplayIDRaw == 0 ? nil : CGDirectDisplayID(overlayPinnedDisplayIDRaw)
+            },
+            set: { overlayPinnedDisplayIDRaw = Int($0 ?? 0) }
         )
     }
 
@@ -866,6 +884,25 @@ struct CaptureSettingsTab: View {
                 Toggle(isOn: $captureRegionOnRelease) {
                     Text("Capture as soon as I let go")
                     Text("Off, the rectangle stays up with handles so you can nudge it, and Return or a double-click takes the shot.")
+                }
+
+                Picker("Show it on", selection: $overlayFollowsMouse) {
+                    Text("Whatever screen my mouse is on").tag(true)
+                    Text("A specific screen").tag(false)
+                }
+                .onChange(of: overlayFollowsMouse) { _, followsMouse in
+                    guard !followsMouse, overlayPinnedDisplayIDRaw == 0,
+                          let mainScreen = NSScreen.main ?? NSScreen.screens.first,
+                          let mainID = ActiveDisplayResolver.displayID(for: mainScreen) else { return }
+                    overlayPinnedDisplayIDRaw = Int(mainID)
+                }
+
+                if !overlayFollowsMouse {
+                    Picker("Screen", selection: overlayPinnedDisplayID) {
+                        ForEach(connectedScreens, id: \.id) { entry in
+                            Text(entry.screen.localizedName).tag(Optional(entry.id))
+                        }
+                    }
                 }
             } header: {
                 Text("Region")
@@ -899,6 +936,8 @@ struct CaptureSettingsTab: View {
         .alert("Restore Capture settings to their defaults?", isPresented: $isConfirmingReset) {
             Button("Restore Defaults", role: .destructive) {
                 selfTimerRaw = 0
+                overlayFollowsMouse = true
+                overlayPinnedDisplayIDRaw = 0
                 openEditorAfterCapture = false
                 keepInDeckUntilSaved = false
                 captureRegionOnRelease = false
