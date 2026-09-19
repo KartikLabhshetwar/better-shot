@@ -118,6 +118,10 @@ and keys are kept as separate tracks.
 ### Gallery and Settings
 
 Media Gallery uses a native split view and toolbar with compact icon/list views.
+On this Mac and Cloud Shares each expose All Media, Screenshots, and Videos;
+local availability and a saved cloud link are independent, so an item can appear
+in both. Use the shared file-type resolver for legacy/imported videos and resolve
+recording previews from the package when flattened exports change.
 Keep single-click selection, double-click opening, keyboard access, contextual
 actions, and local/cloud deletion confirmations consistent across both views.
 Settings uses a searchable sidebar and grouped native forms; preserve existing

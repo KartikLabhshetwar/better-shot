@@ -848,7 +848,8 @@ private func checkTransferToastPresentation(movieURL: URL) {
 @MainActor
 private func checkLibraryWindowToolbars() async throws {
     for root in [AnyView(MediaGalleryContent(items: [])), AnyView(PreferencesView())] {
-        let window = NSWindow(contentViewController: NSHostingController(rootView: root))
+        let window = NSWindow(contentViewController: NSHostingController(rootView: root.environment(\.colorScheme, .dark)))
+        window.appearance = NSAppearance(named: .darkAqua)
         window.styleMask = [.titled, .closable, .resizable, .fullSizeContentView]
         window.setContentSize(NSSize(width: 780, height: 620))
         window.isReleasedWhenClosed = false
@@ -857,8 +858,16 @@ private func checkLibraryWindowToolbars() async throws {
         try await Task.sleep(for: .milliseconds(100))
         precondition(window.toolbar?.items.isEmpty == false,
                      "Gallery and Settings must install their native window toolbars")
+        let view = window.contentView!
+        let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
+        view.cacheDisplay(in: view.bounds, to: bitmap)
+        // Sample the empty sidebar margin, where the previous glass surface rendered solid white.
+        let scale = CGFloat(bitmap.pixelsWide) / view.bounds.width
+        let color = bitmap.colorAt(x: Int(12 * scale), y: bitmap.pixelsHigh / 2)!.usingColorSpace(.deviceRGB)!
+        precondition(min(color.redComponent, color.greenComponent, color.blueComponent) < 0.8,
+                     "Dark gallery and Settings sidebars must not render as white blocks")
     }
-    print("PASS native gallery and Settings toolbar installation at compact size")
+    print("PASS native gallery/Settings toolbars and dark sidebar rendering at compact size")
 }
 
 @MainActor
@@ -901,6 +910,8 @@ private func checkMediaGallery(imageURL: URL, movieURL: URL) async throws {
     precondition(ScreenshotHistoryStore.shouldKeep(image), "Missing files must retain cloud links on reload")
     var missing = image
     missing.cloudURL = nil
+    precondition(ScreenshotHistoryStore.shouldKeep(missing), "An available original must preserve its editor history")
+    missing.sourceCapturePath = nil
     precondition(!ScreenshotHistoryStore.shouldKeep(missing))
     for value in ["file:///tmp/file", "javascript:alert(1)", "https://", "not a link"] {
         precondition(MediaGalleryItem.cloudLink(value) == nil)
@@ -911,6 +922,50 @@ private func checkMediaGallery(imageURL: URL, movieURL: URL) async throws {
     precondition(cloudOnly.open(cloud: false) != nil, "A missing local file must report an actionable opening error")
     precondition(MediaGalleryItem.filtered([cloudOnly], kind: nil, cloud: false, search: "").isEmpty)
     precondition(MediaGalleryItem.filtered([cloudOnly], kind: nil, cloud: true, search: "").count == 1)
+    let localImage = MediaGalleryItem(id: "local-image", title: "Local screenshot", createdAt: Date(),
+        kind: .screenshot, localURL: imageURL, editorURL: imageURL)
+    let localVideo = MediaGalleryItem(id: "local-video", title: "Local video", createdAt: Date(),
+        kind: .recording, localURL: movieURL, editorURL: movieURL)
+    let cloudVideo = MediaGalleryItem(id: "cloud-video", title: "Cloud video", createdAt: Date(),
+        kind: .recording, localURL: root.appendingPathComponent("missing.mp4"),
+        editorURL: root.appendingPathComponent("missing.mp4"), cloudURL: URL(string: "https://example.com/s/missing-video"))
+    let classified = entries + [localImage, localVideo, cloudOnly, cloudVideo]
+    for category in MediaGalleryCategory.allCases {
+        let matches = MediaGalleryItem.filtered(classified, kind: category.kind, cloud: category.cloud, search: "")
+        precondition(matches.count == (category.kind == nil ? 4 : 2), "Each local/cloud and image/video sidebar filter must classify independently")
+        precondition(matches.allSatisfy { category.cloud ? $0.cloudURL != nil : $0.hasLocalFile })
+    }
+    for ext in ["MOV", "mp4", "m4v", "avi"] {
+        let legacy = ScreenshotHistoryItem(id: UUID(), createdAt: Date(), updatedAt: Date(),
+            fileName: "Legacy.\(ext)", pixelWidth: 1920, pixelHeight: 1080,
+            cloudURL: "https://example.com/s/legacy")
+        var json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(legacy)) as! [String: Any]
+        for storedKind in [nil, "image"] as [String?] {
+            json["kind"] = storedKind
+            let decoded = try JSONDecoder().decode(ScreenshotHistoryItem.self, from: JSONSerialization.data(withJSONObject: json))
+            precondition(decoded.kind == .video && decoded.isVideo, "Legacy videos must not default to screenshots")
+            let recovered = MediaGalleryItem.collect(history: HistoryStore(storageDirectory: root.appendingPathComponent("empty")), edits: [decoded], projects: [])
+            precondition(MediaGalleryItem.filtered(recovered, kind: .recording, cloud: true, search: "").count == 1)
+            precondition(PreviewOverlay.isVideo(URL(fileURLWithPath: "Legacy.\(ext)")))
+        }
+    }
+    let inferredHistory = HistoryStore(storageDirectory: root.appendingPathComponent("inferred"))
+    precondition(inferredHistory.referenceCapture(at: movieURL)?.kind == .recording)
+    precondition(inferredHistory.importCapture(from: movieURL, deleteSource: false)?.kind == .recording)
+    let staleRecord = CaptureRecord(filename: movieURL.lastPathComponent, pixelWidth: 1920, pixelHeight: 1080,
+        sourcePath: movieURL.path)
+    try JSONEncoder().encode([staleRecord]).write(to: root.appendingPathComponent("inferred/history.json"))
+    precondition(HistoryStore(storageDirectory: root.appendingPathComponent("inferred")).records.first?.kind == .recording)
+    precondition(HistoryStore.decodeThumbnail(.init(url: movieURL, kind: .screenshot)) != nil,
+                 "Video thumbnail decoding must recover stale image metadata")
+    try FileManager.default.copyItem(at: movieURL, to: session.finalURL)
+    precondition(RecordingSession.sessionDirectory(containing: session.finalURL) == session.directoryURL)
+    precondition(RecordingSession.sessionDirectory(containing: session.cameraURL) == nil)
+    let rendered = MediaGalleryItem.collect(history: history, edits: [video], projects: [project]).first { $0.kind == .recording }!
+    precondition(rendered.previewURL == session.finalURL)
+    try FileManager.default.removeItem(at: session.finalURL)
+    precondition(rendered.hasLocalFile && rendered.previewURL == session.screenURL,
+                 "Invalidating a flattened video must keep the local recording available")
     for item in entries {
         precondition(HistoryStore.decodeThumbnail(.init(url: item.localURL, kind: item.kind), maxSize: 480) != nil,
                      "Both screenshot and video gallery sources must decode")
@@ -949,6 +1004,10 @@ private func checkMediaGallery(imageURL: URL, movieURL: URL) async throws {
             hosting.cacheDisplay(in: hosting.bounds, to: bitmap)
             try bitmap.representation(using: .png, properties: [:])!.write(
                 to: output.appendingPathComponent("gallery-\(scheme)-\(Int(width)).png"))
+        }
+        for category in [MediaGalleryCategory.videos, .cloudScreenshots, .cloudVideos] {
+            try snapshot(MediaGalleryContent(items: classified, category: category), scheme: scheme, width: 780,
+                to: output.appendingPathComponent("gallery-\(category.rawValue)-\(scheme).png"), height: 620)
         }
         try snapshot(MediaGalleryContent(items: snapshotItems, listView: true), scheme: scheme, width: 780,
             to: output.appendingPathComponent("gallery-list-\(scheme).png"), height: 520)

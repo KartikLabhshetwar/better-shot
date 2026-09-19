@@ -57,36 +57,44 @@ struct PreferencesView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $selection) {
-                Section {
-                    HStack(spacing: 10) {
-                        Image(nsImage: NSImage(named: "AppIcon") ?? NSApp.applicationIconImage)
-                            .resizable().frame(width: 36, height: 36)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("BetterShot").font(.headline)
-                            Text("About & Updates").font(.caption).foregroundStyle(.secondary)
+        HSplitView {
+            VStack(spacing: 0) {
+                TextField("Search sections", text: $search)
+                    .textFieldStyle(.roundedBorder)
+                    .padding(12)
+                List(selection: $selection) {
+                    Section {
+                        HStack(spacing: 10) {
+                            Image(nsImage: NSImage(named: "AppIcon") ?? NSApp.applicationIconImage)
+                                .resizable().frame(width: 36, height: 36)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("BetterShot").font(.headline).foregroundStyle(.primary)
+                                Text("About & Updates").font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 6)
+                        .tag(SettingsSection.about)
+                    }
+                    Section("Settings") {
+                        ForEach(SettingsSection.preferenceGroup.filter {
+                            search.isEmpty || $0.title.localizedStandardContains(search)
+                        }, content: row)
+                        if !search.isEmpty && !SettingsSection.preferenceGroup.contains(where: {
+                            $0.title.localizedStandardContains(search)
+                        }) {
+                            Text("No matching sections").font(.callout).foregroundStyle(.secondary)
                         }
                     }
-                    .padding(.vertical, 6)
-                    .tag(SettingsSection.about)
                 }
-                Section("Settings") {
-                    ForEach(SettingsSection.preferenceGroup.filter {
-                        search.isEmpty || $0.title.localizedStandardContains(search)
-                    }, content: row)
-                    if !search.isEmpty && !SettingsSection.preferenceGroup.contains(where: {
-                        $0.title.localizedStandardContains(search)
-                    }) {
-                        Text("No matching sections").font(.callout).foregroundStyle(.secondary)
-                    }
-                }
+                .listStyle(.sidebar)
+                .scrollContentBackground(.hidden)
             }
-            .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 240)
-        } detail: {
+            .frame(minWidth: 200, idealWidth: 220, maxWidth: 240, maxHeight: .infinity)
+            .studioGlass(cornerRadius: 0)
             detail
+                .buttonStyle(EditorButtonStyle(bordered: true))
                 .toggleStyle(.switch)
+                .scrollContentBackground(.hidden)
                 .scrollIndicators(.hidden)
                 .frame(maxWidth: 720)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -99,8 +107,6 @@ struct PreferencesView: View {
                     .sharedBackgroundVisibility(.hidden)
                 }
         }
-        .searchable(text: $search, placement: .sidebar, prompt: "Search sections")
-        .navigationSplitViewStyle(.balanced)
         .tint(EditorChrome.accent)
         .accentColor(EditorChrome.accent)
         .frame(minWidth: 780, minHeight: 620)
@@ -108,7 +114,7 @@ struct PreferencesView: View {
 
     private func row(_ section: SettingsSection) -> some View {
         Label {
-            Text(section.title)
+            Text(section.title).foregroundStyle(.primary)
         } icon: {
             Image(systemName: section.icon)
                 .font(.system(size: 13, weight: .medium))

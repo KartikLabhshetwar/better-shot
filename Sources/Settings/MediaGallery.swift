@@ -14,7 +14,12 @@ struct MediaGalleryItem: Identifiable {
     var deletionURLs: [URL] = []
     var modifiedAt: Date?
 
-    var hasLocalFile: Bool { FileManager.default.fileExists(atPath: localURL.path) }
+    var previewURL: URL {
+        RecordingSession.isSessionDirectory(editorURL)
+            ? RecordingSession(directoryURL: editorURL).deliverableURL : localURL
+    }
+
+    var hasLocalFile: Bool { FileManager.default.fileExists(atPath: previewURL.path) }
 
     static func cloudLink(_ value: String?) -> URL? {
         guard let value, let url = URL(string: value),
@@ -30,12 +35,13 @@ struct MediaGalleryItem: Identifiable {
         var representedPaths: [String: Int] = [:]
         for item in edits {
             let session = item.recordingSession
-            let local = FileManager.default.fileExists(atPath: item.url.path)
-                ? item.url : item.sourceCapturePath.map { URL(fileURLWithPath: $0) } ?? item.url
+                ?? RecordingSession.sessionDirectory(containing: item.url).map { RecordingSession(directoryURL: $0) }
+            let local = session?.deliverableURL ?? (FileManager.default.fileExists(atPath: item.url.path)
+                ? item.url : item.sourceCapturePath.map { URL(fileURLWithPath: $0) } ?? item.url)
             result.append(Self(id: item.id.uuidString,
                 title: session?.displayName ?? item.fileName, createdAt: item.createdAt,
                 kind: item.isVideo ? .recording : .screenshot, localURL: local,
-                editorURL: local == item.url ? item.editorURL : local,
+                editorURL: session?.directoryURL ?? (local == item.url ? item.editorURL : local),
                 cloudURL: cloudLink(item.cloudURL), historyID: item.id,
                 deletionURLs: localFiles(for: item.url, kind: item.isVideo ? .recording : .screenshot),
                 modifiedAt: item.updatedAt))
@@ -44,11 +50,16 @@ struct MediaGalleryItem: Identifiable {
                 representedPaths[URL(fileURLWithPath: source).standardizedFileURL.path] = result.count - 1
                 result[result.count - 1].deletionURLs += localFiles(for: URL(fileURLWithPath: source), kind: item.isVideo ? .recording : .screenshot)
             }
-            if let session { representedPaths[session.screenURL.standardizedFileURL.path] = result.count - 1 }
+            if let session {
+                for url in [session.screenURL] + VideoExportContainer.allCases.map({ session.finalURL(for: $0) }) {
+                    representedPaths[url.standardizedFileURL.path] = result.count - 1
+                }
+            }
         }
         for record in history.records {
             let raw = history.urlForRecord(record)
-            let display = history.displayURLForRecord(record)
+            let session = RecordingSession.sessionDirectory(containing: raw).map { RecordingSession(directoryURL: $0) }
+            let display = session?.deliverableURL ?? history.displayURLForRecord(record)
             let paths = [raw.path, display.path] + [record.beautifiedPath].compactMap { $0 }
             let files = paths.flatMap { localFiles(for: URL(fileURLWithPath: $0), kind: record.kind) }
             if let index = paths.compactMap({ representedPaths[URL(fileURLWithPath: $0).standardizedFileURL.path] }).first {
@@ -57,7 +68,8 @@ struct MediaGalleryItem: Identifiable {
                 if result[index].cloudURL == nil { result[index].cloudURL = cloudLink(record.shareURL) }
                 continue
             }
-            representedPaths[raw.standardizedFileURL.path] = result.count
+            for path in paths { representedPaths[URL(fileURLWithPath: path).standardizedFileURL.path] = result.count }
+            if let session { representedPaths[session.screenURL.standardizedFileURL.path] = result.count }
             result.append(Self(id: record.id.uuidString, title: record.filename,
                 createdAt: record.createdAt, kind: record.kind, localURL: display,
                 editorURL: record.kind == .recording
@@ -141,27 +153,30 @@ struct MediaGallery: View {
 }
 
 enum MediaGalleryCategory: String, CaseIterable, Identifiable {
-    case all, screenshots, videos
+    case all, screenshots, videos, cloudAll, cloudScreenshots, cloudVideos
     var id: Self { self }
+    static let local: [Self] = [.all, .screenshots, .videos]
+    static let shared: [Self] = [.cloudAll, .cloudScreenshots, .cloudVideos]
+    var cloud: Bool { Self.shared.contains(self) }
     var title: String {
         switch self {
-        case .all: "All Media"
-        case .screenshots: "Screenshots"
-        case .videos: "Videos"
+        case .all, .cloudAll: "All Media"
+        case .screenshots, .cloudScreenshots: "Screenshots"
+        case .videos, .cloudVideos: "Videos"
         }
     }
     var icon: String {
         switch self {
-        case .all: "clock"
-        case .screenshots: "photo"
-        case .videos: "video"
+        case .all, .cloudAll: "square.grid.2x2"
+        case .screenshots, .cloudScreenshots: "photo"
+        case .videos, .cloudVideos: "video"
         }
     }
     var kind: CaptureKind? {
         switch self {
-        case .all: nil
-        case .screenshots: .screenshot
-        case .videos: .recording
+        case .all, .cloudAll: nil
+        case .screenshots, .cloudScreenshots: .screenshot
+        case .videos, .cloudVideos: .recording
         }
     }
 }
@@ -170,8 +185,8 @@ struct MediaGalleryContent: View {
     let items: [MediaGalleryItem]
     var refresh: () -> Void = {}
     @State var listView = false
-    @State private var category = MediaGalleryCategory.all
-    @State private var cloud = false
+    @State var category = MediaGalleryCategory.all
+    private var cloud: Bool { category.cloud }
     @State private var search = ""
     @State private var newestFirst = true
     @State private var selection: String?
@@ -181,29 +196,19 @@ struct MediaGalleryContent: View {
     var body: some View {
         let filtered = MediaGalleryItem.filtered(items, kind: category.kind, cloud: cloud, search: search)
         let visible = filtered.sorted { newestFirst ? $0.createdAt > $1.createdAt : $0.createdAt < $1.createdAt }
-        NavigationSplitView {
+        HSplitView {
             List(selection: $category) {
-                Section("Library") {
-                    ForEach(MediaGalleryCategory.allCases) { category in
-                        Label(category.title, systemImage: category.icon).tag(category)
-                    }
+                Section("On this Mac") {
+                    ForEach(MediaGalleryCategory.local, content: sidebarRow)
+                }
+                Section("Cloud Shares") {
+                    ForEach(MediaGalleryCategory.shared, content: sidebarRow)
                 }
             }
             .listStyle(.sidebar)
-            .safeAreaInset(edge: .bottom) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Picker("Storage", selection: $cloud) {
-                        Label("On this Mac", systemImage: "internaldrive").tag(false)
-                        Label("Cloud", systemImage: "icloud").tag(true)
-                    }
-                    Text(cloud ? "Cloud links saved on this Mac." : "Saved captures and editable projects.")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(12)
-            }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 240)
-        } detail: {
+            .scrollContentBackground(.hidden)
+            .frame(minWidth: 180, idealWidth: 200, maxWidth: 240, maxHeight: .infinity)
+            .studioGlass(cornerRadius: 0)
             VStack(spacing: 0) {
                 if let actionMessage {
                     HStack(alignment: .top) {
@@ -283,8 +288,10 @@ struct MediaGalleryContent: View {
                 .background(.bar)
             }
             .background(Color(nsColor: .textBackgroundColor))
-            .navigationTitle(category.title)
+            .navigationTitle("\(cloud ? "Cloud Shares" : "On this Mac") — \(category.title)")
             .toolbar {
+                DefaultToolbarItem(kind: .search)
+                    .sharedBackgroundVisibility(.hidden)
                 ToolbarItem {
                     Picker("View", selection: $listView) {
                         Label("Icons", systemImage: "square.grid.2x2").tag(false)
@@ -293,6 +300,7 @@ struct MediaGalleryContent: View {
                     .pickerStyle(.segmented).labelStyle(.iconOnly)
                     .help("Gallery view")
                 }
+                .sharedBackgroundVisibility(.hidden)
                 ToolbarItem {
                     Menu {
                         Picker("Sort by date", selection: $newestFirst) {
@@ -304,20 +312,29 @@ struct MediaGalleryContent: View {
                     }
                     .help("Sort by date")
                 }
+                .sharedBackgroundVisibility(.hidden)
                 ToolbarItem {
                     Button("Refresh", systemImage: "arrow.clockwise", action: refresh)
                         .help("Refresh media")
                 }
+                .sharedBackgroundVisibility(.hidden)
             }
         }
         .searchable(text: $search, placement: .toolbar, prompt: "Search media")
-        .navigationSplitViewStyle(.balanced)
         .scrollIndicators(.hidden)
         .tint(EditorChrome.accent)
         .onChange(of: focusedItem) { if let focusedItem { selection = focusedItem } }
         .onChange(of: visible.map(\.id)) {
             if !visible.contains(where: { $0.id == selection }) { selection = nil }
         }
+    }
+
+    private func sidebarRow(_ category: MediaGalleryCategory) -> some View {
+        Label(category.title, systemImage: category.icon)
+            .foregroundStyle(.primary)
+            .badge(MediaGalleryItem.filtered(items, kind: category.kind, cloud: category.cloud, search: "").count)
+            .tag(category)
+            .accessibilityLabel("\(category.cloud ? "Cloud" : "Local") \(category.title)")
     }
 
     private func card(_ item: MediaGalleryItem) -> some View {
@@ -404,8 +421,8 @@ struct MediaGalleryCard: View {
                 ? "The shared copy of “\(item.title)” will be permanently deleted and its link will stop working. Local files stay on your Mac."
                 : "“\(item.title)” and its local source and edit files will move to Trash. Close its editor first. Existing cloud shares stay online.")
         }
-        .task(id: [item.localURL.path, String(describing: item.modifiedAt)]) {
-            let source = HistoryStore.ThumbnailSource(url: item.localURL, kind: item.kind)
+        .task(id: [item.previewURL.path, String(describing: item.modifiedAt)]) {
+            let source = HistoryStore.ThumbnailSource(url: item.previewURL, kind: item.kind)
             let decoded = await Task.detached(priority: .utility) {
                 HistoryStore.decodeThumbnail(source, maxSize: 320)
             }.value
@@ -445,7 +462,7 @@ struct MediaGalleryCard: View {
         Button("Edit", systemImage: "pencil", action: edit).disabled(!item.hasLocalFile)
         if item.hasLocalFile {
             Button("Reveal in Finder", systemImage: "folder") {
-                NSWorkspace.shared.activateFileViewerSelecting([item.localURL])
+                NSWorkspace.shared.activateFileViewerSelecting([item.previewURL])
             }
         }
         if let url = item.cloudURL {

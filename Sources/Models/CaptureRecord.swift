@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import UniformTypeIdentifiers
 
 /// Represents a captured screenshot or recording in the history.
 struct CaptureRecord: Identifiable, Codable, Equatable {
@@ -44,6 +45,11 @@ struct CaptureRecord: Identifiable, Codable, Equatable {
 enum CaptureKind: String, Codable {
     case screenshot
     case recording
+
+    nonisolated static func resolved(for url: URL, fallback: Self = .screenshot) -> Self {
+        let type = UTType(filenameExtension: url.pathExtension.lowercased())
+        return type?.conforms(to: .movie) == true ? .recording : fallback
+    }
 }
 
 /// Background configuration for the beautifier.

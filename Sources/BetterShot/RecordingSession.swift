@@ -157,7 +157,11 @@ nonisolated struct RecordingSession: Sendable, Equatable {
     static func sessionDirectory(containing url: URL) -> URL? {
         if isSessionDirectory(url) { return url }
         let parent = url.deletingLastPathComponent()
-        return url.lastPathComponent == screenFileName && isSessionDirectory(parent) ? parent : nil
+        guard isSessionDirectory(parent) else { return nil }
+        let session = Self(directoryURL: parent)
+        return url.lastPathComponent == screenFileName
+            || VideoExportContainer.allCases.contains { session.finalURL(for: $0).standardizedFileURL == url.standardizedFileURL }
+            ? parent : nil
     }
 
     func loadCaptureManifest() -> CaptureManifest? {

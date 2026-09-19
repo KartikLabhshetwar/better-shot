@@ -5,12 +5,18 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.4] - Unreleased
 
 ### Changed
 
 - Media Gallery now uses Finder-style icon and list views, native sidebar and toolbar search, compact thumbnails, selection, contextual actions, and a location/status bar.
 - Settings now follows the macOS System Settings layout with colored section icons, sidebar section search, native switches, and grouped controls.
+
+### Fixed
+
+- Media Gallery separates On this Mac and Cloud Shares into explicit All Media, Screenshots, and Videos sections with counts. A shared item with a local source appears in both locations; cloud-only links remain available after local deletion.
+- Video recognition uses macOS file types for imported and legacy history entries, including missing or stale image labels. Video previews and editor reopening retain their recording package when an export is regenerated or removed.
+- Gallery and Settings use a native split view with classic frosted sidebars and subdued toolbar controls, removing automatic glass surfaces that could appear as white blocks. Settings keeps native grouped forms, accessible controls, and light/dark support.
 
 ## [0.5.3] - 2026-09-11
 

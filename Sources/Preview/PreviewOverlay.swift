@@ -184,8 +184,7 @@ final class PreviewOverlay {
     var hasStagedItems: Bool { items.contains { DeckStaging.isStaged($0) || Self.isVideo($0) } }
 
     static func isVideo(_ url: URL) -> Bool {
-        let ext = url.pathExtension.lowercased()
-        return ext == "mov" || ext == "mp4"
+        CaptureKind.resolved(for: url) == .recording
     }
 
     private func showSavedToast(count: Int) {

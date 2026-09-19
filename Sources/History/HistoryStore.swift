@@ -26,6 +26,7 @@ final class HistoryStore {
     // MARK: - Import
 
     func importCapture(from tempURL: URL, deleteSource: Bool = true, kind: CaptureKind = .screenshot) -> CaptureRecord? {
+        let kind = CaptureKind.resolved(for: tempURL, fallback: kind)
         let ext = tempURL.pathExtension.isEmpty ? "png" : tempURL.pathExtension
         let filename = "bettershot_\(UUID().uuidString).\(ext)"
         let destURL = storageDir.appendingPathComponent(filename)
@@ -57,6 +58,7 @@ final class HistoryStore {
     @discardableResult
     func referenceCapture(at url: URL, kind: CaptureKind = .screenshot, filename: String? = nil) -> CaptureRecord? {
         let url = url.standardizedFileURL
+        let kind = CaptureKind.resolved(for: url, fallback: kind)
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         if let existing = records.first(where: { $0.sourcePath.map { URL(fileURLWithPath: $0).standardizedFileURL.path } == url.path }) {
             return existing
@@ -181,7 +183,7 @@ final class HistoryStore {
     }
 
     nonisolated static func decodeThumbnail(_ source: ThumbnailSource, maxSize: CGFloat = 120) -> NSImage? {
-        if source.kind == .recording {
+        if CaptureKind.resolved(for: source.url, fallback: source.kind) == .recording {
             let directory = source.url.deletingLastPathComponent()
             if RecordingSession.isSessionDirectory(directory),
                FileManager.default.fileExists(atPath: directory.appendingPathComponent(RecordingSession.posterFileName).path),
@@ -298,7 +300,11 @@ final class HistoryStore {
         guard let data = try? Data(contentsOf: manifestURL) else { return }
         let decoded = (try? JSONDecoder().decode([CaptureRecord].self, from: data)) ?? []
         // Filter out records whose files no longer exist
-        records = decoded.filter {
+        records = decoded.map { record in
+            var record = record
+            record.kind = CaptureKind.resolved(for: urlForRecord(record), fallback: record.kind)
+            return record
+        }.filter {
             FileManager.default.fileExists(atPath: urlForRecord($0).path) || $0.shareURL != nil
         }
         trimToRetentionLimit()

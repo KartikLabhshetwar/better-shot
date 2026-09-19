@@ -6,13 +6,14 @@ extension MediaGalleryItem {
             return NSWorkspace.shared.open(cloudURL) ? nil : "Couldn’t open the link. Try again or copy it."
         }
         guard hasLocalFile else { return "This file was moved or deleted. Refresh the gallery." }
-        PreviewOverlay.shared.show(url: localURL, automaticallyDismiss: false)
+        PreviewOverlay.shared.show(url: previewURL, automaticallyDismiss: false)
         return nil
     }
 
     /// Move every owned file before changing history. A failure keeps metadata available for retry.
     func deleteLocal(history: HistoryStore = .shared, edits: ScreenshotHistoryStore = .shared,
                      trash: (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }) throws {
+        let previewURL = previewURL
         let urls = Self.deletionTargets(deletionURLs)
         for url in urls where FileManager.default.fileExists(atPath: url.path) {
             try trash(url)
@@ -21,6 +22,7 @@ extension MediaGalleryItem {
         try history.forgetLocalRecords(ids: Set(captureIDs))
         for url in urls { PreviewOverlay.shared.remove(url) }
         PreviewOverlay.shared.remove(localURL)
+        PreviewOverlay.shared.remove(previewURL)
         RecordingProjectStore.shared.reload()
     }
 
