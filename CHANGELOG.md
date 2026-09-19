@@ -10,10 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Media Gallery now uses Finder-style icon and list views, native sidebar and toolbar search, compact thumbnails, selection, contextual actions, and a location/status bar.
-- Settings now follows the macOS System Settings layout with colored section icons, sidebar section search, native switches, and grouped controls.
+- Settings now follows the macOS System Settings layout with compact neutral SF Symbol tiles, a native search field, native switches, and grouped controls.
 
 ### Fixed
 
+- Settings displays the selected section title once using the native toolbar title. Gallery list view uses native sortable Name, Date Created, and Kind columns; compact previews and folder/media SF Symbols bring both views closer to Finder.
 - Media Gallery separates On this Mac and Cloud Shares into explicit All Media, Screenshots, and Videos sections with counts. A shared item with a local source appears in both locations; cloud-only links remain available after local deletion.
 - Video recognition uses macOS file types for imported and legacy history entries, including missing or stale image labels. Video previews and editor reopening retain their recording package when an export is regenerated or removed.
 - Gallery and Settings use a native split view with classic frosted sidebars and subdued toolbar controls, removing automatic glass surfaces that could appear as white blocks. Settings keeps native grouped forms, accessible controls, and light/dark support.

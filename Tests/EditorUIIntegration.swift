@@ -847,9 +847,15 @@ private func checkTransferToastPresentation(movieURL: URL) {
 
 @MainActor
 private func checkLibraryWindowToolbars() async throws {
-    for root in [AnyView(MediaGalleryContent(items: [])), AnyView(PreferencesView())] {
+    for section in SettingsSection.allCases {
+        precondition(NSImage(systemSymbolName: section.icon, accessibilityDescription: nil) != nil,
+                     "Settings icons must exist in the system SF Symbols catalog")
+    }
+    for (name, root) in [("gallery", AnyView(MediaGalleryContent(items: []))),
+                         ("settings", AnyView(PreferencesView()))] {
         let window = NSWindow(contentViewController: NSHostingController(rootView: root.environment(\.colorScheme, .dark)))
         window.appearance = NSAppearance(named: .darkAqua)
+        window.title = name == "settings" ? SettingsSection.general.title : "Media Gallery"
         window.styleMask = [.titled, .closable, .resizable, .fullSizeContentView]
         window.setContentSize(NSSize(width: 780, height: 620))
         window.isReleasedWhenClosed = false
@@ -858,6 +864,16 @@ private func checkLibraryWindowToolbars() async throws {
         try await Task.sleep(for: .milliseconds(100))
         precondition(window.toolbar?.items.isEmpty == false,
                      "Gallery and Settings must install their native window toolbars")
+        if name == "settings" {
+            precondition(window.toolbar?.items.count == 1,
+                         "Settings must have a single native title item, without a duplicate toolbar heading")
+        }
+        if let frame = window.contentView?.superview,
+           let chrome = frame.bitmapImageRepForCachingDisplay(in: frame.bounds) {
+            frame.cacheDisplay(in: frame.bounds, to: chrome)
+            try chrome.representation(using: .png, properties: [:])!.write(to:
+                URL(fileURLWithPath: ".build/editor-snapshots/\(name)-window-dark.png"))
+        }
         let view = window.contentView!
         let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
         view.cacheDisplay(in: view.bounds, to: bitmap)

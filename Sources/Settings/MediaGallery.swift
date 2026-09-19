@@ -19,6 +19,8 @@ struct MediaGalleryItem: Identifiable {
             ? RecordingSession(directoryURL: editorURL).deliverableURL : localURL
     }
 
+    var kindLabel: String { kind == .recording ? "Video" : "Screenshot" }
+
     var hasLocalFile: Bool { FileManager.default.fileExists(atPath: previewURL.path) }
 
     static func cloudLink(_ value: String?) -> URL? {
@@ -167,9 +169,10 @@ enum MediaGalleryCategory: String, CaseIterable, Identifiable {
     }
     var icon: String {
         switch self {
-        case .all, .cloudAll: "square.grid.2x2"
+        case .all: "folder"
+        case .cloudAll: "icloud"
         case .screenshots, .cloudScreenshots: "photo"
-        case .videos, .cloudVideos: "video"
+        case .videos, .cloudVideos: "film"
         }
     }
     var kind: CaptureKind? {
@@ -188,14 +191,14 @@ struct MediaGalleryContent: View {
     @State var category = MediaGalleryCategory.all
     private var cloud: Bool { category.cloud }
     @State private var search = ""
-    @State private var newestFirst = true
+    @State private var sortOrder = [KeyPathComparator(\MediaGalleryItem.createdAt, order: .reverse)]
     @State private var selection: String?
     @FocusState private var focusedItem: String?
     @State private var actionMessage: String?
 
     var body: some View {
         let filtered = MediaGalleryItem.filtered(items, kind: category.kind, cloud: cloud, search: search)
-        let visible = filtered.sorted { newestFirst ? $0.createdAt > $1.createdAt : $0.createdAt < $1.createdAt }
+        let visible = filtered.sorted(using: sortOrder)
         HSplitView {
             List(selection: $category) {
                 Section("On this Mac") {
@@ -226,12 +229,21 @@ struct MediaGalleryContent: View {
                             : "Try another name or media type."))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if listView {
-                    List(selection: $selection) {
-                        ForEach(visible) { item in
-                            card(item).tag(item.id)
+                    Table(visible, selection: $selection, sortOrder: $sortOrder) {
+                        TableColumn("Name", value: \.title) { item in
+                            card(item)
                         }
+                        .width(min: 160, ideal: 200, max: .infinity)
+                        TableColumn("Date Created", value: \.createdAt) { item in
+                            Text(item.createdAt.formatted(date: .abbreviated, time: .omitted))
+                                .foregroundStyle(.secondary)
+                                .help(item.createdAt.formatted(date: .complete, time: .standard))
+                        }
+                        .width(140)
+                        TableColumn("Kind", value: \.kindLabel)
+                            .width(76)
                     }
-                    .listStyle(.inset(alternatesRowBackgrounds: true))
+                    .tableStyle(.inset(alternatesRowBackgrounds: true))
                     .onKeyPress(keys: [.return, .space]) { _ in
                         guard let item = visible.first(where: { $0.id == selection }) else { return .ignored }
                         actionMessage = item.open(cloud: cloud)
@@ -241,7 +253,7 @@ struct MediaGalleryContent: View {
                     GeometryReader { geometry in
                         ScrollViewReader { proxy in
                             ScrollView {
-                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 128), spacing: 20)], spacing: 20) {
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 112), spacing: 16)], spacing: 16) {
                                     ForEach(visible) { item in
                                         card(item)
                                             .focusable()
@@ -252,7 +264,7 @@ struct MediaGalleryContent: View {
                                 .padding(20)
                             }
                             .onMoveCommand { direction in
-                                let columns = max(1, Int((geometry.size.width - 20) / 148))
+                                let columns = max(1, Int((geometry.size.width - 24) / 128))
                                 let index = visible.firstIndex { $0.id == selection } ?? 0
                                 let offset: Int
                                 switch direction {
@@ -303,14 +315,16 @@ struct MediaGalleryContent: View {
                 .sharedBackgroundVisibility(.hidden)
                 ToolbarItem {
                     Menu {
-                        Picker("Sort by date", selection: $newestFirst) {
-                            Text("Newest First").tag(true)
-                            Text("Oldest First").tag(false)
+                        Picker("Sort", selection: $sortOrder) {
+                            Text("Name").tag([KeyPathComparator(\MediaGalleryItem.title)])
+                            Text("Kind").tag([KeyPathComparator(\MediaGalleryItem.kindLabel)])
+                            Text("Newest First").tag([KeyPathComparator(\MediaGalleryItem.createdAt, order: .reverse)])
+                            Text("Oldest First").tag([KeyPathComparator(\MediaGalleryItem.createdAt)])
                         }
                     } label: {
                         Label("Sort", systemImage: "arrow.up.arrow.down")
                     }
-                    .help("Sort by date")
+                    .help("Sort media")
                 }
                 .sharedBackgroundVisibility(.hidden)
                 ToolbarItem {
@@ -330,11 +344,15 @@ struct MediaGalleryContent: View {
     }
 
     private func sidebarRow(_ category: MediaGalleryCategory) -> some View {
-        Label(category.title, systemImage: category.icon)
-            .foregroundStyle(.primary)
-            .badge(MediaGalleryItem.filtered(items, kind: category.kind, cloud: category.cloud, search: "").count)
-            .tag(category)
-            .accessibilityLabel("\(category.cloud ? "Cloud" : "Local") \(category.title)")
+        Label {
+            Text(category.title).foregroundStyle(.primary)
+        } icon: {
+            Image(systemName: category.icon)
+                .symbolRenderingMode(.hierarchical)
+        }
+        .badge(MediaGalleryItem.filtered(items, kind: category.kind, cloud: category.cloud, search: "").count)
+        .tag(category)
+        .accessibilityLabel("\(category.cloud ? "Cloud" : "Local") \(category.title)")
     }
 
     private func card(_ item: MediaGalleryItem) -> some View {
@@ -362,18 +380,16 @@ struct MediaGalleryCard: View {
         VStack(spacing: 6) {
             if listView {
                 HStack(spacing: 12) {
-                    artwork.frame(width: 40, height: 36)
+                    artwork.frame(width: 24, height: 24)
                     Text(item.title).lineLimit(1).truncationMode(.middle)
                     Spacer(minLength: 8)
-                    Text(item.createdAt.formatted(date: .abbreviated, time: .omitted))
-                        .foregroundStyle(.secondary).font(.caption)
                     actionMenu
                 }
                 .padding(.vertical, 3)
             } else {
                 artwork
                     .padding(10)
-                    .frame(height: 100)
+                    .frame(height: 84)
                     .frame(maxWidth: .infinity)
                     .background(selected ? Color.primary.opacity(0.09) : .clear,
                                 in: RoundedRectangle(cornerRadius: 8))

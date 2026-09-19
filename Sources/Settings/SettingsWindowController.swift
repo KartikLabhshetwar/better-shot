@@ -14,7 +14,10 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     func open(on screen: NSScreen? = nil, section: SettingsSection? = nil) {
         if let existing = window, existing.isVisible {
             if let section {
-                existing.contentViewController = NSHostingController(rootView: PreferencesView(selection: section))
+                existing.contentViewController = NSHostingController(rootView: PreferencesView(selection: section) { [weak existing] in
+                    existing?.title = $0.title
+                })
+                existing.title = section.title
             }
             existing.orderFrontRegardless()
             NSApp.activate(ignoringOtherApps: true)
@@ -22,7 +25,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             return
         }
 
-        let controller = NSHostingController(rootView: PreferencesView(selection: section ?? .general))
+        let controller = NSHostingController(rootView: PreferencesView(selection: section ?? .general) { [weak self] in
+            self?.window?.title = $0.title
+        })
 
         let win = NSWindow(contentViewController: controller)
         win.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
@@ -30,8 +35,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         win.minSize = NSSize(width: 780, height: 620)
         win.titlebarAppearsTransparent = true
         win.toolbarStyle = .unified
-        win.title = "Settings"
-        win.titleVisibility = .hidden
+        win.title = (section ?? .general).title
         win.isReleasedWhenClosed = false
         win.delegate = self
         win.collectionBehavior = [.transient, .moveToActiveSpace]

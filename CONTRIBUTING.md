@@ -124,8 +124,10 @@ in both. Use the shared file-type resolver for legacy/imported videos and resolv
 recording previews from the package when flattened exports change.
 Keep single-click selection, double-click opening, keyboard access, contextual
 actions, and local/cloud deletion confirmations consistent across both views.
-Settings uses a searchable sidebar and grouped native forms; preserve existing
-preference bindings and the shared InspectorSlider controls.
+Gallery list view uses SwiftUI Table with native column sorting. Settings uses a
+searchable sidebar, neutral SF Symbols, one native toolbar title, and grouped
+native forms; preserve existing preference bindings and the shared InspectorSlider
+controls.
 
 ### Editing and persistence
 

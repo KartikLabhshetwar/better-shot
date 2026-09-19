@@ -25,25 +25,13 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
-        case .general: "gearshape"
+        case .general: "gear"
         case .capture: "camera.viewfinder"
-        case .overlay: "rectangle.on.rectangle"
-        case .recording: "record.circle"
-        case .shortcuts: "command"
+        case .overlay: "macwindow.on.rectangle"
+        case .recording: "video.fill"
+        case .shortcuts: "keyboard"
         case .sharing: "icloud.and.arrow.up"
         case .about: "info.circle"
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .general: .gray
-        case .capture: .blue
-        case .overlay: .purple
-        case .recording: .red
-        case .shortcuts: .orange
-        case .sharing: .blue
-        case .about: .gray
         }
     }
 }
@@ -51,16 +39,18 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 struct PreferencesView: View {
     @State private var selection: SettingsSection
     @State private var search = ""
+    var onSelectionChange: (SettingsSection) -> Void = { _ in }
 
-    init(selection: SettingsSection = .general) {
+    init(selection: SettingsSection = .general, onSelectionChange: @escaping (SettingsSection) -> Void = { _ in }) {
         _selection = State(initialValue: selection)
+        self.onSelectionChange = onSelectionChange
     }
 
     var body: some View {
         HSplitView {
             VStack(spacing: 0) {
-                TextField("Search sections", text: $search)
-                    .textFieldStyle(.roundedBorder)
+                SettingsSearchField(text: $search)
+                    .frame(height: 24)
                     .padding(12)
                 List(selection: $selection) {
                     Section {
@@ -99,13 +89,12 @@ struct PreferencesView: View {
                 .frame(maxWidth: 720)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(nsColor: .windowBackgroundColor))
-                .navigationTitle(selection.title)
-                .toolbar {
-                    ToolbarItem(placement: .navigation) {
-                        Text(selection.title).font(.headline)
-                    }
-                    .sharedBackgroundVisibility(.hidden)
-                }
+        }
+        .navigationTitle(selection.title)
+        .onChange(of: selection) { _, section in onSelectionChange(section) }
+        .toolbar {
+            DefaultToolbarItem(kind: .title, placement: .navigation)
+                .sharedBackgroundVisibility(.hidden)
         }
         .tint(EditorChrome.accent)
         .accentColor(EditorChrome.accent)
@@ -117,12 +106,13 @@ struct PreferencesView: View {
             Text(section.title).foregroundStyle(.primary)
         } icon: {
             Image(systemName: section.icon)
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 15, weight: .regular))
+                .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(.white)
-                .frame(width: 26, height: 26)
-                .background(section.color, in: RoundedRectangle(cornerRadius: 6))
+                .frame(width: 24, height: 24)
+                .background(Color(nsColor: .systemGray), in: RoundedRectangle(cornerRadius: 6))
         }
-        .padding(.vertical, 3)
+        .padding(.vertical, 1)
         .tag(section)
     }
 
@@ -136,6 +126,35 @@ struct PreferencesView: View {
         case .shortcuts: ShortcutSettingsTab()
         case .sharing: SharingSettingsTab()
         case .about: AboutTab()
+        }
+    }
+}
+
+private struct SettingsSearchField: NSViewRepresentable {
+    @Binding var text: String
+
+    func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
+
+    func makeNSView(context: Context) -> NSSearchField {
+        let field = NSSearchField()
+        field.placeholderString = "Search sections"
+        field.setAccessibilityLabel("Search settings sections")
+        field.delegate = context.coordinator
+        return field
+    }
+
+    func updateNSView(_ field: NSSearchField, context: Context) {
+        context.coordinator.text = $text
+        if field.stringValue != text { field.stringValue = text }
+    }
+
+    final class Coordinator: NSObject, NSSearchFieldDelegate {
+        var text: Binding<String>
+        init(text: Binding<String>) { self.text = text }
+
+        func controlTextDidChange(_ notification: Notification) {
+            guard let field = notification.object as? NSSearchField else { return }
+            text.wrappedValue = field.stringValue
         }
     }
 }
