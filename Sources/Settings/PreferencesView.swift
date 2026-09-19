@@ -30,14 +30,27 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .overlay: "rectangle.on.rectangle"
         case .recording: "record.circle"
         case .shortcuts: "command"
-        case .sharing: "link"
+        case .sharing: "icloud.and.arrow.up"
         case .about: "info.circle"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .general: .gray
+        case .capture: .blue
+        case .overlay: .purple
+        case .recording: .red
+        case .shortcuts: .orange
+        case .sharing: .blue
+        case .about: .gray
         }
     }
 }
 
 struct PreferencesView: View {
     @State private var selection: SettingsSection
+    @State private var search = ""
 
     init(selection: SettingsSection = .general) {
         _selection = State(initialValue: selection)
@@ -46,21 +59,47 @@ struct PreferencesView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $selection) {
-                Section("Preferences") {
-                    ForEach(SettingsSection.preferenceGroup, content: row)
-                }
                 Section {
-                    row(.about)
+                    HStack(spacing: 10) {
+                        Image(nsImage: NSImage(named: "AppIcon") ?? NSApp.applicationIconImage)
+                            .resizable().frame(width: 36, height: 36)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("BetterShot").font(.headline)
+                            Text("About & Updates").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                    .tag(SettingsSection.about)
+                }
+                Section("Settings") {
+                    ForEach(SettingsSection.preferenceGroup.filter {
+                        search.isEmpty || $0.title.localizedStandardContains(search)
+                    }, content: row)
+                    if !search.isEmpty && !SettingsSection.preferenceGroup.contains(where: {
+                        $0.title.localizedStandardContains(search)
+                    }) {
+                        Text("No matching sections").font(.callout).foregroundStyle(.secondary)
+                    }
                 }
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 184, ideal: 196, max: 240)
+            .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 240)
         } detail: {
             detail
-                .buttonStyle(EditorButtonStyle(bordered: true))
+                .toggleStyle(.switch)
+                .scrollIndicators(.hidden)
+                .frame(maxWidth: 720)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(nsColor: .windowBackgroundColor))
                 .navigationTitle(selection.title)
+                .toolbar {
+                    ToolbarItem(placement: .navigation) {
+                        Text(selection.title).font(.headline)
+                    }
+                    .sharedBackgroundVisibility(.hidden)
+                }
         }
+        .searchable(text: $search, placement: .sidebar, prompt: "Search sections")
         .navigationSplitViewStyle(.balanced)
         .tint(EditorChrome.accent)
         .accentColor(EditorChrome.accent)
@@ -68,8 +107,17 @@ struct PreferencesView: View {
     }
 
     private func row(_ section: SettingsSection) -> some View {
-        Label(section.title, systemImage: section.icon)
-            .tag(section)
+        Label {
+            Text(section.title)
+        } icon: {
+            Image(systemName: section.icon)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(width: 26, height: 26)
+                .background(section.color, in: RoundedRectangle(cornerRadius: 6))
+        }
+        .padding(.vertical, 3)
+        .tag(section)
     }
 
     @ViewBuilder

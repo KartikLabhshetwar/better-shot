@@ -11,6 +11,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     try await checkColorPickerAndToast()
     try await checkPreviewOverlay(imageURL: imageURL)
     try await checkMediaGallery(imageURL: imageURL, movieURL: movieURL)
+    try await checkLibraryWindowToolbars()
     checkTransferToastPresentation(movieURL: movieURL)
     try await checkGeneralEditorDefaults(movieURL: movieURL)
     try await checkCameraAspectRatios(movieURL: movieURL)
@@ -845,6 +846,22 @@ private func checkTransferToastPresentation(movieURL: URL) {
 
 
 @MainActor
+private func checkLibraryWindowToolbars() async throws {
+    for root in [AnyView(MediaGalleryContent(items: [])), AnyView(PreferencesView())] {
+        let window = NSWindow(contentViewController: NSHostingController(rootView: root))
+        window.styleMask = [.titled, .closable, .resizable, .fullSizeContentView]
+        window.setContentSize(NSSize(width: 780, height: 620))
+        window.isReleasedWhenClosed = false
+        defer { window.contentViewController = nil; window.close() }
+        window.contentView?.layoutSubtreeIfNeeded()
+        try await Task.sleep(for: .milliseconds(100))
+        precondition(window.toolbar?.items.isEmpty == false,
+                     "Gallery and Settings must install their native window toolbars")
+    }
+    print("PASS native gallery and Settings toolbar installation at compact size")
+}
+
+@MainActor
 private func checkMediaGallery(imageURL: URL, movieURL: URL) async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -865,6 +882,9 @@ private func checkMediaGallery(imageURL: URL, movieURL: URL) async throws {
         fileName: "Demo.mov", pixelWidth: 1920, pixelHeight: 1080, kind: .video,
         cloudURL: "https://example.com/s/video", recordingSessionPath: session.directoryURL.path)
     let entries = MediaGalleryItem.collect(history: history, edits: [image, video], projects: [project])
+    precondition(MediaGalleryCategory.all.kind == nil)
+    precondition(MediaGalleryCategory.screenshots.kind == .screenshot)
+    precondition(MediaGalleryCategory.videos.kind == .recording)
     precondition(entries.count == 2, "Capture, edited history, and package must not duplicate media")
     precondition(entries.first { $0.kind == .recording }!.editorURL == session.directoryURL,
                  "Videos must reopen their editable project")
@@ -888,6 +908,7 @@ private func checkMediaGallery(imageURL: URL, movieURL: URL) async throws {
     let cloudOnly = MediaGalleryItem(id: "cloud-only", title: "Cloud screenshot", createdAt: Date(),
         kind: .screenshot, localURL: root.appendingPathComponent("missing.png"),
         editorURL: root.appendingPathComponent("missing.png"), cloudURL: URL(string: "https://example.com/s/missing"))
+    precondition(cloudOnly.open(cloud: false) != nil, "A missing local file must report an actionable opening error")
     precondition(MediaGalleryItem.filtered([cloudOnly], kind: nil, cloud: false, search: "").isEmpty)
     precondition(MediaGalleryItem.filtered([cloudOnly], kind: nil, cloud: true, search: "").count == 1)
     for item in entries {
@@ -929,6 +950,10 @@ private func checkMediaGallery(imageURL: URL, movieURL: URL) async throws {
             try bitmap.representation(using: .png, properties: [:])!.write(
                 to: output.appendingPathComponent("gallery-\(scheme)-\(Int(width)).png"))
         }
+        try snapshot(MediaGalleryContent(items: snapshotItems, listView: true), scheme: scheme, width: 780,
+            to: output.appendingPathComponent("gallery-list-\(scheme).png"), height: 520)
+        try snapshot(MediaGalleryCard(item: snapshotItems[0], cloud: false, selected: true), scheme: scheme, width: 148,
+            to: output.appendingPathComponent("gallery-selected-\(scheme).png"), height: 160)
         try snapshot(MediaGalleryCard(item: cloudOnly, cloud: true), scheme: scheme, width: 260,
             to: output.appendingPathComponent("gallery-cloud-\(scheme).png"), height: 400)
         try snapshot(MediaGalleryContent(items: []), scheme: scheme, width: 780,

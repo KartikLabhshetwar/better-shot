@@ -115,6 +115,14 @@ Area recordings use `RecordingAreaSelectionPresenter` with the adjustable AppKit
 `RegionSelectionOverlay` and system crosshair. Screen, camera, pointer events,
 and keys are kept as separate tracks.
 
+### Gallery and Settings
+
+Media Gallery uses a native split view and toolbar with compact icon/list views.
+Keep single-click selection, double-click opening, keyboard access, contextual
+actions, and local/cloud deletion confirmations consistent across both views.
+Settings uses a searchable sidebar and grouped native forms; preserve existing
+preference bindings and the shared InspectorSlider controls.
+
 ### Editing and persistence
 
 Image annotations live in source-pixel coordinates. `AnnoShapeDrawing` is shared

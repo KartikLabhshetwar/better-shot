@@ -1,6 +1,15 @@
 import AppKit
 
 extension MediaGalleryItem {
+    func open(cloud: Bool) -> String? {
+        if cloud, let cloudURL {
+            return NSWorkspace.shared.open(cloudURL) ? nil : "Couldn’t open the link. Try again or copy it."
+        }
+        guard hasLocalFile else { return "This file was moved or deleted. Refresh the gallery." }
+        PreviewOverlay.shared.show(url: localURL, automaticallyDismiss: false)
+        return nil
+    }
+
     /// Move every owned file before changing history. A failure keeps metadata available for retry.
     func deleteLocal(history: HistoryStore = .shared, edits: ScreenshotHistoryStore = .shared,
                      trash: (URL) throws -> Void = { try FileManager.default.trashItem(at: $0, resultingItemURL: nil) }) throws {

@@ -29,7 +29,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         win.setContentSize(NSSize(width: 820, height: 660))
         win.minSize = NSSize(width: 780, height: 620)
         win.titlebarAppearsTransparent = true
+        win.toolbarStyle = .unified
         win.title = "Settings"
+        win.titleVisibility = .hidden
         win.isReleasedWhenClosed = false
         win.delegate = self
         win.collectionBehavior = [.transient, .moveToActiveSpace]

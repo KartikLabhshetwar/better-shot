@@ -101,7 +101,9 @@ final class MediaGalleryWindowController: NSWindowController, NSWindowDelegate {
     func open(on screen: NSScreen? = nil) {
         if window == nil {
             let window = NSWindow(contentViewController: NSHostingController(rootView: MediaGallery()))
-            window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+            window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+            window.toolbarStyle = .unified
+            window.titlebarAppearsTransparent = true
             window.title = "Media Gallery"
             window.setContentSize(NSSize(width: 1080, height: 740))
             window.minSize = NSSize(width: 780, height: 560)
@@ -138,74 +140,76 @@ struct MediaGallery: View {
     }
 }
 
+enum MediaGalleryCategory: String, CaseIterable, Identifiable {
+    case all, screenshots, videos
+    var id: Self { self }
+    var title: String {
+        switch self {
+        case .all: "All Media"
+        case .screenshots: "Screenshots"
+        case .videos: "Videos"
+        }
+    }
+    var icon: String {
+        switch self {
+        case .all: "clock"
+        case .screenshots: "photo"
+        case .videos: "video"
+        }
+    }
+    var kind: CaptureKind? {
+        switch self {
+        case .all: nil
+        case .screenshots: .screenshot
+        case .videos: .recording
+        }
+    }
+}
+
 struct MediaGalleryContent: View {
     let items: [MediaGalleryItem]
     var refresh: () -> Void = {}
-    @State private var kind: CaptureKind?
+    @State var listView = false
+    @State private var category = MediaGalleryCategory.all
     @State private var cloud = false
     @State private var search = ""
     @State private var newestFirst = true
-    @State private var deletionMessage: String?
-
-    private var title: String {
-        switch kind {
-        case .screenshot: "Screenshots"
-        case .recording: "Videos"
-        case nil: "All media"
-        }
-    }
+    @State private var selection: String?
+    @FocusState private var focusedItem: String?
+    @State private var actionMessage: String?
 
     var body: some View {
-        let filtered = MediaGalleryItem.filtered(items, kind: kind, cloud: cloud, search: search)
+        let filtered = MediaGalleryItem.filtered(items, kind: category.kind, cloud: cloud, search: search)
         let visible = filtered.sorted { newestFirst ? $0.createdAt > $1.createdAt : $0.createdAt < $1.createdAt }
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 24) {
-                Label("Your media", systemImage: "photo.on.rectangle")
-                    .font(.headline).padding(.top, 12)
-                VStack(alignment: .leading, spacing: 4) {
-                    sidebarButton("All Media", icon: "square.grid.2x2", selected: kind == nil) { kind = nil }
-                    sidebarButton("Screenshots", icon: "photo", selected: kind == .screenshot) { kind = .screenshot }
-                    sidebarButton("Videos", icon: "video", selected: kind == .recording) { kind = .recording }
+        NavigationSplitView {
+            List(selection: $category) {
+                Section("Library") {
+                    ForEach(MediaGalleryCategory.allCases) { category in
+                        Label(category.title, systemImage: category.icon).tag(category)
+                    }
                 }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("STORAGE").font(.caption.weight(.medium)).foregroundStyle(.secondary).padding(.bottom, 8)
-                    sidebarButton("On this Mac", icon: "internaldrive", selected: !cloud) { cloud = false }
-                    sidebarButton("Cloud", icon: "icloud", selected: cloud) { cloud = true }
-                }
-                Spacer()
-                Text(cloud ? "Cloud links saved on this Mac." : "Saved captures and editable projects.")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(16).frame(width: 184).frame(maxHeight: .infinity)
-            .studioGlass(cornerRadius: 0)
-            Divider()
-            VStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack(spacing: 16) {
-                        Text("\(title) (\(visible.count))").font(.title3.bold()).monospacedDigit()
-                        Spacer(minLength: 0)
-                        TextField("Search by name", text: $search)
-                            .textFieldStyle(.roundedBorder).frame(maxWidth: 260)
+            .listStyle(.sidebar)
+            .safeAreaInset(edge: .bottom) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Picker("Storage", selection: $cloud) {
+                        Label("On this Mac", systemImage: "internaldrive").tag(false)
+                        Label("Cloud", systemImage: "icloud").tag(true)
                     }
-                    HStack {
-                        Picker("Sort", selection: $newestFirst) {
-                            Text("Newest first").tag(true)
-                            Text("Oldest first").tag(false)
-                        }
-                        .labelsHidden().fixedSize()
-                        Spacer()
-                        Button("Refresh", systemImage: "arrow.clockwise", action: refresh)
-                            .buttonStyle(EditorButtonStyle())
-                    }
+                    Text(cloud ? "Cloud links saved on this Mac." : "Saved captures and editable projects.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(24).background(EditorChrome.panel)
-                Divider()
-                if let deletionMessage {
+                .padding(12)
+            }
+            .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 240)
+        } detail: {
+            VStack(spacing: 0) {
+                if let actionMessage {
                     HStack(alignment: .top) {
-                        Text(deletionMessage + " Refresh to review remaining items; local files already moved can be restored from Trash.")
+                        Text(actionMessage)
                             .font(.callout).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
-                        Button("Dismiss") { self.deletionMessage = nil }
+                        Button("Dismiss") { self.actionMessage = nil }
                     }
                     .padding(16)
                 }
@@ -216,36 +220,119 @@ struct MediaGalleryContent: View {
                             ? (cloud ? "Share a screenshot or video from its editor to see it here." : "Save a screenshot or finish a recording, then refresh.")
                             : "Try another name or media type."))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if listView {
+                    List(selection: $selection) {
+                        ForEach(visible) { item in
+                            card(item).tag(item.id)
+                        }
+                    }
+                    .listStyle(.inset(alternatesRowBackgrounds: true))
+                    .onKeyPress(keys: [.return, .space]) { _ in
+                        guard let item = visible.first(where: { $0.id == selection }) else { return .ignored }
+                        actionMessage = item.open(cloud: cloud)
+                        return .handled
+                    }
                 } else {
-                    ScrollView {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 24)], alignment: .leading, spacing: 24) {
-                            ForEach(visible) { item in
-                                MediaGalleryCard(item: item, cloud: cloud, onDeleteFailure: { deletionMessage = $0 })
+                    GeometryReader { geometry in
+                        ScrollViewReader { proxy in
+                            ScrollView {
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 128), spacing: 20)], spacing: 20) {
+                                    ForEach(visible) { item in
+                                        card(item)
+                                            .focusable()
+                                            .focused($focusedItem, equals: item.id)
+                                            .id(item.id)
+                                    }
+                                }
+                                .padding(20)
+                            }
+                            .onMoveCommand { direction in
+                                let columns = max(1, Int((geometry.size.width - 20) / 148))
+                                let index = visible.firstIndex { $0.id == selection } ?? 0
+                                let offset: Int
+                                switch direction {
+                                case .left: offset = -1
+                                case .right: offset = 1
+                                case .up: offset = -columns
+                                case .down: offset = columns
+                                @unknown default: return
+                                }
+                                let target = visible[min(max(index + offset, 0), visible.count - 1)].id
+                                selection = target
+                                focusedItem = target
+                                proxy.scrollTo(target)
                             }
                         }
-                        .padding(24)
                     }
-                    .scrollIndicators(.hidden)
+                }
+                Divider()
+                HStack(spacing: 8) {
+                    Image(systemName: cloud ? "icloud" : "internaldrive")
+                    Text(cloud ? "Cloud" : "On this Mac")
+                    Image(systemName: "chevron.right").font(.caption2)
+                    Text(category.title)
+                    if let selected = visible.first(where: { $0.id == selection }) {
+                        Image(systemName: "chevron.right").font(.caption2)
+                        Text(selected.title).lineLimit(1).truncationMode(.middle)
+                    }
+                    Spacer(minLength: 8)
+                    Text("\(visible.count) items").monospacedDigit().fixedSize()
+                }
+                .font(.caption).foregroundStyle(.secondary)
+                .padding(.horizontal, 16).padding(.vertical, 9)
+                .background(.bar)
+            }
+            .background(Color(nsColor: .textBackgroundColor))
+            .navigationTitle(category.title)
+            .toolbar {
+                ToolbarItem {
+                    Picker("View", selection: $listView) {
+                        Label("Icons", systemImage: "square.grid.2x2").tag(false)
+                        Label("List", systemImage: "list.bullet").tag(true)
+                    }
+                    .pickerStyle(.segmented).labelStyle(.iconOnly)
+                    .help("Gallery view")
+                }
+                ToolbarItem {
+                    Menu {
+                        Picker("Sort by date", selection: $newestFirst) {
+                            Text("Newest First").tag(true)
+                            Text("Oldest First").tag(false)
+                        }
+                    } label: {
+                        Label("Sort", systemImage: "arrow.up.arrow.down")
+                    }
+                    .help("Sort by date")
+                }
+                ToolbarItem {
+                    Button("Refresh", systemImage: "arrow.clockwise", action: refresh)
+                        .help("Refresh media")
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(EditorChrome.workspace)
         }
+        .searchable(text: $search, placement: .toolbar, prompt: "Search media")
+        .navigationSplitViewStyle(.balanced)
+        .scrollIndicators(.hidden)
         .tint(EditorChrome.accent)
+        .onChange(of: focusedItem) { if let focusedItem { selection = focusedItem } }
+        .onChange(of: visible.map(\.id)) {
+            if !visible.contains(where: { $0.id == selection }) { selection = nil }
+        }
     }
 
-    private func sidebarButton(_ title: String, icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: icon).frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(EditorButtonStyle(selected: selected))
-        .accessibilityAddTraits(selected ? .isSelected : [])
+    private func card(_ item: MediaGalleryItem) -> some View {
+        MediaGalleryCard(item: item, cloud: cloud, listView: listView, selected: selection == item.id,
+            onSelect: { selection = item.id; if !listView { focusedItem = item.id } },
+            onDeleteFailure: { actionMessage = $0 + " Refresh to review remaining items; local files already moved can be restored from Trash." })
     }
 }
 
 struct MediaGalleryCard: View {
     let item: MediaGalleryItem
     let cloud: Bool
+    var listView = false
+    var selected = false
+    var onSelect: () -> Void = {}
     var onDeleteFailure: (String) -> Void = { _ in }
     @State private var thumbnail: NSImage?
     @State private var error: String?
@@ -255,67 +342,37 @@ struct MediaGalleryCard: View {
     @State private var deleting = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Button(action: open) {
-                ZStack {
-                    Rectangle().fill(.quaternary)
-                    if let thumbnail {
-                        Image(nsImage: thumbnail).resizable().scaledToFit()
-                    } else {
-                        Image(systemName: item.kind == .recording ? "video" : "photo")
-                            .font(.largeTitle).foregroundStyle(.secondary)
-                    }
-                    if item.kind == .recording {
-                        Image(systemName: "play.circle.fill").font(.system(size: 44))
-                            .symbolRenderingMode(.palette).foregroundStyle(.blue, .white)
-                            .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
-                    }
+        VStack(spacing: 6) {
+            if listView {
+                HStack(spacing: 12) {
+                    artwork.frame(width: 40, height: 36)
+                    Text(item.title).lineLimit(1).truncationMode(.middle)
+                    Spacer(minLength: 8)
+                    Text(item.createdAt.formatted(date: .abbreviated, time: .omitted))
+                        .foregroundStyle(.secondary).font(.caption)
+                    actionMenu
                 }
-                .aspectRatio(1, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Open \(cloud ? "cloud copy of " : "")\(item.title)")
-            HStack(spacing: 4) {
-                Text(item.title).font(.callout.weight(.medium)).lineLimit(1).truncationMode(.middle).help(item.title)
-                Spacer(minLength: 0)
-                Button("Edit", systemImage: "pencil", action: edit)
-                    .buttonStyle(EditorButtonStyle(horizontalPadding: 6))
-                    .disabled(!item.hasLocalFile)
-                    .help(item.hasLocalFile ? "Edit local source" : "The local source is unavailable. Restore it to edit.")
-            }
-            Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
-                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            if !item.hasLocalFile {
-                Text("Local source unavailable for editing.").font(.caption).foregroundStyle(.secondary)
-            }
-            HStack(spacing: 4) {
-                Button(role: .destructive) {
-                    confirmingDelete = true
-                } label: {
-                    Label(cloud ? "Delete Cloud Share" : "Move to Trash", systemImage: "trash").foregroundStyle(.red)
-                }
-                .help(cloud ? "Delete cloud share" : "Move local files to Trash")
-                Spacer()
-                if item.hasLocalFile {
-                    Button("Reveal in Finder", systemImage: "folder") {
-                        NSWorkspace.shared.activateFileViewerSelecting([item.localURL])
+                .padding(.vertical, 3)
+            } else {
+                artwork
+                    .padding(10)
+                    .frame(height: 100)
+                    .frame(maxWidth: .infinity)
+                    .background(selected ? Color.primary.opacity(0.09) : .clear,
+                                in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(alignment: .topTrailing) {
+                        if selected { actionMenu.padding(3) }
                     }
-                    .help("Reveal in Finder")
-                }
-                if let url = item.cloudURL {
-                    Button(copied ? "Link copied" : "Copy Link", systemImage: copied ? "checkmark" : "link") {
-                        NSPasteboard.general.clearContents()
-                        copied = NSPasteboard.general.setString(url.absoluteString, forType: .string)
-                        error = copied ? nil : "Couldn’t copy the link. Try again."
-                    }
-                    .help(copied ? "Link copied" : "Copy Link")
-                    Button("Open Cloud", systemImage: "arrow.up.right.square") { openCloud(url) }
-                        .help("Open cloud share")
-                }
+                Text(item.title)
+                    .font(.system(size: 12))
+                    .lineLimit(2).truncationMode(.middle)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 4).padding(.vertical, 2)
+                    .foregroundStyle(selected ? Color.white : Color.primary)
+                    .background(selected ? EditorChrome.accent : .clear,
+                                in: RoundedRectangle(cornerRadius: 4))
+                    .frame(height: 36, alignment: .top)
             }
-            .labelStyle(.iconOnly)
-            .buttonStyle(EditorButtonStyle(horizontalPadding: 6))
             if deleting { ProgressView("Deleting…").controlSize(.small) }
             if let error {
                 Text(error).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
@@ -325,9 +382,19 @@ struct MediaGalleryCard: View {
                 Button("Try Again") { confirmingDelete = true }.controlSize(.small)
             }
         }
-        .padding(14)
-        .background(EditorChrome.panel, in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(EditorChrome.border, lineWidth: 0.5))
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2, perform: open)
+        .onTapGesture(perform: onSelect)
+        .onKeyPress(.return) { open(); return .handled }
+        .onKeyPress(.space) { open(); return .handled }
+        .contextMenu { actions }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(item.title)
+        .accessibilityValue(item.hasLocalFile ? (item.kind == .recording ? "Video" : "Screenshot") : "Local source unavailable")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityAction(named: "Open", open)
+        .accessibilityAction(named: "Select", onSelect)
+        .help(item.title + (item.hasLocalFile ? " — Double-click to open. Right-click for actions." : " — Local source unavailable for editing."))
         .disabled(deleting)
         .alert(cloud ? "Delete this cloud share?" : "Move this capture to Trash?", isPresented: $confirmingDelete) {
             Button(cloud ? "Delete Cloud Share" : "Move to Trash", role: .destructive) { delete() }
@@ -340,10 +407,59 @@ struct MediaGalleryCard: View {
         .task(id: [item.localURL.path, String(describing: item.modifiedAt)]) {
             let source = HistoryStore.ThumbnailSource(url: item.localURL, kind: item.kind)
             let decoded = await Task.detached(priority: .utility) {
-                HistoryStore.decodeThumbnail(source, maxSize: 640)
+                HistoryStore.decodeThumbnail(source, maxSize: 320)
             }.value
             guard !Task.isCancelled else { return }
             thumbnail = decoded
+        }
+    }
+
+    private var artwork: some View {
+        ZStack(alignment: .bottomTrailing) {
+            if let thumbnail {
+                Image(nsImage: thumbnail).resizable().scaledToFit()
+                    .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
+            } else {
+                Image(systemName: item.kind == .recording ? "video" : "photo")
+                    .font(.system(size: listView ? 24 : 40)).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            if item.kind == .recording {
+                Image(systemName: "play.circle.fill")
+                    .symbolRenderingMode(.palette).foregroundStyle(.white, .black.opacity(0.7))
+                    .font(.system(size: listView ? 12 : 18)).padding(2)
+            }
+        }
+    }
+
+    private var actionMenu: some View {
+        Menu { actions } label: {
+            Label("Actions for \(item.title)", systemImage: "ellipsis.circle")
+        }
+        .labelStyle(.iconOnly).menuStyle(.borderlessButton).fixedSize()
+        .help("Media actions")
+    }
+
+    @ViewBuilder private var actions: some View {
+        Button("Open", systemImage: "arrow.up.right.square", action: open)
+        Button("Edit", systemImage: "pencil", action: edit).disabled(!item.hasLocalFile)
+        if item.hasLocalFile {
+            Button("Reveal in Finder", systemImage: "folder") {
+                NSWorkspace.shared.activateFileViewerSelecting([item.localURL])
+            }
+        }
+        if let url = item.cloudURL {
+            Divider()
+            Button(copied ? "Link Copied" : "Copy Link", systemImage: "link") {
+                NSPasteboard.general.clearContents()
+                copied = NSPasteboard.general.setString(url.absoluteString, forType: .string)
+                error = copied ? nil : "Couldn’t copy the link. Try again."
+            }
+            Button("Open Cloud", systemImage: "icloud") { openCloud(url) }
+        }
+        Divider()
+        Button(cloud ? "Delete Cloud Share…" : "Move to Trash…", systemImage: "trash", role: .destructive) {
+            confirmingDelete = true
         }
     }
 
@@ -378,7 +494,6 @@ struct MediaGalleryCard: View {
     }
 
     private func open() {
-        if cloud, let url = item.cloudURL { openCloud(url) }
-        else if available() { PreviewOverlay.shared.show(url: item.localURL, automaticallyDismiss: false) }
+        error = item.open(cloud: cloud)
     }
 }

@@ -5,6 +5,13 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Media Gallery now uses Finder-style icon and list views, native sidebar and toolbar search, compact thumbnails, selection, contextual actions, and a location/status bar.
+- Settings now follows the macOS System Settings layout with colored section icons, sidebar section search, native switches, and grouped controls.
+
 ## [0.5.3] - 2026-09-11
 
 ### Added
