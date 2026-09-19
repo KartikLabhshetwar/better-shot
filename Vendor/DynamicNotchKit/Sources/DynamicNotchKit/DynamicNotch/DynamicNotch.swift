@@ -108,6 +108,10 @@ public final class DynamicNotch<Expanded, CompactLeading, CompactTrailing>: Obse
         deinitializeWindow()
     }
 
+    private var screenTask: Task<Void, Never>?
+
+    deinit { screenTask?.cancel() }
+
     private var closePanelTask: Task<(), Never>? // Used to close the panel after hiding completes
 
     /// Creates a new DynamicNotch with custom content and style.
@@ -166,13 +170,14 @@ public final class DynamicNotch<Expanded, CompactLeading, CompactTrailing>: Obse
 
     /// Observes screen parameters changes and re-initializes the window if necessary.
     private func observeScreenParameters() {
-        Task {
+        screenTask = Task { [weak self] in
             let sequence = NotificationCenter.default.notifications(named: NSApplication.didChangeScreenParametersNotification)
             for await _ in sequence.map(\.name) {
-                guard state != .hidden else { continue }
-                let current = windowController?.window?.screen
+                guard let self else { break }
+                guard self.state != .hidden else { continue }
+                let current = self.windowController?.window?.screen
                 if let screen = NSScreen.screens.first(where: { $0 == current }) ?? NSScreen.screens.first {
-                    initializeWindow(screen: screen)
+                    self.initializeWindow(screen: screen)
                 }
             }
         }
@@ -396,7 +401,7 @@ private extension DynamicNotch {
 
         let size = NSSize(
             width: screen.frame.width,
-            height: screen.frame.height * 0.8
+            height: screen.frame.height
         )
         let origin = NSPoint(
             x: screen.frame.midX - (size.width / 2),

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct OverlaySettingsTab: View {
-    @AppStorage(AppPreferences.presentationModeKey) private var mode = CapturePresentationMode.normal.rawValue
+    @AppStorage(AppPreferences.presentationModeKey) private var mode = CapturePresentationMode.normal
     var resourceBundle: Bundle = .main
     @AppStorage("bs_overlayPosition") private var position = OverlayPosition.bottomRight.rawValue
     @AppStorage("bs_overlayCardSize") private var size = OverlayCardSize.small.rawValue
@@ -17,7 +17,7 @@ struct OverlaySettingsTab: View {
         Form {
             Section {
                 Picker("Presentation", selection: $mode) {
-                    ForEach(CapturePresentationMode.allCases) { Text($0.title).tag($0.rawValue) }
+                    ForEach(CapturePresentationMode.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
             } header: {
@@ -26,7 +26,7 @@ struct OverlaySettingsTab: View {
                 Text("Normal uses the floating capture bar and preview cards. Notch brings screenshot tools, recording controls, and image/video actions to the top of your display. Displays without a notch use a floating panel at the top.")
             }
 
-            if mode == CapturePresentationMode.normal.rawValue {
+            if mode == .normal {
                 Section {
                     Picker("Layout preset", selection: Binding(
                         get: { layout.preset },

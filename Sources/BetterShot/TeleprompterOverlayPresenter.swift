@@ -194,6 +194,7 @@ final class TeleprompterOverlayPresenter {
         } else {
             NotchPresenter.shared.script = nil
             let panel = panel ?? makePanel()
+            PreviewWindowCaptureExclusion.shared.register(window: panel)
             position(panel, on: screen)
             panel.orderFrontRegardless()
         }

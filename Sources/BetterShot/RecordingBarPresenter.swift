@@ -34,7 +34,13 @@ final class RecordingBarPresenter {
     /// tells the hosting view which part of itself is real and satellite
     /// windows where to anchor.
     var showsRecordingOptions = false
-    var recordingConfirmation: ShortcutService.Action?
+    var recordingConfirmation: ShortcutService.Action? {
+        didSet {
+            if recordingConfirmation != nil, AppPreferences.presentationMode == .notch {
+                NotchPresenter.shared.show()
+            }
+        }
+    }
 
     var barFrameInPanel: CGRect = .zero
 

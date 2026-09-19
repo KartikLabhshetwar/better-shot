@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import DynamicNotchKit
 @testable import BetterShot
 
 @MainActor
@@ -38,6 +39,8 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     AppPreferences.saveDirectory = saveFolder.path
     defaults.set("notch", forKey: AppPreferences.presentationModeKey)
     notch.refreshMode()
+    notch.show()
+    precondition(notch.expanded, "An empty compact notch must open the New Capture action")
     bar.showPicker(activate: false)
     overlay.show(url: imageURL)
     overlay.show(url: movieURL)
@@ -51,18 +54,50 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     precondition(overlay.items.count == 2, "Notch previews stay available until acted on")
     window.contentView?.layoutSubtreeIfNeeded()
     if let frame = notch.contentFrame, let screen = window.screen {
+        precondition(frame.width > 600 && frame.height > 100)
         precondition(frame.width < screen.frame.width && frame.height < screen.frame.height)
         precondition(frame.midX > screen.frame.minX && frame.midX < screen.frame.maxX)
     }
+    if let hosting = window.contentView {
+        hosting.layoutSubtreeIfNeeded()
+        precondition(hosting.hitTest(CGPoint(x: 1, y: 1)) == nil, "Transparent margins must pass clicks through")
+        if let bitmap = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) {
+            hosting.cacheDisplay(in: hosting.bounds, to: bitmap)
+            try bitmap.representation(using: .png, properties: [:])?.write(to: output.appendingPathComponent("notch-native-window.png"))
+        }
+    }
+    notch.collapse()
+    if window.screen?.safeAreaInsets.top ?? 0 > 0 {
+        precondition(!notch.expanded && notch.isVisible)
+        bar.recordingConfirmation = .restartRecording
+        precondition(notch.expanded, "Recording confirmations must expand a compact notch")
+        bar.recordingConfirmation = nil
+    }
+    notch.show()
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
         try snapshot(NotchContent(), scheme: scheme, width: 660,
                      to: output.appendingPathComponent("notch-captures-\(name).png"), height: 470)
-        try snapshot(NotchContent().environment(\.accessibilityReduceTransparency, true)
-            .environment(\.accessibilityReduceMotion, true), scheme: scheme, width: 660,
-                     to: output.appendingPathComponent("notch-accessibility-\(name).png"), height: 470)
         try snapshot(PreferencesView(selection: .overlay), scheme: scheme, width: 780,
                      to: output.appendingPathComponent("notch-settings-\(name).png"), height: 620)
+    }
+    // Exercise the kit's non-notched fallback on the same screen without changing display settings.
+    if let screen = window.screen {
+        let floating = DynamicNotch(hoverBehavior: [], style: .floating) { NotchContent() }
+        floating.presentImmediately(on: screen)
+        defer { floating.dismissImmediately() }
+        try await Task.sleep(for: .milliseconds(80))
+        precondition(floating.windowController?.window?.isVisible == true)
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let fallbackWindow = floating.windowController!.window!
+            fallbackWindow.appearance = NSAppearance(named: appearance)
+            let hosting = fallbackWindow.contentView!
+            hosting.layoutSubtreeIfNeeded()
+            if let bitmap = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) {
+                hosting.cacheDisplay(in: hosting.bounds, to: bitmap)
+                try bitmap.representation(using: .png, properties: [:])?.write(to: output.appendingPathComponent("notch-floating-\(appearance.rawValue).png"))
+            }
+        }
     }
     defaults.set("normal", forKey: AppPreferences.presentationModeKey)
     notch.refreshMode()
@@ -73,6 +108,8 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     precondition(notch.isVisible && overlay.items.count == 2)
     notch.suspendForCapture()
     precondition(!notch.isVisible && overlay.items.count == 2)
+    await notch.runCountdown(seconds: 1, on: window.screen)
+    precondition(notch.countdown == nil && !notch.isVisible, "Countdown must disappear before screenshot capture")
     // Updates arriving during capture must not bring the notch back into the image.
     ToastWindow.shared.show(message: "Saved", duration: 30)
     precondition(!notch.isVisible)
@@ -122,5 +159,5 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     owner.close()
     precondition(notch.transfers.isEmpty, "Closing the owner cleans up notch transfer feedback")
     anchor.removeFromSuperview()
-    print("PASS notch defaults, mode migration, pending images/video, capture suspension, recording controls, save/share recovery, transfer cleanup, compact light/dark and accessibility snapshots")
+    print("PASS notch defaults, mode migration, pending images/video, capture suspension, recording controls, save/share recovery, transfer cleanup, compact light/dark snapshots")
 }

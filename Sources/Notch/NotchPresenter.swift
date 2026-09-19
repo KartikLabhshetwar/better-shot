@@ -34,20 +34,19 @@ final class NotchPresenter {
 
     private init() {}
 
-    func show(on screen: NSScreen? = nil, activate: Bool = false) {
+    func show(on screen: NSScreen? = nil) {
         if AppPreferences.presentationMode == .notch { enabledSession = true }
         self.screen = screen ?? self.screen ?? ActiveDisplayResolver.screenForScreenshotCapture()
         expanded = true
-        refresh()
-        if activate { window?.makeKey() }
+        refresh(collapseIfEmpty: false)
     }
 
-    func refresh() {
+    func refresh(collapseIfEmpty: Bool = true) {
         guard AppPreferences.presentationMode == .notch, (!captureSuspended || countdown != nil), hasContent || enabledSession else {
             notch?.dismissImmediately()
             return
         }
-        if !hasContent && countdown == nil { expanded = false }
+        if collapseIfEmpty && !hasContent && countdown == nil { expanded = false }
         guard let screen = NSScreen.screens.first(where: { $0 == self.screen }) ?? NSScreen.main ?? NSScreen.screens.first else { return }
         self.screen = screen
         if notch == nil {
@@ -129,13 +128,34 @@ struct NotchContent: View {
     @State private var bar = RecordingBarPresenter.shared
     @State private var overlay = PreviewOverlay.shared
     @State private var selectedURL: URL?
-    @State private var tooltip = BarTooltipModel()
 
     private var selected: URL? {
         selectedURL.flatMap { overlay.items.contains($0) ? $0 : nil } ?? overlay.items.last
     }
 
     var body: some View {
+        ViewThatFits(in: .vertical) {
+            content
+            ScrollView { content }.scrollIndicators(.hidden)
+        }
+        .frame(width: 620)
+        .frame(maxHeight: max(240, (presenter.screen?.visibleFrame.height ?? 800) - 120))
+        .fixedSize(horizontal: false, vertical: true)
+        .onChange(of: overlay.items) { selectedURL = overlay.items.last }
+        .onExitCommand {
+            if bar.isVisible && bar.mode == .picker {
+                bar.dismiss()
+                Task { await CameraRecordingManager.shared.stopPreview() }
+            } else { presenter.collapse() }
+        }
+        .onKeyPress("a") {
+            guard bar.isVisible, bar.mode == .picker else { return .ignored }
+            bar.captureLastRegion()
+            return .handled
+        }
+    }
+
+    private var content: some View {
         VStack(spacing: 10) {
             HStack {
                 Image("MenuBarIcon").resizable().scaledToFit().frame(width: 18, height: 18)
@@ -162,6 +182,7 @@ struct NotchContent: View {
                 }
                 if let script = presenter.script {
                     TeleprompterOverlayView(model: script).textArea
+                        .padding(8).background(.black, in: RoundedRectangle(cornerRadius: 8))
                 }
                 if overlay.isPresented, let url = selected {
                     Divider()
@@ -200,22 +221,6 @@ struct NotchContent: View {
             }
         }
         .padding(.top, 8)
-        .frame(width: 620)
-        .fixedSize(horizontal: false, vertical: true)
-        .environment(tooltip)
-        .onChange(of: overlay.items) { selectedURL = overlay.items.last }
-        .onExitCommand {
-            if bar.isVisible && bar.mode == .picker {
-                bar.dismiss()
-                Task { await CameraRecordingManager.shared.stopPreview() }
-            }
-            else { presenter.collapse() }
-        }
-        .onKeyPress("a") {
-            guard bar.isVisible, bar.mode == .picker else { return .ignored }
-            bar.captureLastRegion()
-            return .handled
-        }
     }
 
     private func moveSelection(_ delta: Int) {
