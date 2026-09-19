@@ -11,6 +11,11 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     let keys = [AppPreferences.presentationModeKey, BetterShotPreferences.recordingCameraDeviceIDKey,
                 "bs_overlayDismissDelay", "bs_saveDirectory", "bs_overlayFollowsMouse"]
     let saved = keys.map { defaults.object(forKey: $0) }
+    let configuration = ProcessInfo.processInfo.environment["BETTERSHOT_BUILD_CONFIGURATION"] ?? "Debug"
+    let derived = ProcessInfo.processInfo.environment["BETTERSHOT_DERIVED_DATA"] ?? ".build/tests"
+    let bundle = Bundle(url: URL(fileURLWithPath: derived).appendingPathComponent("Build/Products/\(configuration)/BetterShot.app"))!
+    let logo = bundle.image(forResource: "MenuBarIcon")!
+    logo.setName("MenuBarIcon")
     let notch = NotchPresenter.shared
     let bar = RecordingBarPresenter.shared
     let overlay = PreviewOverlay.shared
@@ -68,14 +73,6 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     if let hosting = window.contentView {
         hosting.layoutSubtreeIfNeeded()
         precondition(hosting.hitTest(CGPoint(x: 1, y: 1)) == nil, "Transparent margins must pass clicks through")
-        func hasNativeGlass(_ view: NSView) -> Bool {
-            if let effect = view as? NSVisualEffectView,
-               effect.material == .popover && effect.blendingMode == .behindWindow { return true }
-            return view.subviews.contains(where: hasNativeGlass)
-        }
-        if !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency {
-            precondition(hasNativeGlass(hosting), "Expanded notch must use native behind-window glass")
-        }
         let originalAppearance = window.appearance
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             window.appearance = NSAppearance(named: appearance)
@@ -92,7 +89,7 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
         window.appearance = originalAppearance
     }
     notch.collapse()
-    try await Task.sleep(for: .milliseconds(80))
+    try await Task.sleep(for: .milliseconds(350))
     if let hosting = window.contentView {
         hosting.layoutSubtreeIfNeeded()
         if let bitmap = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) {
@@ -109,30 +106,30 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     notch.show()
     notch.updateHoverState(true)
     notch.updateHoverState(false)
-    try await Task.sleep(for: .milliseconds(180))
-    precondition(!notch.expanded && notch.isVisible, "Leaving the notch must collapse without a click")
+    try await Task.sleep(for: .milliseconds(350))
+    precondition(!notch.expanded && notch.isVisible, "Leaving the notch must collapse without a click (menu tracking: \(notch.menuTrackingCount), modal: \(NSApp.modalWindow != nil), children: \(window.childWindows?.count ?? 0))")
     notch.updateHoverState(true)
     notch.updateHoverState(false)
-    try await Task.sleep(for: .milliseconds(180))
+    try await Task.sleep(for: .milliseconds(350))
     precondition(!notch.expanded, "A brief pass across the notch must settle closed")
     notch.updateHoverState(true)
-    try await Task.sleep(for: .milliseconds(180))
+    try await Task.sleep(for: .milliseconds(350))
     precondition(notch.expanded, "Hover must open the whole compact surface")
     notch.updateHoverState(false)
     notch.updateHoverState(true)
-    try await Task.sleep(for: .milliseconds(180))
+    try await Task.sleep(for: .milliseconds(350))
     precondition(notch.expanded, "Returning before close must cancel pending dismissal")
     notch.menuTrackingCount = 2
     notch.updateHoverState(false)
-    try await Task.sleep(for: .milliseconds(180))
+    try await Task.sleep(for: .milliseconds(350))
     precondition(notch.expanded, "Native menu tracking must keep the notch open")
     notch.menuTrackingCount -= 1
     notch.resumeHoverDismissal()
-    try await Task.sleep(for: .milliseconds(180))
+    try await Task.sleep(for: .milliseconds(350))
     precondition(notch.expanded, "Closing a submenu must preserve its parent menu")
     notch.menuTrackingCount -= 1
     notch.resumeHoverDismissal()
-    try await Task.sleep(for: .milliseconds(180))
+    try await Task.sleep(for: .milliseconds(350))
     precondition(!notch.expanded, "Dismiss after the menu closes with the pointer outside")
     notch.show()
     let child = NSPanel(contentRect: CGRect(x: 0, y: 0, width: 80, height: 80),
@@ -141,7 +138,7 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     window.addChildWindow(child, ordered: .above)
     child.orderFront(nil)
     notch.updateHoverState(false)
-    try await Task.sleep(for: .milliseconds(180))
+    try await Task.sleep(for: .milliseconds(350))
     precondition(notch.expanded, "An attached popover must prevent premature collapse")
     window.removeChildWindow(child)
     child.close()
@@ -149,11 +146,11 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     // Send the intended leave after AppKit has finished removing the child.
     try await Task.sleep(for: .milliseconds(80))
     notch.updateHoverState(false)
-    try await Task.sleep(for: .milliseconds(180))
+    try await Task.sleep(for: .milliseconds(350))
     precondition(!notch.expanded, "Leaving after a popover closes must collapse the notch")
     notch.updateHoverState(true)
     notch.suspendForCapture()
-    try await Task.sleep(for: .milliseconds(180))
+    try await Task.sleep(for: .milliseconds(350))
     precondition(!notch.isVisible, "Capture suspension must hide the hovered notch")
     notch.resumeAfterCapture()
     notch.window?.ignoresMouseEvents = true
@@ -174,8 +171,10 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     print("PASS recent screenshot/video filters and reopening saved media through shared gallery actions")
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
-        try snapshot(NotchContent(), scheme: scheme, width: 660,
+        try snapshot(NotchContent().environment(\.colorScheme, .dark).padding(16).background(.black), scheme: scheme, width: 660,
                      to: output.appendingPathComponent("notch-captures-\(name).png"), height: 700)
+        try snapshot(NotchContent(showsRecent: true).environment(\.colorScheme, .dark).padding(16).background(.black), scheme: scheme, width: 660,
+                     to: output.appendingPathComponent("notch-recents-\(name).png"), height: 360)
         try snapshot(PreferencesView(selection: .general), scheme: scheme, width: 780,
                      to: output.appendingPathComponent("notch-settings-\(name).png"), height: 620)
     }
@@ -233,7 +232,7 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     notch.refreshMode()
     precondition(bar.mode == .recording && notch.isVisible)
     for scheme in [ColorScheme.light, .dark] {
-        try snapshot(NotchContent(), scheme: scheme, width: 660,
+        try snapshot(NotchContent().environment(\.colorScheme, .dark).padding(16).background(.black), scheme: scheme, width: 660,
                      to: output.appendingPathComponent("notch-recording-\(scheme == .light ? "light" : "dark").png"), height: 700)
     }
     bar.hide()

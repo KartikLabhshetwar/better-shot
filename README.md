@@ -229,7 +229,7 @@ If BetterShot helps you, you can [support its development](https://www.buymeacof
 ## License
 
 [BSD 3-Clause](LICENSE) for original BetterShot code; adapted Cap rendering uses
-AGPLv3. See [third-party notices](Resources/Licenses/NOTICE.md) for distribution
+AGPLv3; the notch also includes GPLv3 Boring Notch adaptations. See [third-party notices](Resources/Licenses/NOTICE.md) for distribution
 terms and the bundled TourKit MIT license.
 
 ### Optional notch mode (v0.5.5)
@@ -237,13 +237,16 @@ terms and the bundled TourKit MIT license.
 In **Settings > General > Capture Mode**, choose **Normal Mode** (the default)
 or **Notch Mode**. Notch mode puts the capture tools, recording controls,
 image/video previews, and transfer status at the top of the capture display.
+Use the Capture tab for tools and pending previews, and Recents for your library.
 Use the preview actions to Copy, Save, Edit, Pin, Cloud Share, or Dismiss; arrow
 buttons browse pending captures. New Capture opens the shared capture tools.
 The image and video editors still open in their full editing windows.
-The expanded notch uses native macOS frosted glass and follows light/dark
-appearance, with an opaque background when Reduce Transparency is enabled.
+The notch uses an opaque black surface to match the camera cutout, with native
+macOS controls and readable dark-appearance labels in either system appearance.
 
-Hover over the notch to expand it; moving away collapses it after a short delay.
+The compact notch shows the BetterShot logo and a readiness/editor indicator,
+or the timer while recording. Hover to expand; moving away collapses it after a
+short delay. Brief transitions respect Reduce Motion.
 Menus, recording options, and confirmations stay open while you use them. Click
 remains available for keyboard/accessibility use. Other displays use a floating
 panel that collapses to compact capture status. The Recent Captures section shows
@@ -251,3 +254,5 @@ screenshots and videos from your library; filter by type and click a thumbnail
 to reopen its preview and actions. Open Gallery shows the full library. Pending
 captures remain until you act on them. Switching back restores your normal overlay
 layout and timing. Capture exclusion and private staging work in both modes.
+
+Notch UI and hover interactions include code from [Boring Notch](https://github.com/TheBoredTeam/boring.notch), credited to TheBoredTeam and its contributors. See [source and license notices](Resources/Licenses/NOTICE.md).

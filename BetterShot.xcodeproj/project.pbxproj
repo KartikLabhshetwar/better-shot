@@ -227,6 +227,7 @@
 		FE59D61ABB427B6DFC1D377A /* CaptureOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B626577BDFABF32D144DC8B /* CaptureOrchestrator.swift */; };
 		FEAA5D4F3A6152816BB7EA7B /* Vec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C0979159F4E2923F7AD447 /* Vec.swift */; };
 		FFB826CA31FB62EF0C4858DF /* Recording3DLane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D6579AC33175436B5F53B1C /* Recording3DLane.swift */; };
+		FFC9ABBF0D3449325BC001A7 /* BoringNotchHoverButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 297470BDCFA9440CC1AACDC6 /* BoringNotchHoverButton.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -265,6 +266,7 @@
 		27B9B3F0836AF531CFB09F8C /* AnnoCanvasLayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnoCanvasLayerView.swift; sourceTree = "<group>"; };
 		283839739CC9AE12352E03C1 /* LastRegionGhostPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LastRegionGhostPresenter.swift; sourceTree = "<group>"; };
 		293EA45B51DD6073E49641F4 /* AnnotationEditorWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationEditorWindow.swift; sourceTree = "<group>"; };
+		297470BDCFA9440CC1AACDC6 /* BoringNotchHoverButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoringNotchHoverButton.swift; sourceTree = "<group>"; };
 		2A151485F935146E94D5705F /* RecordingInputAuthorization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingInputAuthorization.swift; sourceTree = "<group>"; };
 		2B95C7007292236807887D07 /* ToastWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastWindow.swift; sourceTree = "<group>"; };
 		2B9AD5D36F1252CDF86D6D06 /* AnnotationMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationMetrics.swift; sourceTree = "<group>"; };
@@ -763,6 +765,7 @@
 		BDA590964BECE51622E85075 /* Notch */ = {
 			isa = PBXGroup;
 			children = (
+				297470BDCFA9440CC1AACDC6 /* BoringNotchHoverButton.swift */,
 				613D2B1B74DE4BF67B4B1A2C /* NotchPresenter.swift */,
 				7D6C3162472265AFC3EF722B /* NotchRecentCaptures.swift */,
 			);
@@ -956,6 +959,7 @@
 				BA2E35F115F67D7CA6DEE5A9 /* BetterShotApp.swift in Sources */,
 				12F0105D52F612AA1BD73023 /* BetterShotDelegate.swift in Sources */,
 				61BB1B90D49DA0006C882330 /* BetterShotPreferences.swift in Sources */,
+				FFC9ABBF0D3449325BC001A7 /* BoringNotchHoverButton.swift in Sources */,
 				46070CAF5A877CB564FDB379 /* Box.swift in Sources */,
 				F3BAB5D4C1617D203E95885B /* BundledBackgrounds.swift in Sources */,
 				37000BC29C1251CAF994FE0F /* CameraRecordingManager.swift in Sources */,

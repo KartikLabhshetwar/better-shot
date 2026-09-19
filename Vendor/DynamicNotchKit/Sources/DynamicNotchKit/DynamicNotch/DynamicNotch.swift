@@ -92,12 +92,20 @@ public final class DynamicNotch<Expanded, CompactLeading, CompactTrailing>: Obse
 
     /// Immediate transitions avoid delayed hides racing capture and mode changes.
     @MainActor
-    public func presentImmediately(on screen: NSScreen, expanded: Bool = true) {
+    public func presentImmediately(on screen: NSScreen, expanded: Bool = true, animated: Bool = false) {
         closePanelTask?.cancel()
         if windowController?.window?.screen != screen || windowController == nil {
             initializeWindow(screen: screen, orderFront: false)
         }
-        state = expanded ? .expanded : .compact
+        let target: DynamicNotchState = expanded ? .expanded : .compact
+        if state != target {
+            let animation: Animation? = animated && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+                // Adapted from boring.notch ContentView's interruptible spring.
+                // GPL-3.0; see BetterShot's Resources/Licenses/NOTICE.md.
+                // Shorter, critically damped response for BetterShot's capture controls.
+                ? .interactiveSpring(response: 0.2, dampingFraction: 1, blendDuration: 0) : nil
+            withAnimation(animation) { state = target }
+        }
         windowController?.window?.alphaValue = 1
         windowController?.window?.orderFrontRegardless()
     }
@@ -189,7 +197,10 @@ public final class DynamicNotch<Expanded, CompactLeading, CompactTrailing>: Obse
     /// - Parameter hovering: a boolean indicating whether the mouse is hovering over the notch.
     func updateHoverState(_ hovering: Bool) {
         // Ensure that we only update when the state changes
-        guard state != .hidden, hovering != isHovering else { return }
+        // SwiftUI tracking areas can emit geometry-driven hover events even when
+        // AppKit ignores pointer input. Honor that setting for the whole panel.
+        guard windowController?.window?.ignoresMouseEvents != true,
+              state != .hidden, hovering != isHovering else { return }
 
         isHovering = hovering
         onHoverChanged?(hovering)

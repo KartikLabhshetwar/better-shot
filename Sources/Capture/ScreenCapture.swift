@@ -45,7 +45,7 @@ final class ScreenCapture {
         }
         args.append(tempPath)
 
-        let success = await runScreencapture(args)
+        let success = try await runScreencapture(args)
         guard success, FileManager.default.fileExists(atPath: tempPath) else { return nil }
         return URL(fileURLWithPath: tempPath)
     }
@@ -58,7 +58,7 @@ final class ScreenCapture {
         defer { isCapturing = false }
 
         let tempPath = makeTempPath()
-        let success = await runScreencapture(["-i", "-o", "-x", "-t", "png", tempPath])
+        let success = try await runScreencapture(["-i", "-o", "-x", "-t", "png", tempPath])
         guard success, FileManager.default.fileExists(atPath: tempPath) else { return nil }
         return URL(fileURLWithPath: tempPath)
     }
@@ -76,7 +76,7 @@ final class ScreenCapture {
         try? await Task.sleep(for: .milliseconds(80))
         let tempPath = makeTempPath()
         let region = RegionGeometry.screencaptureArgument(pointsRect)
-        let success = await runScreencapture(["-R", region, "-x", "-t", "png", tempPath])
+        let success = try await runScreencapture(["-R", region, "-x", "-t", "png", tempPath])
         guard success, FileManager.default.fileExists(atPath: tempPath) else { return nil }
         return URL(fileURLWithPath: tempPath)
     }
@@ -91,12 +91,17 @@ final class ScreenCapture {
     }
 
     private func windowShot(includeShadow: Bool) async throws -> URL? {
+        guard CGPreflightScreenCaptureAccess() || CGRequestScreenCaptureAccess() else {
+            throw NSError(domain: "BetterShot.ScreenCapture", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "Allow BetterShot in System Settings > Privacy & Security > Screen & System Audio Recording, then quit and reopen BetterShot."
+            ])
+        }
         let tempPath = makeTempPath()
         var args = ["-w"]
         if !includeShadow { args.append("-o") }
         args.append(contentsOf: ["-x", "-t", "png", tempPath])
 
-        let success = await runScreencapture(args)
+        let success = try await runScreencapture(args)
         guard success, FileManager.default.fileExists(atPath: tempPath) else { return nil }
         return URL(fileURLWithPath: tempPath)
     }
@@ -173,20 +178,35 @@ final class ScreenCapture {
         return "\(dir)bettershot_\(UUID().uuidString).png"
     }
 
-    private func runScreencapture(_ arguments: [String]) async -> Bool {
-        await withCheckedContinuation { continuation in
+    private func runScreencapture(_ arguments: [String]) async throws -> Bool {
+        try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
                 process.arguments = arguments
+                let errors = Pipe()
+                process.standardError = errors
                 do {
                     try process.run()
+                    let data = errors.fileHandleForReading.readDataToEndOfFile()
                     process.waitUntilExit()
-                    continuation.resume(returning: process.terminationStatus == 0)
+                    continuation.resume(returning: try Self.validateCommandResult(
+                        status: process.terminationStatus, diagnostic: String(decoding: data, as: UTF8.self)))
                 } catch {
-                    continuation.resume(returning: false)
+                    continuation.resume(throwing: error)
                 }
             }
         }
     }
+
+    /// Interactive cancellation has no diagnostic; actual failures must reach the user.
+    nonisolated static func validateCommandResult(status: Int32, diagnostic: String) throws -> Bool {
+        if status == 0 { return true }
+        let message = diagnostic.trimmingCharacters(in: .whitespacesAndNewlines)
+        if status == 1 && message.isEmpty { return false }
+        throw NSError(domain: "BetterShot.ScreenCapture", code: Int(status), userInfo: [
+            NSLocalizedDescriptionKey: "\(message.isEmpty ? "macOS could not create the screenshot." : message) Try again. If this continues, quit and reopen BetterShot and check Screen & System Audio Recording permission in System Settings."
+        ])
+    }
+
 }

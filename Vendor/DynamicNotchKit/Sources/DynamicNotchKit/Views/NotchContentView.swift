@@ -41,7 +41,6 @@ struct NotchContentView<Expanded, CompactLeading, CompactTrailing>: View where E
         ZStack {
             if style.isNotch {
                 NotchView(dynamicNotch: dynamicNotch)
-                    .foregroundStyle(dynamicNotch.state == .expanded ? Color.primary : Color.white)
             } else {
                 NotchlessView(dynamicNotch: dynamicNotch)
             }
@@ -56,6 +55,7 @@ struct NotchContentView<Expanded, CompactLeading, CompactTrailing>: View where E
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .coordinateSpace(name: "notchPanel")
         .environment(\.notchStyle, style)
+        .environment(\.colorScheme, .dark)
 
         .onAppear {
             if dynamicNotch.namespace == nil {

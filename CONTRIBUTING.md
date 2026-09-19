@@ -298,7 +298,7 @@ BETTERSHOT_CHECK_3D_ONLY=1 bash Tests/run-exports.sh
 # With existing Screen Recording permission, capture displayed player windows:
 BETTERSHOT_CHECK_3D_ONLY=1 BETTERSHOT_CHECK_3D_WINDOWS=1 bash Tests/run-exports.sh
 # With optimized Release objects, measure warm 1080p/4K transform, Gaussian, and bokeh GPU frame times:
-BETTERSHOT_BUILD_CONFIGURATION=Release BETTERSHOT_CHECK_3D_ONLY=1 BETTERSHOT_BENCHMARK_3D=1 bash Tests/run-exports.sh
+BETTERSHOT_DERIVED_DATA=.build BETTERSHOT_BUILD_CONFIGURATION=Release BETTERSHOT_CHECK_3D_ONLY=1 BETTERSHOT_BENCHMARK_3D=1 bash Tests/run-exports.sh
 ```
 
 Offscreen snapshots do not validate live AVPlayer layers. The optional window
@@ -313,11 +313,13 @@ media. It does not automate pointer dragging or keyboard entry in the controls.
 make test
 ```
 
-This builds unsigned Debug with testability enabled, runs
+This builds unsigned Debug in `.build/tests` with testability enabled, runs
 [scripts/run-checks.sh](scripts/run-checks.sh), then
 [Tests/run-exports.sh](Tests/run-exports.sh). The runners set
 `BETTERSHOT_TESTING=1` so tests use isolated storage and do not access real R2
-Keychain credentials. Always use the runners; never substitute production
+Keychain credentials. The separate test build directory keeps unsigned tests from replacing
+a running signed dev app and invalidating its Screen Recording permission. Quit the dev
+app before rebuilding its `.build` bundle. Always use the runners; never substitute production
 credentials to make a test pass.
 
 For a logic regression, add a small check against production code. Standalone
@@ -333,6 +335,8 @@ with `make test` when production code changes.
 
 | Area | Command |
 | --- | --- |
+| Notch hover, preview actions, and compact/expanded snapshots | `BETTERSHOT_CHECK_NOTCH=1 bash Tests/run-exports.sh` |
+| Native window selection, preview, and Escape in both modes (moves the pointer; requires existing Screen Recording/Accessibility permission) | `BETTERSHOT_CHECK_WINDOW_CAPTURE=1 bash Tests/run-exports.sh` |
 | Screenshot Copy/Save and private storage | `BETTERSHOT_CHECK_SCREENSHOT_SAVING=1 bash Tests/run-exports.sh` |
 | Video compositing and encoded exports | `BETTERSHOT_CHECK_VIDEO_EXPORTS=1 bash Tests/run-exports.sh` |
 | Displayed Gallery and Settings windows | `BETTERSHOT_CHECK_LIBRARY_WINDOWS=1 bash Tests/run-exports.sh` |
@@ -365,7 +369,7 @@ make generate
 xcodebuild -project BetterShot.xcodeproj -scheme BetterShot -configuration Release \
   -derivedDataPath .build CODE_SIGNING_ALLOWED=NO ENABLE_TESTABILITY=YES \
   SWIFT_COMPILATION_MODE=incremental build
-BETTERSHOT_BUILD_CONFIGURATION=Release BETTERSHOT_BENCHMARK=1 bash Tests/run-exports.sh
+BETTERSHOT_DERIVED_DATA=.build BETTERSHOT_BUILD_CONFIGURATION=Release BETTERSHOT_BENCHMARK=1 bash Tests/run-exports.sh
 ```
 
 It measures two-minute 1080p clips with plain and heavy effects, including 60/30 fps
@@ -462,9 +466,16 @@ add a second saving, copying, upload, or recording implementation. Normal mode i
 the fallback for missing or unknown `bs_presentationMode` values. Mode changes
 must preserve pending media, transfers, and active recording state.
 
-Preserve capture exclusion before presentation, immediate show/hide, transparent
-margin hit testing, display selection, and accessibility. Expanded surfaces use native
-`NSVisualEffectView` popover material with an opaque Reduce Transparency fallback;
-keep the compact notch black and expanded controls in system colors. `make test` exercises mode switching,
-capture suspension, preview actions, transfer cleanup, and both appearances;
-live recording, selectors, and multi-display hardware still need manual checks.
+Preserve capture exclusion before presentation, immediate capture/mode dismissal,
+transparent margin hit testing, display selection, and accessibility. Expanded and
+compact surfaces stay opaque black with native dark-appearance controls. Short
+interruptible transitions respect Reduce Motion. Capture/Recents tabs reuse the
+existing controls and media resolver; compact logo/status never shows a thumbnail
+or capture count. `make test` exercises mode switching, hover cancellation,
+menu/sheet protection, capture suspension, preview actions, transfer cleanup, and
+both appearances. The opt-in window-capture check drives selection and Escape;
+live recording and multi-display hardware still need manual checks.
+
+Boring Notch's copied shape and adapted hover button/interaction code retain their
+source credits and GPLv3 notices. See `Resources/Licenses/NOTICE.md` for the pinned
+revision and exact file mapping; bundle `BoringNotch.txt` with distributions.

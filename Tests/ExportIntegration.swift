@@ -28,6 +28,18 @@ struct ExportIntegration {
         precondition(ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] == "1",
                      "Run through Tests/run-exports.sh to keep the real Keychain isolated")
         precondition(R2CredentialStore.shared.keychainAccess == .empty)
+        let succeeded = try ScreenCapture.validateCommandResult(status: 0, diagnostic: "")
+        let cancelled = try ScreenCapture.validateCommandResult(status: 1, diagnostic: "\n")
+        precondition(succeeded && !cancelled)
+        for (status, diagnostic) in [(Int32(1), "could not create image from window"), (Int32(9), "")] {
+            do {
+                _ = try ScreenCapture.validateCommandResult(status: status, diagnostic: diagnostic)
+                preconditionFailure("Capture errors must not be treated as cancellation")
+            } catch {
+                precondition(error.localizedDescription.contains("quit and reopen BetterShot"))
+            }
+        }
+        print("PASS screenshot success, cancellation, and actionable capture errors")
         defer { try? FileManager.default.removeItem(at: ScreenshotHistoryStore.applicationSupportDirectory) }
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             UUID().uuidString)
@@ -42,6 +54,14 @@ struct ExportIntegration {
         context.setFillColor(CGColor(red: 0.1, green: 0.2, blue: 0.8, alpha: 1))
         context.fill(CGRect(x: 960, y: 0, width: 960, height: 1080))
         let image = context.makeImage()!
+        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_NOTCH"] == "1" {
+            let png = directory.appendingPathComponent("notch-fixture.png")
+            try NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])!.write(to: png)
+            let movie = directory.appendingPathComponent("notch-fixture.mov")
+            try await makeMovie(at: movie, image: image)
+            try await checkNotchPresentation(imageURL: png, movieURL: movie)
+            return
+        }
         if ProcessInfo.processInfo.environment["BETTERSHOT_BENCHMARK_IMAGES"] == "1" {
             try benchmarkImageExports(image: image, directory: directory)
             return

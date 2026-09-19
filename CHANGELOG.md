@@ -14,11 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Notch shape, hover controls, and interactions reuse Boring Notch code, with contributor attribution, pinned source references, and its GPLv3 license bundled with the app.
+
+- The notch uses native Capture/Recents tabs, grouped tools, and preview actions beside the selected image or video. Its compact state shows the BetterShot logo and readiness/editor status, or the recording timer. Short, interruptible transitions respect Reduce Motion.
+
 - The notch opens on hover and collapses after the pointer leaves. Menus, recording options, and confirmations prevent premature closing; non-notched displays also have a compact state. Recent Captures shows saved screenshots and videos with type filters, thumbnails, and the existing gallery actions.
 
-- Expanded Notch Mode uses native macOS frosted glass, system-colored controls, and light/dark appearance. The compact notch stays black, and Reduce Transparency uses an opaque surface.
+- Expanded and compact Notch Mode use an opaque black surface matching the camera cutout, with native macOS controls and readable dark-appearance labels in either system appearance.
 
 ### Fixed
+
+- Screenshot failures now show recovery guidance instead of disappearing silently. Window capture checks macOS Screen Recording access before selection. Unsigned test builds use a separate directory so they cannot overwrite the running dev app and invalidate its capture permission.
 
 - Fix an editor redraw loop in notch transfer-status routing that could consume a CPU core and make video playback controls and scrubbing lag, even with no transfer in progress. Repeated idle/unchanged status updates no longer publish changes; real progress and current Cancel/Retry actions remain available.
 

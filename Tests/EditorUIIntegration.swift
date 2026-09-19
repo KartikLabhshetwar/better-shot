@@ -317,7 +317,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
     let buildConfiguration = ProcessInfo.processInfo.environment["BETTERSHOT_BUILD_CONFIGURATION"] ?? "Debug"
     let appBundle = Bundle(url: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-        .appendingPathComponent(".build/Build/Products/\(buildConfiguration)/BetterShot.app"))!
+        .appendingPathComponent("\(ProcessInfo.processInfo.environment["BETTERSHOT_DERIVED_DATA"] ?? ".build/tests")/Build/Products/\(buildConfiguration)/BetterShot.app"))!
     let practiceDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: practiceDirectory) }
     for sample in OnboardingSample.allCases {
@@ -1138,7 +1138,7 @@ private func checkMediaGallery(imageURL: URL, movieURL: URL) async throws {
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
     let configuration = ProcessInfo.processInfo.environment["BETTERSHOT_BUILD_CONFIGURATION"] ?? "Debug"
     let galleryBundle = Bundle(url: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-        .appendingPathComponent(".build/Build/Products/\(configuration)/BetterShot.app"))!
+        .appendingPathComponent("\(ProcessInfo.processInfo.environment["BETTERSHOT_DERIVED_DATA"] ?? ".build/tests")/Build/Products/\(configuration)/BetterShot.app"))!
     let previousIcon = NSApp.applicationIconImage
     NSApp.applicationIconImage = galleryBundle.image(forResource: "AppIcon")
     defer { NSApp.applicationIconImage = previousIcon }
@@ -1408,7 +1408,7 @@ private func checkPreviewOverlay(imageURL: URL) async throws {
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
         let bundle = Bundle(url: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-            .appendingPathComponent(".build/Build/Products/\(ProcessInfo.processInfo.environment["BETTERSHOT_BUILD_CONFIGURATION"] ?? "Debug")/BetterShot.app"))!
+            .appendingPathComponent("\(ProcessInfo.processInfo.environment["BETTERSHOT_DERIVED_DATA"] ?? ".build/tests")/Build/Products/\(ProcessInfo.processInfo.environment["BETTERSHOT_BUILD_CONFIGURATION"] ?? "Debug")/BetterShot.app"))!
         try snapshot(OverlaySettingsTab(resourceBundle: bundle), scheme: scheme,
                      width: 540, to: output.appendingPathComponent("overlay-settings-\(name).png"), height: 1050)
         try snapshot(PreferencesView(selection: .overlay), scheme: scheme, width: 780,

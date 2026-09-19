@@ -55,9 +55,9 @@ final class CaptureOrchestrator {
         case .region, .timedRegion, .regionCopy, .regionSave, .regionEdit, .regionPin:
             await captureAndProcess(action: action) { try await ScreenCapture.shared.captureRegion() }
         case .fullscreen:
-            await captureAndProcess { try await ScreenCapture.shared.captureFullscreen(on: captureScreen) }
+            await captureAndProcess(action: action) { try await ScreenCapture.shared.captureFullscreen(on: captureScreen) }
         case .window:
-            await captureAndProcess { try await ScreenCapture.shared.captureWindow() }
+            await captureAndProcess(action: action) { try await ScreenCapture.shared.captureWindow() }
         case .ocr, .ocrSingleLine:
             await performOCR(singleLine: action == .ocrSingleLine)
         case .colorPicker:
@@ -82,7 +82,8 @@ final class CaptureOrchestrator {
 
             await processCapturedImage(url, action: action)
         } catch {
-            print("Capture failed: \(error.localizedDescription)")
+            ToastWindow.shared.show(title: "Couldn’t capture screenshot", message: error.localizedDescription,
+                systemIcon: "exclamationmark.triangle", duration: 10, on: captureScreen)
         }
     }
 

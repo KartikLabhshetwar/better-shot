@@ -9,7 +9,6 @@ import SwiftUI
 
 struct NotchView<Expanded, CompactLeading, CompactTrailing>: View where Expanded: View, CompactLeading: View, CompactTrailing: View {
     @ObservedObject private var dynamicNotch: DynamicNotch<Expanded, CompactLeading, CompactTrailing>
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var compactLeadingWidth: CGFloat = 0
     @State private var compactTrailingWidth: CGFloat = 0
     private let safeAreaInset: CGFloat = 15
@@ -56,24 +55,7 @@ struct NotchView<Expanded, CompactLeading, CompactTrailing>: View where Expanded
 
     var body: some View {
         notchContent()
-            .background {
-                if dynamicNotch.state == .expanded {
-                    Group {
-                        if reduceTransparency { Color(nsColor: .windowBackgroundColor) }
-                        else { VisualEffectView(material: .popover, blendingMode: .behindWindow) }
-                    }
-                    .overlay {
-                        NotchShape(topCornerRadius: topCornerRadius, bottomCornerRadius: bottomCornerRadius)
-                            .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-                    }
-                    .overlay(alignment: .top) {
-                        // Keep the physical camera cutout black while the controls use native glass.
-                        Color.black.frame(width: dynamicNotch.notchSize.width, height: dynamicNotch.notchSize.height)
-                    }
-                } else {
-                    Color.black.padding(-50)
-                }
-            }
+            .background(Color.black.padding(-50))
             .mask {
                 NotchShape(
                     topCornerRadius: topCornerRadius,
@@ -124,7 +106,7 @@ struct NotchView<Expanded, CompactLeading, CompactTrailing>: View where Expanded
                     .safeAreaInset(edge: .top, spacing: 0) { Color.clear.frame(height: 4) }
                     .safeAreaInset(edge: .bottom, spacing: 0) { Color.clear.frame(height: 8) }
                     .onGeometryChange(for: CGFloat.self, of: \.size.width) { compactLeadingWidth = $0 }
-                    .transition(.blur(intensity: 10).combined(with: .scale(x: 0, anchor: .trailing)).combined(with: .opacity))
+                    .transition(.opacity)
             }
 
             Spacer()
@@ -137,7 +119,7 @@ struct NotchView<Expanded, CompactLeading, CompactTrailing>: View where Expanded
                     .safeAreaInset(edge: .top, spacing: 0) { Color.clear.frame(height: 4) }
                     .safeAreaInset(edge: .bottom, spacing: 0) { Color.clear.frame(height: 8) }
                     .onGeometryChange(for: CGFloat.self, of: \.size.width) { compactTrailingWidth = $0 }
-                    .transition(.blur(intensity: 10).combined(with: .scale(x: 0, anchor: .leading)).combined(with: .opacity))
+                    .transition(.opacity)
             }
         }
         .frame(height: dynamicNotch.notchSize.height)
@@ -157,7 +139,7 @@ struct NotchView<Expanded, CompactLeading, CompactTrailing>: View where Expanded
         HStack(spacing: 0) {
             if dynamicNotch.state == .expanded {
                 dynamicNotch.expandedContent
-                    .transition(.blur(intensity: 10).combined(with: .scale(y: 0.6, anchor: .top)).combined(with: .opacity))
+                    .transition(.opacity)
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) { Color.clear.frame(height: dynamicNotch.notchSize.height) }

@@ -22,6 +22,7 @@ PROJECT      = BetterShot.xcodeproj
 CONFIG_DEBUG = Debug
 CONFIG_REL   = Release
 DERIVED_DIR  = .build
+TEST_DERIVED_DIR = $(DERIVED_DIR)/tests
 APP_DEBUG    = $(DERIVED_DIR)/Build/Products/$(CONFIG_DEBUG)/$(SCHEME).app
 APP_RELEASE  = $(DERIVED_DIR)/Build/Products/$(CONFIG_REL)/$(SCHEME).app
 VERSION     := $(shell python3 -c "import json; print(json.load(open('version.json'))['version'])")
@@ -87,10 +88,10 @@ lint: ## Check for compiler warnings
 
 test: generate ## Build and run regression/editor/export checks without Keychain prompts
 	@xcodebuild -project $(PROJECT) -scheme $(SCHEME) \
-		-configuration $(CONFIG_DEBUG) -derivedDataPath $(DERIVED_DIR) \
+		-configuration $(CONFIG_DEBUG) -derivedDataPath $(TEST_DERIVED_DIR) \
 		CODE_SIGNING_ALLOWED=NO ENABLE_TESTABILITY=YES build 2>&1 | tail -3
 	@bash scripts/run-checks.sh
-	@bash Tests/run-exports.sh
+	@BETTERSHOT_DERIVED_DATA="$(TEST_DERIVED_DIR)" bash Tests/run-exports.sh
 
 test-build: clean release ## Full clean + release build
 	@echo "==> Test build passed."

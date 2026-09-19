@@ -9,7 +9,6 @@ import SwiftUI
 
 struct NotchlessView<Expanded, CompactLeading, CompactTrailing>: View where Expanded: View, CompactLeading: View, CompactTrailing: View {
     @ObservedObject private var dynamicNotch: DynamicNotch<Expanded, CompactLeading, CompactTrailing>
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var windowHeight: CGFloat = 0
     private let safeAreaInset: CGFloat = 15
 
@@ -27,16 +26,7 @@ struct NotchlessView<Expanded, CompactLeading, CompactTrailing>: View where Expa
 
     var body: some View {
         notchContent()
-            .background {
-                Group {
-                    if reduceTransparency { Color(nsColor: .windowBackgroundColor) }
-                    else { VisualEffectView(material: .popover, blendingMode: .behindWindow) }
-                }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .strokeBorder(.quaternary, lineWidth: 1)
-                    }
-            }
+            .background(Color.black)
             .clipShape(.rect(cornerRadius: cornerRadius))
             .padding(20)
             .onGeometryChange(for: CGFloat.self, of: \.size.height) { newHeight in
@@ -59,7 +49,7 @@ struct NotchlessView<Expanded, CompactLeading, CompactTrailing>: View where Expa
                     dynamicNotch.expandedContent
                 }
             }
-                .transition(.blur(intensity: 10).combined(with: .opacity))
+                .transition(.opacity)
                 .safeAreaInset(edge: .top, spacing: 0) { Color.clear.frame(height: safeAreaInset) }
                 .safeAreaInset(edge: .bottom, spacing: 0) { Color.clear.frame(height: safeAreaInset) }
                 .safeAreaInset(edge: .leading, spacing: 0) { Color.clear.frame(width: safeAreaInset) }

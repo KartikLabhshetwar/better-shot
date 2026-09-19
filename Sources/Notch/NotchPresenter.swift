@@ -12,7 +12,7 @@ final class NotchPresenter {
     private(set) var captureSuspended = false
     var countdown: Int?
     @ObservationIgnored private var enabledSession = false
-    @ObservationIgnored private var hoverDismissTimer: Timer?
+    @ObservationIgnored private var hoverTask: Task<Void, Never>?
     @ObservationIgnored private var isHovering = false
     @ObservationIgnored var menuTrackingCount = 0
     var notification: AnyView?
@@ -65,6 +65,7 @@ final class NotchPresenter {
                 panel.identifier = NSUserInterfaceItemIdentifier("BetterShot.Notch")
                 panel.title = "BetterShot notch"
                 panel.level = .statusBar
+                panel.appearance = NSAppearance(named: .darkAqua)
                 panel.isOpaque = false
                 panel.hidesOnDeactivate = false
                 panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
@@ -72,18 +73,18 @@ final class NotchPresenter {
             }
             self.notch = notch
         }
-        notch?.presentImmediately(on: screen, expanded: expanded)
+        notch?.presentImmediately(on: screen, expanded: expanded, animated: true)
     }
 
     func collapse() {
-        hoverDismissTimer?.invalidate()
+        hoverTask?.cancel()
         guard expanded else { return }
         expanded = false
         refresh()
     }
 
     func suspendForCapture() {
-        hoverDismissTimer?.invalidate()
+        hoverTask?.cancel()
         isHovering = false
         menuTrackingCount = 0
         captureSuspended = true
@@ -96,7 +97,7 @@ final class NotchPresenter {
     }
 
     func refreshMode() {
-        hoverDismissTimer?.invalidate()
+        hoverTask?.cancel()
         isHovering = false
         menuTrackingCount = 0
         enabledSession = AppPreferences.presentationMode == .notch
@@ -110,20 +111,24 @@ final class NotchPresenter {
 
     func updateHoverState(_ hovering: Bool) {
         isHovering = hovering
-        hoverDismissTimer?.invalidate()
+        hoverTask?.cancel()
         guard AppPreferences.presentationMode == .notch, !captureSuspended else { return }
         if hovering {
             if !expanded { show() }
             return
         }
-        let timer = Timer(timeInterval: 0.1, repeats: false) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self, !self.isHovering, self.canCollapseAfterHover else { return }
-                self.collapse()
-            }
+        // Adapted from ContentView.handleHover in TheBoredTeam/boring.notch
+        // (99c26e418323d10e48886469fc9bd83900194bec), GPL-3.0.
+        // Keep BetterShot's native menu/sheet and capture-suspension guards.
+        // See Resources/Licenses/NOTICE.md and BoringNotch.txt.
+        // Measure from the pointer event, not from when SwiftUI layout lets the task start.
+        let deadline = ContinuousClock.now.advanced(by: .milliseconds(100))
+        hoverTask = Task { [weak self] in
+            try? await Task.sleep(until: deadline, clock: .continuous)
+            guard !Task.isCancelled, let self,
+                  !self.isHovering, self.canCollapseAfterHover else { return }
+            self.collapse()
         }
-        hoverDismissTimer = timer
-        RunLoop.main.add(timer, forMode: .common)
     }
 
     private var canCollapseAfterHover: Bool {
@@ -171,6 +176,12 @@ struct NotchContent: View {
     @State private var bar = RecordingBarPresenter.shared
     @State private var overlay = PreviewOverlay.shared
     @State private var selectedURL: URL?
+    @State private var showsRecent = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init(showsRecent: Bool = false) {
+        _showsRecent = State(initialValue: showsRecent)
+    }
 
     private var selected: URL? {
         selectedURL.flatMap { overlay.items.contains($0) ? $0 : nil } ?? overlay.items.last
@@ -208,86 +219,126 @@ struct NotchContent: View {
         .onChange(of: presenter.countdown) { _, countdown in
             if countdown == nil { presenter.resumeHoverDismissal() }
         }
-        .onChange(of: overlay.items) { selectedURL = overlay.items.last }
+        .onChange(of: overlay.items) {
+            selectedURL = overlay.items.last
+            if !overlay.items.isEmpty { showsRecent = false }
+        }
         .onExitCommand {
             if bar.isVisible && bar.mode == .picker {
                 bar.dismiss()
                 Task { await CameraRecordingManager.shared.stopPreview() }
-            } else { presenter.collapse() }
+            }
+            presenter.collapse()
         }
         .onKeyPress("a") {
-            guard bar.isVisible, bar.mode == .picker else { return .ignored }
+            guard !showsRecent, !ScreenRecordingManager.shared.isActive else { return .ignored }
             bar.captureLastRegion()
             return .handled
         }
     }
 
     private var content: some View {
-        VStack(spacing: 10) {
-            HStack {
-                Image("MenuBarIcon").resizable().scaledToFit().frame(width: 18, height: 18)
+        VStack(spacing: 14) {
+            HStack(spacing: 10) {
+                Image(nsImage: NSImage(named: "MenuBarIcon") ?? NSImage()).resizable().renderingMode(.template)
+                    .scaledToFit().frame(width: 20, height: 20)
+                    .accessibilityHidden(true)
                 Text("BetterShot").font(.headline)
                 Spacer()
-                if !bar.isVisible && !ScreenRecordingManager.shared.isActive {
-                    Button("New Capture", systemImage: "viewfinder") { bar.showPicker() }
+                Picker("Notch section", selection: $showsRecent) {
+                    Text("Capture").tag(false)
+                    Text("Recents").tag(true)
                 }
-                Button("Collapse notch", systemImage: "chevron.up") { presenter.collapse() }
-                    .labelStyle(.iconOnly)
+                .pickerStyle(.segmented).labelsHidden().frame(width: 190)
+                BoringNotchHoverButton(title: "Settings", icon: "gearshape") {
+                    SettingsWindowController.shared.open(section: .general)
+                }
+                BoringNotchHoverButton(title: "Collapse notch — Esc", icon: "chevron.up") {
+                    presenter.collapse()
+                }
             }
             if let countdown = presenter.countdown {
                 Label("Starting in \(countdown)", systemImage: "timer")
                     .font(.title2.monospacedDigit()).padding()
             } else {
-                if bar.isVisible {
-                    if bar.mode == .recording {
-                        RecordingSessionControls().frame(height: BarMetrics.recordingHeight)
-                    } else {
-                        RecordingPickerControls().frame(height: BarMetrics.height)
-                    }
+                if ScreenRecordingManager.shared.isActive {
+                    RecordingSessionControls().frame(height: BarMetrics.recordingHeight)
                 }
                 if let script = presenter.script {
                     TeleprompterOverlayView(model: script).textArea
                         .padding(8).background(.black, in: RoundedRectangle(cornerRadius: 8))
                 }
-                if overlay.isPresented, let url = selected {
-                    Divider()
-                    HStack {
-                        Text(PreviewOverlay.isVideo(url) ? "Recording" : "Screenshot").font(.subheadline)
-                        Spacer()
-                        if overlay.items.count > 1 {
-                            Button("Previous capture", systemImage: "chevron.left") { moveSelection(-1) }
-                                .labelStyle(.iconOnly)
-                            Text("\((overlay.items.firstIndex(of: url) ?? 0) + 1) / \(overlay.items.count)")
-                                .monospacedDigit()
-                            Button("Next capture", systemImage: "chevron.right") { moveSelection(1) }
-                                .labelStyle(.iconOnly)
-                            Button("Save All") { overlay.saveAll() }
-                            Button("Clear All") { overlay.clearAll() }
-                        }
-                    }
-                    PreviewCardView(overlay: overlay, url: url, usesNotchActions: true)
-                        .id(url)
-                    HStack(spacing: 16) {
-                        ForEach(OverlayTool.allCases) { tool in
-                            Button { overlay.perform(tool, for: url) } label: {
-                                Label(tool.title, systemImage: tool.symbol)
-                            }
-                            .disabled(overlay.savingItems.contains(url) || overlay.transferStatus(for: url) != nil)
-                        }
-                    }
-                    .controlSize(.small)
-                    .onHover { hovering in
-                        if hovering { overlay.cancelScheduledDismiss(for: url) }
-                        else { overlay.scheduleDismiss(for: url) }
+                Group {
+                    if showsRecent {
+                        NotchRecentCaptures()
+                    } else {
+                        captureContent
                     }
                 }
-                Divider()
-                NotchRecentCaptures()
+                .transition(.opacity)
                 if let id = presenter.transferOrder.last, let card = presenter.transfers[id] { card }
                 if let notification = presenter.notification { notification }
             }
         }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: showsRecent)
         .padding(.top, 8)
+    }
+
+    private var captureContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if !ScreenRecordingManager.shared.isActive {
+                RecordingPickerControls(showsCloseButton: false)
+                    .frame(maxWidth: .infinity).frame(height: BarMetrics.height)
+                    .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+            }
+            if overlay.isPresented, let url = selected {
+                HStack {
+                    Label(PreviewOverlay.isVideo(url) ? "Recording" : "Screenshot",
+                          systemImage: PreviewOverlay.isVideo(url) ? "video" : "photo")
+                        .font(.subheadline.weight(.medium))
+                    Spacer()
+                    if overlay.items.count > 1 {
+                        Button("Previous capture", systemImage: "chevron.left") { moveSelection(-1) }
+                            .labelStyle(.iconOnly)
+                        Text("\((overlay.items.firstIndex(of: url) ?? 0) + 1) of \(overlay.items.count)")
+                            .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                        Button("Next capture", systemImage: "chevron.right") { moveSelection(1) }
+                            .labelStyle(.iconOnly)
+                        Menu("More", systemImage: "ellipsis") {
+                            Button("Save All") { overlay.saveAll() }
+                            Button("Clear All") { overlay.clearAll() }
+                        }.labelStyle(.iconOnly)
+                    }
+                }
+                HStack(alignment: .center, spacing: 20) {
+                    PreviewCardView(overlay: overlay, url: url, usesNotchActions: true).id(url)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Ready to edit or share").font(.headline)
+                        Text("Keep capturing. Your captures stay here until you dismiss them.")
+                            .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                            ForEach([OverlayTool.edit, .copy, .save, .share, .pin, .dismiss]) { tool in
+                                Button { overlay.perform(tool, for: url) } label: {
+                                    Label(tool.title, systemImage: tool.symbol)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .buttonStyle(EditorButtonStyle(bordered: true))
+                                .disabled(overlay.savingItems.contains(url) || overlay.transferStatus(for: url) != nil)
+                            }
+                        }
+                    }
+                }
+            } else if !ScreenRecordingManager.shared.isActive {
+                VStack(spacing: 8) {
+                    Image(systemName: "viewfinder").font(.system(size: 28, weight: .light))
+                    Text("Ready to capture").font(.headline)
+                    Text("Choose an area, display, or window above.")
+                        .font(.callout).foregroundStyle(.secondary)
+                    Button("Browse recent captures") { showsRecent = true }
+                }
+                .frame(maxWidth: .infinity).padding(.vertical, 22)
+            }
+        }
     }
 
     private func moveSelection(_ delta: Int) {
@@ -299,26 +350,48 @@ struct NotchContent: View {
 struct NotchCompactLeading: View {
     var body: some View {
         Button { NotchPresenter.shared.show() } label: {
-            if (NotchPresenter.shared.screen?.safeAreaInsets.top ?? 0) == 0 {
-                Text("BetterShot").font(.caption)
-            } else {
-                Color.clear.frame(width: 1, height: 18)
-            }
+            Image(nsImage: NSImage(named: "MenuBarIcon") ?? NSImage()).resizable().renderingMode(.template)
+                .scaledToFit().frame(width: 18, height: 18)
+                .frame(width: 28, height: 22)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Expand BetterShot notch")
+        .accessibilityLabel("BetterShot — expand capture tools")
+        .help("BetterShot — capture tools and recent media")
     }
 }
 
 struct NotchCompactTrailing: View {
+    @State private var editorIsOpen = false
+
+    private var status: (title: String, symbol: String) {
+        if editorIsOpen { return ("Editor open", "pencil.and.outline") }
+        if PreviewOverlay.shared.isPresented { return ("Capture ready", "checkmark") }
+        return ("Ready to capture", "viewfinder")
+    }
+
     var body: some View {
-        if ScreenRecordingManager.shared.isActive {
-            Button { NotchPresenter.shared.show() } label: {
-                Label(ScreenRecordingManager.shared.formattedElapsedTime, systemImage: "record.circle")
-                    .monospacedDigit()
+        Button { NotchPresenter.shared.show() } label: {
+            if ScreenRecordingManager.shared.isActive {
+                Label(ScreenRecordingManager.shared.formattedElapsedTime, systemImage: "record.circle.fill")
+                    .monospacedDigit().foregroundStyle(.red)
+            } else {
+                Image(systemName: status.symbol).font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.blue).frame(width: 28, height: 22)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Expand recording controls")
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(ScreenRecordingManager.shared.isActive ? "Expand recording controls" : status.title)
+        .help(ScreenRecordingManager.shared.isActive ? "Recording in progress" : status.title)
+        .onAppear { refreshEditors() }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in refreshEditors() }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { notification in
+            refreshEditors(excluding: notification.object as? NSWindow)
+        }
+    }
+
+    private func refreshEditors(excluding closing: NSWindow? = nil) {
+        editorIsOpen = NSApp.windows.contains {
+            $0 !== closing && ($0.isVisible || $0.isMiniaturized) && $0.delegate is EditorCloseGuard
         }
     }
 }

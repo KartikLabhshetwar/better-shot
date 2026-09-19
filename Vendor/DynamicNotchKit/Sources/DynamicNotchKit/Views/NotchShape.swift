@@ -1,9 +1,13 @@
 //
 //  NotchShape.swift
-//  DynamicNotchKit
+//  boringNotch
 //
-//  Created by Kai Azim on 2023-08-24.
-//
+// Created by Kai Azim on 2023-08-24.
+// Original source: https://github.com/MrKai77/DynamicNotchKit
+// Modified by Alexander on 2025-05-18.
+
+// Copied from TheBoredTeam/boring.notch at 99c26e418323d10e48886469fc9bd83900194bec.
+// GPL-3.0; see Resources/Licenses/BoringNotch.txt and NOTICE.md in BetterShot.
 
 import SwiftUI
 
@@ -12,11 +16,11 @@ struct NotchShape: Shape {
     private var bottomCornerRadius: CGFloat
 
     init(
-        topCornerRadius: CGFloat,
-        bottomCornerRadius: CGFloat
+        topCornerRadius: CGFloat? = nil,
+        bottomCornerRadius: CGFloat? = nil
     ) {
-        self.topCornerRadius = topCornerRadius
-        self.bottomCornerRadius = bottomCornerRadius
+        self.topCornerRadius = topCornerRadius ?? 6
+        self.bottomCornerRadius = bottomCornerRadius ?? 14
     }
 
     var animatableData: AnimatablePair<CGFloat, CGFloat> {

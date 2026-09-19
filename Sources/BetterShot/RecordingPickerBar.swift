@@ -38,6 +38,7 @@ extension RecordingBarPresenter {
 // MARK: - Controls
 
 struct RecordingPickerControls: View {
+    var showsCloseButton = true
     @State private var sources = RecordingSourceCatalog.shared
     @AppStorage(BetterShotPreferences.recordingCameraDeviceIDKey) private var cameraID = ""
     @AppStorage(BetterShotPreferences.recordingMicrophoneDeviceIDKey) private var microphoneID = ""
@@ -77,9 +78,11 @@ struct RecordingPickerControls: View {
                 .padding(20)
                 .task { await sources.refresh() }
             }
-            BarActionButton(id: .close, title: "Close", systemImage: "xmark",
+            if showsCloseButton {
+                BarActionButton(id: .close, title: "Close", systemImage: "xmark",
                             accessibility: "Close capture bar — Esc") {
-                dismissPicker()
+                    dismissPicker()
+                }
             }
         }
     }
