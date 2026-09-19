@@ -5,13 +5,13 @@ import SwiftUI
 @testable import BetterShot
 
 /// Offscreen snapshots and model checks, plus a brief native transfer-toast lifecycle check.
-/// AVPlayer layers and window toolbars require live UI testing and are not captured here.
+/// Set BETTERSHOT_CHECK_LIBRARY_WINDOWS=1 for displayed gallery/Settings screenshots.
+/// AVPlayer layers and interactive capture still require manual testing.
 @MainActor
 func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     try await checkColorPickerAndToast()
     try await checkPreviewOverlay(imageURL: imageURL)
     try await checkMediaGallery(imageURL: imageURL, movieURL: movieURL)
-    try await checkLibraryWindowToolbars()
     checkTransferToastPresentation(movieURL: movieURL)
     try await checkGeneralEditorDefaults(movieURL: movieURL)
     try await checkCameraAspectRatios(movieURL: movieURL)
@@ -846,44 +846,92 @@ private func checkTransferToastPresentation(movieURL: URL) {
 
 
 @MainActor
-private func checkLibraryWindowToolbars() async throws {
+private func checkLibraryWindowToolbars(items: [MediaGalleryItem]) async throws {
     for section in SettingsSection.allCases {
         precondition(NSImage(systemSymbolName: section.icon, accessibilityDescription: nil) != nil,
                      "Settings icons must exist in the system SF Symbols catalog")
     }
-    for (name, root) in [("gallery", AnyView(MediaGalleryContent(items: []))),
-                         ("settings", AnyView(PreferencesView()))] {
-        let window = NSWindow(contentViewController: NSHostingController(rootView: root.environment(\.colorScheme, .dark)))
-        window.appearance = NSAppearance(named: .darkAqua)
-        window.title = name == "settings" ? SettingsSection.general.title : "Media Gallery"
-        window.styleMask = [.titled, .closable, .resizable, .fullSizeContentView]
-        window.setContentSize(NSSize(width: 780, height: 620))
-        window.isReleasedWhenClosed = false
-        defer { window.contentViewController = nil; window.close() }
-        window.contentView?.layoutSubtreeIfNeeded()
-        try await Task.sleep(for: .milliseconds(100))
-        precondition(window.toolbar?.items.isEmpty == false,
-                     "Gallery and Settings must install their native window toolbars")
-        if name == "settings" {
-            precondition(window.toolbar?.items.count == 1,
-                         "Settings must have a single native title item, without a duplicate toolbar heading")
-        }
-        if let frame = window.contentView?.superview,
-           let chrome = frame.bitmapImageRepForCachingDisplay(in: frame.bounds) {
-            frame.cacheDisplay(in: frame.bounds, to: chrome)
-            try chrome.representation(using: .png, properties: [:])!.write(to:
-                URL(fileURLWithPath: ".build/editor-snapshots/\(name)-window-dark.png"))
-        }
-        let view = window.contentView!
-        let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
-        view.cacheDisplay(in: view.bounds, to: bitmap)
-        // Sample the empty sidebar margin, where the previous glass surface rendered solid white.
-        let scale = CGFloat(bitmap.pixelsWide) / view.bounds.width
-        let color = bitmap.colorAt(x: Int(12 * scale), y: bitmap.pixelsHigh / 2)!.usingColorSpace(.deviceRGB)!
-        precondition(min(color.redComponent, color.greenComponent, color.blueComponent) < 0.8,
-                     "Dark gallery and Settings sidebars must not render as white blocks")
+    let live = ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_LIBRARY_WINDOWS"] == "1"
+    let activationPolicy = NSApp.activationPolicy()
+    defer { if live { NSApp.setActivationPolicy(activationPolicy) } }
+    if live {
+        precondition(CGPreflightScreenCaptureAccess(), "Live window checks require existing Screen Recording access")
+        NSApp.setActivationPolicy(.regular)
     }
-    print("PASS native gallery/Settings toolbars and dark sidebar rendering at compact size")
+    for scheme in [ColorScheme.light, .dark] {
+        for width: CGFloat in live ? [780, 1080] : [780] {
+            for (name, root) in [
+                ("gallery", AnyView(MediaGalleryContent(items: items))),
+                ("gallery-list", AnyView(MediaGalleryContent(items: items, listView: true))),
+                ("settings", AnyView(PreferencesView()))
+            ] {
+                let window = NSWindow(contentViewController: NSHostingController(rootView: root.environment(\.colorScheme, scheme)))
+                window.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
+                window.title = name == "settings" ? SettingsSection.general.title : MediaGalleryCategory.all.title
+                window.styleMask = [.titled, .closable, .resizable, .fullSizeContentView]
+                window.toolbarStyle = .unified
+                window.titlebarAppearsTransparent = true
+                window.collectionBehavior = [.moveToActiveSpace]
+                window.setContentSize(NSSize(width: width, height: 660))
+                window.isReleasedWhenClosed = false
+                defer { window.contentViewController = nil; window.close() }
+                window.contentView?.layoutSubtreeIfNeeded()
+                try await Task.sleep(for: .milliseconds(100))
+                precondition(window.toolbar?.items.contains(where: { $0.label == "Toggle Sidebar" }) == true,
+                             "Gallery and Settings must provide the native sidebar toggle")
+                // cacheDisplay cannot capture macOS's compositor-backed sidebar/search surfaces.
+                // Check the real window rather than mistaking white offscreen placeholders for UI.
+                if live {
+                    window.center()
+                    window.orderFrontRegardless()
+                    window.makeKeyAndOrderFront(nil)
+                    NSApp.activate(ignoringOtherApps: true)
+                    try await Task.sleep(for: .milliseconds(400))
+                    let path = ".build/editor-snapshots/\(name)-window-\(scheme)-\(Int(width)).png"
+                    for attempt in 0..<2 {
+                        let capture = Process()
+                        capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+                        capture.arguments = ["-x", "-o", "-l", String(window.windowNumber), path]
+                        try capture.run()
+                        capture.waitUntilExit()
+                        if capture.terminationStatus == 0 { break }
+                        precondition(attempt == 0, "Could not capture displayed \(name) window")
+                        // WindowServer can need another turn after changing spaces or appearance.
+                        window.orderFrontRegardless()
+                        try await Task.sleep(for: .milliseconds(500))
+                    }
+                    let bitmap = NSBitmapImageRep(data: try Data(contentsOf: URL(fileURLWithPath: path)))!
+                    if scheme == .dark {
+                        let color = bitmap.colorAt(x: bitmap.pixelsWide / 10, y: bitmap.pixelsHigh * 3 / 4)!.usingColorSpace(.deviceRGB)!
+                        precondition(max(color.redComponent, color.greenComponent, color.blueComponent) < 0.8,
+                                     "Displayed dark sidebars must not render as white blocks")
+                    }
+                    func clickSidebarToggle() {
+                        let button = window.toolbar!.items.first { $0.label == "Toggle Sidebar" }!.view!
+                        let point = button.convert(NSPoint(x: button.bounds.midX, y: button.bounds.midY), to: nil)
+                        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                            window.sendEvent(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
+                                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!)
+                        }
+                    }
+                    func splitView(in view: NSView) -> NSSplitView? {
+                        (view as? NSSplitView) ?? view.subviews.lazy.compactMap { splitView(in: $0) }.first
+                    }
+                    let split = splitView(in: window.contentView!)!
+                    let sidebar = split.arrangedSubviews[0]
+                    precondition(!split.isSubviewCollapsed(sidebar))
+                    clickSidebarToggle()
+                    try await Task.sleep(for: .milliseconds(300))
+                    precondition(split.isSubviewCollapsed(sidebar), "Sidebar button must hide the sidebar")
+                    clickSidebarToggle()
+                    try await Task.sleep(for: .milliseconds(300))
+                    precondition(!split.isSubviewCollapsed(sidebar), "Sidebar button must restore the sidebar")
+                }
+            }
+        }
+    }
+    print("PASS native gallery/Settings sidebar toolbars in both appearances" + (live ? ", displayed compact/wide snapshots and dark material rendering" : ""))
 }
 
 @MainActor
@@ -992,6 +1040,9 @@ private func checkMediaGallery(imageURL: URL, movieURL: URL) async throws {
     let configuration = ProcessInfo.processInfo.environment["BETTERSHOT_BUILD_CONFIGURATION"] ?? "Debug"
     let galleryBundle = Bundle(url: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         .appendingPathComponent(".build/Build/Products/\(configuration)/BetterShot.app"))!
+    let previousIcon = NSApp.applicationIconImage
+    NSApp.applicationIconImage = galleryBundle.image(forResource: "AppIcon")
+    defer { NSApp.applicationIconImage = previousIcon }
     var snapshotItems = entries
     for sample in OnboardingSample.allCases {
         let url = sample.sourceURL(in: galleryBundle)!
@@ -1034,6 +1085,7 @@ private func checkMediaGallery(imageURL: URL, movieURL: URL) async throws {
         try snapshot(MediaGalleryContent(items: []), scheme: scheme, width: 780,
             to: output.appendingPathComponent("gallery-empty-\(scheme).png"), height: 520)
     }
+    try await checkLibraryWindowToolbars(items: snapshotItems)
     try await checkGalleryDeletion(imageURL: imageURL, movieURL: movieURL, root: root)
     print("PASS gallery source merging, project reopening, local/cloud/type/search filters, missing local shares, and compact/light/dark layouts")
 }

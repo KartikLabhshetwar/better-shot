@@ -39,6 +39,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 struct PreferencesView: View {
     @State private var selection: SettingsSection
     @State private var search = ""
+    @State private var columnVisibility = NavigationSplitViewVisibility.all
     var onSelectionChange: (SettingsSection) -> Void = { _ in }
 
     init(selection: SettingsSection = .general, onSelectionChange: @escaping (SettingsSection) -> Void = { _ in }) {
@@ -47,7 +48,7 @@ struct PreferencesView: View {
     }
 
     var body: some View {
-        HSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             VStack(spacing: 0) {
                 SettingsSearchField(text: $search)
                     .frame(height: 24)
@@ -79,8 +80,16 @@ struct PreferencesView: View {
                 .listStyle(.sidebar)
                 .scrollContentBackground(.hidden)
             }
-            .frame(minWidth: 200, idealWidth: 220, maxWidth: 240, maxHeight: .infinity)
-            .studioGlass(cornerRadius: 0)
+            .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 260)
+            .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    Button("Toggle Sidebar", systemImage: "sidebar.left") {
+                        columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+                    }
+                    .help("Show or hide the sidebar")
+                }
+            }
+        } detail: {
             detail
                 .buttonStyle(EditorButtonStyle(bordered: true))
                 .toggleStyle(.switch)
@@ -89,13 +98,10 @@ struct PreferencesView: View {
                 .frame(maxWidth: 720)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(nsColor: .windowBackgroundColor))
+                .navigationTitle(selection.title)
         }
-        .navigationTitle(selection.title)
+        .navigationSplitViewStyle(.balanced)
         .onChange(of: selection) { _, section in onSelectionChange(section) }
-        .toolbar {
-            DefaultToolbarItem(kind: .title, placement: .navigation)
-                .sharedBackgroundVisibility(.hidden)
-        }
         .tint(EditorChrome.accent)
         .accentColor(EditorChrome.accent)
         .frame(minWidth: 780, minHeight: 620)

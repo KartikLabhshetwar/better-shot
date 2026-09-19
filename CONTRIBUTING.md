@@ -117,14 +117,19 @@ and keys are kept as separate tracks.
 
 ### Gallery and Settings
 
-Media Gallery uses a native split view and toolbar with compact icon/list views.
+Media Gallery uses `NavigationSplitView` and a native toolbar with compact icon/list views.
+Keep section titles and search in the detail column, with the system sidebar toggle
+and resizable sidebar. Icon previews fit within 64 pt without cropping; filenames
+carry the blue selection highlight. Grid keyboard movement must use the same
+column width, spacing, and insets as the displayed grid.
 On this Mac and Cloud Shares each expose All Media, Screenshots, and Videos;
 local availability and a saved cloud link are independent, so an item can appear
 in both. Use the shared file-type resolver for legacy/imported videos and resolve
 recording previews from the package when flattened exports change.
 Keep single-click selection, double-click opening, keyboard access, contextual
 actions, and local/cloud deletion confirmations consistent across both views.
-Gallery list view uses SwiftUI Table with native column sorting. Settings uses a
+Gallery list view uses SwiftUI Table with native column sorting. Settings uses the
+same native navigation columns with its title above the detail pane, a
 searchable sidebar, neutral SF Symbols, one native toolbar title, and grouped
 native forms; preserve existing preference bindings and the shared InspectorSlider
 controls.
@@ -230,6 +235,14 @@ Editor snapshots appear in `.build/editor-snapshots/`. Check light/dark and
 narrow layouts. Offscreen snapshots cannot validate live AVPlayer layers,
 native toolbars, global shortcuts, capture selection, or permissions. For
 relevant changes, check these manually and report gaps honestly.
+
+With existing Screen Recording permission, run
+`BETTERSHOT_CHECK_LIBRARY_WINDOWS=1 make test` to also display and capture the
+gallery icon/list and Settings windows at compact and wide sizes in both
+appearances. These test-only windows use fixture media and isolated credentials.
+Use their `*-window-*-780.png` / `*-window-*-1080.png` images to review native
+materials: offscreen `cacheDisplay` snapshots cannot render the system sidebar
+and search surfaces reliably.
 
 For website changes, run `pnpm lint` and `pnpm build` from `bettershot-landing/`.
 

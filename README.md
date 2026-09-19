@@ -22,7 +22,7 @@ unless you share it, and shares go to storage you own.
 - **Cursor styling:** choose Recorded, Dark, Light, Dot, or native Hand with size, motion, press/ripple effects, and idle hiding. High-resolution artwork preserved in exports.
 - **Capture deck:** keep up to five captures in a floating stack with Copy, Save, Pin, Edit, cloud share, and drag-out. Configurable layouts, tool positions, and dismissal timing.
 - **Media Gallery:** Finder-style icon and list views with separate On this Mac and Cloud Shares sections for screenshots and videos, toolbar search, native sortable Name/Date Created/Kind table columns, and a location/status bar. Shared media with a local source appears in both locations. Click to select, double-click to open, or use the item menu to edit, reveal, copy cloud links, or delete with confirmation.
-- **Native Settings:** a native sidebar search field, compact neutral SF Symbols, a single section title, and grouped controls follow the macOS System Settings layout.
+- **Native Settings:** resizable native navigation columns, sidebar search, compact neutral SF Symbols, a section title above the detail pane, and grouped controls follow the macOS System Settings layout. Both Settings and Media Gallery let you hide or show the sidebar from the toolbar.
 - **Video export:** GPU compositing and hardware encoding, with 30/60 fps, resolution, quality, and MP4/MOV controls. Export and sharing reuse unchanged saved renders.
 - **Cloud sharing:** upload to your own Cloudflare R2 bucket. Optimized image compression, MP4 video, native progress, and retry on failure.
 - **75 customizable shortcuts:** configure global capture, recording controls, deck actions, image tools, and video editing keys. Conflict detection per scope.

@@ -114,11 +114,13 @@ final class MediaGalleryWindowController: NSWindowController, NSWindowDelegate {
 
     func open(on screen: NSScreen? = nil) {
         if window == nil {
-            let window = NSWindow(contentViewController: NSHostingController(rootView: MediaGallery()))
+            let window = NSWindow(contentViewController: NSHostingController(rootView: MediaGallery { [weak self] in
+                self?.window?.title = $0.title
+            }))
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             window.toolbarStyle = .unified
             window.titlebarAppearsTransparent = true
-            window.title = "Media Gallery"
+            window.title = MediaGalleryCategory.all.title
             window.setContentSize(NSSize(width: 1080, height: 740))
             window.minSize = NSSize(width: 780, height: 560)
             window.isReleasedWhenClosed = false
@@ -141,10 +143,12 @@ final class MediaGalleryWindowController: NSWindowController, NSWindowDelegate {
 }
 
 struct MediaGallery: View {
+    var onCategoryChange: (MediaGalleryCategory) -> Void = { _ in }
+
     var body: some View {
         MediaGalleryContent(items: MediaGalleryItem.collect(history: HistoryStore.shared,
             edits: ScreenshotHistoryStore.shared.items, projects: RecordingProjectStore.shared.projects),
-            refresh: refresh)
+            refresh: refresh, onCategoryChange: onCategoryChange)
             .task { refresh() }
     }
 
@@ -187,10 +191,12 @@ enum MediaGalleryCategory: String, CaseIterable, Identifiable {
 struct MediaGalleryContent: View {
     let items: [MediaGalleryItem]
     var refresh: () -> Void = {}
+    var onCategoryChange: (MediaGalleryCategory) -> Void = { _ in }
     @State var listView = false
     @State var category = MediaGalleryCategory.all
     private var cloud: Bool { category.cloud }
     @State private var search = ""
+    @State private var columnVisibility = NavigationSplitViewVisibility.all
     @State private var sortOrder = [KeyPathComparator(\MediaGalleryItem.createdAt, order: .reverse)]
     @State private var selection: String?
     @FocusState private var focusedItem: String?
@@ -199,7 +205,7 @@ struct MediaGalleryContent: View {
     var body: some View {
         let filtered = MediaGalleryItem.filtered(items, kind: category.kind, cloud: cloud, search: search)
         let visible = filtered.sorted(using: sortOrder)
-        HSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             List(selection: $category) {
                 Section("On this Mac") {
                     ForEach(MediaGalleryCategory.local, content: sidebarRow)
@@ -210,8 +216,16 @@ struct MediaGalleryContent: View {
             }
             .listStyle(.sidebar)
             .scrollContentBackground(.hidden)
-            .frame(minWidth: 180, idealWidth: 200, maxWidth: 240, maxHeight: .infinity)
-            .studioGlass(cornerRadius: 0)
+            .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 260)
+            .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    Button("Toggle Sidebar", systemImage: "sidebar.left") {
+                        columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
+                    }
+                    .help("Show or hide the sidebar")
+                }
+            }
+        } detail: {
             VStack(spacing: 0) {
                 if let actionMessage {
                     HStack(alignment: .top) {
@@ -253,18 +267,19 @@ struct MediaGalleryContent: View {
                     GeometryReader { geometry in
                         ScrollViewReader { proxy in
                             ScrollView {
-                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 112), spacing: 16)], spacing: 16) {
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 112), spacing: 16)], spacing: 24) {
                                     ForEach(visible) { item in
                                         card(item)
                                             .focusable()
+                                            .focusEffectDisabled()
                                             .focused($focusedItem, equals: item.id)
                                             .id(item.id)
                                     }
                                 }
-                                .padding(20)
+                                .padding(24)
                             }
                             .onMoveCommand { direction in
-                                let columns = max(1, Int((geometry.size.width - 24) / 128))
+                                let columns = max(1, Int((geometry.size.width - 48 + 16) / 128))
                                 let index = visible.firstIndex { $0.id == selection } ?? 0
                                 let offset: Int
                                 switch direction {
@@ -285,9 +300,9 @@ struct MediaGalleryContent: View {
                 Divider()
                 HStack(spacing: 8) {
                     Image(systemName: cloud ? "icloud" : "internaldrive")
-                    Text(cloud ? "Cloud" : "On this Mac")
+                    Text(cloud ? "Cloud Shares" : "On this Mac").fixedSize()
                     Image(systemName: "chevron.right").font(.caption2)
-                    Text(category.title)
+                    Text(category.title).lineLimit(1)
                     if let selected = visible.first(where: { $0.id == selection }) {
                         Image(systemName: "chevron.right").font(.caption2)
                         Text(selected.title).lineLimit(1).truncationMode(.middle)
@@ -300,10 +315,8 @@ struct MediaGalleryContent: View {
                 .background(.bar)
             }
             .background(Color(nsColor: .textBackgroundColor))
-            .navigationTitle("\(cloud ? "Cloud Shares" : "On this Mac") — \(category.title)")
+            .navigationTitle(category.title)
             .toolbar {
-                DefaultToolbarItem(kind: .search)
-                    .sharedBackgroundVisibility(.hidden)
                 ToolbarItem {
                     Picker("View", selection: $listView) {
                         Label("Icons", systemImage: "square.grid.2x2").tag(false)
@@ -312,7 +325,6 @@ struct MediaGalleryContent: View {
                     .pickerStyle(.segmented).labelStyle(.iconOnly)
                     .help("Gallery view")
                 }
-                .sharedBackgroundVisibility(.hidden)
                 ToolbarItem {
                     Menu {
                         Picker("Sort", selection: $sortOrder) {
@@ -326,17 +338,17 @@ struct MediaGalleryContent: View {
                     }
                     .help("Sort media")
                 }
-                .sharedBackgroundVisibility(.hidden)
                 ToolbarItem {
                     Button("Refresh", systemImage: "arrow.clockwise", action: refresh)
                         .help("Refresh media")
                 }
-                .sharedBackgroundVisibility(.hidden)
             }
+            .searchable(text: $search, placement: .toolbar, prompt: "Search media")
         }
-        .searchable(text: $search, placement: .toolbar, prompt: "Search media")
+        .navigationSplitViewStyle(.balanced)
         .scrollIndicators(.hidden)
         .tint(EditorChrome.accent)
+        .onChange(of: category) { _, category in onCategoryChange(category) }
         .onChange(of: focusedItem) { if let focusedItem { selection = focusedItem } }
         .onChange(of: visible.map(\.id)) {
             if !visible.contains(where: { $0.id == selection }) { selection = nil }
@@ -388,16 +400,16 @@ struct MediaGalleryCard: View {
                 .padding(.vertical, 3)
             } else {
                 artwork
+                    .frame(width: 64, height: 64)
                     .padding(10)
                     .frame(height: 84)
-                    .frame(maxWidth: .infinity)
                     .background(selected ? Color.primary.opacity(0.09) : .clear,
                                 in: RoundedRectangle(cornerRadius: 8))
                     .overlay(alignment: .topTrailing) {
                         if selected { actionMenu.padding(3) }
                     }
                 Text(item.title)
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .lineLimit(2).truncationMode(.middle)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 4).padding(.vertical, 2)
