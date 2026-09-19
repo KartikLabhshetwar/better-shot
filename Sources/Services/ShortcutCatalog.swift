@@ -38,6 +38,7 @@ extension ShortcutService {
         case openSettings = 14
         // 15 is reserved: onboarding is available only during initial setup.
         case unpinAll = 16
+        case editClipboard = 17
         case region = 1
         case fullscreen = 2
         case window = 3
@@ -120,6 +121,7 @@ extension ShortcutService {
             case .openImage: "Open Image from File"
             case .openSettings: "Open Settings"
             case .unpinAll: "Unpin All Captures"
+            case .editClipboard: "Edit Clipboard Image or Last Capture"
             case .region: "Capture Region"
             case .fullscreen: "Capture Fullscreen"
             case .window: "Capture Window"
@@ -197,7 +199,7 @@ extension ShortcutService {
 
         var group: Group {
             switch self {
-            case .recording, .mediaGallery, .restoreLastCapture, .pinLastCapture, .openImage, .openSettings, .unpinAll: .general
+            case .recording, .mediaGallery, .restoreLastCapture, .pinLastCapture, .openImage, .openSettings, .unpinAll, .editClipboard: .general
             case .region, .fullscreen, .window, .previousRegion, .timedRegion, .regionCopy, .regionSave, .regionEdit, .regionPin: .screenshots
             case .ocr, .ocrSingleLine, .colorPicker: .ocr
             case .recordingOptions, .recordArea, .stopRecording, .pauseRecording, .restartRecording, .discardRecording: .recording

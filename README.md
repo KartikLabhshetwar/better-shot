@@ -26,7 +26,7 @@ unless you share it, and shares go to storage you own.
 - **Native Settings:** resizable native navigation columns, sidebar search, compact neutral SF Symbols, a section title above the detail pane, and grouped controls follow the macOS System Settings layout. Both Settings and Media Gallery let you hide or show the sidebar from the toolbar.
 - **Video export:** GPU compositing and hardware encoding, with 30/60 fps, resolution, quality, and MP4/MOV controls. Export and sharing reuse unchanged saved renders.
 - **Cloud sharing:** upload to your own Cloudflare R2 bucket. Optimized image compression, MP4 video, native progress, and retry on failure.
-- **79 customizable shortcuts:** configure global capture, recording controls, deck actions, image tools, and video editing keys. Conflict detection per scope.
+- **80 customizable shortcuts:** configure global capture, recording controls, deck actions, image tools, and video editing keys. Conflict detection per scope.
 - **URL scheme:** trigger actions from Raycast, Shortcuts, Alfred, or scripts: `bettershot://capture/region`, `bettershot://record`, `bettershot://ocr`, and more.
 
 Both editors use a left inspector with compact controls and frosted chrome. Action
