@@ -9,6 +9,9 @@ import SwiftUI
 /// AVPlayer layers and interactive capture still require manual testing.
 @MainActor
 func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
+    if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_EDITOR_WINDOWS"] == "1" {
+        try await checkEditorWindowInteractions(imageURL: imageURL, movieURL: movieURL)
+    }
     try await checkColorPickerAndToast()
     try await checkPreviewOverlay(imageURL: imageURL)
     try await checkMediaGallery(imageURL: imageURL, movieURL: movieURL)
@@ -1391,4 +1394,120 @@ private func checkColorPickerAndToast() async throws {
         precondition(!panel.isVisible)
     }
     print("PASS color picker sRGB/P3/grayscale conversion, safe unsupported colors, and stable native toast lifecycle")
+}
+
+
+/// Displays production editor views and exercises AppKit events, not offscreen snapshots.
+@MainActor
+private func checkEditorWindowInteractions(imageURL: URL, movieURL: URL) async throws {
+    let defaults = UserDefaults.standard
+    let keys = [AppPreferences.editorOpensFullScreenKey, AppPreferences.showInDockKey,
+                AppPreferences.showInMenuBarKey, "bs_openEditorAfterCapture", "bs_copyAfterSave",
+                "bs_selfTimerDelay", AfterCaptureAction.save.storageKey(for: .screenshot),
+                BetterShotPreferences.recordingCameraDeviceIDKey]
+    let savedPreferences = keys.map { defaults.object(forKey: $0) }
+    let previousApp = NSWorkspace.shared.frontmostApplication
+    let policy = NSApp.activationPolicy()
+    let presenter = PreviewPanelPresenter.shared
+    let oldAnnotate = presenter.onAnnotate
+    let oldVideo = presenter.onEditVideo
+    let tray = MenuBarPopoverController.shared
+    var editor: NSWindow?
+    defer {
+        editor?.contentViewController = nil
+        editor?.close()
+        tray.closePopover()
+        tray.setVisible(false)
+        RecordingBarPresenter.shared.dismiss()
+        PreviewOverlay.shared.clearAll()
+        presenter.onAnnotate = oldAnnotate
+        presenter.onEditVideo = oldVideo
+        for (key, value) in zip(keys, savedPreferences) { defaults.set(value, forKey: key) }
+        NSApp.setActivationPolicy(policy)
+        previousApp?.activate()
+    }
+    defaults.set(false, forKey: AppPreferences.showInDockKey)
+    defaults.set(true, forKey: AppPreferences.showInMenuBarKey)
+    defaults.set(false, forKey: "bs_openEditorAfterCapture")
+    defaults.set(false, forKey: "bs_copyAfterSave")
+    defaults.set(0, forKey: "bs_selfTimerDelay")
+    defaults.set(false, forKey: AfterCaptureAction.save.storageKey(for: .screenshot))
+    defaults.set("", forKey: BetterShotPreferences.recordingCameraDeviceIDKey)
+    AppActivationPolicy.applyVisibility()
+    func open(_ content: AnyView) {
+        let window = NSWindow(contentViewController: NSHostingController(rootView: content))
+        window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
+        window.isReleasedWhenClosed = false
+        window.setContentSize(NSSize(width: 1100, height: 760))
+        window.center()
+        editor = window
+        window.makeKeyAndOrderFront(nil)
+    }
+    presenter.onAnnotate = { open(AnyView(AnnotationEditorWindow(url: .constant($0)))) }
+    presenter.onEditVideo = { open(AnyView(RecordingStudioWindow(url: .constant($0)))) }
+    for source in [imageURL, movieURL] {
+        for automatic in [false, true] {
+            defaults.set(automatic, forKey: AppPreferences.editorOpensFullScreenKey)
+            PreviewOverlay.shared.show(url: source)
+            PreviewOverlay.shared.openAnnotateEditor(for: source)
+            try await Task.sleep(for: .seconds(2))
+            let window = editor!
+            precondition(NSApp.isActive && window.isKeyWindow, "Opening from the overlay must focus the editor")
+            precondition(window.collectionBehavior.contains(.fullScreenPrimary))
+            precondition(window.styleMask.contains(.fullScreen) == automatic,
+                         "Editors honor the automatic full-screen preference")
+            if !automatic {
+                window.toggleFullScreen(nil)
+                try await Task.sleep(for: .seconds(2))
+                precondition(window.styleMask.contains(.fullScreen), "Manual full screen works with the default disabled")
+            }
+            let probe = EditorClickProbe(frame: NSRect(x: 10, y: 10, width: 20, height: 20))
+            window.contentView!.addSubview(probe)
+            tray.openPopover()
+            let panel = NSApp.windows.first { $0.identifier?.rawValue == "BetterShot.MenuBar" && $0.isVisible }!
+            precondition(tray.isOpen)
+            let point = probe.convert(NSPoint(x: 10, y: 10), to: nil)
+            NSApp.sendEvent(NSEvent.mouseEvent(with: .leftMouseDown, location: point, modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!)
+            precondition(!tray.isOpen && !panel.isVisible && probe.clicks == 1,
+                         "An editor click dismisses the tray immediately and still reaches the editor")
+            probe.removeFromSuperview()
+            tray.openPopover()
+            NSApp.sendEvent(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}",
+                isARepeat: false, keyCode: 53)!)
+            precondition(!tray.isOpen, "Escape dismisses the tray")
+            tray.openPopover()
+            RecordingBarPresenter.shared.showPicker(recordingOptions: true)
+            precondition(!tray.isOpen && RecordingBarPresenter.shared.showsRecordingOptions,
+                         "Recording options close the tray while an editor is full screen")
+            await RecordingBarPresenter.shared.hidePickerForCapture()
+            tray.openPopover()
+            if CGPreflightScreenCaptureAccess() {
+                let previous = CaptureOrchestrator.shared.lastCaptureURL
+                await CaptureOrchestrator.shared.performCapture(.fullscreen, on: window.screen)
+                precondition(!tray.isOpen && CaptureOrchestrator.shared.lastCaptureURL != previous,
+                             "Screenshot capture completes from the tray with a full-screen editor open")
+            } else {
+                await RecordingBarPresenter.shared.hidePickerForCapture()
+                precondition(!tray.isOpen)
+                print("SKIP real screenshot capture: Screen Recording permission is unavailable")
+            }
+            PreviewOverlay.shared.clearAll()
+            window.toggleFullScreen(nil)
+            try await Task.sleep(for: .seconds(2))
+            precondition(!window.styleMask.contains(.fullScreen), "Editors can leave full screen")
+            window.contentViewController = nil
+            window.close()
+            editor = nil
+        }
+    }
+    print("PASS native image/video editor activation, automatic/manual full screen, tray dismissal/click-through/Escape, and capture handoff")
+}
+
+private final class EditorClickProbe: NSView {
+    var clicks = 0
+    override func mouseDown(with event: NSEvent) { clicks += 1 }
 }

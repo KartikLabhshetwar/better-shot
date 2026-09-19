@@ -141,6 +141,13 @@ controls.
 
 ### Editing and persistence
 
+Both editor scenes use minimum-content sizing with no content-derived maximum.
+The shared window modifier enables native full screen even when automatic
+full-screen opening is off, and focuses windows opened from overlays. The menu
+tray monitors same-app and other-app clicks, passes editor clicks through, and
+closes synchronously before capture or recording-picker actions. Remove both
+event monitors when the tray closes.
+
 Image annotations live in source-pixel coordinates. `AnnoShapeDrawing` is shared
 between the canvas and export. Recording packages contain `screen.mov`, optional
 `camera.mov`, input/capture/edit JSON, and a flattened deliverable. Source movies
@@ -248,6 +255,13 @@ appearances. These test-only windows use fixture media and isolated credentials.
 Use their `*-window-*-780.png` / `*-window-*-1080.png` images to review native
 materials: offscreen `cacheDisplay` snapshots cannot render the system sidebar
 and search surfaces reliably.
+
+Run `BETTERSHOT_CHECK_EDITOR_WINDOWS=1 make test` to display the production
+image/video editor views and check overlay opening, focus, automatic/manual full
+screen, exit from full screen, same-app tray dismissal, Escape, and recording
+picker handoff. With existing Screen Recording permission, this also performs
+full-screen screenshots into isolated test storage while each editor is open.
+It does not automate region selection or start a microphone/camera recording.
 
 For website changes, run `pnpm lint` and `pnpm build` from `bettershot-landing/`.
 

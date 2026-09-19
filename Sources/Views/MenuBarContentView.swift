@@ -201,10 +201,9 @@ struct MenuBarContentView: View {
     }
 
     private func dismissAndRun(_ action: ShortcutService.Action) {
-        nonisolated(unsafe) let screen = originScreen
+        let screen = originScreen
         dismissPopover()
-        Task.detached {
-            try? await Task.sleep(nanoseconds: 200_000_000)
+        Task { @MainActor in
             await CaptureOrchestrator.shared.performCapture(action, on: screen)
         }
     }

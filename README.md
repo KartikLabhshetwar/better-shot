@@ -30,7 +30,9 @@ unless you share it, and shares go to storage you own.
 
 Both editors use a left inspector with compact controls and frosted chrome. Action
 icons use Apple SF Symbols. Full-resolution previews are the default, and original
-source files remain editable.
+source files remain editable. Both editors support native full screen; the menu
+tray dismisses when you click an editor, and screenshot and recording controls
+remain available while editing.
 
 ## Install
 

@@ -8,7 +8,22 @@ import UniformTypeIdentifiers
 
 @main
 struct ExportIntegration {
-    @MainActor static func main() async throws {
+    @MainActor static func main() {
+        let app = NSApplication.shared
+        Task { @MainActor in
+            do {
+                try await runChecks()
+                exit(0)
+            } catch {
+                print("FAIL integration: \(error)")
+                exit(1)
+            }
+        }
+        // Activation and full-screen transitions need AppKit's event dispatch.
+        app.run()
+    }
+
+    @MainActor static func runChecks() async throws {
         setbuf(stdout, nil)
         precondition(ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] == "1",
                      "Run through Tests/run-exports.sh to keep the real Keychain isolated")

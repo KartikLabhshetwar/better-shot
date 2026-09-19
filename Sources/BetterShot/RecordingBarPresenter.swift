@@ -55,6 +55,7 @@ final class RecordingBarPresenter {
 
     func showPicker(activate: Bool = true, recordingOptions: Bool = false, on displayID: CGDirectDisplayID? = nil) {
         guard !ScreenRecordingManager.shared.isActive else { return }
+        MenuBarPopoverController.shared.closePopover()
         let panel = panel ?? makePanel()
         PreviewWindowCaptureExclusion.shared.register(window: panel)
         mode = .picker
@@ -74,6 +75,7 @@ final class RecordingBarPresenter {
 
     /// All screenshot entry points clear the shared picker before capturing.
     func hidePickerForCapture() async {
+        MenuBarPopoverController.shared.closePopover()
         guard mode == .picker, !ScreenRecordingManager.shared.isActive else { return }
         hide()
         await CameraRecordingManager.shared.stopPreview()

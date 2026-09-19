@@ -254,10 +254,14 @@ private struct EditorFullScreenModifier: ViewModifier {
         content.onWindowChange { window in
             guard let window, !didConfigure else { return }
             didConfigure = true
-            guard AppPreferences.editorOpensFullScreen else { return }
+            window.collectionBehavior.remove([.fullScreenNone, .fullScreenAuxiliary])
             window.collectionBehavior.insert(.fullScreenPrimary)
             DispatchQueue.main.async {
-                guard !window.styleMask.contains(.fullScreen) else { return }
+                // Overlay/tray actions can create a scene before its window has focus.
+                window.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+                guard AppPreferences.editorOpensFullScreen,
+                      !window.styleMask.contains(.fullScreen) else { return }
                 window.toggleFullScreen(nil)
             }
         }

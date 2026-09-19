@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Image and video editors support native full screen with automatic full-screen opening enabled or disabled, and take focus when opened from the preview overlay. The menu tray dismisses immediately on editor clicks or Escape and closes before screenshot or recording-picker actions, including while an editor is full screen.
+
 - Settings displays the selected section title once using the native toolbar title. Gallery list view uses native sortable Name, Date Created, and Kind columns; compact previews and folder/media SF Symbols bring both views closer to Finder.
 - Media Gallery separates On this Mac and Cloud Shares into explicit All Media, Screenshots, and Videos sections with counts. A shared item with a local source appears in both locations; cloud-only links remain available after local deletion.
 - Video recognition uses macOS file types for imported and legacy history entries, including missing or stale image labels. Video previews and editor reopening retain their recording package when an export is regenerated or removed.
