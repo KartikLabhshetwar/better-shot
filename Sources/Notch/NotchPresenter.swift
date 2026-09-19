@@ -179,16 +179,13 @@ struct NotchContent: View {
     @State private var presenter = NotchPresenter.shared
     @State private var bar = RecordingBarPresenter.shared
     @State private var overlay = PreviewOverlay.shared
-    @State private var selectedURL: URL?
-    @State private var showsRecent = false
+    @State private var shelfStore = NotchShelfStore.shared
+    @State private var filter: NotchShelfFilter
+    @State private var showsTools = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(showsRecent: Bool = false) {
-        _showsRecent = State(initialValue: showsRecent)
-    }
-
-    private var selected: URL? {
-        selectedURL.flatMap { overlay.items.contains($0) ? $0 : nil } ?? overlay.items.last
+    init(filter: NotchShelfFilter = .all) {
+        _filter = State(initialValue: filter)
     }
 
     var body: some View {
@@ -198,7 +195,7 @@ struct NotchContent: View {
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
-        .frame(width: 552)
+        .frame(width: min(560, (presenter.screen?.visibleFrame.width ?? 624) - 64))
         .frame(maxHeight: max(240, (presenter.screen?.visibleFrame.height ?? 800) - 120))
         .fixedSize(horizontal: false, vertical: true)
         .onReceive(NotificationCenter.default.publisher(for: NSMenu.didBeginTrackingNotification)) { _ in
@@ -223,13 +220,15 @@ struct NotchContent: View {
         .onChange(of: presenter.countdown) { _, countdown in
             if countdown == nil { presenter.resumeHoverDismissal() }
         }
+        .onChange(of: bar.isVisible, initial: true) { _, visible in
+            if visible { showsTools = true }
+        }
         .onChange(of: presenter.captureSuspended) { _, suspended in
-            if !suspended { showsRecent = false }
+            if !suspended { filter = .all }
         }
-        .onChange(of: overlay.items) {
-            selectedURL = overlay.items.last
-            if !overlay.items.isEmpty { showsRecent = false }
-        }
+        .onChange(of: overlay.items) { filter = .all }
+        .onChange(of: presenter.ocrText) { filter = .all }
+        .onChange(of: presenter.colorHex) { filter = .all }
         .onExitCommand {
             if bar.isVisible && bar.mode == .picker {
                 bar.dismiss()
@@ -238,30 +237,50 @@ struct NotchContent: View {
             presenter.collapse()
         }
         .onKeyPress("a") {
-            guard !showsRecent, !ScreenRecordingManager.shared.isActive else { return .ignored }
+            guard !ScreenRecordingManager.shared.isActive else { return .ignored }
             bar.captureLastRegion()
             return .handled
         }
     }
 
     private var content: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 10) {
-                Image(nsImage: NSImage(named: "MenuBarIcon") ?? NSImage()).resizable().renderingMode(.template)
-                    .scaledToFit().frame(width: 16, height: 16)
-                    .accessibilityHidden(true)
-                Text("BetterShot").font(.subheadline.weight(.semibold))
-                Spacer()
-                Picker("Notch section", selection: $showsRecent) {
-                    Text("Capture").tag(false)
-                    Text("Recents").tag(true)
+        VStack(spacing: 10) {
+            HStack(spacing: 6) {
+                ForEach(NotchShelfFilter.allCases) { tab in
+                    Button { filter = tab } label: {
+                        Text(tab.rawValue).font(.system(size: 12, weight: .semibold))
+                            .padding(.horizontal, 9).frame(height: 28)
+                            .foregroundStyle(filter == tab ? .black : .white.opacity(0.65))
+                            .background(filter == tab ? Color.white : .clear, in: Capsule())
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Show \(tab.rawValue.lowercased())")
+                    .accessibilityAddTraits(filter == tab ? .isSelected : [])
                 }
-                .pickerStyle(.segmented).labelsHidden().frame(width: 160)
+                Spacer(minLength: 4)
+                BoringNotchHoverButton(title: "Capture tools", icon: "square.grid.2x2",
+                                      iconColor: showsTools ? .white : .secondary) {
+                    showsTools.toggle()
+                    if !showsTools { bar.showsRecordingOptions = false }
+                }
+                    .accessibilityValue(showsTools ? "Expanded" : "Collapsed")
+                Menu {
+                    Button("Open Gallery", systemImage: "folder") {
+                        MediaGalleryWindowController.shared.open(on: presenter.screen)
+                    }
+                    if !overlay.items.isEmpty {
+                        Divider()
+                        Button("Save All Captures") { overlay.saveAll() }
+                        Button("Dismiss All Captures") { overlay.clearAll() }
+                    }
+                } label: {
+                    Image(systemName: "folder").frame(width: 30, height: 30)
+                }
+                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                .accessibilityLabel("Library and capture actions").help("Library and capture actions")
                 BoringNotchHoverButton(title: "Settings", icon: "gearshape") {
                     SettingsWindowController.shared.open(section: .general)
-                }
-                BoringNotchHoverButton(title: "Collapse notch — Esc", icon: "chevron.up") {
-                    presenter.collapse()
                 }
             }
             if let issue = presenter.captureIssue {
@@ -291,97 +310,67 @@ struct NotchContent: View {
                     TeleprompterOverlayView(model: script).textArea
                         .padding(8).background(.black, in: RoundedRectangle(cornerRadius: 8))
                 }
-                Group {
-                    if showsRecent {
-                        NotchRecentCaptures()
-                    } else {
-                        captureContent
-                    }
+                if showsTools && !ScreenRecordingManager.shared.isActive {
+                    RecordingPickerControls(showsCloseButton: false, compact: true)
+                        .controlSize(.small).frame(maxWidth: .infinity).frame(height: 36)
+                        .transition(.opacity)
                 }
-                .transition(.opacity)
+                shelf
+                if let error = shelfStore.error { Text(error).font(.caption).foregroundStyle(.orange) }
                 if let id = presenter.transferOrder.last, let card = presenter.transfers[id] { card }
 
             }
         }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: showsRecent)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: showsTools)
         .padding(.top, 8)
     }
 
-    private var captureContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if !ScreenRecordingManager.shared.isActive {
-                RecordingPickerControls(showsCloseButton: false)
-                    .controlSize(.mini)
-                    .frame(maxWidth: .infinity).frame(height: 52)
-                Divider().overlay(.white.opacity(0.08))
-            }
-            if let text = presenter.ocrText {
-                NotchTextResult(title: "Recognized Text", value: text, isColor: false) {
-                    presenter.ocrText = nil
-                    presenter.refresh()
-                }.id(text)
-            }
-            if let hex = presenter.colorHex {
-                NotchTextResult(title: "Picked Color", value: hex, isColor: true) {
-                    presenter.colorHex = nil
-                    presenter.refresh()
-                }.id(hex)
-            }
-            if overlay.isPresented, let url = selected {
-                HStack {
-                    Label(PreviewOverlay.isVideo(url) ? "Recording" : "Screenshot",
-                          systemImage: PreviewOverlay.isVideo(url) ? "video" : "photo")
-                        .font(.subheadline.weight(.medium))
-                    Spacer()
-                    if overlay.items.count > 1 {
-                        Button("Previous capture", systemImage: "chevron.left") { moveSelection(-1) }
-                            .labelStyle(.iconOnly)
-                        Text("\((overlay.items.firstIndex(of: url) ?? 0) + 1) of \(overlay.items.count)")
-                            .font(.caption).monospacedDigit().foregroundStyle(.secondary)
-                        Button("Next capture", systemImage: "chevron.right") { moveSelection(1) }
-                            .labelStyle(.iconOnly)
-                        Menu("More", systemImage: "ellipsis") {
-                            Button("Save All") { overlay.saveAll() }
-                            Button("Clear All") { overlay.clearAll() }
-                        }.labelStyle(.iconOnly)
+    private var shelf: some View {
+        let media = NotchRecentCaptures.mediaURLs(pending: overlay.items, filter: filter)
+        let hasText = (filter == .all || filter == .text) && presenter.ocrText != nil
+        let hasColor = (filter == .all || filter == .colors) && presenter.colorHex != nil
+        return ScrollView(.horizontal) {
+            LazyHStack(alignment: .top, spacing: 12) {
+                if hasColor, let hex = presenter.colorHex {
+                    NotchTextResult(title: "Color", value: hex, isColor: true) {
+                        presenter.colorHex = nil
+                        presenter.refresh()
+                    }.id(hex)
+                }
+                if hasText, let text = presenter.ocrText {
+                    NotchTextResult(title: "Text", value: text, isColor: false) {
+                        presenter.ocrText = nil
+                        presenter.refresh()
+                    }.id(text)
+                }
+                if filter == .all || filter == .text {
+                    ForEach(shelfStore.entries.filter { $0.text != presenter.ocrText && $0.text != presenter.colorHex }) { entry in
+                        NotchTextResult(title: entry.imageURL == nil ? "Clipboard" : "Voice note",
+                            value: entry.text, isColor: false, imageURL: entry.imageURL) {
+                            shelfStore.remove(entry.id)
+                        }
                     }
                 }
-                HStack(alignment: .center, spacing: 20) {
-                    PreviewCardView(overlay: overlay, url: url, usesNotchActions: true).id(url)
-                    VStack(alignment: .leading, spacing: 12) {
-                        Button { overlay.perform(.edit, for: url) } label: {
-                            Label("Open Editor", systemImage: OverlayTool.edit.symbol)
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.regular)
-                        HStack(spacing: 8) {
-                            ForEach([OverlayTool.copy, .save]) { tool in
-                                Button { overlay.perform(tool, for: url) } label: {
-                                    Label(tool.title, systemImage: tool.symbol).frame(maxWidth: .infinity)
-                                }
-                            }
-                        }
-                        HStack(spacing: 8) {
-                            ForEach([OverlayTool.share, .pin, .dismiss]) { tool in
-                                BoringNotchHoverButton(title: tool.title, icon: tool.symbol) {
-                                    overlay.perform(tool, for: url)
-                                }
-                            }
-                            Spacer(minLength: 0)
-                        }
-                    }
-                    .disabled(overlay.savingItems.contains(url) || overlay.transferStatus(for: url) != nil)
+                ForEach(media, id: \.self) { url in
+                    NotchMediaCard(url: url)
                 }
-            } else if !ScreenRecordingManager.shared.isActive && presenter.ocrText == nil && presenter.colorHex == nil {
-                NotchRecentCaptures()
+                if media.isEmpty && !hasText && !hasColor && ((filter != .all && filter != .text) || shelfStore.entries.isEmpty) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Image(systemName: filter.symbol).font(.title2).foregroundStyle(.secondary)
+                        Text(filter == .all ? "Your captures, together" : "No \(filter.rawValue.lowercased()) yet")
+                            .font(.headline)
+                        Text("Use Capture tools to add something to your shelf.")
+                            .font(.callout).foregroundStyle(.secondary)
+                        Button("Capture tools", systemImage: "viewfinder") { showsTools = true }
+                    }
+                    .padding(20).frame(height: 160)
+                }
             }
+            .padding(.vertical, 2)
         }
-    }
-
-    private func moveSelection(_ delta: Int) {
-        guard let selected, let index = overlay.items.firstIndex(of: selected), !overlay.items.isEmpty else { return }
-        selectedURL = overlay.items[(index + delta + overlay.items.count) % overlay.items.count]
+        .scrollIndicators(.hidden)
+        .frame(height: 164)
+        .id(filter)
     }
 }
 
@@ -390,52 +379,80 @@ private struct NotchTextResult: View {
     let title: String
     let value: String
     let isColor: Bool
+    var imageURL: URL? = nil
     var dismiss: () -> Void
     @State private var copyFailed = false
     @State private var copied = false
 
+    private var ink: Color {
+        guard isColor, let color = NSColor(annoHex: value).usingColorSpace(.sRGB) else { return .white }
+        func linear(_ channel: CGFloat) -> CGFloat {
+            channel <= 0.04045 ? channel / 12.92 : pow((channel + 0.055) / 1.055, 2.4)
+        }
+        let luminance = 0.2126 * linear(color.redComponent) + 0.7152 * linear(color.greenComponent) + 0.0722 * linear(color.blueComponent)
+        return luminance > 0.179 ? .black : .white
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                if isColor {
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(Color(nsColor: NSColor(annoHex: value)))
-                        .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(.white.opacity(0.3)))
-                        .frame(width: 24, height: 24).accessibilityHidden(true)
-                    Text(value).font(.system(.body, design: .monospaced)).textSelection(.enabled)
-                        .accessibilityLabel("Picked color \(value)")
-                } else {
-                    Label(title, systemImage: "doc.text.viewfinder").font(.subheadline.weight(.medium))
-                }
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(title).font(.caption.weight(.medium))
                 Spacer()
-                Button {
+                Button("Dismiss \(title.lowercased())", systemImage: "xmark", action: dismiss)
+                    .labelStyle(.iconOnly).buttonStyle(.plain)
+            }
+            if isColor {
+                Spacer(minLength: 0)
+                Text(value).font(.system(.body, design: .monospaced).weight(.semibold))
+                    .textSelection(.enabled)
+            } else {
+                ScrollView {
+                    Text(value).font(.system(size: 13)).textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }.scrollIndicators(.hidden)
+            }
+            if let imageURL {
+                Button("Open image", systemImage: "photo") { NotchQuickEditor.shared.open(imageURL) }
+                    .buttonStyle(.plain).font(.caption)
+            }
+            Button {
+                if let imageURL {
+                    copyFailed = (try? NotchShelfStore.copy(.init(text: value, imageURL: imageURL))) != true
+                } else { copyFailed = !CaptureOrchestrator.copyText(value) }
+                copied = !copyFailed
+                if copied { NotchPresenter.shared.captureIssue = nil }
+            } label: {
+                Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.plain).padding(.vertical, 5)
+            .background(ink.opacity(0.12), in: Capsule())
+            .accessibilityLabel(imageURL != nil ? "Copy image and transcript" : isColor ? "Copy color code" : "Copy text")
+            .accessibilityValue(copied ? "Copied to clipboard" : "")
+            .task(id: copied) {
+                guard copied else { return }
+                do { try await Task.sleep(for: .seconds(1.5)) } catch { return }
+                copied = false
+            }
+            if copyFailed { Text("Couldn’t copy. Try again.").font(.caption) }
+        }
+        .padding(14).frame(width: 160, height: 160)
+        .foregroundStyle(ink)
+        .background {
+            if isColor {
+                Color(nsColor: NSColor(annoHex: value))
+            } else { Color.white.opacity(0.09) }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.white.opacity(0.12)))
+        .contextMenu {
+            if imageURL != nil {
+                Button("Copy transcript", systemImage: "text.quote") {
                     copyFailed = !CaptureOrchestrator.copyText(value)
                     copied = !copyFailed
-                    if copied { NotchPresenter.shared.captureIssue = nil }
-                } label: {
-                    Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
-                        .frame(width: 70)
                 }
-                .accessibilityLabel(isColor ? "Copy color code" : "Copy recognized text")
-                .accessibilityValue(copied ? "Copied to clipboard" : "")
-                .task(id: copied) {
-                    guard copied else { return }
-                    do { try await Task.sleep(for: .seconds(1.5)) } catch { return }
-                    copied = false
-                }
-                BoringNotchHoverButton(title: "Dismiss \(title.lowercased())", icon: "xmark", action: dismiss)
             }
-            if !isColor {
-                ScrollView {
-                    Text(value).font(.body).textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .scrollIndicators(.hidden).frame(maxHeight: 96)
-            }
-            if copyFailed { Text("Couldn’t copy. Try Copy again.").font(.caption).foregroundStyle(.red) }
         }
-        .padding(12)
-        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
     }
 }
 

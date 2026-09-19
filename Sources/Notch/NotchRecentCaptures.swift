@@ -1,50 +1,76 @@
 import SwiftUI
 
-/// Reuse the gallery's project resolution, thumbnails, and capture actions.
-struct NotchRecentCaptures: View {
-    @State private var kind: CaptureKind?
-    @State private var error: String?
+enum NotchShelfFilter: String, CaseIterable, Identifiable {
+    case all = "All", text = "Text", images = "Images", videos = "Videos", colors = "Colors"
+    var id: Self { self }
+    var symbol: String {
+        switch self {
+        case .all: return "square.grid.2x2"
+        case .text: return "doc.text.viewfinder"
+        case .images: return "photo"
+        case .videos: return "video"
+        case .colors: return "eyedropper"
+        }
+    }
+}
 
+/// Keep the gallery's project resolution and ordering; pending captures lead the shelf.
+enum NotchRecentCaptures {
     static func items(kind: CaptureKind? = nil) -> [MediaGalleryItem] {
         let all = MediaGalleryItem.collect(history: HistoryStore.shared,
             edits: ScreenshotHistoryStore.shared.items, projects: RecordingProjectStore.shared.projects)
         return Array(MediaGalleryItem.filtered(all, kind: kind, cloud: false, search: "").prefix(4))
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Recent Captures").font(.subheadline.weight(.medium))
-                Spacer()
-                Picker("Recent capture type", selection: $kind) {
-                    Text("All").tag(Optional<CaptureKind>.none)
-                    Text("Screenshots").tag(Optional(CaptureKind.screenshot))
-                    Text("Videos").tag(Optional(CaptureKind.recording))
-                }
-                .pickerStyle(.menu)
-                .labelsHidden().fixedSize()
-
-                Button("Open Gallery", systemImage: "photo.on.rectangle") {
-                    MediaGalleryWindowController.shared.open(on: NotchPresenter.shared.screen)
-                }
-            }
-            let recent = Self.items(kind: kind)
-            if recent.isEmpty {
-                Text("Your recent screenshots and videos will appear here.")
-                    .font(.callout).foregroundStyle(.secondary).padding(.vertical, 8)
-            } else {
-                HStack(alignment: .top, spacing: 8) {
-                    ForEach(recent) { item in
-                        MediaGalleryCard(item: item, cloud: false,
-                            onSelect: { error = item.open(cloud: false) },
-                            onDeleteFailure: { error = $0 })
-                            .frame(width: 132)
-                            .focusable()
-                            .help("Open \(item.title). Right-click for more actions.")
-                    }
-                }
-            }
-            if let error { Text(error).font(.caption).foregroundStyle(.red) }
+    static func mediaURLs(pending: [URL], filter: NotchShelfFilter) -> [URL] {
+        guard filter != .text, filter != .colors else { return [] }
+        let kind: CaptureKind? = filter == .images ? .screenshot : filter == .videos ? .recording : nil
+        var seen = Set<URL>()
+        return (Array(pending.reversed()) + items(kind: kind).map(\.previewURL)).filter { url in
+            guard seen.insert(url.standardizedFileURL).inserted else { return false }
+            return kind == nil || PreviewOverlay.isVideo(url) == (kind == .recording)
         }
+    }
+}
+
+struct NotchMediaCard: View {
+    let url: URL
+    @State private var overlay = PreviewOverlay.shared
+
+    private var busy: Bool { overlay.savingItems.contains(url) || overlay.transferStatus(for: url) != nil }
+    private var pending: Bool { overlay.items.contains(url) }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            PreviewCardView(overlay: overlay, url: url, usesNotchActions: true,
+                            notchCardSize: CGSize(width: 160, height: 124))
+            HStack(spacing: 8) {
+                Text(PreviewOverlay.isVideo(url) ? "Video" : "Image")
+                    .font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                Button("Copy", systemImage: "doc.on.doc") { overlay.perform(.copy, for: url) }
+                    .labelStyle(.iconOnly).buttonStyle(.plain).help("Copy capture")
+                Menu {
+                    if !PreviewOverlay.isVideo(url) {
+                        Button("Quick Edit", systemImage: "slider.horizontal.3") { NotchQuickEditor.shared.open(url) }
+                    }
+                    ForEach([OverlayTool.edit, .copy, .save, .share, .pin]) { tool in
+                        Button(tool.title, systemImage: tool.symbol) { overlay.perform(tool, for: url) }
+                    }
+                    if pending {
+                        Divider()
+                        Button("Dismiss", systemImage: "xmark") { overlay.perform(.dismiss, for: url) }
+                    }
+                } label: { Label("Capture actions", systemImage: "ellipsis") }
+                .labelStyle(.iconOnly).menuStyle(.borderlessButton).fixedSize()
+            }
+            .padding(.horizontal, 12).frame(height: 36)
+            .disabled(busy)
+        }
+        .frame(width: 160, height: 160)
+        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.white.opacity(0.12)))
+        .help("Open \(url.lastPathComponent) in the editor. Use the actions menu to save, share, or pin.")
     }
 }

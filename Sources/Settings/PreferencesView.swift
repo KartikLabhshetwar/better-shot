@@ -184,6 +184,9 @@ struct GeneralSettingsTab: View {
     @AppStorage(AppPreferences.showCaptureBarAtLaunchKey) private var showCaptureBarAtLaunch = true
     @AppStorage(AppPreferences.showInDockKey) private var showInDock = false
     @AppStorage(AppPreferences.showInMenuBarKey) private var showInMenuBar = true
+    @AppStorage(NotchShelfStore.enabledKey) private var clipboardHistory = false
+    @AppStorage(NotchVoiceCapture.gestureKey) private var holdOption = false
+    @State private var confirmClearShelf = false
     @State private var loginStatus: SMAppService.Status = .notRegistered
     @State private var loginError: String?
 
@@ -237,6 +240,25 @@ struct GeneralSettingsTab: View {
                 Text("Capture Mode")
             } footer: {
                 Text("Normal uses the floating capture bar and preview cards. Notch brings screenshot tools, recording controls, and image/video actions to the top of your display. Displays without a notch use a floating panel at the top.")
+            }
+
+            Section("Notch Shelf") {
+                Toggle("Keep copied text on this Mac", isOn: $clipboardHistory)
+                    .onChange(of: clipboardHistory) { NotchShelfStore.shared.refreshMonitoring() }
+                Toggle("Hold Option to draw and speak", isOn: $holdOption)
+                    .onChange(of: holdOption) { NotchVoiceCapture.shared.refreshGesture() }
+                Text("Hold Option briefly, draw over the screen, then release to save with a local transcript. Requires Microphone and Accessibility access. Voice is also available from Capture tools.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text("Text history keeps up to 50 items locally. Copies marked private by their source app are skipped; unmarked sensitive text can still be saved. Turning history off stops new copies; Clear removes saved shelf text and transcripts.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Button("Clear Shelf Text…", role: .destructive) { confirmClearShelf = true }
+                    .alert("Clear shelf text and transcripts?", isPresented: $confirmClearShelf) {
+                        Button("Cancel", role: .cancel) {}
+                        Button("Clear", role: .destructive) { NotchShelfStore.shared.clear() }
+                    } message: { Text("Screenshot files and recordings stay in your library.") }
+                if let error = NotchShelfStore.shared.error {
+                    Text(error).font(.caption).foregroundStyle(.red)
+                }
             }
 
             Section("Startup") {

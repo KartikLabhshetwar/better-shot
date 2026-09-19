@@ -58,6 +58,19 @@ struct ExportIntegration {
         context.setFillColor(CGColor(red: 0.1, green: 0.2, blue: 0.8, alpha: 1))
         context.fill(CGRect(x: 960, y: 0, width: 960, height: 1080))
         let image = context.makeImage()!
+        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_LOCAL_SHELF"] == "1" {
+            let png = directory.appendingPathComponent("shelf-fixture.png")
+            try NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])!.write(to: png)
+            try await checkLocalShelfFeatures(imageURL: png, directory: directory,
+                output: URL(fileURLWithPath: ".build/editor-snapshots"))
+            if let audio = ProcessInfo.processInfo.environment["BETTERSHOT_SPEECH_FIXTURE"] {
+                let transcript = try await RecordingTranscriptionService.transcribeAudio(at: URL(fileURLWithPath: audio))
+                let text = transcript.words.map(\.text).joined().lowercased()
+                precondition(text.contains("button") && text.contains("smaller"), "Unexpected local transcript: \(text)")
+                print("PASS on-device voice fixture transcription")
+            }
+            return
+        }
         if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_NOTCH"] == "1" {
             let png = directory.appendingPathComponent("notch-fixture.png")
             try NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])!.write(to: png)

@@ -8,13 +8,14 @@ final class CaptureOrchestrator {
     static let shared = CaptureOrchestrator()
 
     private(set) var lastCaptureURL: URL?
-    private var captureInProgress = false
+    private(set) var captureInProgress = false
     private var pendingCaptures: [(ShortcutService.Action, NSScreen?)] = []
     private var captureScreen: NSScreen?
 
     private init() {}
 
     func performCapture(_ action: ShortcutService.Action, on screen: NSScreen? = nil) async {
+        guard !NotchVoiceCapture.shared.isPreparing, !NotchQuickEditor.shared.listening else { return }
         if captureInProgress {
             pendingCaptures.append((action, screen))
             return

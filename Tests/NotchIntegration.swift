@@ -82,12 +82,9 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
             window.appearance = NSAppearance(named: appearance)
             try await Task.sleep(for: .milliseconds(80))
             hosting.layoutSubtreeIfNeeded()
-            if let bitmap = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) {
-                hosting.cacheDisplay(in: hosting.bounds, to: bitmap)
-                try bitmap.representation(using: .png, properties: [:])?.write(to: output.appendingPathComponent("notch-native-\(appearance.rawValue).png"))
-                if appearance == .darkAqua {
-                    try bitmap.representation(using: .png, properties: [:])?.write(to: output.appendingPathComponent("notch-native-window.png"))
-                }
+            try snapshotNativeNotch(notch, to: output.appendingPathComponent("notch-native-\(appearance.rawValue).png"))
+            if appearance == .darkAqua {
+                try snapshotNativeNotch(notch, to: output.appendingPathComponent("notch-native-window.png"))
             }
         }
         window.appearance = originalAppearance
@@ -172,16 +169,29 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     precondition(recentVideos.first(where: { $0.previewURL == movieURL })!.open(cloud: false) == nil)
     precondition(overlay.items.contains(movieURL), "Recent saved media must reopen the existing preview/actions")
     precondition(NotchRecentCaptures.items().count <= 4)
+    let shelf = NotchRecentCaptures.mediaURLs(pending: [imageURL, movieURL, imageURL], filter: .all)
+    precondition(shelf.prefix(2) == [imageURL, movieURL], "Newest pending captures lead, with no duplicate recent cards")
+    precondition(Set(shelf).count == shelf.count)
+    precondition(NotchRecentCaptures.mediaURLs(pending: [imageURL, movieURL], filter: .images).allSatisfy { !PreviewOverlay.isVideo($0) })
+    precondition(NotchRecentCaptures.mediaURLs(pending: [imageURL, movieURL], filter: .videos).allSatisfy { PreviewOverlay.isVideo($0) })
+    precondition(NotchRecentCaptures.mediaURLs(pending: [imageURL], filter: .text).isEmpty)
+    precondition(NotchRecentCaptures.mediaURLs(pending: [imageURL], filter: .colors).isEmpty)
     print("PASS recent screenshot/video filters and reopening saved media through shared gallery actions")
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
-        try snapshot(NotchContent().environment(\.colorScheme, .dark).padding(16).background(.black), scheme: scheme, width: 584,
+        try snapshot(NotchContent().environment(\.colorScheme, .dark).padding(16).background(.black), scheme: scheme, width: 592,
                      to: output.appendingPathComponent("notch-captures-\(name).png"), height: 700)
-        try snapshot(NotchContent(showsRecent: true).environment(\.colorScheme, .dark).padding(16).background(.black), scheme: scheme, width: 584,
+        try snapshot(NotchContent(filter: .images).environment(\.colorScheme, .dark).padding(16).background(.black), scheme: scheme, width: 592,
                      to: output.appendingPathComponent("notch-recents-\(name).png"), height: 360)
         try snapshot(PreferencesView(selection: .general), scheme: scheme, width: 780,
                      to: output.appendingPathComponent("notch-settings-\(name).png"), height: 620)
     }
+    try await checkLocalShelfFeatures(imageURL: imageURL, directory: saveFolder, output: output)
+    let quickPanel = NotchQuickEditor.shared
+    quickPanel.open(imageURL)
+    precondition(quickPanel.panel?.canBecomeKey == true && quickPanel.panel!.frame.width <= 640)
+    quickPanel.requestClose()
+    precondition(!quickPanel.isOpen)
     // Exercise the kit's non-notched fallback on the same screen without changing display settings.
     if let screen = window.screen {
         let floating = DynamicNotch(hoverBehavior: [], style: .floating) { NotchContent() }
@@ -226,7 +236,7 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     precondition(notch.captureIssue?.title == "Couldn’t save capture" && notch.expanded)
     precondition(!NSApp.windows.contains { $0.identifier?.rawValue == "BetterShot.Toast" && $0.isVisible })
     try snapshot(NotchContent().environment(\.colorScheme, .dark).padding(16).background(.black),
-        scheme: .dark, width: 584, to: output.appendingPathComponent("notch-inline-error.png"), height: 500)
+        scheme: .dark, width: 592, to: output.appendingPathComponent("notch-inline-error.png"), height: 500)
     notch.suspendForCapture()
     precondition(notch.captureIssue == nil, "Trying a capture again clears stale failure feedback")
     print("PASS no notch toasts, no success expansion, immediate mode-switch dismissal, and inline failure recovery")
@@ -251,7 +261,7 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     notch.refreshMode()
     precondition(bar.mode == .recording && notch.isVisible)
     for scheme in [ColorScheme.light, .dark] {
-        try snapshot(NotchContent().environment(\.colorScheme, .dark).padding(16).background(.black), scheme: scheme, width: 584,
+        try snapshot(NotchContent().environment(\.colorScheme, .dark).padding(16).background(.black), scheme: scheme, width: 592,
                      to: output.appendingPathComponent("notch-recording-\(scheme == .light ? "light" : "dark").png"), height: 700)
     }
     bar.hide()
@@ -292,8 +302,11 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     ToastWindow.shared.dismiss(animated: false)
     for scheme in [ColorScheme.light, .dark] {
         try snapshot(NotchContent().environment(\.colorScheme, .dark).padding(16).background(.black),
-            scheme: scheme, width: 584, to: output.appendingPathComponent("notch-text-results-\(scheme == .light ? "light" : "dark").png"), height: 440)
+            scheme: scheme, width: 592, to: output.appendingPathComponent("notch-text-results-\(scheme == .light ? "light" : "dark").png"), height: 440)
     }
+    notch.updateHoverState(true)
+    try await Task.sleep(for: .milliseconds(250))
+    try snapshotNativeNotch(notch, to: output.appendingPathComponent("notch-native-results.png"))
     notch.ocrText = nil
     notch.colorHex = nil
     print("PASS OCR/color auto-copy, single-line normalization, persistent notch results, repeat copy, and empty OCR")
@@ -347,4 +360,88 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     anchor.removeFromSuperview()
     print("PASS transfer observation settles for idle/unchanged progress, publishes real changes, and retains current callbacks")
     print("PASS notch defaults, mode migration, pending images/video, capture suspension, recording controls, save/share recovery, transfer cleanup, compact light/dark snapshots")
+}
+
+@MainActor
+func checkLocalShelfFeatures(imageURL: URL, directory: URL, output: URL) async throws {
+    try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+    // Bounded clipboard history and private pasteboard markers, using an isolated store/pasteboard.
+    let shelfDirectory = directory.appendingPathComponent("shelf")
+    let shelf = NotchShelfStore(directory: shelfDirectory)
+    let clipboard = NSPasteboard(name: .init("BetterShotShelfTests-\(UUID())"))
+    defer { clipboard.releaseGlobally() }
+    CaptureOrchestrator.copyText("first", to: clipboard)
+    shelf.readClipboard(clipboard)
+    precondition(shelf.entries.map(\.text) == ["first"])
+    clipboard.clearContents()
+    clipboard.setString("secret", forType: .string)
+    clipboard.setString("", forType: .init("org.nspasteboard.ConcealedType"))
+    shelf.readClipboard(clipboard)
+    precondition(shelf.entries.count == 1, "Concealed clipboard content must never enter history")
+    shelf.add(text: String(repeating: "x", count: 100_001))
+    shelf.add(text: "   ")
+    precondition(shelf.entries.count == 1)
+    for index in 0..<55 { shelf.add(text: "item \(index)") }
+    shelf.add(text: "item 10")
+    precondition(shelf.entries.count == 50 && shelf.entries.first?.text == "item 10")
+    precondition(NotchShelfStore(directory: shelfDirectory).entries == shelf.entries)
+    let voiceEntry = NotchShelfStore.Entry(text: "Make this button smaller.", imageURL: imageURL)
+    let voiceCopied = try NotchShelfStore.copy(voiceEntry, to: clipboard)
+    precondition(voiceCopied)
+    precondition(clipboard.string(forType: .string) == voiceEntry.text)
+    precondition(clipboard.data(forType: .png) != nil && clipboard.string(forType: .fileURL) != nil)
+    shelf.readClipboard(clipboard)
+    precondition(shelf.entries.count == 50 && shelf.entries.first?.text == "item 10")
+    let clipboardBeforeFailure = clipboard.changeCount
+    do {
+        _ = try NotchShelfStore.copy(.init(text: "missing", imageURL: directory.appendingPathComponent("missing.png")), to: clipboard)
+        preconditionFailure("Missing images must fail without replacing the clipboard")
+    } catch { precondition(clipboard.changeCount == clipboardBeforeFailure) }
+    shelf.clear()
+    precondition(NotchShelfStore(directory: shelfDirectory).entries.isEmpty)
+    print("PASS local clipboard persistence, size limits, deduplication, private markers, clear, and image/transcript copy")
+
+    let quickModel = AnnotationEditorModel()
+    quickModel.load(url: imageURL)
+    quickModel.backgroundSettings = AnnotationBackgroundSettings()
+    if quickModel.selectedTool != .freehand { quickModel.selectTool(.freehand) }
+    let imageFrame = CGRect(origin: .zero, size: quickModel.imageSize)
+    quickModel.beginInteraction(at: CGPoint(x: 30, y: 30), imageFrame: imageFrame, boundaryFrame: imageFrame)
+    quickModel.updateInteraction(to: CGPoint(x: 120, y: 100), imageFrame: imageFrame, boundaryFrame: imageFrame)
+    quickModel.endInteraction(at: CGPoint(x: 150, y: 100), imageFrame: imageFrame, boundaryFrame: imageFrame)
+    precondition(!quickModel.shapes.isEmpty)
+    let originalPixels = try Data(contentsOf: imageURL)
+    let quickResult = try await NotchQuickEditor.commit(quickModel)
+    let preservedPixels = try Data(contentsOf: imageURL)
+    precondition(originalPixels == preservedPixels, "Quick edits must retain the untouched source")
+    precondition(ScreenshotImageLoader.imageSize(at: quickResult) == quickModel.imageSize)
+    let reopenedQuick = AnnotationEditorModel()
+    reopenedQuick.load(url: quickResult)
+    precondition(reopenedQuick.shapes == quickModel.shapes, "Quick edits must stay editable in the full editor")
+    let quick = NotchQuickEditor.shared
+    quick.model.load(url: quickResult)
+    for scheme in [ColorScheme.light, .dark] {
+        try snapshot(NotchQuickEditorView(editor: quick), scheme: scheme, width: 640,
+                     to: output.appendingPathComponent("notch-quick-editor-\(scheme == .dark ? "dark" : "light").png"), height: 460)
+    }
+    quick.model.releaseEditorResources()
+    quickModel.releaseEditorResources()
+    reopenedQuick.releaseEditorResources()
+    print("PASS quick-edit full-resolution render, editable annotations, and compact light/dark layouts")
+
+}
+
+@MainActor
+private func snapshotNativeNotch(_ notch: NotchPresenter, to url: URL) throws {
+    guard let window = notch.window, let hosting = window.contentView, let frame = notch.contentFrame,
+          let bitmap = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else { return }
+    // Cache the full hosting view: drawing a nonzero-origin subrect flips some SwiftUI text layers.
+    hosting.cacheDisplay(in: hosting.bounds, to: bitmap)
+    let bounds = hosting.convert(window.convertFromScreen(frame), from: nil)
+    let scale = CGFloat(bitmap.pixelsWide) / hosting.bounds.width
+    let top = hosting.isFlipped ? bounds.minY : hosting.bounds.height - bounds.maxY
+    let pixels = CGRect(x: bounds.minX * scale, y: top * scale,
+                        width: bounds.width * scale, height: bounds.height * scale)
+    guard let cropped = bitmap.cgImage?.cropping(to: pixels) else { return }
+    try NSBitmapImageRep(cgImage: cropped).representation(using: .png, properties: [:])?.write(to: url)
 }

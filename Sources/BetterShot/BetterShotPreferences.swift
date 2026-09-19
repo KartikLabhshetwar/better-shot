@@ -280,18 +280,18 @@ enum ScreenshotFileActions {
         try copyImageToClipboard(from: url, dataType: dataType)
     }
 
-    static func copyPNGToClipboard(from url: URL) throws {
-        try copyImageToClipboard(from: url, dataType: .png)
+    static func copyPNGToClipboard(from url: URL, text: String? = nil, to pasteboard: NSPasteboard = .general) throws {
+        try copyImageToClipboard(from: url, dataType: .png, text: text, pasteboard: pasteboard)
     }
 
-    private static func copyImageToClipboard(from url: URL, dataType: NSPasteboard.PasteboardType) throws {
+    private static func copyImageToClipboard(from url: URL, dataType: NSPasteboard.PasteboardType,
+                                              text: String? = nil, pasteboard: NSPasteboard = .general) throws {
         let imageData = try Data(contentsOf: url, options: .mappedIfSafe)
         // Keep a clipboard snapshot independent of later dismissal, edits, or Save.
         let clipboardURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("BetterShot-Clipboard-\(UUID().uuidString)")
             .appendingPathExtension(url.pathExtension)
         try imageData.write(to: clipboardURL, options: .atomic)
-        let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
 
         // Write several representations on a single pasteboard item so that
@@ -305,6 +305,10 @@ enum ScreenshotFileActions {
         // Only providing image data is why pasting worked in Gmail but not in
         // terminal apps - those read the file URL flavor instead.
         let item = NSPasteboardItem()
+        if let text {
+            item.setString(text, forType: .string)
+            item.setString("", forType: .init("com.bettershot.voice-capture"))
+        }
         item.setString(clipboardURL.absoluteString, forType: .fileURL)
         item.setData(imageData, forType: dataType)
         if let tiffData = NSBitmapImageRep(data: imageData)?.tiffRepresentation

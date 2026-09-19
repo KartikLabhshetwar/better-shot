@@ -62,6 +62,7 @@
 		3AA2E443AA076D9AA4BCFFA9 /* PinnedScreenshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B3D8697A2AEA9FD3527BA3D /* PinnedScreenshot.swift */; };
 		3AA56BD8027AACABC1257B3D /* AnnotationWallpaperPreviewCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06C8996BCFE669700EEF01EE /* AnnotationWallpaperPreviewCache.swift */; };
 		3BF5DBCBE10B92005C121A2D /* RecordingSourceCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7711E5BB4466B588EE32C7BC /* RecordingSourceCatalog.swift */; };
+		3CA0F0B61AD84D125B91E9AF /* NotchVoiceCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DF3A00AA83CB4F8ED8C7F30 /* NotchVoiceCapture.swift */; };
 		3DFD0AFCC40248A410ACC8BD /* AnnotationEditorZoom.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FC217457F424CFCD7667853 /* AnnotationEditorZoom.swift */; };
 		3EB30B21F2F488EC0524A801 /* TeleprompterOverlayPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A5FFC877AB3AB6B64894072 /* TeleprompterOverlayPresenter.swift */; };
 		40B553DB8E65CE93297F3D11 /* SmartRedactionRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DD10CB10250C7A3DEC3186 /* SmartRedactionRecognizer.swift */; };
@@ -70,6 +71,7 @@
 		435989A6E7CFD7DC8AE1B593 /* Mat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E1854845C0B1A123F908A41 /* Mat.swift */; };
 		44601DAC2783F0755C8D58BA /* AnnotationCropModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F7378F3CC5B8D8FDD885D11 /* AnnotationCropModels.swift */; };
 		46070CAF5A877CB564FDB379 /* Box.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB9AE65970CD5EA6BDABF0B5 /* Box.swift */; };
+		47DCC099CAE8F680E0DC9E28 /* NotchShelfStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06E86E8B9AD49CDD2E7D82E4 /* NotchShelfStore.swift */; };
 		48D780C259A85BBCB1B6BE82 /* RecordingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DB2C921338E7AA1207539D1 /* RecordingSession.swift */; };
 		49F98CCBDB5611D43C61342D /* AnnotationMockupEffectsRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86308A7F5B1D769189631945 /* AnnotationMockupEffectsRenderer.swift */; };
 		4C60427E131EEFD8D35939F8 /* RecordingStudioStylePresetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F111988702AFBAF2496331 /* RecordingStudioStylePresetStore.swift */; };
@@ -126,6 +128,7 @@
 		88E571E986C805E582BE853A /* RecordingPointerTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AAC5749AE8D3AA8D0826D94 /* RecordingPointerTimeline.swift */; };
 		8939FAA9B01BDCCFC1C9277E /* AnnotationBackgroundPresetBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 751FDBAB1B6B4ABB24713FA4 /* AnnotationBackgroundPresetBar.swift */; };
 		8A3678236C5B3E1EDBDDF0E5 /* CaptureURLAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D024DBA83E8292A232F91B1 /* CaptureURLAction.swift */; };
+		8AFA6969827A60DD09628DFD /* NotchQuickEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FA2DD7387FCB1E10A13912F /* NotchQuickEditor.swift */; };
 		8B60C5A0D9E05E27D0CDB08A /* AnnotationEditorChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7768BE2B53992147285FACBF /* AnnotationEditorChrome.swift */; };
 		8BF5172EE59AE9CAA014B690 /* AnnotationCropOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1546D84751A7403E9E6ACF0 /* AnnotationCropOverlay.swift */; };
 		8C76612CC356391B94F0AD36 /* StrokeOutline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7846895DF5BEB0C9BC144710 /* StrokeOutline.swift */; };
@@ -239,6 +242,7 @@
 		05FA15DAA501361C2A48050B /* RecordingExportFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingExportFeedback.swift; sourceTree = "<group>"; };
 		061AE6D677E2E3AB437A6738 /* AnnotationBackgroundInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationBackgroundInspector.swift; sourceTree = "<group>"; };
 		06C8996BCFE669700EEF01EE /* AnnotationWallpaperPreviewCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationWallpaperPreviewCache.swift; sourceTree = "<group>"; };
+		06E86E8B9AD49CDD2E7D82E4 /* NotchShelfStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchShelfStore.swift; sourceTree = "<group>"; };
 		0837CDA77E08CBA5E8D80F3B /* SilenceDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SilenceDetector.swift; sourceTree = "<group>"; };
 		087AF8EECF1AB0781D8D1F70 /* PerfectDash.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerfectDash.swift; sourceTree = "<group>"; };
 		098DDCECCCE5591FAA09480B /* ShortcutActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutActions.swift; sourceTree = "<group>"; };
@@ -258,6 +262,7 @@
 		1A8FF0E5AD713FC1D7E99DE7 /* BetterShotDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BetterShotDelegate.swift; sourceTree = "<group>"; };
 		1A982D92197DBD85F4E99877 /* Shape.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shape.swift; sourceTree = "<group>"; };
 		1EDA57621906E0853E3239C7 /* TransferStatusCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferStatusCard.swift; sourceTree = "<group>"; };
+		1FA2DD7387FCB1E10A13912F /* NotchQuickEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchQuickEditor.swift; sourceTree = "<group>"; };
 		21453FFFE9FF2E1860B1BB7E /* ScreenRecordingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenRecordingManager.swift; sourceTree = "<group>"; };
 		218BCF4C3E6DEC3D0AE86959 /* PathBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathBuilder.swift; sourceTree = "<group>"; };
 		23F4D20DF3F0349735C2F80D /* RecordingProject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingProject.swift; sourceTree = "<group>"; };
@@ -308,6 +313,7 @@
 		4CCD4CBE6C2F68F14298572D /* RecordingTranscriptEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingTranscriptEditing.swift; sourceTree = "<group>"; };
 		4D1CE0648EC6540156A8EF27 /* AnnotationProgressiveBlurGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationProgressiveBlurGeometry.swift; sourceTree = "<group>"; };
 		4DB2C921338E7AA1207539D1 /* RecordingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSession.swift; sourceTree = "<group>"; };
+		4DF3A00AA83CB4F8ED8C7F30 /* NotchVoiceCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchVoiceCapture.swift; sourceTree = "<group>"; };
 		4E1A0B71553D27B9862CF83D /* OverlayToolArrangement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayToolArrangement.swift; sourceTree = "<group>"; };
 		4EC77E432857F5D8BC3C0500 /* Arrowheads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Arrowheads.swift; sourceTree = "<group>"; };
 		4EC83F060B8C618716847D95 /* ScreenshotFileNaming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotFileNaming.swift; sourceTree = "<group>"; };
@@ -774,7 +780,10 @@
 			children = (
 				297470BDCFA9440CC1AACDC6 /* BoringNotchHoverButton.swift */,
 				613D2B1B74DE4BF67B4B1A2C /* NotchPresenter.swift */,
+				1FA2DD7387FCB1E10A13912F /* NotchQuickEditor.swift */,
 				7D6C3162472265AFC3EF722B /* NotchRecentCaptures.swift */,
+				06E86E8B9AD49CDD2E7D82E4 /* NotchShelfStore.swift */,
+				4DF3A00AA83CB4F8ED8C7F30 /* NotchVoiceCapture.swift */,
 			);
 			path = Notch;
 			sourceTree = "<group>";
@@ -1004,7 +1013,10 @@
 				BC811FEA82E635D6292A80FD /* MenuBarContentView.swift in Sources */,
 				5DC7C7A2CF426EEB84D10515 /* MenuBarPopoverController.swift in Sources */,
 				A66A0FE146E7C133382FD375 /* NotchPresenter.swift in Sources */,
+				8AFA6969827A60DD09628DFD /* NotchQuickEditor.swift in Sources */,
 				380EDC32A94F83B02916D6DD /* NotchRecentCaptures.swift in Sources */,
+				47DCC099CAE8F680E0DC9E28 /* NotchShelfStore.swift in Sources */,
+				3CA0F0B61AD84D125B91E9AF /* NotchVoiceCapture.swift in Sources */,
 				0E620055B0FC6109771DC972 /* OnboardingDemoView.swift in Sources */,
 				22833BA0A9BCC6501CF14A1B /* OnboardingPermissionsView.swift in Sources */,
 				E5F46E4A80BB763B20FF325D /* OnboardingState.swift in Sources */,

@@ -340,6 +340,11 @@ nonisolated enum RecordingTranscriptionService {
         let narrationURL = try await extractNarrationAudio(from: screenMovieURL)
         defer { try? FileManager.default.removeItem(at: narrationURL) }
 
+        return try await transcribeAudio(at: narrationURL)
+    }
+
+    /// Shared by recording subtitles and local screenshot voice notes.
+    static func transcribeAudio(at narrationURL: URL) async throws -> RecordingTranscript {
         let locale = try await resolveLocale()
         let transcriber = SpeechTranscriber(
             locale: locale,

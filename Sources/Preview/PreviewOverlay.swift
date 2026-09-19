@@ -499,6 +499,7 @@ struct PreviewCardView: View {
     let overlay: PreviewOverlay
     let url: URL
     var usesNotchActions = false
+    var notchCardSize: CGSize?
     @State private var isHovered = false
     @FocusState private var hasFocus: Bool
     @FocusState private var focusedAction: String?
@@ -508,15 +509,16 @@ struct PreviewCardView: View {
     @State private var thumbnail: NSImage?
     @State private var isLoadingThumbnail = true
 
-    init(overlay: PreviewOverlay, url: URL, thumbnail: NSImage? = nil, usesNotchActions: Bool = false) {
+    init(overlay: PreviewOverlay, url: URL, thumbnail: NSImage? = nil, usesNotchActions: Bool = false, notchCardSize: CGSize? = nil) {
         self.overlay = overlay
         self.url = url
         self.usesNotchActions = usesNotchActions
+        self.notchCardSize = notchCardSize
         _thumbnail = State(initialValue: thumbnail)
     }
 
     private var size: OverlayCardSize { usesNotchActions ? .medium : overlay.cardSize }
-    private var cardSize: CGSize { size.thumbnailSize }
+    private var cardSize: CGSize { notchCardSize ?? size.thumbnailSize }
     private var controlScale: CGFloat { size.controlScale }
 
     private var isVideo: Bool { PreviewOverlay.isVideo(url) }
@@ -548,11 +550,11 @@ struct PreviewCardView: View {
                         .frame(width: cardSize.width, height: cardSize.height)
                         .clipped()
                         .onTapGesture {
-                            overlay.openAnnotateEditor(for: url)
+                            openEditor()
                         }
                         .onDrag {
-                            DeckStaging.promote(url)
-                            if let provider = NSItemProvider(contentsOf: url) {
+                            let retainedURL = DeckStaging.retain(url)
+                            if let provider = NSItemProvider(contentsOf: retainedURL) {
                                 provider.suggestedName = url.lastPathComponent
                                 return provider
                             }
@@ -586,7 +588,7 @@ struct PreviewCardView: View {
                     else if !hasFocus && focusedAction == nil { overlay.scheduleDismiss(for: url) }
                 }
                 .onTapGesture {
-                    overlay.openAnnotateEditor(for: url)
+                    openEditor()
                 }
                 .onDrag {
                     let retainedURL = DeckStaging.retain(url)
@@ -598,7 +600,7 @@ struct PreviewCardView: View {
                 }
             } else {
                 Button {
-                    overlay.openAnnotateEditor(for: url)
+                    openEditor()
                 } label: {
                     VStack(spacing: 8) {
                         if isLoadingThumbnail {
@@ -629,7 +631,7 @@ struct PreviewCardView: View {
         }
         .onKeyPress(.return) {
             guard overlay.transferStatus(for: url) == nil else { return .ignored }
-            overlay.openAnnotateEditor(for: url)
+            openEditor()
             return .handled
         }
         .accessibilityLabel(isVideo ? "Recording preview" : "Screenshot preview")
@@ -644,6 +646,11 @@ struct PreviewCardView: View {
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
             }
         }
+    }
+
+    private func openEditor() {
+        if usesNotchActions && !isVideo { NotchQuickEditor.shared.open(url) }
+        else { overlay.openAnnotateEditor(for: url) }
     }
 
     private func loadThumbnail() async {
@@ -670,7 +677,7 @@ struct PreviewCardView: View {
         ZStack {
             Color.black.opacity(0.45)
                 .contentShape(Rectangle())
-                .onTapGesture { overlay.openAnnotateEditor(for: url) }
+                .onTapGesture { openEditor() }
             OverlayToolArrangement(scale: controlScale) { slot in
                 if let tool = OverlayToolLayout(data: layoutData).assignments[slot] {
                     Button { overlay.perform(tool, for: url) } label: {

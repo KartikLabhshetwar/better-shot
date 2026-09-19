@@ -30,6 +30,7 @@ extension RecordingBarPresenter {
 
 struct RecordingPickerControls: View {
     var showsCloseButton = true
+    var compact = false
     @AppStorage("bs_selfTimerDelay") private var screenshotDelay = 0
     @Bindable private var presenter = RecordingBarPresenter.shared
 
@@ -42,15 +43,53 @@ struct RecordingPickerControls: View {
     ]
 
     var body: some View {
+        if compact { compactControls } else { normalControls }
+    }
+
+    private var compactControls: some View {
+        HStack(spacing: 8) {
+            ForEach(Self.screenshotActions, id: \.0) { item in
+                Button { capture(item.1) } label: {
+                    Label(item.2, systemImage: item.3).frame(width: 28, height: 26)
+                }
+                .help(ShortcutService.shared.help(item.2, for: item.1))
+            }
+            Divider().frame(height: 18)
+            Button { Task { await NotchVoiceCapture.shared.capture() } } label: {
+                Label("Draw and speak", systemImage: "mic").frame(width: 28, height: 26)
+            }.help("Capture a screenshot with a local voice note")
+            .disabled(NotchVoiceCapture.shared.isPreparing || NotchQuickEditor.shared.isOpen)
+            Button { presenter.showsRecordingOptions.toggle() } label: {
+                Label("Record video", systemImage: "video").frame(width: 28, height: 26)
+            }
+            .popover(isPresented: $presenter.showsRecordingOptions, arrowEdge: .top) { RecordingOptionsView() }
+            Spacer(minLength: 0)
+            Menu {
+                Picker("Screenshot delay", selection: $screenshotDelay) {
+                    ForEach(SelfTimerDelay.allCases, id: \.rawValue) { Text($0.label).tag($0.rawValue) }
+                }
+            } label: { Label("Screenshot delay", systemImage: "timer") }
+                .menuIndicator(.hidden).fixedSize().help("Screenshot delay")
+        }
+        .labelStyle(.iconOnly).buttonStyle(.borderless).controlSize(.small)
+        .padding(.horizontal, 10).padding(.vertical, 4)
+        .background(.white.opacity(0.06), in: Capsule())
+    }
+
+    private func capture(_ action: ShortcutService.Action) {
+        presenter.showsRecordingOptions = false
+        let screen = ActiveDisplayResolver.activeScreen(preferPointer: true)
+        Task { await CaptureOrchestrator.shared.performCapture(action, on: screen) }
+    }
+
+    private var normalControls: some View {
         HStack(spacing: 4) {
             ForEach(Array(Self.screenshotActions.enumerated()), id: \.element.0) { index, item in
                 if index == 3 { BarDivider() }
                 let (id, action, caption, icon) = item
                 let title = ShortcutService.shared.help(action == .ocr ? "Copy text from screen" : caption, for: action)
                 BarActionButton(id: id, title: title, systemImage: icon, caption: caption) {
-                    presenter.showsRecordingOptions = false
-                    let screen = ActiveDisplayResolver.activeScreen(preferPointer: true)
-                    Task { await CaptureOrchestrator.shared.performCapture(action, on: screen) }
+                    capture(action)
                 }
                 .help(title)
             }

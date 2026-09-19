@@ -155,6 +155,21 @@ Recording areas use BetterShot's adjustable AppKit selector.
 `RecordingPickerControls` and `RecordingOptionsView` are shared by the bar and notch.
 Run `BETTERSHOT_CHECK_CAPTURE_UI=1 bash Tests/run-exports.sh` after building for
 focused light/dark capture layout checks without generating a video fixture.
+The notch shelf uses `NotchRecentCaptures.mediaURLs` to merge pending and recent
+media without duplicates. Reuse `PreviewCardView` and `PreviewOverlay.perform` for
+card rendering/actions; notch sizing must not change the normal overlay.
+`NotchQuickEditor` reuses `AnnotationCanvas`, `AnnotationRenderer`, and editable
+history sidecars. Done saves privately; it must not update an exported file.
+`NotchVoiceCapture` observes modifier state only when enabled; never retain plain
+keystrokes. Microphone capture ends before on-device transcription, with temporary
+audio retained only for retry until completion/discard. Reuse
+`RecordingTranscriptionService.transcribeAudio` rather than adding a cloud service.
+`NotchShelfStore` keeps bounded, opt-in text history and checks private pasteboard
+markers before reading text. Test with isolated pasteboards and storage only.
+After building, `BETTERSHOT_CHECK_LOCAL_SHELF=1 bash Tests/run-exports.sh` checks
+persistence, copying and quick-edit rendering without live capture. An optional
+`BETTERSHOT_SPEECH_FIXTURE` path can supply synthesized speech saying “button” and
+“smaller” to validate the actual on-device transcription engine.
 Keep source selection separate from starting a recording, preserve permission checks
 for camera/microphone, and keep screenshot and recording delays distinct.
 
