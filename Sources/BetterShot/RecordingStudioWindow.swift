@@ -473,8 +473,8 @@ private struct StudioCanvas: View {
                 let cropCenter = RecordingVideoCrop.point(CGPoint(x: 0.5, y: 0.5), in: crop)
 
                 ZStack {
-                    if !model.timeline3D.shots.isEmpty && !model.isCroppingVideo && !model.isEditingMasks {
-                        Recording3DPreview(model: model, time: model.displayTime, revision: model.previewRenderRevision, timeline: model.timeline3D)
+                    if !model.previewTimeline3D.shots.isEmpty && !model.isCroppingVideo && !model.isEditingMasks {
+                        Recording3DPreview(model: model, time: model.displayTime, revision: model.previewRenderRevision, timeline: model.previewTimeline3D)
                             .frame(width: canvasSize.width, height: canvasSize.height)
                         if model.isCameraVisible(at: model.displayTime), layout.bubbleRect.width > 0 {
                             Color.clear
@@ -565,7 +565,7 @@ private struct StudioCanvas: View {
                         )
                     }
 
-                    if let error = model.preview3DError, !model.timeline3D.shots.isEmpty {
+                    if let error = model.preview3DError, !model.previewTimeline3D.shots.isEmpty {
                         VStack(spacing: 8) {
                             Text(error).font(.callout).multilineTextAlignment(.center)
                             Button("Retry Preview") { model.retry3DPreview() }.buttonStyle(EditorButtonStyle())
@@ -1477,7 +1477,7 @@ private struct StudioTimelineEditor: View {
                            origin: scale.time(forX: x + scrollX))
             }
         ))
-        .frame(height: StudioTimelineMetrics.lanesHeight(showsMaskLane: model.showsMaskLane, showsCutLane: !cutMarkers.isEmpty, shows3DLane: !model.timeline3D.shots.isEmpty))
+        .frame(height: StudioTimelineMetrics.lanesHeight(showsMaskLane: model.showsMaskLane, showsCutLane: !cutMarkers.isEmpty, shows3DLane: !model.previewTimeline3D.shots.isEmpty))
         .onChange(of: model.duration, initial: true) { old, duration in
             if old == 0 || old == duration { viewport.fit(duration: duration) }
             else {
@@ -1508,7 +1508,7 @@ private struct StudioTimelineEditor: View {
                     StudioZoomLaneBackground()
                         .frame(height: StudioTimelineMetrics.maskLaneHeight)
                 }
-                if !model.timeline3D.shots.isEmpty {
+                if !model.previewTimeline3D.shots.isEmpty {
                     StudioZoomLaneBackground().frame(height: StudioTimelineMetrics.shotLaneHeight)
                 }
                 Color.clear
@@ -1549,7 +1549,7 @@ private struct StudioTimelineEditor: View {
                         )
                     }
 
-                    if !model.timeline3D.shots.isEmpty {
+                    if !model.previewTimeline3D.shots.isEmpty {
                         Recording3DLane(model: model, pointsPerSecond: scale.pointsPerSecond,
                                         visibleRange: scale.visibleRange(scrollX: scrollX))
                             .frame(width: scale.contentWidth, height: StudioTimelineMetrics.shotLaneHeight)
@@ -1569,7 +1569,7 @@ private struct StudioTimelineEditor: View {
                 }
             }
         }
-        .frame(height: StudioTimelineMetrics.scrollingLanesHeight(showsMaskLane: model.showsMaskLane, showsCutLane: !cutMarkers.isEmpty, shows3DLane: !model.timeline3D.shots.isEmpty))
+        .frame(height: StudioTimelineMetrics.scrollingLanesHeight(showsMaskLane: model.showsMaskLane, showsCutLane: !cutMarkers.isEmpty, shows3DLane: !model.previewTimeline3D.shots.isEmpty))
         .mask(edgeFadeMask(scale: scale))
         .overlay(alignment: .top) {
             if !cutMarkers.isEmpty {

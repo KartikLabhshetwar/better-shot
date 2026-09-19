@@ -42,6 +42,27 @@ with tempfile.TemporaryDirectory() as temp:
     module = json.dumps(str(cap / 'apps/desktop/src/routes/editor/three-d.ts'))
     (temp / 'presets.ts').write_text(f"import {{ ANGLE_PRESETS, MOTION_TEMPLATES, anglePresetMotion }} from {module};\nconsole.log(JSON.stringify([...MOTION_TEMPLATES, ...ANGLE_PRESETS.map(anglePresetMotion)]));")
     templates = json.loads(subprocess.check_output(['bun', str(temp / 'presets.ts')], text=True))
+    scene_script = f"""import {{ CAMERA3D_SCENES, autoCamera3DScene, applySceneToRange, getStartPose, getEndPose }} from {module};
+const cases = [];
+for (const duration of [0.2, 0.7, 1, 1.9, 2, 2.8, 3, 4.7, 6.1, 12]) {{
+  for (const count of [1,2,3,4,5,6]) {{
+    for (const cuts of [[], [1.15,2.9,4.1,6.8,8.6]]) {{
+      cases.push({{kind: 'auto', count, start:0, end:duration, cuts,
+        shots: applySceneToRange(autoCamera3DScene(count),0,duration,cuts)}});
+    }}
+  }}
+}}
+for (const scene of CAMERA3D_SCENES) {{
+  for (const length of [0.7,1.9,2.8,3,6,10]) {{
+    const cuts = [2.8,3.3,5.1,6.6,8.9];
+    cases.push({{kind:scene.name, count:3, start:2, end:2+length, cuts,
+      shots:applySceneToRange(scene,2,2+length,cuts)}});
+  }}
+}}
+console.log(JSON.stringify(cases.map(c => ({{...c, shots:c.shots.map(s => ({{start:s.start,end:s.end,from:getStartPose(s),to:getEndPose(s),blur:s.blur}}))}}))));
+"""
+    (temp / 'scenes.ts').write_text(scene_script)
+    raw_scenes = json.loads(subprocess.check_output(['bun', str(temp / 'scenes.ts')], text=True))
     # Only wire-type stubs: the algorithm is compiled directly from the upstream file.
     source = RUST.replace('UPSTREAM_SOURCE', str(cap / 'crates/rendering/src/camera3d.rs'))
     (temp / 'reference.rs').write_text(source)
@@ -68,5 +89,9 @@ with tempfile.TemporaryDirectory() as temp:
     output = subprocess.check_output([str(temp / 'reference')], input='\n'.join(rows)+'\n', text=True)
     for case,line in zip(cases, output.splitlines(), strict=True):
         result=json.loads(line); case['inverse']=result[:9]; case['activity']=result[9]
+    for scene in raw_scenes:
+        scene['shots'] = [dict(start=t['start'], end=t['end'], startCamera=camera(t['from']), endCamera=camera(t['to']), blur=blur(t['blur'])) for t in scene['shots']]
+    (root / 'Tests/Fixtures/Cap3DScenes.json').write_text(json.dumps(dict(revision=revision,cases=raw_scenes), separators=(',',':'))+'\n')
+    print(f'Generated {len(raw_scenes)} actual upstream auto/named scene cases')
     (root / 'Tests/Fixtures/Cap3DReference.json').write_text(json.dumps(dict(revision=revision,presets=presets,cases=cases), separators=(',',':'))+'\n')
     print(f'Generated {len(presets)} presets and {len(cases)} renderer cases from {revision}')

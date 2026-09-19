@@ -21,9 +21,10 @@ struct Recording3DKeyframeEditor: View {
                     $0.blurKey != nil || shot?.startPose.camera != nil || shot?.endPose.camera != nil
                 }) { Text($0.title).tag($0) }
             }
+            .pickerStyle(.menu)
             .onChange(of: property) { selectedID = frames.first?.id }
             if property.blurKey != nil && (shot?.blur?.mode ?? Recording3DBlur.Mode.none) == Recording3DBlur.Mode.none {
-                Text("Choose a focus mode in Blur to preview this animation.")
+                Text("Choose a focus mode in Depth Blur to preview this animation.")
                     .font(.caption2).foregroundStyle(.secondary)
             }
             HStack {
@@ -114,7 +115,13 @@ struct Recording3DKeyframeEditor: View {
     }
 
     private func editing(_ active: Bool) {
-        if active { model.begin3DShotEdit() } else { model.end3DShotEdit() }
+        if active {
+            model.begin3DShotEdit()
+            if let shot, let index = selectedIndex {
+                let time = shot.start + frames[index].position * (shot.end - shot.start)
+                model.seek(to: min(time, shot.end - 1.0 / 60))
+            }
+        } else { model.end3DShotEdit() }
     }
     private func updateFrames(_ edit: (inout [Recording3DKeyframe]) -> Void) {
         guard var shot else { return }

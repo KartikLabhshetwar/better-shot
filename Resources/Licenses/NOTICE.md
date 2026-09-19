@@ -9,9 +9,12 @@ Adaptation to Swift/Core Image/Metal: Copyright (c) 2026 Kartik Labhshetwar.
 
 Upstream files: crates/rendering/src/camera3d.rs,
 crates/rendering/src/shaders/camera3d.wgsl, and
-crates/rendering/src/shaders/camera3d-blur.wgsl.
+crates/rendering/src/shaders/camera3d-blur.wgsl, and
+apps/desktop/src/routes/editor/three-d.ts.
 Adapted files: Sources/BetterShot/Recording3DShot.swift and
-Sources/BetterShot/Recording3DBlurRenderer.swift. The rendering composition and
+Sources/BetterShot/Recording3DBlurRenderer.swift. Scene selection/timing and the
+native vector thumbnails in Sources/BetterShot/Recording3DInspector.swift also
+adapt the editor's scene and preview geometry. The rendering composition and
 zoom integration in RecordingStudioExporter.swift and RecordingStudioStyle.swift
 also follow these upstream algorithms.
 

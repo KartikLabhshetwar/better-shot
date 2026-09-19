@@ -412,6 +412,13 @@ nonisolated enum Recording3DPreset: String, CaseIterable, Sendable {
 
 nonisolated enum Recording3DScene: String, CaseIterable {
     case showcase = "Showcase", tour = "Product tour", punch = "Punch in"
+    var summary: String {
+        switch self {
+        case .showcase: "Close-up, overhead sweep, then pull back"
+        case .tour: "Reveal, orbit, then settle on your screen"
+        case .punch: "Focus on a detail, then pull back"
+        }
+    }
     var weights: [Double] { self == .showcase ? [0.27, 0.25, 0.48] : [0.3, 0.3, 0.4] }
     var presets: [Recording3DPreset] {
         switch self {
@@ -476,24 +483,58 @@ nonisolated struct Recording3DTimeline: Equatable, Sendable {
         return start...(start + length)
     }
 
+    /// Cap's automatic sequence uses equal shares of Showcase, then Product Tour.
+    static func autoScene(count: Int, duration: Double, clipCuts: [Double] = []) -> [Recording3DShot] {
+        guard duration.isFinite, duration >= Recording3DShot.minimumDuration else { return [] }
+        let wanted = min(max(count, 1), 6)
+        let pool: [Recording3DPreset] = wanted == 1 ? [.glide] : [.closeUp, .topDown, .pullBack, .unfold, .perspective, .center]
+        return scene(Array(pool.prefix(wanted)), in: 0...duration, showcaseFinish: wanted >= 3, clipCuts: clipCuts)
+    }
+
+    static func maximumAutoShots(duration: Double) -> Int {
+        guard duration.isFinite, duration >= Recording3DShot.minimumDuration else { return 0 }
+        return Int(min(6, floor(duration)))
+    }
+
+    /// Adapted from Cap's applySceneToRange: retain leading shots on short ranges,
+    /// reserve a second for each cut, and snap to nearby footage edits (15% window).
+    /// Manual shot resizing and existing projects keep their 0.2 second minimum.
     static func scene(_ presets: [Recording3DPreset], in range: ClosedRange<Double>,
-                      weights: [Double]? = nil, showcaseFinish: Bool = false) -> [Recording3DShot] {
-        guard !presets.isEmpty, range.lowerBound.isFinite, range.upperBound.isFinite else { return [] }
+                      weights: [Double]? = nil, showcaseFinish: Bool = false,
+                      clipCuts: [Double] = []) -> [Recording3DShot] {
+        let duration = range.upperBound - range.lowerBound
+        guard !presets.isEmpty, range.lowerBound.isFinite, range.upperBound.isFinite,
+              duration.isFinite, duration >= Recording3DShot.minimumDuration else { return [] }
         let weights = weights ?? Array(repeating: 1, count: presets.count)
         guard weights.count == presets.count, weights.allSatisfy({ $0.isFinite && $0 > 0 }) else { return [] }
-        let sum = weights.reduce(0, +), duration = range.upperBound - range.lowerBound
-        guard sum.isFinite, duration.isFinite,
-              weights.allSatisfy({ duration * $0 / sum >= Recording3DShot.minimumDuration - 0.000_001 }) else { return [] }
-        var start = range.lowerBound
-        return presets.enumerated().map { index, preset in
-            let end = index == presets.count - 1 ? range.upperBound : start + duration * weights[index] / sum
-            var shot = Recording3DShot(start: start, end: end)
+        let kept = min(presets.count, Int(min(Double(presets.count), max(1, floor(duration)))))
+        let weightsToUse = Array(weights.prefix(kept))
+        let sum = weightsToUse.reduce(0, +)
+        guard sum.isFinite else { return [] }
+        let cuts = clipCuts.filter { $0.isFinite && $0 > range.lowerBound && $0 < range.upperBound }
+        var boundaries = [range.lowerBound]
+        var cumulative = 0.0
+        for index in 0..<(kept - 1) {
+            cumulative += weightsToUse[index] / sum
+            let lower = boundaries[index] + 1
+            let upper = range.upperBound - Double(kept - 1 - index)
+            let weighted = min(max(range.lowerBound + duration * cumulative, lower), upper)
+            let nearest = cuts.enumerated().min {
+                let a = abs($0.element - weighted), b = abs($1.element - weighted)
+                return a == b ? $0.offset < $1.offset : a < b
+            }?.element
+            if let nearest, abs(nearest - weighted) <= duration * 0.15, nearest >= lower, nearest <= upper {
+                boundaries.append(nearest)
+            } else { boundaries.append(weighted) }
+        }
+        boundaries.append(range.upperBound)
+        return presets.prefix(kept).enumerated().map { index, preset in
+            var shot = Recording3DShot(start: boundaries[index], end: boundaries[index + 1])
             shot.apply(preset)
             if showcaseFinish && index == 2 {
                 shot.endPose.camera?.distance = 1.6
                 shot.blur = .init(mode: .radial, strength: 19, falloff: 0.67, focusY: 0.52, bokeh: true)
             }
-            start = end
             return shot
         }
     }

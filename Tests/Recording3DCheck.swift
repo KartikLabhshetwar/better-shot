@@ -48,8 +48,53 @@ import QuartzCore
         print("PASS 13 upstream presets and \(reference.cases.count) actual Cap Rust camera/zoom/transition reference cases")
     }
 
+    static func checkSceneReference() throws {
+        struct Fixture: Decodable {
+            struct Sample: Decodable {
+                struct Shot: Decodable {
+                    let start, end: Double
+                    let startCamera, endCamera: Recording3DCamera
+                    let blur: Recording3DBlur
+                }
+                let kind: String
+                let count: Int
+                let start, end: Double
+                let cuts: [Double]
+                let shots: [Shot]
+            }
+            let cases: [Sample]
+        }
+        let fixture = try JSONDecoder().decode(Fixture.self, from: Data(contentsOf: URL(fileURLWithPath: "Tests/Fixtures/Cap3DScenes.json")))
+        for sample in fixture.cases {
+            let actual: [Recording3DShot]
+            if sample.kind == "auto" {
+                actual = Recording3DTimeline.autoScene(count: sample.count, duration: sample.end, clipCuts: sample.cuts)
+            } else {
+                let scene = Recording3DScene(rawValue: sample.kind)!
+                actual = Recording3DTimeline.scene(scene.presets, in: sample.start...sample.end,
+                    weights: scene.weights, showcaseFinish: scene == .showcase, clipCuts: sample.cuts)
+            }
+            precondition(actual.count == sample.shots.count, "Scene count differs from upstream: \(sample.kind) \(sample.end)")
+            for (shot, expected) in zip(actual, sample.shots) {
+                precondition(abs(shot.start - expected.start) < 1e-8 && abs(shot.end - expected.end) < 1e-8, "Scene boundaries must match Cap")
+                for (key, _, _) in Recording3DCamera.controls {
+                    precondition(abs(shot.startPose.camera![keyPath: key] - expected.startCamera[keyPath: key]) < 1e-9
+                        && abs(shot.endPose.camera![keyPath: key] - expected.endCamera[keyPath: key]) < 1e-9,
+                        "Generated camera move must match Cap: \(sample.kind) shot \(shot.title)")
+                }
+                precondition(shot.blur == expected.blur && shot.easing == .linear && shot.transition == 0)
+                if sample.end - sample.start >= 1 { precondition(shot.end - shot.start >= 1 - 1e-8) }
+            }
+        }
+        precondition(Recording3DTimeline.maximumAutoShots(duration: 4.7) == 4)
+        precondition(Recording3DTimeline.maximumAutoShots(duration: .nan) == 0)
+        precondition(Recording3DTimeline.maximumAutoShots(duration: 0.7) == 0)
+        print("PASS \(fixture.cases.count) actual Cap auto/named scene cases: poses, focus, minimum durations, and clip-cut snapping")
+    }
+
     static func main() throws {
         try checkCapReference()
+        try checkSceneReference()
         let empty = Recording3DTimeline(shots: [], duration: 10)
         precondition(empty.insertionRange(at: 2, duration: 10) == 2...5)
         precondition(empty.insertionRange(at: 9.8, duration: 10) == 7...10)

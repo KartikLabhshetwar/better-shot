@@ -53,8 +53,11 @@ permissions and your first capture.
 - **3D video shots.** Use the timeline’s **+ Add > 3D Shot** menu, then choose
   from eight camera moves and five drifting angles in Effects. Adjust camera
   orbit, screen fold, distance, and lens, or generate a scene. The same menu adds
-  zoom segments. Camera, Blur, and Keyframes tabs provide radial/directional/tilt-shift
-  focus, bokeh highlights, and editable Bézier curves. Preview and export share
+  zoom segments. **Auto Scene** previews a sequence before applying it, keeps
+  generated shots at least one second long, and snaps nearby boundaries to clip cuts.
+  The native **Edit** menu groups Look, Camera, Depth Blur, Keyframes, and Timing.
+  Controls include radial/directional/tilt-shift focus, bokeh highlights, and editable
+  Bézier curves. Preview and export share
   the GPU compositor. Zoom enlarges the whole 3D card; separate entry/exit controls
   ease the camera into and out of its shot.
 - **Make the cursor easier to follow.** Choose Recorded, Arrow, Dark, Light, or

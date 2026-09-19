@@ -25,6 +25,17 @@ func check3DShots(movie: URL, directory: URL) async throws {
     creationModel.hoverPreviewTime = nil
     precondition(creationModel.shots3D.isEmpty && creationModel.hasUnsavedChanges == wasDirty)
     precondition(creationModel.previewRenderRevision == revision, "Hover must not invalidate decoration or author an effect")
+    creationModel.seek(to: 0.4)
+    creationModel.previewAuto3DScene(count: 6)
+    precondition(creationModel.suggested3DScene?.shots.count == 2, "A two-second video must not get six rapid cuts")
+    precondition(creationModel.timeline3D.shots.isEmpty && creationModel.shots3D.isEmpty)
+    precondition(creationModel.previewTimeline3D.shots.count == 2 && creationModel.hasUnsavedChanges == wasDirty)
+    precondition(creationModel.previewRenderRevision == revision, "A suggestion preview must reuse decoration")
+    creationModel.saveProject()
+    let previewDocument = session.loadEditDocument()
+    precondition(previewDocument != nil && (previewDocument?.shots3D ?? []).isEmpty, "Preview suggestions must never be saved or exported")
+    creationModel.cancel3DScenePreview()
+    precondition(creationModel.suggested3DScene == nil && abs(creationModel.currentTime - 0.4) < 0.001 && !creationModel.isPlaying)
     creationModel.add3DShot(at: 0)
     precondition(creationModel.shots3D[0].start == proposed.lowerBound && creationModel.shots3D[0].end == proposed.upperBound,
                  "The insertion must match its hover ghost exactly")
@@ -81,7 +92,7 @@ func check3DShots(movie: URL, directory: URL) async throws {
     model.endMaskEditing()
     model.select3DShot(id: edited.id)
     model.apply3DScene([.glide, .unfold, .center], wholeMovie: true)
-    precondition(model.timeline3D.shots.count == 3)
+    precondition(model.timeline3D.shots.count == 2)
     var bounded = model.selected3DShot!
     let end = bounded.end
     bounded.start = -100; bounded.end = 100
@@ -89,7 +100,7 @@ func check3DShots(movie: URL, directory: URL) async throws {
     precondition(model.selected3DShot?.start == 0 && model.selected3DShot?.end == end,
                  "Timing edits must not overlap adjacent shots")
     model.play3DShot()
-    try await Task.sleep(for: .seconds(1))
+    try await Task.sleep(for: .seconds(end + 0.25))
     precondition(!model.isPlaying && abs(model.currentTime - end) < 0.03,
                  "Play Shot must stop before the remainder of the movie")
     let authored = model.shots3D
@@ -97,7 +108,7 @@ func check3DShots(movie: URL, directory: URL) async throws {
     precondition(model.shots3D == authored, "Shortening a clip must retain authored shots for undo")
     precondition(model.timeline3D.shots.allSatisfy { $0.end <= model.duration })
     model.setClipSpeed(1, forClipID: model.clipTimeline.segments[0].id)
-    precondition(model.timeline3D.shots.count == 3)
+    precondition(model.timeline3D.shots.count == 2)
     await model.discardChanges()
     precondition(model.shots3D == [edited] && !model.hasUnsavedChanges)
     model.select3DShot(id: edited.id)
@@ -140,6 +151,16 @@ func check3DShots(movie: URL, directory: URL) async throws {
     var style = RecordingStudioStyle()
     style.background = .solid(AnnotationBackgroundColor("green", title: "Green", red: 0, green: 1, blue: 0))
     style.padding = 0; style.shadow = 0; style.cornerRadius = 0
+    let suggestionModel = RecordingStudioModel(url: movie)
+    await suggestionModel.load()
+    suggestionModel.applyAuto3DScene(count: 6)
+    let suggested = suggestionModel.shots3D
+    precondition(suggested.count == 2 && suggested.allSatisfy { $0.end - $0.start >= 1 })
+    suggestionModel.undo()
+    precondition(suggestionModel.shots3D.isEmpty, "Apply Auto Scene is one undo step")
+    suggestionModel.redo()
+    precondition(suggestionModel.shots3D == suggested)
+    suggestionModel.teardown()
     let source = buffer(source: true), output = buffer()
     func compositor(_ timeline: Recording3DTimeline, size: CGSize = CGSize(width: 320, height: 180),
                     masks: [RecordingMaskSegment] = []) -> StudioFrameCompositor {
@@ -423,11 +444,25 @@ private func check3DWindows(model: RecordingStudioModel) async throws {
                      "Paused 3D edits must redraw while reusing the compositor")
         model.update3DShot(original)
         try await Task.sleep(for: .milliseconds(150))
+        let authored = model.shots3D, originalTime = model.currentTime
+        let beforeSuggestionFrames = preview.renderedFrameCount
+        model.previewAuto3DScene(count: 2)
+        try await Task.sleep(for: .milliseconds(400))
+        model.pause()
+        precondition(model.suggested3DScene != nil && model.shots3D == authored
+                     && model.preview3DError == nil && preview.renderedFrameCount > beforeSuggestionFrames
+                     && preview.compositorBuildCount == beforeCompositors,
+                     "Auto Scene must render transient shots through the existing GPU compositor")
+        model.cancel3DScenePreview()
+        precondition(model.suggested3DScene == nil && model.shots3D == authored
+                     && abs(model.currentTime - originalTime) < 0.001,
+                     "Cancel must restore the authored scene and playhead")
+        try await Task.sleep(for: .milliseconds(150))
         let capture = Process()
         capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
         capture.arguments = ["-x", "-o", "-l", String(window.windowNumber), output.appendingPathComponent("video-3d-live-\(name).png").path]
         try capture.run(); capture.waitUntilExit()
         precondition(capture.terminationStatus == 0)
     }
-    print("PASS displayed 3D editor playback/scrubbing screenshots in light and dark appearances")
+    print("PASS displayed 3D playback, transient Auto Scene/cancel, compositor reuse, and light/dark screenshots")
 }

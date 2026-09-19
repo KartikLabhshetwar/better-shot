@@ -25,16 +25,22 @@ struct Recording3DLane: View {
                     case .ended: clearHover()
                     }
                 }
-            if let hoverTime, let range = model.timeline3D.insertionRange(at: hoverTime, duration: model.duration) {
+            if model.suggested3DScene == nil, let hoverTime, let range = model.timeline3D.insertionRange(at: hoverTime, duration: model.duration) {
                 Recording3DInsertionGhost(range: range, pointsPerSecond: pointsPerSecond)
-            } else if model.timeline3D.shots.isEmpty {
+            } else if model.timeline3D.shots.isEmpty && model.suggested3DScene == nil {
                 Label("Click to add a 3D shot", systemImage: "plus")
                     .font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity).frame(height: 36)
                     .allowsHitTesting(false)
             }
-            ForEach(model.timeline3D.shots.filter { $0.end >= visibleRange.lowerBound && $0.start <= visibleRange.upperBound }) { shot in
-                Recording3DBlock(model: model, shot: shot, pointsPerSecond: pointsPerSecond)
+            if let preview = model.suggested3DScene {
+                ForEach(preview.shots) { shot in
+                    Recording3DInsertionGhost(range: shot.start...shot.end, pointsPerSecond: pointsPerSecond)
+                }
+            } else {
+                ForEach(model.timeline3D.shots.filter { $0.end >= visibleRange.lowerBound && $0.start <= visibleRange.upperBound }) { shot in
+                    Recording3DBlock(model: model, shot: shot, pointsPerSecond: pointsPerSecond)
+                }
             }
         }
         .onDisappear { clearHover() }

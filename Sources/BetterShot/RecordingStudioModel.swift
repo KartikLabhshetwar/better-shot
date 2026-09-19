@@ -433,6 +433,7 @@ final class RecordingStudioModel {
     }
 
     func teardown() {
+        cancel3DScenePreview()
         StudioProjectRegistry.shared.unregister(self)
         exportTask?.cancel()
         audioExportTask?.cancel()
@@ -906,16 +907,61 @@ final class RecordingStudioModel {
         timeline3D.shots.first { $0.id == selected3DShotID }
     }
 
+    private(set) var suggested3DScene: Recording3DTimeline?
+    private var before3DScenePreview: Double?
+    var previewTimeline3D: Recording3DTimeline { suggested3DScene ?? timeline3D }
+
+    private var sceneClipCuts: [Double] {
+        var end = 0.0
+        return clipTimeline.segments.map { end += $0.editorDuration; return end }
+    }
+
+    func suggested3DShots(count: Int) -> [Recording3DShot] {
+        Recording3DTimeline.autoScene(count: count, duration: duration, clipCuts: sceneClipCuts)
+    }
+
+    func previewAuto3DScene(count: Int) {
+        let shots = suggested3DShots(count: count)
+        guard !shots.isEmpty else { return }
+        if before3DScenePreview == nil { before3DScenePreview = currentTime }
+        pause()
+        hoverPreviewTime = nil
+        suggested3DScene = Recording3DTimeline(shots: shots, duration: duration)
+        seek(to: 0)
+        play()
+        shotPlaybackEnd = duration
+    }
+
+    func cancel3DScenePreview() {
+        guard let originalTime = before3DScenePreview else { return }
+        before3DScenePreview = nil
+        suggested3DScene = nil
+        pause()
+        seek(to: originalTime)
+    }
+
+    func applyAuto3DScene(count: Int) {
+        let shots = suggested3DShots(count: count)
+        guard !shots.isEmpty else { return }
+        cancel3DScenePreview()
+        set3DShots(shots, actionName: "Apply Auto Scene")
+        select3DShot(id: shots[0].id)
+        pause()
+        seek(to: shots[0].start)
+    }
+
     func preview3DPose(at time: Double) -> Recording3DPose {
-        isCroppingVideo || isEditingMasks ? .identity : timeline3D.pose(at: time)
+        isCroppingVideo || isEditingMasks ? .identity : previewTimeline3D.pose(at: time)
     }
 
     private func rebuild3DTimeline() {
+        cancel3DScenePreview()
         timeline3D = Recording3DTimeline(shots: shots3D, duration: duration)
         if !timeline3D.shots.contains(where: { $0.id == selected3DShotID }) { selected3DShotID = nil }
     }
 
     func select3DShot(id: UUID) {
+        cancel3DScenePreview()
         guard timeline3D.shots.contains(where: { $0.id == id }) else { return }
         if isCroppingVideo { cancelVideoCrop() }
         if isEditingMasks { endMaskEditing() }
@@ -996,7 +1042,7 @@ final class RecordingStudioModel {
         guard duration > 0 else { return }
         let replacesAll = wholeMovie || selected3DShot == nil
         let range = replacesAll ? 0...duration : selected3DShot.map { $0.start...$0.end } ?? 0...duration
-        let shots = Recording3DTimeline.scene(presets, in: range, weights: weights, showcaseFinish: showcaseFinish)
+        let shots = Recording3DTimeline.scene(presets, in: range, weights: weights, showcaseFinish: showcaseFinish, clipCuts: sceneClipCuts)
         guard !shots.isEmpty else {
             shot3DError = "This range is too short. Allow at least 0.2 seconds per shot."
             return
@@ -1005,7 +1051,7 @@ final class RecordingStudioModel {
         set3DShots(remaining + shots, actionName: "Apply 3D Scene")
         select3DShot(id: shots[0].id)
         pause()
-        seek(to: shots[0].start + min(0.5, (shots[0].end - shots[0].start) / 2))
+        seek(to: ceil(shots[0].start * 60 - 0.000_001) / 60)
     }
 
     func play3DShot() {

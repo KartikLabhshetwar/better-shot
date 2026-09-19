@@ -550,10 +550,14 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
         for width: CGFloat in [260, 320] {
-            try snapshot(ScrollView { Recording3DInspector(model: videoModel) }.scrollIndicators(.hidden),
-                         scheme: scheme, width: width,
-                         to: output.appendingPathComponent("video-3d-inspector-\(name)-\(Int(width)).png"), height: 1400)
+            for panel in Recording3DInspector.Panel.allCases {
+                try snapshot(ScrollView { Recording3DInspector(model: videoModel, panel: panel) }.scrollIndicators(.hidden),
+                    scheme: scheme, width: width,
+                    to: output.appendingPathComponent("video-3d-inspector-\(panel.rawValue)-\(name)-\(Int(width)).png"), height: 1000)
+            }
         }
+        try snapshot(Recording3DAutoScenePicker(model: videoModel, dismiss: {}), scheme: scheme, width: 360,
+            to: output.appendingPathComponent("video-auto-scene-\(name).png"), height: 390)
         try snapshot(RecordingStudioContent(model: videoModel), scheme: scheme, width: 1100,
                      to: output.appendingPathComponent("video-3d-\(name).png"))
     }
