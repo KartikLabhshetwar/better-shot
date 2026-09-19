@@ -6,6 +6,16 @@ import SwiftUI
 
 @MainActor
 func check3DShots(movie: URL, directory: URL) async throws {
+    let orbitStart = Recording3DPreset.glide.poses.0
+    let orbitMove = Recording3DOrbitPad.orbit(orbitStart, translation: CGSize(width: 10, height: -10), size: CGSize(width: 200, height: 100))
+    precondition(abs(orbitMove.camera!.tiltY - orbitStart.camera!.tiltY - 6) < 1e-8)
+    precondition(abs(orbitMove.camera!.tiltX - orbitStart.camera!.tiltX - 14) < 1e-8)
+    precondition(orbitMove.camera!.distance == orbitStart.camera!.distance && orbitMove.camera!.rotateX == orbitStart.camera!.rotateX)
+    let edge = Recording3DOrbitPad.orbit(orbitStart, translation: CGSize(width: 10000, height: -10000), size: CGSize(width: 200, height: 100))
+    precondition(edge.camera!.tiltY == 60 && edge.camera!.tiltX == 70)
+    let legacyOrbit = Recording3DOrbitPad.orbit(.identity, translation: CGSize(width: -1000, height: 1000), size: CGSize(width: 100, height: 100))
+    precondition(legacyOrbit.camera == nil && legacyOrbit.tiltX == -65 && legacyOrbit.tiltY == -65)
+    precondition(Recording3DOrbitPad.orbit(orbitStart, translation: .zero, size: .zero) == orbitStart)
     let compact = StudioTimelineMetrics.scrollingLanesHeight(showsMaskLane: false, showsCutLane: false, shows3DLane: true)
     let withCuts = StudioTimelineMetrics.scrollingLanesHeight(showsMaskLane: false, showsCutLane: true, shows3DLane: true)
     precondition(withCuts - compact == 36, "No cut-marker gutter may remain when there are no cuts")

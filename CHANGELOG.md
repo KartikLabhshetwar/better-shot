@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Visual 3D controls:** separate Looks, Camera, Depth Blur, Keyframes, and Timing cards, side-by-side Start/End previews, a bounded drag-to-orbit pad, adaptive preset grids, and scene cards with shot counts. Depth blur has an enable switch and focus choices. All numeric camera and curve controls remain available. Close up now uses a gentler centered push-in with lighter bokeh and a broader sharp area; previously saved shots retain their framing.
+
 - Image and video editors support native full screen with automatic full-screen opening enabled or disabled, and take focus when opened from the preview overlay. The menu tray dismisses immediately on editor clicks or Escape and closes before screenshot or recording-picker actions, including while an editor is full screen.
 
 - Settings displays the selected section title once using the native toolbar title. Gallery list view uses native sortable Name, Date Created, and Kind columns; compact previews and folder/media SF Symbols bring both views closer to Finder.

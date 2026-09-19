@@ -208,6 +208,7 @@
 		EB848575CC3229A7EFFA6F13 /* BackgroundStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE8FF05309B340FEAE149775 /* BackgroundStyle.swift */; };
 		EC7BD9967E6AE24E581FA796 /* TeleprompterScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8FAC6D4EA9409CD20552C2B /* TeleprompterScript.swift */; };
 		F01CDEDDE68450311F860048 /* RecordingCompositionBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 585BD4DB8B9D1DEAEF5027E4 /* RecordingCompositionBuilder.swift */; };
+		F0F4CD24EA88F07B1C477D47 /* Recording3DOrbitPad.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEB2AEB81BE4A6B5313E0654 /* Recording3DOrbitPad.swift */; };
 		F1BD9BB54CFB037D8A39EDF0 /* CurvedArrow.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC98709615BCFD7C3C15600A /* CurvedArrow.swift */; };
 		F3BAB5D4C1617D203E95885B /* BundledBackgrounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94D707990F014D8BE452023A /* BundledBackgrounds.swift */; };
 		F425B700C7B4E08A43AAF173 /* R2Uploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 861CE2F486701322F7B4FAD3 /* R2Uploader.swift */; };
@@ -414,6 +415,7 @@
 		D9CAA6D017C7FB19CD3466D7 /* MathUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MathUtils.swift; sourceTree = "<group>"; };
 		DAB3C2075FF2BEF2BC2650CB /* Geometry2d.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Geometry2d.swift; sourceTree = "<group>"; };
 		DC01231A76D0FEF4269A0806 /* OverlayLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayLayout.swift; sourceTree = "<group>"; };
+		DEB2AEB81BE4A6B5313E0654 /* Recording3DOrbitPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Recording3DOrbitPad.swift; sourceTree = "<group>"; };
 		DEDFDD9AD76A019ADE57581A /* AnnotationTextStyleControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationTextStyleControls.swift; sourceTree = "<group>"; };
 		E1F111988702AFBAF2496331 /* RecordingStudioStylePresetStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStudioStylePresetStore.swift; sourceTree = "<group>"; };
 		E2532AE9303B012F07C0FC4F /* AnnotationRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationRenderer.swift; sourceTree = "<group>"; };
@@ -643,6 +645,7 @@
 				C96F75A7EB8769B15A71CCD1 /* Recording3DInspector.swift */,
 				B3DAB62F4C89B00163C2ECB0 /* Recording3DKeyframeEditor.swift */,
 				2D6579AC33175436B5F53B1C /* Recording3DLane.swift */,
+				DEB2AEB81BE4A6B5313E0654 /* Recording3DOrbitPad.swift */,
 				3034437BB87F62844847BB2E /* Recording3DPreview.swift */,
 				C315ACDB8155CA8169D8CEFF /* Recording3DShot.swift */,
 				868BDBFEC12D9D90939923A2 /* RecordingAreaHighlightPresenter.swift */,
@@ -996,6 +999,7 @@
 				C7D570AB49763BC8452EEFA8 /* Recording3DInspector.swift in Sources */,
 				571A6FBD80D409ECE967E066 /* Recording3DKeyframeEditor.swift in Sources */,
 				FFB826CA31FB62EF0C4858DF /* Recording3DLane.swift in Sources */,
+				F0F4CD24EA88F07B1C477D47 /* Recording3DOrbitPad.swift in Sources */,
 				DEF24106429AF3B516278F72 /* Recording3DPreview.swift in Sources */,
 				CD703C2110FDB5F74D7B1924 /* Recording3DShot.swift in Sources */,
 				1B0581442F771F48B16539BE /* RecordingAreaHighlightPresenter.swift in Sources */,

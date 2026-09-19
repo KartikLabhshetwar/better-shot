@@ -18,6 +18,8 @@ import QuartzCore
         precondition(reference.presets.count == Recording3DPreset.allCases.count)
         for expected in reference.presets {
             let preset = Recording3DPreset.allCases.first { $0.rawValue == expected.name }!
+            // Close up deliberately uses gentler framing/focus; renderer references below remain unchanged.
+            if preset == .closeUp { continue }
             precondition(preset.poses.0.camera == expected.start && preset.poses.1.camera == expected.end, "Cap camera preset changed: \(expected.name)")
             precondition(preset.blur == expected.blur, "Cap blur preset changed: \(expected.name)")
         }
@@ -45,7 +47,7 @@ import QuartzCore
                 }
             }
         }
-        print("PASS 13 upstream presets and \(reference.cases.count) actual Cap Rust camera/zoom/transition reference cases")
+        print("PASS 12 unchanged upstream presets and \(reference.cases.count) actual Cap Rust camera/zoom/transition reference cases")
     }
 
     static func checkSceneReference() throws {
@@ -77,24 +79,41 @@ import QuartzCore
             precondition(actual.count == sample.shots.count, "Scene count differs from upstream: \(sample.kind) \(sample.end)")
             for (shot, expected) in zip(actual, sample.shots) {
                 precondition(abs(shot.start - expected.start) < 1e-8 && abs(shot.end - expected.end) < 1e-8, "Scene boundaries must match Cap")
-                for (key, _, _) in Recording3DCamera.controls {
-                    precondition(abs(shot.startPose.camera![keyPath: key] - expected.startCamera[keyPath: key]) < 1e-9
-                        && abs(shot.endPose.camera![keyPath: key] - expected.endCamera[keyPath: key]) < 1e-9,
-                        "Generated camera move must match Cap: \(sample.kind) shot \(shot.title)")
+                if shot.title != Recording3DPreset.closeUp.rawValue {
+                    for (key, _, _) in Recording3DCamera.controls {
+                        precondition(abs(shot.startPose.camera![keyPath: key] - expected.startCamera[keyPath: key]) < 1e-9
+                            && abs(shot.endPose.camera![keyPath: key] - expected.endCamera[keyPath: key]) < 1e-9,
+                            "Generated camera move must match Cap: \(sample.kind) shot \(shot.title)")
+                    }
+                    precondition(shot.blur == expected.blur)
                 }
-                precondition(shot.blur == expected.blur && shot.easing == .linear && shot.transition == 0)
+                precondition(shot.easing == .linear && shot.transition == 0)
                 if sample.end - sample.start >= 1 { precondition(shot.end - shot.start >= 1 - 1e-8) }
             }
         }
         precondition(Recording3DTimeline.maximumAutoShots(duration: 4.7) == 4)
         precondition(Recording3DTimeline.maximumAutoShots(duration: .nan) == 0)
         precondition(Recording3DTimeline.maximumAutoShots(duration: 0.7) == 0)
-        print("PASS \(fixture.cases.count) actual Cap auto/named scene cases: poses, focus, minimum durations, and clip-cut snapping")
+        print("PASS \(fixture.cases.count) Cap scene timing/cut cases and unchanged look parameters (Close up intentionally refined)")
     }
 
     static func main() throws {
         try checkCapReference()
         try checkSceneReference()
+        // The readable Close up stays centered throughout its move in common canvas ratios.
+        var closeUp = Recording3DShot(start: 0, end: 4)
+        closeUp.apply(.closeUp)
+        precondition(closeUp.blur!.strength == 8 && closeUp.blur!.focusX == 0.5 && closeUp.blur!.focusSize == 0.65)
+        for aspect in [16.0 / 9, 1, 9.0 / 16] {
+            let size = CGSize(width: 360 * aspect, height: 360)
+            for time in [0.0, 1, 2, 3, 3.99] {
+                let pose = closeUp.pose(at: time)
+                let center = pose.project(CGPoint(x: size.width / 2, y: size.height / 2), in: size)
+                precondition(abs(center.x / size.width - 0.5) < 0.12 && abs(center.y / size.height - 0.5) < 0.12,
+                             "Close up must keep the screen center readable")
+                precondition(pose.camera!.distance >= 1.22 && abs(pose.camera!.tiltY) <= 16)
+            }
+        }
         let empty = Recording3DTimeline(shots: [], duration: 10)
         precondition(empty.insertionRange(at: 2, duration: 10) == 2...5)
         precondition(empty.insertionRange(at: 9.8, duration: 10) == 7...10)

@@ -6,7 +6,7 @@ import simd
 
 struct Recording3DInspector: View {
     enum Section: String, CaseIterable {
-        case camera = "Camera", blur = "Depth Blur", keyframes = "Keyframes", timing = "Timing", look = "Looks"
+        case look = "Looks", camera = "Camera", blur = "Depth Blur", keyframes = "Keyframes", timing = "Timing"
     }
     @Bindable var model: RecordingStudioModel
     @State private var showsMoves = true
@@ -15,65 +15,72 @@ struct Recording3DInspector: View {
     @State private var confirmsRemoval = false
 
     var body: some View {
-        StudioEffectSection(title: "3D Shots", systemImage: "cube.transparent", accessory: {
-            Button { model.add3DShot(at: model.currentTime) } label: { Image(systemName: "plus") }
-                .buttonStyle(EditorButtonStyle()).accessibilityLabel("Add 3D shot at playhead")
-                .help("Add 3D shot at playhead")
-        }) {
-            VStack(alignment: .leading, spacing: 12) {
-                Button { showsAutoScene = true } label: {
-                    Label("Auto Scene…", systemImage: "wand.and.stars")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(EditorButtonStyle(bordered: true))
-                .popover(isPresented: $showsAutoScene, arrowEdge: .trailing) {
-                    Recording3DAutoScenePicker(model: model) { showsAutoScene = false }
-                }
-                if let shot = model.selected3DShot {
-                    HStack(spacing: 8) {
-                        Text(shot.title).font(.callout.weight(.semibold)).lineLimit(2)
-                        Spacer(minLength: 0)
-                        Toggle("Enable 3D shot", isOn: Binding(get: { shot.isEnabled }, set: { value in change { $0.isEnabled = value } }))
-                            .labelsHidden().toggleStyle(.switch).controlSize(.mini)
+        VStack(alignment: .leading, spacing: 10) {
+            StudioEffectSection(title: "3D Shots", systemImage: "cube.transparent", accessory: {
+                Button { model.add3DShot(at: model.currentTime) } label: { Image(systemName: "plus") }
+                    .buttonStyle(EditorButtonStyle()).accessibilityLabel("Add 3D shot at playhead")
+                    .help("Add 3D shot at playhead")
+            }) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Button { showsAutoScene = true } label: {
+                        Label("Auto Scene…", systemImage: "wand.and.stars")
+                            .frame(maxWidth: .infinity)
                     }
-                    HStack(spacing: 8) {
-                        Button { model.isPlaying ? model.pause() : model.play3DShot() } label: {
-                            Label(model.isPlaying ? "Pause" : "Play Shot", systemImage: model.isPlaying ? "pause.fill" : "play.fill")
+                    .buttonStyle(EditorButtonStyle(bordered: true))
+                    .popover(isPresented: $showsAutoScene, arrowEdge: .trailing) {
+                        Recording3DAutoScenePicker(model: model) { showsAutoScene = false }
+                    }
+                    if let shot = model.selected3DShot {
+                        HStack(spacing: 8) {
+                            Text(shot.title).font(.callout.weight(.semibold)).lineLimit(2)
+                            Spacer(minLength: 0)
+                            Toggle("Enable 3D shot", isOn: Binding(get: { shot.isEnabled }, set: { value in change { $0.isEnabled = value } }))
+                                .labelsHidden().toggleStyle(.switch).controlSize(.mini)
                         }
-                        Spacer(minLength: 0)
-                        Button { confirmsRemoval = true } label: { Image(systemName: "trash") }
-                            .accessibilityLabel("Remove 3D shot").help("Remove this shot")
-                    }.buttonStyle(EditorButtonStyle())
-                    Divider()
-                    ForEach(Section.allCases, id: \.self) { section in
-                        VStack(alignment: .leading, spacing: 12) {
-                            if section != .blur && section != .keyframes {
+                        HStack(spacing: 8) {
+                            Button { model.isPlaying ? model.pause() : model.play3DShot() } label: {
+                                Label(model.isPlaying ? "Pause" : "Play Shot", systemImage: model.isPlaying ? "pause.fill" : "play.fill")
+                            }
+                            Spacer(minLength: 0)
+                            Button { confirmsRemoval = true } label: { Image(systemName: "trash") }
+                                .accessibilityLabel("Remove 3D shot").help("Remove this shot")
+                        }.buttonStyle(EditorButtonStyle())
+
+                    } else {
+                        Text(model.timeline3D.shots.isEmpty
+                            ? "Arrange a scene automatically, or add a shot at the playhead and choose its look."
+                            : "Select a shot in the timeline to change its look, camera, or timing.")
+                            .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        if model.timeline3D.shots.isEmpty {
+                            Button("Add a Shot") { model.add3DShot(at: model.currentTime) }
+                                .buttonStyle(EditorButtonStyle())
+                        }
+                    }
+                    if let error = model.shot3DError {
+                        Label(error, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.red)
+                    }
+                }
+            }
+            if let shot = model.selected3DShot {
+                ForEach(Section.allCases, id: \.self) { section in
+                    VStack(alignment: .leading, spacing: 12) {
+                        if section != .blur && section != .keyframes {
+                            HStack {
                                 Text(section.rawValue).font(.callout.weight(.semibold))
                                     .accessibilityAddTraits(.isHeader)
-                            }
-                            switch section {
-                            case .camera: cameraControls(shot)
-                            case .blur: Recording3DBlurInspector(model: model)
-                            case .keyframes: Recording3DKeyframeEditor(model: model)
-                            case .timing: timingControls(shot)
-                            case .look: lookControls(shot)
+                                Spacer(minLength: 0)
+                                if section == .camera { flipControls }
                             }
                         }
-                        .id(section)
-                        if section != Section.allCases.last { Divider().padding(.vertical, 4) }
+                        switch section {
+                        case .camera: cameraControls(shot)
+                        case .blur: Recording3DBlurInspector(model: model)
+                        case .keyframes: Recording3DKeyframeEditor(model: model)
+                        case .timing: timingControls(shot)
+                        case .look: lookControls(shot)
+                        }
                     }
-                } else {
-                    Text(model.timeline3D.shots.isEmpty
-                        ? "Arrange a scene automatically, or add a shot at the playhead and choose its look."
-                        : "Select a shot in the timeline to change its look, camera, or timing.")
-                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    if model.timeline3D.shots.isEmpty {
-                        Button("Add a Shot") { model.add3DShot(at: model.currentTime) }
-                            .buttonStyle(EditorButtonStyle())
-                    }
-                }
-                if let error = model.shot3DError {
-                    Label(error, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(.red)
+                    .padding(12).studioEffectCard().id(section)
                 }
             }
         }
@@ -99,7 +106,7 @@ struct Recording3DInspector: View {
                 Text("Moves").tag(true)
                 Text("Angles").tag(false)
             }.pickerStyle(.segmented).labelsHidden()
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 78))], spacing: 10) {
                 ForEach(Recording3DPreset.allCases.filter { $0.isMove == showsMoves }, id: \.self) { preset in
                     Recording3DLookTile(preset: preset, selected: shot.title == preset.rawValue) {
                         change { $0.apply(preset) }
@@ -110,18 +117,24 @@ struct Recording3DInspector: View {
             }
             Divider()
             Text("Scenes").font(.caption.weight(.semibold))
-            ForEach(Recording3DScene.allCases, id: \.self) { scene in
-                Button {
-                    model.apply3DScene(scene.presets, weights: scene.weights, showcaseFinish: scene == .showcase)
-                } label: {
-                    HStack {
-                        Label(scene.rawValue, systemImage: "square.stack.3d.up")
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.right").font(.caption2).accessibilityHidden(true)
-                    }.frame(maxWidth: .infinity)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
+                ForEach(Recording3DScene.allCases, id: \.self) { scene in
+                    Button {
+                        model.apply3DScene(scene.presets, weights: scene.weights, showcaseFinish: scene == .showcase)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(scene.rawValue).font(.caption.weight(.medium)).lineLimit(2)
+                                .frame(height: 30, alignment: .topLeading)
+                            let count = min(3, max(1, Int(shot.end - shot.start)))
+                            Text("\(count) \(count == 1 ? "shot" : "shots")").font(.caption2).foregroundStyle(.secondary)
+                            HStack(spacing: 3) {
+                                ForEach(0..<count, id: \.self) { _ in Capsule().fill(Color.accentColor.opacity(0.65)).frame(height: 3) }
+                            }
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(EditorButtonStyle(horizontalPadding: 7, bordered: true))
+                    .help(scene.summary + ". Replaces this shot’s range; shorter ranges use fewer shots.")
                 }
-                .buttonStyle(EditorButtonStyle(bordered: true))
-                .help(scene.summary + ". Replaces this shot’s range; shorter ranges use fewer shots.")
             }
             Text("Scenes replace the selected shot. Auto Scene arranges the whole video.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -130,17 +143,22 @@ struct Recording3DInspector: View {
 
     private func cameraControls(_ shot: Recording3DShot) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Picker("Camera position", selection: $editsEnd) {
-                Text("Start").tag(false)
-                Text("End").tag(true)
-            }.pickerStyle(.segmented).labelsHidden().onChange(of: editsEnd) { previewPose() }
-            Recording3DPoseThumbnail(pose: editsEnd ? shot.endPose : shot.startPose).frame(height: 100)
-                .background(.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
-            HStack(spacing: 8) {
-                Button { change { $0.reverse() }; previewPose() } label: { Label("Reverse", systemImage: "arrow.left.arrow.right") }
-                Button { change { $0.holdCamera() }; previewPose() } label: { Label("Still", systemImage: "pause") }
-                    .disabled(shot.startPose == shot.endPose)
-            }.buttonStyle(EditorButtonStyle())
+            HStack(alignment: .top, spacing: 6) {
+                endpoint(shot, end: false)
+                Button { change { $0.reverse() }; previewPose() } label: { Image(systemName: "arrow.left.arrow.right") }
+                    .buttonStyle(EditorButtonStyle(horizontalPadding: 3)).padding(.top, 26)
+                    .accessibilityLabel("Swap start and end").help("Reverse this camera move")
+                endpoint(shot, end: true)
+            }
+            Button { change { $0.holdCamera() }; previewPose() } label: { Label("Still shot", systemImage: "pause") }
+                .buttonStyle(EditorButtonStyle()).disabled(shot.startPose == shot.endPose)
+            Recording3DOrbitPad(pose: Binding(get: {
+                guard let current = model.selected3DShot else { return .identity }
+                return editsEnd ? current.endPose : current.startPose
+            }, set: { value in change { if editsEnd { $0.endPose = value } else { $0.startPose = value } } }), editing: { active in
+                if active { model.begin3DShotEdit(); previewPose() } else { model.end3DShotEdit() }
+            })
+            .disabled(shot.tracks?.contains { $0.property == .tiltX || $0.property == .tiltY } == true)
             if shot.tracks?.contains(where: { $0.property.cameraKey != nil }) == true {
                 Text("Keyframes control the animated properties. Use the Keyframes shortcut above to edit their values and curves.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -165,10 +183,6 @@ struct Recording3DInspector: View {
                 poseSlider("Perspective", key: \.perspective, range: 20...70, format: .degrees())
             }
             HStack {
-                Button { flip(horizontal: true) } label: { Image(systemName: "arrow.left.and.right.righttriangle.left.righttriangle.right") }
-                    .accessibilityLabel("Flip horizontally").help("Mirror the camera horizontally")
-                Button { flip(horizontal: false) } label: { Image(systemName: "arrow.up.and.down.righttriangle.up.righttriangle.down") }
-                    .accessibilityLabel("Flip vertically").help("Mirror the camera vertically")
                 Spacer(minLength: 0)
                 Button("Reset") {
                     change { shot in
@@ -181,6 +195,31 @@ struct Recording3DInspector: View {
                 }.help("Reset this position and remove camera keyframes")
             }.buttonStyle(EditorButtonStyle())
         }
+    }
+
+    private var flipControls: some View {
+        HStack(spacing: 4) {
+            Button { flip(horizontal: true) } label: { Image(systemName: "arrow.left.and.right.righttriangle.left.righttriangle.right") }
+                .accessibilityLabel("Flip horizontally").help("Mirror the camera horizontally")
+            Button { flip(horizontal: false) } label: { Image(systemName: "arrow.up.and.down.righttriangle.up.righttriangle.down") }
+                .accessibilityLabel("Flip vertically").help("Mirror the camera vertically")
+        }.buttonStyle(EditorButtonStyle(horizontalPadding: 4))
+    }
+
+    private func endpoint(_ shot: Recording3DShot, end: Bool) -> some View {
+        Button { editsEnd = end; previewPose() } label: {
+            VStack(alignment: .leading, spacing: 5) {
+                Recording3DPoseThumbnail(pose: end ? shot.endPose : shot.startPose)
+                    .frame(height: 76)
+                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+                    .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(editsEnd == end ? Color.accentColor : EditorChrome.border, lineWidth: editsEnd == end ? 2 : 0.5) }
+                Text(end ? "End" : "Start").font(.caption.weight(.medium))
+                Text((end ? shot.end : shot.start).formatted(.number.precision(.fractionLength(2))) + "s")
+                    .font(.caption2).monospacedDigit().foregroundStyle(.secondary)
+            }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+        }.buttonStyle(.plain)
+        .accessibilityLabel(end ? "Edit end camera position" : "Edit start camera position")
+        .accessibilityAddTraits(editsEnd == end ? .isSelected : [])
     }
 
     private func timingControls(_ shot: Recording3DShot) -> some View {
@@ -271,29 +310,30 @@ struct Recording3DInspector: View {
 struct Recording3DBlurInspector: View {
     @Bindable var model: RecordingStudioModel
     private var blur: Recording3DBlur { model.selected3DShot?.blur ?? .none }
+    @State private var lastFocus = Recording3DBlur.Mode.radial
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Depth Blur").font(.callout.weight(.semibold)).accessibilityAddTraits(.isHeader)
-            Picker("Focus", selection: Binding(get: { blur.mode }, set: { mode in
-                change { blur in
-                    blur.mode = mode
-                    switch mode {
-                    case .none: break
-                    case .radial: blur.focusX = 0.37; blur.focusY = 0.5; blur.focusSize = 0.5
-                    case .directional: blur.position = 0.5; blur.angle = 0
-                    case .tiltShift: blur.focusSize = 0.1; blur.focusY = 0.5; blur.angle = 45
+            HStack {
+                Text("Depth Blur").font(.callout.weight(.semibold)).accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 0)
+                Toggle("Enable depth blur", isOn: Binding(get: { blur.mode != .none }, set: { enabled in
+                    if !enabled { lastFocus = blur.mode }
+                    change { blur in
+                        blur.mode = enabled ? lastFocus : .none
+                        if enabled && blur.strength == 0 { blur.strength = 19 }
                     }
-                    if mode != .none && blur.strength == 0 { blur.strength = 19 }
-                }
-            })) {
-                ForEach(Recording3DBlur.Mode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                })).labelsHidden().toggleStyle(.switch).controlSize(.small)
             }
-            .pickerStyle(.menu)
             if blur.mode != .none {
+                slider("Amount", .strength, format: .decimal(fractionDigits: 1))
+                Text("Focus").font(.caption).foregroundStyle(.secondary)
+                ViewThatFits(in: .horizontal) {
+                    focusPicker.pickerStyle(.segmented).controlSize(.small)
+                    focusPicker.pickerStyle(.menu)
+                }
                 Toggle("Bokeh highlights", isOn: Binding(get: { blur.bokeh }, set: { enabled in change { $0.bokeh = enabled } }))
                     .toggleStyle(.switch).controlSize(.small)
-                slider("Strength", .strength, format: .decimal(fractionDigits: 1))
                 slider("Falloff", .falloff)
                 if blur.mode == .directional {
                     slider("Position", .position)
@@ -307,6 +347,25 @@ struct Recording3DBlurInspector: View {
                     .font(.caption2).foregroundStyle(.secondary)
             }
         }
+        .onChange(of: model.selected3DShotID, initial: true) { _, _ in lastFocus = blur.mode == .none ? .radial : blur.mode }
+    }
+
+    private var focusPicker: some View {
+        Picker("Focus", selection: Binding(get: { blur.mode }, set: { mode in
+            lastFocus = mode
+            change { blur in
+                blur.mode = mode
+                switch mode {
+                case .none: break
+                case .radial: blur.focusX = 0.37; blur.focusY = 0.5; blur.focusSize = 0.5
+                case .directional: blur.position = 0.5; blur.angle = 0
+                case .tiltShift: blur.focusSize = 0.1; blur.focusY = 0.5; blur.angle = 45
+                }
+                if blur.strength == 0 { blur.strength = 19 }
+            }
+        })) {
+            ForEach(Recording3DBlur.Mode.allCases.filter { $0 != .none }, id: \.self) { Text($0.rawValue).tag($0) }
+        }.labelsHidden()
     }
     private func change(_ edit: (inout Recording3DBlur) -> Void) {
         guard var shot = model.selected3DShot else { return }
@@ -395,6 +454,14 @@ private struct Recording3DLookTile: View {
                     .frame(height: 66)
                     .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
                     .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(selected || focused ? Color.accentColor : Color.primary.opacity(hovered ? 0.25 : 0.12), lineWidth: selected || focused ? 2 : 1) }
+                    .overlay(alignment: .bottomTrailing) {
+                        if preset.isMove {
+                            Image(systemName: "arrow.right").font(.system(size: 8, weight: .semibold))
+                                .padding(.horizontal, 4).padding(.vertical, 2)
+                                .background(Color(nsColor: .controlBackgroundColor), in: Capsule()).padding(4)
+                                .accessibilityHidden(true)
+                        }
+                    }
                 Text(preset.rawValue).font(.system(size: 11, weight: selected ? .semibold : .regular))
                     .lineLimit(1).frame(maxWidth: .infinity)
             }.contentShape(Rectangle())
@@ -448,12 +515,12 @@ struct Recording3DPoseThumbnail: View {
             let width = size.width * 0.75, height = width / 1.6
             let card = CGRect(x: (size.width - width) / 2, y: (size.height - height) / 2, width: width, height: height)
             let outline = projectedRect(card)
-            context.fill(outline, with: .color(Color(nsColor: .textBackgroundColor)))
-            context.stroke(outline, with: .color(.primary.opacity(0.25)), lineWidth: 1)
+            context.fill(outline, with: .color(Color(white: 0.92)))
+            context.stroke(outline, with: .color(.black.opacity(0.18)), lineWidth: 1)
             for (row, fraction) in [0.6, 0.75, 0.35].enumerated() {
                 let rect = CGRect(x: card.minX + width * 0.1, y: card.minY + height * (0.22 + Double(row) * 0.22),
                     width: width * fraction, height: height * 0.09)
-                context.fill(projectedRect(rect), with: .color(row == 2 ? .accentColor : .secondary.opacity(0.5)))
+                context.fill(projectedRect(rect), with: .color(row == 2 ? .accentColor : Color(white: 0.63)))
             }
         }.clipped().accessibilityHidden(true)
     }

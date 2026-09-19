@@ -560,6 +560,15 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         try snapshot(RecordingStudioContent(model: videoModel), scheme: scheme, width: 1100,
                      to: output.appendingPathComponent("video-3d-\(name).png"))
     }
+    if var closeUp = videoModel.selected3DShot {
+        closeUp.apply(.closeUp)
+        videoModel.update3DShot(closeUp)
+        for scheme in [ColorScheme.light, .dark] {
+            let name = scheme == .light ? "light" : "dark"
+            try snapshot(Recording3DInspector(model: videoModel), scheme: scheme, width: 320,
+                to: output.appendingPathComponent("video-3d-close-up-controls-\(name).png"), height: 3000)
+        }
+    }
     if var focusShot = videoModel.selected3DShot {
         for mode in [Recording3DBlur.Mode.radial, .directional, .tiltShift] {
             focusShot.blur?.mode = mode
