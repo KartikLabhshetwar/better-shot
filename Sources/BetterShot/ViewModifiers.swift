@@ -249,21 +249,39 @@ extension View {
 
 private struct EditorFullScreenModifier: ViewModifier {
     @State private var didConfigure = false
+    @State private var pendingFullScreenWindow: Int?
 
     func body(content: Content) -> some View {
-        content.onWindowChange { window in
+        content.windowFullScreenBehavior(.enabled).onWindowChange { window in
             guard let window, !didConfigure else { return }
             didConfigure = true
-            window.collectionBehavior.remove([.fullScreenNone, .fullScreenAuxiliary])
-            window.collectionBehavior.insert(.fullScreenPrimary)
+            pendingFullScreenWindow = AppPreferences.editorOpensFullScreen ? window.windowNumber : nil
             DispatchQueue.main.async {
+                // SwiftUI finishes applying scene behavior after view attachment.
+                window.collectionBehavior.remove([.fullScreenNone, .fullScreenAuxiliary])
+                window.collectionBehavior.insert(.fullScreenPrimary)
                 // Overlay/tray actions can create a scene before its window has focus.
                 window.makeKeyAndOrderFront(nil)
                 NSApp.activate(ignoringOtherApps: true)
-                guard AppPreferences.editorOpensFullScreen,
-                      !window.styleMask.contains(.fullScreen) else { return }
-                window.toggleFullScreen(nil)
+                enterFullScreenIfReady()
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            enterFullScreenIfReady()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            enterFullScreenIfReady()
+        }
+    }
+
+    private func enterFullScreenIfReady() {
+        guard let number = pendingFullScreenWindow, NSApp.isActive,
+              let window = NSApp.window(withWindowNumber: number), window.isKeyWindow else { return }
+        pendingFullScreenWindow = nil
+        // Activation and SwiftUI's window setup must finish before changing Spaces.
+        DispatchQueue.main.async {
+            guard window.isVisible, !window.styleMask.contains(.fullScreen) else { return }
+            window.toggleFullScreen(nil)
         }
     }
 }

@@ -206,6 +206,11 @@ Hover over empty space in the video editor’s 3D timeline to see where a shot w
 fit before clicking. The dashed preview shows its duration; hovering never saves
 an effect. The **+ Add** menu remains available for Zoom and 3D Shot.
 
+The Scenes buttons show each scene’s camera sequence and shot count before
+replacing the selected shot. Both editors support the green window button for
+native full screen; **Settings → General → Open editors in full screen** controls
+whether new editor windows enter it automatically.
+
 
 ## Help and contribute
 

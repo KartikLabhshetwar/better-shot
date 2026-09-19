@@ -337,6 +337,7 @@ with `make test` when production code changes.
 | Video compositing and encoded exports | `BETTERSHOT_CHECK_VIDEO_EXPORTS=1 bash Tests/run-exports.sh` |
 | Displayed Gallery and Settings windows | `BETTERSHOT_CHECK_LIBRARY_WINDOWS=1 bash Tests/run-exports.sh` |
 | Editor focus, full screen, and tray handoff | `BETTERSHOT_CHECK_EDITOR_WINDOWS=1 bash Tests/run-exports.sh` |
+| Actual SwiftUI editor scenes, automatic/manual full screen | `BETTERSHOT_CHECK_EDITOR_SCENES=1 bash Tests/run-exports.sh` |
 
 The screenshot check uses the production post-capture path with fixture media;
 it does not request capture permission. Video checks cover decoded colors,

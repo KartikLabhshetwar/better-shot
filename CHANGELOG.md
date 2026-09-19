@@ -5,12 +5,17 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.5] - Unreleased
+## [0.5.5] - 2026-09-19
 
 ### Added
 
 - **Optional Notch Mode:** choose Normal Mode or Notch Mode in Settings > Overlay. Normal remains the default, including on upgrade. DynamicNotchKit hosts the shared screenshot tools (Area, Fullscreen, Window, OCR, Color, and timers), recording options and Stop/Pause/Restart/Discard controls, and image/video previews with Copy, Save, Edit, Pin, Cloud Share, and Dismiss. Browse pending captures without opening a separate overlay. Hardware notches can collapse to a compact capture/recording status; other displays use a top-center floating panel.
 - Notch mode also hosts countdowns, recording teleprompter text, saved/copied feedback, and export/share progress with existing recovery actions. Pending previews stay available until acted on. Switching modes preserves captures and recording state; the notch hides during selection/capture and follows capture-window exclusion settings.
+
+### Fixed
+
+- Image and video editors can enter and leave native full screen again. SwiftUI no longer overrides fullscreen support after the window opens; the automatic fullscreen preference remains supported.
+- 3D Scenes now use full-width buttons with readable names, shot counts, and scene descriptions. Consistent padding replaces crowded tiles and clipped shot bars in narrow inspectors.
 
 ## [0.5.4] - 2026-09-19
 
