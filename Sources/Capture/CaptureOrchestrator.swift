@@ -82,7 +82,7 @@ final class CaptureOrchestrator {
 
             await processCapturedImage(url, action: action)
         } catch {
-            ToastWindow.shared.show(title: "Couldn’t capture screenshot", message: error.localizedDescription,
+            ToastWindow.shared.show(isError: true, title: "Couldn’t capture screenshot", message: error.localizedDescription,
                 systemIcon: "exclamationmark.triangle", duration: 10, on: captureScreen)
         }
     }
@@ -94,7 +94,7 @@ final class CaptureOrchestrator {
             guard let hex = try await overlay.pickColor() else { return }
             completeTextCapture(hex, action: .colorPicker)
         } catch {
-            ToastWindow.shared.show(title: "Couldn’t pick color", message: error.localizedDescription,
+            ToastWindow.shared.show(isError: true, title: "Couldn’t pick color", message: error.localizedDescription,
                 systemIcon: "eyedropper", on: captureScreen)
         }
     }
@@ -104,7 +104,7 @@ final class CaptureOrchestrator {
             guard let text = try await ScreenCapture.shared.captureAndOCR() else { return }
             completeTextCapture(text, action: singleLine ? .ocrSingleLine : .ocr)
         } catch {
-            ToastWindow.shared.show(title: "Couldn’t recognize text", message: error.localizedDescription,
+            ToastWindow.shared.show(isError: true, title: "Couldn’t recognize text", message: error.localizedDescription,
                 systemIcon: "doc.text.viewfinder", on: captureScreen)
         }
     }
@@ -112,20 +112,21 @@ final class CaptureOrchestrator {
     /// Keep the exact clipboard value available for copying again from the notch.
     func completeTextCapture(_ text: String, action: ShortcutService.Action, pasteboard: NSPasteboard = .general) {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            ToastWindow.shared.show(title: "No text found", message: "Try selecting a clearer text area.",
+            ToastWindow.shared.show(isError: true, title: "No text found", message: "Try selecting a clearer text area.",
                 systemIcon: "doc.text.viewfinder", on: captureScreen)
             return
         }
         let value = action == .ocrSingleLine ? text.split(whereSeparator: \.isNewline).joined(separator: " ") : text
         let isColor = action == .colorPicker
         let notch = NotchPresenter.shared
+        notch.captureIssue = nil
         if isColor { notch.colorHex = value } else { notch.ocrText = value }
         let copied = Self.copyText(value, to: pasteboard)
         ScreenCapture.shared.playShutterSound()
         if AppPreferences.presentationMode == .notch {
             notch.show(on: captureScreen)
         }
-        ToastWindow.shared.show(title: copied ? "Copied" : "Couldn’t copy",
+        ToastWindow.shared.show(isError: !copied, title: copied ? "Copied" : "Couldn’t copy",
             message: copied ? (isColor ? "\(value) copied to clipboard" : "Text copied to clipboard") : "Try Copy again.",
             systemIcon: isColor ? "eyedropper" : "doc.text.viewfinder", on: captureScreen)
     }
@@ -163,7 +164,7 @@ final class CaptureOrchestrator {
             do {
                 try ScreenshotFileActions.copyImageToClipboard(from: displayURL)
             } catch {
-                ToastWindow.shared.show(title: "Copy Failed", message: error.localizedDescription,
+                ToastWindow.shared.show(isError: true, title: "Copy Failed", message: error.localizedDescription,
                     systemIcon: "exclamationmark.triangle", on: captureScreen)
             }
         }
@@ -196,7 +197,7 @@ final class CaptureOrchestrator {
         }.value
 
         guard let stagedURL else {
-            ToastWindow.shared.show(title: "Couldn’t prepare capture",
+            ToastWindow.shared.show(isError: true, title: "Couldn’t prepare capture",
                 message: "The original screenshot is still available in the preview.",
                 systemIcon: "exclamationmark.triangle", on: captureScreen)
             return url

@@ -38,7 +38,7 @@ struct NotchRecentCaptures: View {
                         MediaGalleryCard(item: item, cloud: false,
                             onSelect: { error = item.open(cloud: false) },
                             onDeleteFailure: { error = $0 })
-                            .frame(maxWidth: .infinity)
+                            .frame(width: 132)
                             .focusable()
                             .help("Open \(item.title). Right-click for more actions.")
                     }

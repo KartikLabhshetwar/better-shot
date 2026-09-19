@@ -239,8 +239,9 @@ or **Notch Mode**. Notch mode puts the capture tools, recording controls,
 image/video previews, and transfer status at the top of the capture display.
 Use the Capture tab for tools and pending previews, and Recents for your library.
 OCR text and picked colors are copied automatically and remain in the Capture tab
-with Copy and Dismiss actions until replaced or dismissed. Text is selectable;
-colors show their hex code and swatch. These results stay in memory for this session.
+with Copy and Dismiss actions until replaced or dismissed. Notch Mode shows no
+toast notifications: Copy confirms on its button, and failures appear as inline
+instructions. Text is selectable; colors show their hex code and swatch. These results stay in memory for this session.
 Use the preview actions to Copy, Save, Edit, Pin, Cloud Share, or Dismiss; arrow
 buttons browse pending captures. New Capture opens the shared capture tools.
 The image and video editors still open in their full editing windows.

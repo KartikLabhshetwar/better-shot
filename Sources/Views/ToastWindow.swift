@@ -12,23 +12,21 @@ final class ToastWindow {
 
     private var panelGeneration: UInt = 0
 
-    func show(title: String = "Saved", message: String, icon: NSImage? = nil, systemIcon: String? = nil, duration: TimeInterval = 2.5, on preferredScreen: NSScreen? = nil) {
+    func show(isError: Bool = false, title: String = "Saved", message: String, icon: NSImage? = nil, systemIcon: String? = nil, duration: TimeInterval = 2.5, on preferredScreen: NSScreen? = nil) {
         dismiss(animated: false)
         panelGeneration &+= 1
 
-        let toastView = ToastContentView(title: title, message: message, icon: icon, systemIcon: systemIcon)
         #if canImport(DynamicNotchKit)
+        // Notch Mode never creates a toast, either inside the notch or above an editor.
         if AppPreferences.presentationMode == .notch {
-            NotchPresenter.shared.notification = AnyView(toastView)
-            NotchPresenter.shared.show(on: preferredScreen)
-            dismissTask = Task {
-                try? await Task.sleep(for: .seconds(duration))
-                guard !Task.isCancelled else { return }
-                dismiss(animated: false)
+            if isError {
+                NotchPresenter.shared.captureIssue = (title, message)
+                NotchPresenter.shared.show(on: preferredScreen)
             }
             return
         }
         #endif
+        let toastView = ToastContentView(title: title, message: message, icon: icon, systemIcon: systemIcon)
         let hostingView = NSHostingView(rootView: toastView)
 
         let panel = Self.makePanel(hostingView: hostingView)
@@ -89,10 +87,6 @@ final class ToastWindow {
     func dismiss(animated: Bool) {
         dismissTask?.cancel()
         dismissTask = nil
-        #if canImport(DynamicNotchKit)
-        NotchPresenter.shared.notification = nil
-        NotchPresenter.shared.refresh()
-        #endif
 
         guard let panel, panel.isVisible else {
             self.panel = nil

@@ -17,6 +17,7 @@ struct BoringNotchHoverButton: View {
     var iconColor: Color = .primary
     var scale: Image.Scale = .medium
     var action: () -> Void
+    @Environment(\.isEnabled) private var isEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var isHovering = false
@@ -31,11 +32,11 @@ struct BoringNotchHoverButton: View {
                 .frame(width: size, height: size)
                 .overlay {
                     Capsule()
-                        .fill(isHovering ? Color.gray.opacity(0.2) : .clear)
+                        .fill(isHovering && isEnabled ? Color.gray.opacity(0.2) : .clear)
                         .frame(width: size, height: size)
                         .overlay {
                             Image(systemName: icon)
-                                .foregroundColor(iconColor)
+                                .foregroundColor(iconColor.opacity(isEnabled ? 1 : 0.4))
                                 .font(scale == .large ? .largeTitle : .body)
                         }
                 }

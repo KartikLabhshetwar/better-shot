@@ -10,9 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Optional Notch Mode:** choose Normal Mode or Notch Mode in Settings > General > Capture Mode. Normal remains the default, including on upgrade. The notch hosts the shared screenshot tools (Area, Fullscreen, Window, OCR, Color, and timers), recording options and Stop/Pause/Restart/Discard controls, and image/video previews with Copy, Save, Edit, Pin, Cloud Share, and Dismiss. Browse pending captures without opening a separate overlay. Hardware notches can collapse to a compact capture/recording status; other displays use a top-center floating panel.
-- Notch mode also hosts countdowns, recording teleprompter text, saved/copied feedback, and export/share progress with existing recovery actions. Pending previews stay available until acted on. Switching modes preserves captures and recording state; the notch hides during selection/capture and follows capture-window exclusion settings.
+- Notch mode also hosts countdowns, recording teleprompter text and export/share progress with existing recovery actions. Pending previews stay available until acted on. Switching modes preserves captures and recording state; the notch hides during selection/capture and follows capture-window exclusion settings.
 
 ### Changed
+
+- Notch Mode never displays toast notifications. Copy confirms directly on the result button; capture and saving failures remain as dismissible inline instructions. Switching modes removes existing toasts immediately. Recent items stay aligned and disabled action icons remain readable.
 
 - Notch shape, hover controls, and interactions reuse Boring Notch code, with contributor attribution, pinned source references, and its GPLv3 license bundled with the app.
 

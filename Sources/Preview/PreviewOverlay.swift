@@ -156,7 +156,7 @@ final class PreviewOverlay {
                     ToastWindow.shared.show(message: "Recording saved!", on: screen)
                 } catch {
                     ToastWindow.shared.show(
-                        title: "Couldn't save recording",
+                        isError: true, title: "Couldn't save recording",
                         message: error.localizedDescription,
                         systemIcon: "exclamationmark.triangle",
                         on: screen
@@ -187,7 +187,7 @@ final class PreviewOverlay {
             remove(url)
         } catch {
             cancelScheduledDismiss(for: url)
-            ToastWindow.shared.show(title: "Copy Failed", message: error.localizedDescription,
+            ToastWindow.shared.show(isError: true, title: "Copy Failed", message: error.localizedDescription,
                 systemIcon: "exclamationmark.triangle", on: targetScreen)
         }
     }
@@ -195,7 +195,7 @@ final class PreviewOverlay {
     func showSaveFailure(for url: URL) {
         failedSaves.insert(url)
         cancelScheduledDismiss(for: url)
-        ToastWindow.shared.show(title: "Couldn’t save capture", message: "The capture is still in the deck. Check the save folder in General settings and try Save again.", systemIcon: "exclamationmark.triangle", on: targetScreen)
+        ToastWindow.shared.show(isError: true, title: "Couldn’t save capture", message: "The capture is still in the deck. Check the save folder in General settings and try Save again.", systemIcon: "exclamationmark.triangle", on: targetScreen)
     }
 
     var hasStagedItems: Bool { items.contains { DeckStaging.isStaged($0) || Self.isVideo($0) } }
@@ -356,6 +356,7 @@ final class PreviewOverlay {
     }
 
     func perform(_ tool: OverlayTool, for url: URL) {
+        NotchPresenter.shared.captureIssue = nil
         switch tool {
         case .pin:
             let savedURL = DeckStaging.retain(url)

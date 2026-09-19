@@ -26,6 +26,7 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
     try FileManager.default.createDirectory(at: saveFolder, withIntermediateDirectories: true)
     defer {
+        notch.captureIssue = nil
         overlay.dismiss()
         bar.hide()
         ToastWindow.shared.dismiss(animated: false)
@@ -60,13 +61,16 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     guard let window = notch.window else { preconditionFailure("Missing DynamicNotchKit panel") }
     // Hover is driven explicitly below; keep the user's real pointer out of fixture state.
     window.ignoresMouseEvents = true
+    // Cancel any leave scheduled before pointer isolation took effect.
+    notch.updateHoverState(true)
     precondition(window.sharingType == (PreviewWindowCaptureExclusion.includesAppWindowsInCaptures ? .readOnly : .none))
     precondition(window.canBecomeKey, "Notch controls must accept keyboard focus")
-    try await Task.sleep(for: .milliseconds(120))
+    // Allow the 140 ms presentation transition to settle before measuring geometry.
+    try await Task.sleep(for: .milliseconds(350))
     precondition(overlay.items.count == 2, "Notch previews stay available until acted on")
     window.contentView?.layoutSubtreeIfNeeded()
     if let frame = notch.contentFrame, let screen = window.screen {
-        precondition(frame.width >= 552 && frame.height > 100)
+        precondition(frame.width >= 552 && frame.height > 100, "Expanded notch frame: \(frame)")
         precondition(frame.width < screen.frame.width && frame.height < screen.frame.height)
         precondition(frame.midX > screen.frame.minX && frame.midX < screen.frame.maxX)
     }
@@ -207,10 +211,25 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     notch.refreshMode()
     precondition(!notch.isVisible && overlay.items.count == 2 && bar.isVisible)
     precondition(NSApp.windows.contains { $0.identifier?.rawValue == "BetterShot.CaptureOverlay" && $0.isVisible })
+    ToastWindow.shared.show(message: "Normal mode toast", duration: 30)
+    precondition(NSApp.windows.contains { $0.identifier?.rawValue == "BetterShot.Toast" && $0.isVisible })
     defaults.set("notch", forKey: AppPreferences.presentationModeKey)
     notch.refreshMode()
+    precondition(!NSApp.windows.contains { $0.identifier?.rawValue == "BetterShot.Toast" && $0.isVisible },
+                 "Switching to Notch Mode must remove an already visible toast")
     precondition(notch.isVisible && overlay.items.count == 2)
+    notch.collapse()
+    ToastWindow.shared.show(message: "Saved", duration: 30)
+    precondition(!notch.expanded && notch.captureIssue == nil,
+                 "Success notifications must not expand or add content to the notch")
+    ToastWindow.shared.show(isError: true, title: "Couldn’t save capture", message: "Check the save folder and try Save again.")
+    precondition(notch.captureIssue?.title == "Couldn’t save capture" && notch.expanded)
+    precondition(!NSApp.windows.contains { $0.identifier?.rawValue == "BetterShot.Toast" && $0.isVisible })
+    try snapshot(NotchContent().environment(\.colorScheme, .dark).padding(16).background(.black),
+        scheme: .dark, width: 584, to: output.appendingPathComponent("notch-inline-error.png"), height: 500)
     notch.suspendForCapture()
+    precondition(notch.captureIssue == nil, "Trying a capture again clears stale failure feedback")
+    print("PASS no notch toasts, no success expansion, immediate mode-switch dismissal, and inline failure recovery")
     precondition(!notch.isVisible && overlay.items.count == 2)
     await notch.runCountdown(seconds: 1, on: window.screen)
     precondition(notch.countdown == nil && !notch.isVisible, "Countdown must disappear before screenshot capture")
@@ -268,6 +287,8 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     captures.completeTextCapture(" \n ", action: .ocr, pasteboard: clipboard)
     precondition(notch.ocrText == "First line Second line", "Empty OCR must preserve the last useful result")
     precondition(clipboard.string(forType: .string) == "First line Second line")
+    precondition(notch.captureIssue?.title == "No text found")
+    notch.captureIssue = nil
     ToastWindow.shared.dismiss(animated: false)
     for scheme in [ColorScheme.light, .dark] {
         try snapshot(NotchContent().environment(\.colorScheme, .dark).padding(16).background(.black),

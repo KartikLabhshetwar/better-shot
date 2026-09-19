@@ -148,6 +148,9 @@ Window screenshots use `SCContentSharingPicker` and `SCScreenshotManager.capture
 in the app process; preserve picker cancellation, native pixel dimensions, and private PNG staging.
 OCR and color results share `CaptureOrchestrator.completeTextCapture`: copy the exact
 value and retain session-only notch results. Empty OCR must not erase the clipboard.
+Notch Mode must not show toasts. Mark `ToastWindow.show` failures with `isError: true`
+so recovery instructions appear inline; successes stay quiet or update their action
+button. Export/share progress continues through the embedded `TransferStatusCard`.
 Recording areas use BetterShot's adjustable AppKit selector.
 
 Every screenshot starts in `DeckStaging`. Copy only updates the clipboard and

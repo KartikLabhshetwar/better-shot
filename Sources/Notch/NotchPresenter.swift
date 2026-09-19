@@ -17,7 +17,7 @@ final class NotchPresenter {
     @ObservationIgnored var menuTrackingCount = 0
     var ocrText: String?
     var colorHex: String?
-    var notification: AnyView?
+    var captureIssue: (title: String, message: String)?
     var transfers: [UUID: TransferStatusCard] = [:]
     var transferOrder: [UUID] = []
     var script: TeleprompterOverlayModel?
@@ -34,7 +34,7 @@ final class NotchPresenter {
     var isVisible: Bool { window?.isVisible == true }
     var hasContent: Bool {
         RecordingBarPresenter.shared.isVisible || PreviewOverlay.shared.isPresented ||
-            notification != nil || !transfers.isEmpty || script != nil || ocrText != nil || colorHex != nil
+            captureIssue != nil || !transfers.isEmpty || script != nil || ocrText != nil || colorHex != nil
     }
 
     private init() {}
@@ -86,6 +86,7 @@ final class NotchPresenter {
     }
 
     func suspendForCapture() {
+        captureIssue = nil
         hoverTask?.cancel()
         isHovering = false
         menuTrackingCount = 0
@@ -99,6 +100,7 @@ final class NotchPresenter {
     }
 
     func refreshMode() {
+        ToastWindow.shared.dismiss(animated: false)
         hoverTask?.cancel()
         isHovering = false
         menuTrackingCount = 0
@@ -262,6 +264,22 @@ struct NotchContent: View {
                     presenter.collapse()
                 }
             }
+            if let issue = presenter.captureIssue {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "exclamationmark.circle").foregroundStyle(.orange)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(issue.title).font(.subheadline.weight(.medium))
+                        Text(issue.message).font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+                    }
+                    Spacer(minLength: 0)
+                    BoringNotchHoverButton(title: "Dismiss error", icon: "xmark") {
+                        presenter.captureIssue = nil
+                        presenter.refresh()
+                    }
+                }
+            }
             if let countdown = presenter.countdown {
                 Label("Starting in \(countdown)", systemImage: "timer")
                     .font(.title2.monospacedDigit()).padding()
@@ -282,7 +300,7 @@ struct NotchContent: View {
                 }
                 .transition(.opacity)
                 if let id = presenter.transferOrder.last, let card = presenter.transfers[id] { card }
-                if let notification = presenter.notification { notification }
+
             }
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: showsRecent)
@@ -301,13 +319,13 @@ struct NotchContent: View {
                 NotchTextResult(title: "Recognized Text", value: text, isColor: false) {
                     presenter.ocrText = nil
                     presenter.refresh()
-                }
+                }.id(text)
             }
             if let hex = presenter.colorHex {
                 NotchTextResult(title: "Picked Color", value: hex, isColor: true) {
                     presenter.colorHex = nil
                     presenter.refresh()
-                }
+                }.id(hex)
             }
             if overlay.isPresented, let url = selected {
                 HStack {
@@ -367,13 +385,14 @@ struct NotchContent: View {
     }
 }
 
-/// Session-only results remain readable after the copied notification disappears.
+/// Copy feedback stays on the action; session results remain until dismissed.
 private struct NotchTextResult: View {
     let title: String
     let value: String
     let isColor: Bool
     var dismiss: () -> Void
     @State private var copyFailed = false
+    @State private var copied = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -389,14 +408,21 @@ private struct NotchTextResult: View {
                     Label(title, systemImage: "doc.text.viewfinder").font(.subheadline.weight(.medium))
                 }
                 Spacer()
-                Button("Copy", systemImage: "doc.on.doc") {
+                Button {
                     copyFailed = !CaptureOrchestrator.copyText(value)
-                    if !copyFailed {
-                        ToastWindow.shared.show(title: "Copied", message: isColor ? value : "Text copied to clipboard",
-                            systemIcon: "checkmark", on: NotchPresenter.shared.screen)
-                    }
+                    copied = !copyFailed
+                    if copied { NotchPresenter.shared.captureIssue = nil }
+                } label: {
+                    Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                        .frame(width: 70)
                 }
                 .accessibilityLabel(isColor ? "Copy color code" : "Copy recognized text")
+                .accessibilityValue(copied ? "Copied to clipboard" : "")
+                .task(id: copied) {
+                    guard copied else { return }
+                    do { try await Task.sleep(for: .seconds(1.5)) } catch { return }
+                    copied = false
+                }
                 BoringNotchHoverButton(title: "Dismiss \(title.lowercased())", icon: "xmark", action: dismiss)
             }
             if !isColor {
