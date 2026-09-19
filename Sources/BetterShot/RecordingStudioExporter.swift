@@ -793,8 +793,10 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
     }
 
     private func contentRect(at editorTime: TimeInterval) -> CGRect {
-        RecordingVideoCrop.expandedRect(
-            layout.frameRect(for: viewportFrame(at: editorTime)),
+        let pose = timeline3D.pose(at: editorTime)
+        let viewport: ViewportFrame = pose.camera != nil ? .identity : viewportFrame(at: editorTime)
+        return RecordingVideoCrop.expandedRect(
+            layout.frameRect(for: viewport),
             crop: crop
         )
     }
@@ -836,8 +838,17 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
         let pose = timeline3D.pose(at: editorTime)
         let is3D = pose != .identity
         let canvas = CGRect(origin: .zero, size: canvasSize)
+        let activity = pose.camera != nil ? timeline3D.shot(at: editorTime)?.activity(at: editorTime) ?? 0 : 0
+        func faded(_ image: CIImage, by alpha: Double) -> CIImage {
+            image.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: alpha, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: alpha, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0, z: alpha, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: alpha)
+            ])
+        }
         var result = is3D
-            ? (contentShadow ?? CIImage.empty()).cropped(to: canvas)
+            ? (activity >= 1 ? CIImage.empty() : faded(contentShadow ?? CIImage.empty(), by: 1 - activity)).cropped(to: canvas)
             : backgroundImage
         if layout.showsScreen {
             let sourceImage = CIImage(cvPixelBuffer: screenFrame)
@@ -913,10 +924,9 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
             // recorded artwork anchor point, while the final point still passes
             // through the same viewport transform and rounded-card clip as the
             // source pixels.
-            if pointerTimeline != nil || keystrokeTimeline != nil {
+            if pointerTimeline != nil {
                 result = try raster { context in
                     drawPointer(editorTime: editorTime, in: context)
-                    drawKeystrokeCaption(at: sourceTime, in: context)
                 }.composited(over: result)
             }
         }
@@ -933,7 +943,7 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
                 tx: bubble.midX - camera.extent.width * scale / 2,
                 ty: bubble.midY - camera.extent.height * scale / 2
             ))
-            if layout.decoratesCamera { result = cameraShadow.composited(over: result) }
+            if layout.decoratesCamera && activity < 1 { result = faded(cameraShadow, by: 1 - activity).composited(over: result) }
             result = transformed.applyingFilter("CISourceInCompositing", parameters: [
                 kCIInputBackgroundImageKey: cameraMask
             ]).composited(over: result)
@@ -941,27 +951,14 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
         }
 
         if is3D {
-            // Map the composed transparent plane through the same projection as SwiftUI.
-            // A single GPU warp retains source pixels, masks, cursor, and camera alignment.
-            let corners = [CGPoint.zero, CGPoint(x: canvasSize.width, y: 0),
-                           CGPoint(x: canvasSize.width, y: canvasSize.height), CGPoint(x: 0, y: canvasSize.height)]
-                .map { pose.project($0, in: canvasSize) }
-            let twiceArea = (0..<4).reduce(0.0) { sum, i in
-                let a = corners[i], b = corners[(i + 1) % 4]
-                return sum + a.x * b.y - a.y * b.x
-            }
-            if abs(twiceArea) < 0.001 {
-                // An edge-on plane has no visible area and no invertible homography.
-                result = cleanBackground
-            } else {
-                let vectors = corners.map { CIVector(x: $0.x, y: canvasSize.height - $0.y) }
-                result = result.cropped(to: canvas).applyingFilter("CIPerspectiveTransform", parameters: [
-                    "inputTopLeft": vectors[0], "inputTopRight": vectors[1],
-                    "inputBottomRight": vectors[2], "inputBottomLeft": vectors[3]
-                ]).composited(over: cleanBackground).cropped(to: canvas)
-            }
+            let projection = layout.camera3DProjection(pose, viewport: viewportFrame(at: editorTime))
+            result = try Recording3DBlurRenderer.warp(result.cropped(to: canvas), projection: projection, canvas: canvas)
+                .composited(over: cleanBackground).cropped(to: canvas)
         }
         result = try Recording3DBlurRenderer.apply(timeline3D.defocus(at: editorTime), to: result, canvas: canvas)
+        if keystrokeTimeline != nil {
+            result = try raster { drawKeystrokeCaption(at: sourceTime, in: $0) }.composited(over: result)
+        }
         if subtitleTimeline != nil {
             result = try raster { drawSubtitleBar(at: sourceTime, in: $0) }.composited(over: result)
         }

@@ -2,7 +2,54 @@ import Foundation
 import QuartzCore
 
 @main struct Recording3DCheck {
+    struct Reference: Decodable {
+        struct Preset: Decodable { let name: String; let start, end: Recording3DCamera; let blur: Recording3DBlur }
+        struct Sample: Decodable {
+            let camera: Recording3DCamera
+            let aspect, zoom, entry, exit, time, activity: Double
+            let target: CGPoint
+            let inverse: [Double]
+        }
+        let presets: [Preset]
+        let cases: [Sample]
+    }
+    static func checkCapReference() throws {
+        let reference = try JSONDecoder().decode(Reference.self, from: Data(contentsOf: URL(fileURLWithPath: "Tests/Fixtures/Cap3DReference.json")))
+        precondition(reference.presets.count == Recording3DPreset.allCases.count)
+        for expected in reference.presets {
+            let preset = Recording3DPreset.allCases.first { $0.rawValue == expected.name }!
+            precondition(preset.poses.0.camera == expected.start && preset.poses.1.camera == expected.end, "Cap camera preset changed: \(expected.name)")
+            precondition(preset.blur == expected.blur, "Cap blur preset changed: \(expected.name)")
+        }
+        for sample in reference.cases {
+            let size = CGSize(width: 360 * sample.aspect, height: 360)
+            let shot = Recording3DShot(start: 0, end: 4, startPose: .init(camera: sample.camera),
+                endPose: .init(camera: sample.camera), transitionIn: sample.entry, transitionOut: sample.exit)
+            precondition(abs(shot.activity(at: sample.time) - sample.activity) < 0.0001)
+            let pose = shot.pose(at: sample.time)
+            let m = pose.projection(in: size, zoomAmount: sample.zoom, zoomTarget: sample.target)
+            let rows = sample.inverse
+            let hx = min(sample.aspect, 1.0), hy = min(1 / sample.aspect, 1.0)
+            for x in [-0.8, -0.25, 0, 0.4, 0.9] {
+                for y in [-0.8, -0.25, 0, 0.4, 0.9] {
+                    let w = rows[6] * x + rows[7] * y + rows[8]
+                    guard abs(w) > 0.01 else { continue }
+                    let px = ((rows[0] * x + rows[1] * y + rows[2]) / w / hx + 1) * size.width / 2
+                    let py = (1 - (rows[3] * x + rows[4] * y + rows[5]) / w / hy) * size.height / 2
+                    let depth = m.m14 * px + m.m24 * py + m.m44
+                    let actual = CGPoint(x: (m.m11 * px + m.m21 * py + m.m41) / depth,
+                                         y: (m.m12 * px + m.m22 * py + m.m42) / depth)
+                    let expected = CGPoint(x: (x + 1) * size.width / 2, y: (1 - y) * size.height / 2)
+                    precondition(hypot(actual.x - expected.x, actual.y - expected.y) < 0.03,
+                                 "Projection disagrees with Cap Rust renderer: \(sample.camera), \(actual), \(expected)")
+                }
+            }
+        }
+        print("PASS 13 upstream presets and \(reference.cases.count) actual Cap Rust camera/zoom/transition reference cases")
+    }
+
     static func main() throws {
+        try checkCapReference()
         let size = CGSize(width: 1920, height: 1080)
         for point in [CGPoint.zero, CGPoint(x: 1920, y: 1080), CGPoint(x: 230, y: 790)] {
             let projected = Recording3DPose.identity.project(point, in: size)
@@ -68,9 +115,8 @@ import QuartzCore
             precondition(sample.startPose != sample.endPose, "Every reference look includes motion")
             for canvas in [size, CGSize(width: 1080, height: 1920)] {
                 for time in [1.0, 1.7, 3.9] {
-                    let pose = sample.pose(at: time), matrix = pose.projection(in: canvas)
+                    let pose = sample.pose(at: time)
                     for point in [CGPoint.zero, CGPoint(x: canvas.width, y: 0), CGPoint(x: 0, y: canvas.height), CGPoint(x: canvas.width, y: canvas.height)] {
-                        precondition(matrix.m14 * point.x + matrix.m24 * point.y + matrix.m44 > 0)
                         let p = pose.project(point, in: canvas)
                         let q = pose.project(CGPoint(x: point.x * 2, y: point.y * 2), in: CGSize(width: canvas.width * 2, height: canvas.height * 2))
                         precondition(p.x.isFinite && p.y.isFinite && hypot(p.x - q.x / 2, p.y - q.y / 2) < 1e-8)
@@ -99,6 +145,8 @@ import QuartzCore
         precondition(linear.value(at: -1) == -0.2 && linear.value(at: 2) == 0.4)
         let slowStart = Recording3DTrack.ease(0.25, outgoing: CGPoint(x: 0.65, y: 0), incoming: CGPoint(x: 0.35, y: 1))
         precondition(slowStart < 0.15 && slowStart > 0)
+        precondition(abs(Recording3DEasing.smooth.value(at: 0.25, camera: true) - slowStart) < 1e-8)
+        precondition(Recording3DEasing.smooth.value(at: 0.25) == 0.15625, "Legacy plane motion remains unchanged")
         precondition(abs(Recording3DTrack.ease(0.5, outgoing: CGPoint(x: 1, y: 0), incoming: CGPoint(x: 0, y: 1)) - 0.5) < 0.000_01)
         var invalidKeys = linear
         invalidKeys.keyframes += [.init(position: .nan, value: 1), .init(position: 2, value: .infinity)]
@@ -129,6 +177,9 @@ import QuartzCore
         precondition(held.pose(at: 2) == held.startPose && held.tracks?.count == 1)
         animated.end = 9
         precondition(abs(animated.pose(at: 3).camera!.panX + 0.05) < 1e-8, "Resize preserves relative keyframe timing")
+        var blurOnly = shot; blurOnly.apply(.center)
+        blurOnly.tracks = [.init(property: .strength, keyframes: [.init(position: 0, value: 20)])]
+        precondition(blurOnly.title == "Center", "Blur curves do not change the selected camera look")
         let boundedBlur = Recording3DBlur(mode: .tiltShift, strength: 100, focusSize: 2, angle: 900, bokeh: true).sanitized
         precondition(boundedBlur.strength == 20 && boundedBlur.focusSize == 0.6 && boundedBlur.angle == 180)
         print("3D projection, scaling, near-plane bounds, presets, timing, transitions, sanitization, and Codable checks passed")

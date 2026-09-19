@@ -36,6 +36,9 @@ targets:
       - path: Resources/Onboarding
         type: folder
         buildPhase: resources
+      - path: Resources/Licenses
+        type: folder
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.bettershot.app

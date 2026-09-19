@@ -144,6 +144,7 @@
 		A955FD8E0AA95551C47D1906 /* AnnotationCursor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6A3E940C262BCFCF8AEF1DC /* AnnotationCursor.swift */; };
 		A97649E3AEC5C6DA68FD094C /* AnnotationCameraInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F679730EACFF69E148A529 /* AnnotationCameraInspector.swift */; };
 		AAF2ADDD756895F9924447DE /* Intersect.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1862C288E66E4A4123D1DC5 /* Intersect.swift */; };
+		AD49C285CF7363F0483203C5 /* Licenses in Resources */ = {isa = PBXBuildFile; fileRef = A700AB85604C73318DAF5692 /* Licenses */; };
 		ADA5C9BD650F6C9FDCBDE7DD /* RecordingAreaSelectionPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73420E1B5D54DB5C494DE244 /* RecordingAreaSelectionPresenter.swift */; };
 		ADDDE18D5DA47F866E3C15C2 /* RecordingTranscriptEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CCD4CBE6C2F68F14298572D /* RecordingTranscriptEditing.swift */; };
 		AECE06FCCA388F3C27CA5C9C /* RecordingExportReframe.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02562FF53E7AE39E8DE3E81 /* RecordingExportReframe.swift */; };
@@ -359,6 +360,7 @@
 		A23C7DC0966DCF51AF99B203 /* VideoFileActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoFileActions.swift; sourceTree = "<group>"; };
 		A27006DF56F1309AC938192E /* RecordingProjectStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingProjectStore.swift; sourceTree = "<group>"; };
 		A5A64AC810FA18E292562224 /* Document.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Document.swift; sourceTree = "<group>"; };
+		A700AB85604C73318DAF5692 /* Licenses */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Licenses; path = Resources/Licenses; sourceTree = SOURCE_ROOT; };
 		A8FAC6D4EA9409CD20552C2B /* TeleprompterScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeleprompterScript.swift; sourceTree = "<group>"; };
 		A90D9D546D273A16464FD16B /* CaptureCountdownPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureCountdownPresenter.swift; sourceTree = "<group>"; };
 		A9AE3D9E0B57D78980112DD4 /* AnnotationDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationDocument.swift; sourceTree = "<group>"; };
@@ -723,6 +725,7 @@
 			isa = PBXGroup;
 			children = (
 				A9FD147E96AE29FF1E11357F /* Backgrounds */,
+				A700AB85604C73318DAF5692 /* Licenses */,
 				110CD327D097B8F42B0B8BA1 /* Onboarding */,
 				10094F5FED8623DFE2FA9F1D /* Resources */,
 				C750A8B0B7E68485E0FF536F /* Sources */,
@@ -839,6 +842,7 @@
 			files = (
 				E29FA26E5F3F90C0653923E8 /* Assets.xcassets in Resources */,
 				1CBDB240923B9F176D454CEA /* Backgrounds in Resources */,
+				AD49C285CF7363F0483203C5 /* Licenses in Resources */,
 				2BDDF4C68FA168E537AF4029 /* Onboarding in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

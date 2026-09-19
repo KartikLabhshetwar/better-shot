@@ -192,7 +192,8 @@ struct Recording3DInspector: View {
             }
             shotSlider("Start (s)", key: \.start, range: model.boundsFor3DShot(shot).lowerBound...(shot.end - Recording3DShot.minimumDuration))
             shotSlider("End (s)", key: \.end, range: (shot.start + Recording3DShot.minimumDuration)...model.boundsFor3DShot(shot).upperBound)
-            shotSlider("Transition (s)", key: \.transition, range: 0...min(2, (shot.end - shot.start) / 2))
+            transitionSlider("Ease in (s)", entry: true)
+            transitionSlider("Ease out (s)", entry: false)
             Text("Transitions ease into and out of the flat view. Crop and mask editing temporarily show the flat source.")
                 .font(.caption2).foregroundStyle(.secondary)
         }
@@ -208,7 +209,7 @@ struct Recording3DInspector: View {
     private func previewPose() {
         guard let shot = model.selected3DShot else { return }
         model.pause()
-        let inset = min(max(shot.transition, 0.01), (shot.end - shot.start) / 2)
+        let inset = min(max((editsEnd ? shot.transitionOut : shot.transitionIn) ?? shot.transition, 0.01), (shot.end - shot.start) / 2)
         model.seek(to: editsEnd ? shot.end - inset : shot.start + inset)
     }
 
@@ -240,6 +241,18 @@ struct Recording3DInspector: View {
             else { model.end3DShotEdit() }
         })
         .disabled(model.selected3DShot?.tracks?.contains(where: { $0.property.cameraKey == key }) == true)
+    }
+
+    private func transitionSlider(_ title: String, entry: Bool) -> some View {
+        InspectorSlider(title, value: Binding(get: {
+            guard let shot = model.selected3DShot else { return 0 }
+            return CGFloat((entry ? shot.transitionIn : shot.transitionOut) ?? shot.transition)
+        }, set: { value in
+            change { if entry { $0.transitionIn = value } else { $0.transitionOut = value } }
+        }), range: 0...min(2, ((model.selected3DShot?.end ?? 0) - (model.selected3DShot?.start ?? 0)) / 2),
+            format: .decimal(fractionDigits: 2), onEditingChanged: { active in
+                if active { model.begin3DShotEdit() } else { model.end3DShotEdit() }
+            })
     }
 
     private func shotSlider(_ title: String, key: WritableKeyPath<Recording3DShot, Double>,

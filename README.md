@@ -55,7 +55,8 @@ permissions and your first capture.
   orbit, screen fold, distance, and lens, or generate a scene. The same menu adds
   zoom segments. Camera, Blur, and Keyframes tabs provide radial/directional/tilt-shift
   focus, bokeh highlights, and editable Bézier curves. Preview and export share
-  the GPU compositor.
+  the GPU compositor. Zoom enlarges the whole 3D card; separate entry/exit controls
+  ease the camera into and out of its shot.
 - **Make the cursor easier to follow.** Choose Recorded, Arrow, Dark, Light, or
   Dot, with size, smoothing, click effects, and idle hiding. Cursor restyling
   requires a recorded pointer track; it cannot replace a cursor baked into

@@ -483,7 +483,7 @@ private struct StudioCanvas: View {
                                 .position(x: layout.bubbleRect.midX, y: layout.bubbleRect.midY)
                                 .modifier(StudioCameraDrag(model: model, canvasSize: canvasSize))
                                 .frame(width: canvasSize.width, height: canvasSize.height)
-                                .projectionEffect(ProjectionTransform(model.preview3DPose(at: model.displayTime).projection(in: canvasSize)))
+                                .projectionEffect(ProjectionTransform(layout.camera3DProjection(model.preview3DPose(at: model.displayTime), viewport: state)))
                         }
                     } else {
                     // Fixed frame + clip so a scaledToFill wallpaper can never

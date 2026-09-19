@@ -25,7 +25,7 @@ nonisolated struct Recording3DBlur: Codable, Equatable, Sendable {
         }
         return result
     }
-    var isActive: Bool { mode != .none && strength > 0.001 }
+    var isActive: Bool { mode != .none && strength >= 0.5 }
 }
 
 nonisolated enum Recording3DProperty: String, Codable, CaseIterable, Identifiable, Sendable {

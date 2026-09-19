@@ -1,3 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Adapts Cap 3D rendering, Copyright (c) 2023-present Cap Software, Inc.
+// Swift/Metal adaptation Copyright (c) 2026 Kartik Labhshetwar.
+// See Resources/Licenses/NOTICE.md for upstream source and full license.
+
 import Foundation
 import QuartzCore
 import simd
@@ -68,15 +73,26 @@ nonisolated struct Recording3DPose: Codable, Equatable, Sendable {
         m.m42 = -p.scale * (r10 * cx + r11 * cy) + ty * i
         m.m14 = g; m.m24 = h; m.m44 = i
         guard let camera = p.camera else { return m }
-        let c = camera.projection(in: size)
-        let t = camera.amount
-        // Both homographies have unit depth at the canvas center. Blending is
-        // continuous for optional flat transitions and preserves positive depth.
-        m.m11 += (c.m11 - m.m11) * t; m.m21 += (c.m21 - m.m21) * t
-        m.m41 += (c.m41 - m.m41) * t; m.m12 += (c.m12 - m.m12) * t
-        m.m22 += (c.m22 - m.m22) * t; m.m42 += (c.m42 - m.m42) * t
-        m.m14 += (c.m14 - m.m14) * t; m.m24 += (c.m24 - m.m24) * t
-        m.m44 += (c.m44 - m.m44) * t
+        return camera.projection(in: size)
+    }
+
+    func projection(in size: CGSize, zoomAmount: Double, zoomTarget: CGPoint) -> CATransform3D {
+        var m = projection(in: size)
+        guard camera != nil, zoomAmount.isFinite, zoomAmount > 1.001 else { return m }
+        let x = zoomTarget.x * size.width, y = zoomTarget.y * size.height
+        let depth = m.m14 * x + m.m24 * y + m.m44
+        guard depth > 1e-6 else { return m }
+        let qx = (m.m11 * x + m.m21 * y + m.m41) / depth - size.width / 2
+        let qy = (m.m12 * x + m.m22 * y + m.m42) / depth - size.height / 2
+        let recenter = zoomAmount - 1 / zoomAmount
+        let tx = size.width / 2 * (1 - zoomAmount) - qx * recenter
+        let ty = size.height / 2 * (1 - zoomAmount) - qy * recenter
+        m.m11 = m.m11 * zoomAmount + tx * m.m14
+        m.m21 = m.m21 * zoomAmount + tx * m.m24
+        m.m41 = m.m41 * zoomAmount + tx * m.m44
+        m.m12 = m.m12 * zoomAmount + ty * m.m14
+        m.m22 = m.m22 * zoomAmount + ty * m.m24
+        m.m42 = m.m42 * zoomAmount + ty * m.m44
         return m
     }
 
@@ -132,7 +148,12 @@ nonisolated struct Recording3DCamera: Codable, Equatable, Sendable {
     }
 
     func projection(in size: CGSize) -> CATransform3D {
-        let p = sanitized
+        var p = sanitized
+        let fill = min(size.height / size.width, 1) / tan(p.fieldOfView * .pi / 360)
+        p.distance = fill + (p.distance - fill) * p.amount
+        p.tiltX *= p.amount; p.tiltY *= p.amount; p.roll *= p.amount
+        p.rotateX *= p.amount; p.rotateY *= p.amount
+        p.panX *= p.amount; p.panY *= p.amount
         func rotation(_ degrees: Double, _ axis: SIMD3<Double>) -> simd_quatd {
             simd_quatd(angle: degrees * .pi / 180, axis: axis)
         }
@@ -141,9 +162,8 @@ nonisolated struct Recording3DCamera: Codable, Equatable, Sendable {
             * rotation(p.rotateY, y) * rotation(p.rotateX, x)
         let u = orientation.act(x), v = orientation.act(y)
         let w = Double(size.width), h = Double(size.height), longest = max(w, h)
-        // Pull back only if a custom pose would cross the near plane. Authored
-        // presets stay untouched; arbitrary slider combinations remain finite.
-        let distance = max(p.distance, abs(u.z) * w / longest + abs(v.z) * h / longest + 0.05)
+        // Preserve the authored distance. The inverse warp clips rays behind the camera.
+        let distance = p.distance
         let focal = h / (2 * tan(p.fieldOfView * .pi / 360))
         func homogeneous(_ px: Double, _ py: Double) -> SIMD3<Double> {
             let world = u * ((px - w / 2) * 2 / longest) + v * ((h / 2 - py) * 2 / longest)
@@ -162,8 +182,17 @@ nonisolated struct Recording3DCamera: Codable, Equatable, Sendable {
 
 nonisolated enum Recording3DEasing: String, Codable, CaseIterable, Sendable {
     case smooth = "Smooth", linear = "Linear", easeIn = "Ease In", easeOut = "Ease Out"
-    func value(at t: Double) -> Double {
-        switch self {
+    func value(at t: Double, camera: Bool = false) -> Double {
+        if camera {
+            let handles: (CGPoint, CGPoint) = switch self {
+            case .linear: (.zero, CGPoint(x: 1, y: 1))
+            case .smooth: (CGPoint(x: 0.65, y: 0), CGPoint(x: 0.35, y: 1))
+            case .easeIn: (CGPoint(x: 0.32, y: 0), CGPoint(x: 1, y: 1))
+            case .easeOut: (.zero, CGPoint(x: 0.68, y: 1))
+            }
+            return Recording3DTrack.ease(t, outgoing: handles.0, incoming: handles.1)
+        }
+        return switch self {
         case .smooth: t * t * (3 - 2 * t)
         case .linear: t
         case .easeIn: t * t
@@ -180,36 +209,50 @@ nonisolated struct Recording3DShot: Codable, Equatable, Identifiable, Sendable {
     var endPose = Recording3DPose.identity
     var easing = Recording3DEasing.smooth
     var transition: Double = 0.25
+    var transitionIn: Double?
+    var transitionOut: Double?
     var isEnabled = true
     var blur: Recording3DBlur?
     var tracks: [Recording3DTrack]?
     static let minimumDuration = 0.2
 
     var title: String {
-        if tracks?.contains(where: { !$0.keyframes.isEmpty }) == true { return "Custom move" }
+        if tracks?.contains(where: { $0.property.cameraKey != nil && !$0.keyframes.isEmpty }) == true { return "Custom move" }
         return Recording3DPreset.allCases.first { $0.poses.0 == startPose && $0.poses.1 == endPose }?.rawValue
             ?? (startPose == endPose ? "Custom angle" : "Custom move")
     }
 
     func pose(at time: Double) -> Recording3DPose {
         guard isEnabled, time >= start, time < end, end > start else { return .identity }
-        let progress = easing.value(at: min(max((time - start) / (end - start), 0), 1))
+        let progress = easing.value(at: min(max((time - start) / (end - start), 0), 1), camera: startPose.camera != nil || endPose.camera != nil)
         var pose = startPose.interpolated(to: endPose, progress: progress)
         for track in tracks ?? [] {
             if let key = track.property.cameraKey, let value = track.value(at: (time - start) / (end - start)), pose.camera != nil {
                 pose.camera?[keyPath: key] = value
             }
         }
-        let ramp = min(max(transition, 0), (end - start) / 2)
-        guard ramp > 0 else { return pose }
-        let edge = min(1, min(time - start, end - time) / ramp)
-        return Recording3DPose.identity.interpolated(to: pose, progress: edge * edge * (3 - 2 * edge))
+        let activity = activity(at: time)
+        return Recording3DPose.identity.interpolated(to: pose, progress: activity)
+    }
+
+    func activity(at time: Double) -> Double {
+        guard isEnabled, time >= start, time < end, end > start else { return 0 }
+        let half = (end - start) / 2
+        let entry = min(max(transitionIn ?? transition, 0), half)
+        let exit = min(max(transitionOut ?? transition, 0), half)
+        func ease(_ value: Double) -> Double {
+            let t = min(max(value, 0), 1)
+            if startPose.camera == nil && endPose.camera == nil { return t * t * (3 - 2 * t) }
+            return Recording3DTrack.ease(t, outgoing: CGPoint(x: 0.65, y: 0), incoming: CGPoint(x: 0.35, y: 1))
+        }
+        return (entry > 0 ? ease((time - start) / entry) : 1)
+            * (exit > 0 ? ease((end - time) / exit) : 1)
     }
 
     /// Author keys before the boundary fade, so adding one cannot apply the fade twice.
     func keyframeValue(for property: Recording3DProperty, at position: Double) -> Double {
         var authored = self
-        authored.transition = 0; authored.isEnabled = true
+        authored.transition = 0; authored.transitionIn = 0; authored.transitionOut = 0; authored.isEnabled = true
         let time = min(end.nextDown, start + min(max(position, 0), 1) * (end - start))
         if let key = property.cameraKey {
             return (authored.pose(at: time).camera ?? Recording3DCamera())[keyPath: key]
@@ -222,12 +265,14 @@ nonisolated struct Recording3DShot: Codable, Equatable, Identifiable, Sendable {
         (startPose, endPose) = preset.poses
         easing = .linear
         transition = 0
+        transitionIn = nil; transitionOut = nil
         tracks = nil
         blur = preset.blur
     }
 
     mutating func reverse() {
         swap(&startPose, &endPose)
+        swap(&transitionIn, &transitionOut)
         tracks = tracks?.map { track in
             var track = track
             track.keyframes = track.keyframes.map { frame in
@@ -291,13 +336,8 @@ nonisolated struct Recording3DShot: Codable, Equatable, Identifiable, Sendable {
                 result[keyPath: key] = value
             }
         }
-        result = result.sanitized
-        let ramp = min(max(transition, 0), (end - start) / 2)
-        if ramp > 0 {
-            let edge = min(1, min(time - start, end - time) / ramp)
-            result.strength *= edge * edge * (3 - 2 * edge)
-        }
-        return result
+        result.strength *= activity(at: time)
+        return result.sanitized
     }
 }
 
@@ -400,6 +440,8 @@ nonisolated struct Recording3DTimeline: Equatable, Sendable {
             shot.startPose = shot.startPose.sanitized
             shot.endPose = shot.endPose.sanitized
             shot.transition = shot.transition.isFinite ? min(max(shot.transition, 0), 2) : 0.25
+            shot.transitionIn = shot.transitionIn.map { $0.isFinite ? min(max($0, 0), 2) : shot.transition }
+            shot.transitionOut = shot.transitionOut.map { $0.isFinite ? min(max($0, 0), 2) : shot.transition }
             shot.blur = shot.blur?.sanitized
             var properties = Set<Recording3DProperty>()
             shot.tracks = shot.tracks?.filter { properties.insert($0.property).inserted }

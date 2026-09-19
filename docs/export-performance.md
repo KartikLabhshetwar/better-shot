@@ -164,8 +164,9 @@ Reviewed Cap's repository structure and traced its 3D editor/rendering flow at
 shader in `crates/rendering`. This was a feature-focused review, not an audit of
 every file in Cap's web/backend/media monorepo.
 
-BetterShot uses native Swift quaternion/pinhole projection and Core Image perspective
-transforms. The eight moves and five angles follow Cap’s camera parameters,
+BetterShot uses Swift quaternion/pinhole projection and an inverse Core Image/Metal
+warp adapted from the upstream renderer. The eight moves and five angles follow
+Cap’s camera parameters,
 endpoint motion, linear timing, and zero boundary transition. Camera orbit and
 content fold are independent; distance and vertical field of view determine
 apparent size. Named scenes retain their weighted timing, and Auto Scene uses the
@@ -174,19 +175,28 @@ same shot ordering. Legacy saved plane poses keep their previous geometry.
 Camera and blur properties support individual keyframes with editable cubic Bézier
 curves. Keys use relative shot positions so resizing keeps animation proportional.
 Tracks normalize once when edited, then use binary search and bounded curve
-sampling during rendering. Undo, reverse, flips, persistence, and legacy decoding
+sampling during rendering. Independent entry/exit curves interpolate camera
+parameters from the exact flat-fill distance at the authored field of view.
+Undo, reverse, flips, persistence, and legacy decoding
 share the production model.
 
 Radial, directional, and tilt-shift focus modes include strength, falloff, focus
-position/size, angle, and bokeh controls. The native Metal implementation uses two
-fixed 17-tap Gaussian passes or one 32-sample highlight-weighted disc pass. These
-are native equivalents of the reference controls, not a pixel-identical port of
-Cap’s shader. No Rust runtime, third-party artwork, or web UI dependencies were
-imported. Kernels compile once. Inactive blur bypasses the filters entirely.
+position/size, angle, and bokeh controls. The Metal implementation now uses Cap's
+Gaussian weights/radius limits and three rings of 5/10/15 bokeh samples, including
+its luminance weights and highlight gain. Adjacent Gaussian taps are paired using
+linear filtering to reduce reads without changing their normalized weights.
+Kernels compile once, and inactive blur bypasses the filters. The adapted code's
+AGPLv3 attribution and complete license are bundled in `Resources/Licenses/`.
+No Rust runtime or web UI dependency is required by BetterShot.
 
 Preview and export share the same GPU compositor. The content plane includes the
-screen, masks, cursor, keystrokes, shadows, and camera. Background stays in canvas
-space, depth blur applies to the composed scene, and subtitles remain sharp.
+screen, masks, cursor, and camera. Flat shadows fade away with shot activity.
+Background stays in canvas
+space, depth blur applies to the composed scene, and subtitles/keyboard captions
+remain sharp. Zoom magnifies the entire card about its projected target, with
+recentering; it no longer crops the source inside fixed card bounds. Steep poses
+retain their authored camera distance and clip rays behind the camera. Transparent
+canvas padding and analytic pixel coverage keep the plane's edges clean.
 The Metal preview takes decoded frames from the existing AVPlayers, keeps at most
 two GPU frames in flight, and retains backgrounds/overlays while camera or blur
 keyframes change. It performs no CPU bitmap readback. Crop and mask editing keep
@@ -196,10 +206,10 @@ On this Apple M5 / 32 GB Mac, optimized Release objects measured:
 
 | GPU composition workload | 1920×1080 | 3840×2160 |
 | --- | ---: | ---: |
-| Flat | 1.51 ms/frame | 5.83 ms/frame |
-| Moving 3D shot | 1.85 ms/frame | 8.31 ms/frame |
-| Moving 3D + Gaussian strength 60 | 2.79 ms/frame | 12.30 ms/frame |
-| Moving 3D + bokeh strength 19 | 2.88 ms/frame | 12.76 ms/frame |
+| Flat | 1.48 ms/frame | 5.11 ms/frame |
+| Moving 3D shot | 2.19 ms/frame | 8.32 ms/frame |
+| Moving 3D + Gaussian strength 60 | 2.89 ms/frame | 14.05 ms/frame |
+| Moving 3D + bokeh strength 19 | 3.09 ms/frame | 13.46 ms/frame |
 
 These are medians of three warm 120-frame runs after one warmup, with synchronous
 GPU completion, a reused synthetic source buffer, and no concurrent build. They
@@ -207,7 +217,9 @@ measure GPU composition, not decoding, encoding, display frame rate, cold shader
 compilation, or every recording workload. Reproduce with the command in
 CONTRIBUTING.md.
 
-Validation includes all 13 presets, extreme-angle/edge-on safety, resolution
+Validation compares all 13 upstream presets and 248 geometry/zoom/transition
+cases generated from the actual Cap Rust renderer (under 0.03 output-pixel error
+at 360 pixels high). It also checks extreme-angle/edge-on safety, resolution
 independence, focus-region pixel checks, bokeh output, masks/crop/cursor/camera
 alignment, random seeks over a reused source, encoded 30/60 fps output,
 persistence/undo/discard, and render-cache invalidation. Displayed production

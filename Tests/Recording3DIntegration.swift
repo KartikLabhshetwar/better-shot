@@ -37,6 +37,7 @@ func check3DShots(movie: URL, directory: URL) async throws {
     var edited = original
     edited.apply(.perspective)
     edited.transition = 0
+    edited.transitionIn = 0.1; edited.transitionOut = 0.2
     edited.blur = .init(mode: .tiltShift, strength: 12, focusSize: 0.1, angle: 45, bokeh: true)
     edited.tracks = [.init(property: .strength, keyframes: [
         .init(position: 0, value: 2, outgoing: .zero),
@@ -175,6 +176,29 @@ func check3DShots(movie: URL, directory: URL) async throws {
     try compositor(.init(shots: [edgeOn], duration: 2)).render(screenFrame: source, cameraFrame: nil,
         editorTime: 1, sourceTime: 1, into: output)
     precondition(color(output, at: CGPoint(x: 160, y: 90))[1] > 240, "An edge-on plane renders only the background")
+    let horizon = Recording3DShot(start: 0, end: 2,
+        startPose: .init(camera: .init(tiltY: 60, distance: 0.5, panX: 0.5)),
+        endPose: .init(camera: .init(tiltY: 60, distance: 0.5, panX: 0.5)), transition: 0)
+    try compositor(.init(shots: [horizon], duration: 2)).render(screenFrame: source, cameraFrame: nil,
+        editorTime: 1, sourceTime: 1, into: output)
+    precondition(color(output, at: CGPoint(x: 160, y: 90))[1] > 240,
+                 "A ray behind the camera must show background, without moving the authored camera")
+    style.padding = 0.2; style.shadow = 1
+    let framing = RecordingStudioLayout.make(canvasSize: size, style: style, includeBubble: false)
+    let flatCamera = Recording3DCamera(distance: (size.height / size.width) / tan(.pi / 8))
+    let floating = Recording3DShot(start: 0, end: 2, startPose: .init(camera: flatCamera), endPose: .init(camera: flatCamera), transition: 0)
+    let floatingTrack = Recording3DTimeline(shots: [floating], duration: 2)
+    let zoom = ViewportTimeline.build(cues: [.init(start: 0, end: 2, zoom: 2, anchorMode: .pinnedAnchor, skipsEasing: true)],
+                                     capture: PointerCaptureFile(), clipTimeline: .full(sourceDuration: 2))
+    let zoomed = StudioFrameCompositor(canvasSize: size, style: style, viewportTimeline: zoom,
+        pointerTimeline: nil, showsPressEffects: false, keystrokeTimeline: nil,
+        keystrokePlacement: .bottomCenter, subtitleTimeline: nil, includeBubble: false, timeline3D: floatingTrack)
+    let beyondCard = CGPoint(x: framing.cardRect.minX - 3, y: framing.cardRect.midY)
+    try compositor(floatingTrack).render(screenFrame: source, cameraFrame: nil, editorTime: 1, sourceTime: 1, into: output)
+    precondition(color(output, at: beyondCard)[1] > 250, "A floating 3D card must not retain its flat drop shadow: \(color(output, at: beyondCard)), point=\(beyondCard), card=\(framing.cardRect)")
+    try zoomed.render(screenFrame: source, cameraFrame: nil, editorTime: 1, sourceTime: 1, into: output)
+    precondition(color(output, at: beyondCard)[0] > 240, "3D zoom must enlarge the card, not crop the video inside its old bounds")
+    style.padding = 0; style.shadow = 0
     // A stripe fixture measures focus preservation and softness independently of camera geometry.
     let stripes = buffer(width: 640, height: 360)
     CVPixelBufferLockBaseAddress(stripes, [])
@@ -215,6 +239,39 @@ func check3DShots(movie: URL, directory: URL) async throws {
     focus.mode = .tiltShift; focus.angle = 0; focus.focusSize = 0.05
     try focusPixels(focus)
     precondition(contrast(320, 180) > 240 && contrast(320, 20) < 140, "Tilt shift keeps a sharp horizontal focus band")
+    // A white impulse gives an independent, closed-form check of both kernel weights.
+    let impulse = buffer(width: 640, height: 360)
+    CVPixelBufferLockBaseAddress(impulse, [])
+    let impulseBytes = CVPixelBufferGetBaseAddress(impulse)!.assumingMemoryBound(to: UInt8.self)
+    let impulseStride = CVPixelBufferGetBytesPerRow(impulse)
+    for y in 0..<360 { for x in 0..<640 {
+        let i = y * impulseStride + x * 4
+        impulseBytes[i] = 0; impulseBytes[i + 1] = 0; impulseBytes[i + 2] = 0; impulseBytes[i + 3] = 255
+    } }
+    let center = 180 * impulseStride + 320 * 4
+    for c in 0..<3 { impulseBytes[center + c] = 255 }
+    CVPixelBufferUnlockBaseAddress(impulse, [])
+    let rawContext = CIContext(options: [.workingColorSpace: NSNull()])
+    for bokeh in [false, true] {
+        let settings = Recording3DBlur(mode: .directional, strength: 18, falloff: 0, position: 0, bokeh: bokeh)
+        let result = try Recording3DBlurRenderer.apply(settings, to: CIImage(cvPixelBuffer: impulse), canvas: focusCanvas)
+        rawContext.render(result, to: focusOutput, bounds: focusCanvas, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
+        let weightSum = (-6...6).reduce(0.0) { $0 + exp(-Double($1 * $1) / 18) }
+        let expected = bokeh ? 255 / 29.0 : 255 / (weightSum * weightSum)
+        let actual = Double(color(focusOutput, at: CGPoint(x: 320, y: 180))[0])
+        precondition(abs(actual - expected) < 0.55, "Cap kernel weights changed: bokeh=\(bokeh), actual=\(actual), expected=\(expected)")
+        if bokeh {
+            let ring = Double(color(focusOutput, at: CGPoint(x: 314, y: 180))[0])
+            precondition(abs(ring - 255 * 2.5 / 30.5) < 0.55, "Bokeh must retain Cap's ring positions and highlight gain: \(ring)")
+        } else {
+            for offset in 1...8 {
+                let expected = offset <= 6 ? 255 * exp(-Double(offset * offset) / 18) / (weightSum * weightSum) : 0
+                let actual = Double(color(focusOutput, at: CGPoint(x: 320 + offset, y: 180))[0])
+                precondition(abs(actual - expected) < 0.55, "Paired Gaussian taps must retain reference weights")
+            }
+        }
+    }
+    print("PASS Cap Gaussian/ring-disc weights, horizon clipping, whole-card zoom, and floating shadow suppression")
     print("PASS GPU radial/directional/tilt-shift focus, angle reversal, bokeh discs, and sharp-region preservation")
     print("PASS all 13 looks through GPU rendering, projected source colors, nonsequential seeks, fixed background, and frame reuse")
 

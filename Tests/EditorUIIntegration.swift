@@ -523,8 +523,9 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
         for width: CGFloat in [260, 320] {
-            try snapshot(StudioInspector(model: videoModel, initialTab: .effects), scheme: scheme, width: width,
-                         to: output.appendingPathComponent("video-3d-inspector-\(name)-\(Int(width)).png"), height: 1000)
+            try snapshot(ScrollView { Recording3DInspector(model: videoModel) }.scrollIndicators(.hidden),
+                         scheme: scheme, width: width,
+                         to: output.appendingPathComponent("video-3d-inspector-\(name)-\(Int(width)).png"), height: 1400)
         }
         try snapshot(RecordingStudioContent(model: videoModel), scheme: scheme, width: 1100,
                      to: output.appendingPathComponent("video-3d-\(name).png"))

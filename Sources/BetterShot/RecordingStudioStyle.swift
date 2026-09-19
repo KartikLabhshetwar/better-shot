@@ -8,6 +8,7 @@
 //
 
 import CoreGraphics
+import QuartzCore
 import Foundation
 
 nonisolated enum RecordingCameraAspectRatio: String, Codable, CaseIterable, Sendable {
@@ -62,7 +63,7 @@ struct RecordingCameraBubbleSettings: Equatable {
 }
 
 struct RecordingEditDocument: Codable, Equatable {
-    var formatVersion = 7
+    var formatVersion = 8
     var style: StoredRecordingStudioStyle
     var zoomEnabled: Bool
     var zoomCues: [ZoomCue]
@@ -572,6 +573,13 @@ nonisolated struct RecordingStudioLayout: Sendable {
             bubbleCornerRadius: bubbleCornerRadius,
             contentFillSize: contentFillSize
         )
+    }
+
+    func camera3DProjection(_ pose: Recording3DPose, viewport: ViewportFrame) -> CATransform3D {
+        let neutral = frameRect(for: .identity)
+        let target = CGPoint(x: (neutral.minX + viewport.anchor.x * neutral.width) / canvasSize.width,
+                             y: (neutral.minY + viewport.anchor.y * neutral.height) / canvasSize.height)
+        return pose.projection(in: canvasSize, zoomAmount: viewport.magnification, zoomTarget: target)
     }
 
     /// Where the (zoomed) screen video draws, given a viewport frame. The
