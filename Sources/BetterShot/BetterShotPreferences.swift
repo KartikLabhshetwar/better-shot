@@ -56,7 +56,11 @@ enum BetterShotPreferences {
     /// Settings > General, so editor exports and fresh captures always land
     /// in the same folder as the same kind of file.
     static var exportFormat: ScreenshotExportFormat {
-        AppPreferences.exportFormat == .jpeg ? .jpeg : .png
+        switch AppPreferences.exportFormat {
+        case .jpeg: .jpeg
+        case .webp: .webp
+        case .png: .png
+        }
     }
 
     static var compressionQuality: Double {
@@ -213,6 +217,7 @@ enum ScreenshotExportFormat: String, CaseIterable, Identifiable {
     case png
     case jpeg
     case heic
+    case webp
 
     var id: String { rawValue }
 
@@ -224,6 +229,8 @@ enum ScreenshotExportFormat: String, CaseIterable, Identifiable {
             "JPEG"
         case .heic:
             "HEIC"
+        case .webp:
+            "WebP"
         }
     }
 
@@ -235,6 +242,8 @@ enum ScreenshotExportFormat: String, CaseIterable, Identifiable {
             "jpg"
         case .heic:
             "heic"
+        case .webp:
+            "webp"
         }
     }
 
@@ -246,6 +255,8 @@ enum ScreenshotExportFormat: String, CaseIterable, Identifiable {
             .jpeg
         case .heic:
             .heic
+        case .webp:
+            .webP
         }
     }
 
@@ -257,10 +268,13 @@ enum ScreenshotExportFormat: String, CaseIterable, Identifiable {
 enum ScreenshotFileActions {
     static func copyImageToClipboard(from url: URL) throws {
         let contentType = UTType(filenameExtension: url.pathExtension)
-        let dataType: NSPasteboard.PasteboardType = if contentType?.conforms(to: .jpeg) == true {
-            NSPasteboard.PasteboardType(UTType.jpeg.identifier)
+        let dataType: NSPasteboard.PasteboardType
+        if contentType?.conforms(to: .jpeg) == true {
+            dataType = NSPasteboard.PasteboardType(UTType.jpeg.identifier)
+        } else if contentType?.conforms(to: .webP) == true {
+            dataType = NSPasteboard.PasteboardType(UTType.webP.identifier)
         } else {
-            .png
+            dataType = .png
         }
 
         try copyImageToClipboard(from: url, dataType: dataType)

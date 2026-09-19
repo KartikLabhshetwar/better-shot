@@ -353,12 +353,13 @@ enum OverlayCardSize: String, CaseIterable, Identifiable {
 }
 
 enum ExportFormat: String, CaseIterable {
-    case png, jpeg
+    case png, jpeg, webp
 
     var utType: String {
         switch self {
         case .png: return "public.png"
         case .jpeg: return "public.jpeg"
+        case .webp: return "public.webp"
         }
     }
 
@@ -366,7 +367,12 @@ enum ExportFormat: String, CaseIterable {
         switch self {
         case .png: return "png"
         case .jpeg: return "jpg"
+        case .webp: return "webp"
         }
+    }
+
+    var usesLossyQuality: Bool {
+        self != .png
     }
 }
 

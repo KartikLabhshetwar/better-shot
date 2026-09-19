@@ -148,6 +148,7 @@ final class R2Uploader {
                 session: session
             ) { fraction in
                 Task { @MainActor in
+                    guard R2Uploader.shared.uploadingItems.contains(itemID) else { return }
                     R2Uploader.shared.uploadProgress[itemID] = fraction
                 }
             }

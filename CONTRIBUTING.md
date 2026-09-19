@@ -1,207 +1,214 @@
 # Contributing to BetterShot
 
-Read [AGENTS.md](AGENTS.md) before making changes. It defines the required UI
-patterns, interaction rules, and persistence behavior for contributors and
-coding agents. [CLAUDE.md](CLAUDE.md) imports the same rules for Claude Code.
+Thanks for helping improve BetterShot. Contributions can be code, documentation,
+clear bug reports, or feedback on accessibility and everyday workflows.
 
-## Build and run
+This guide covers getting a development build running, finding the right code,
+and validating a change. Read [AGENTS.md](AGENTS.md) before editing: it is the
+shared source of truth for native UI, capture behavior, persistence, and agent
+rules. [CLAUDE.md](CLAUDE.md) imports those same instructions. Our
+[Code of Conduct](CODE_OF_CONDUCT.md) applies to project participation.
 
-**Requirements:** macOS 26.0+, Xcode 26+ with command-line tools, and
-[XcodeGen](https://github.com/yonaskolb/XcodeGen).
+[Getting started](#getting-started) · [Code map](#code-map) ·
+[Making a change](#making-a-change) · [Validation](#validation) ·
+[Submitting changes](#submitting-changes)
+
+## Before you start
+
+Search [existing issues](https://github.com/KartikLabhshetwar/better-shot/issues)
+for related work. Small fixes and documentation improvements can go straight to
+a pull request. For a substantial feature or a change to an established workflow,
+open an issue describing the problem and proposed behavior first.
+
+A useful bug report includes:
+
+- BetterShot version, macOS version, and Mac architecture.
+- Steps to reproduce, expected behavior, and actual behavior.
+- Relevant context, such as multiple displays, capture mode, or export settings.
+- A screenshot, short recording, or error message when available, with private
+  information removed.
+
+## Getting started
+
+### Requirements
+
+- macOS 26 or later.
+- Xcode 26 or later, including its command-line tools. Open Xcode once to finish
+  setup and select it under **Xcode > Settings > Locations > Command Line Tools**.
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen), available through Homebrew.
+
+Check the active toolchain with `xcodebuild -version`. Apple's standalone Command
+Line Tools installation does not replace the full Xcode app for this project.
+
+### First build
+
+Fork the repository on GitHub, then clone your fork (replace `YOUR_USERNAME`):
 
 ```bash
 brew install xcodegen
 git clone https://github.com/YOUR_USERNAME/better-shot.git
 cd better-shot
+git switch -c fix/describe-the-change
 make release
 open .build/Build/Products/Release/BetterShot.app
 ```
 
-`make release` produces an unsigned build (used by CI). `make build` and
-`make run` use the signing settings in `project.yml`. On a fork, select your
-own team or Sign to Run Locally in Xcode. Do not commit personal signing
-changes. Run `make generate` before opening `BetterShot.xcodeproj` to
-regenerate the project from `project.yml`.
+`make release` generates the Xcode project and produces an **unsigned Release
+build**. It is the simplest build path for a fork and the one CI uses. No
+maintainer signing identity or cloud credentials are needed to build or test.
 
-The app sets `SWIFT_VERSION: "5.0"` with main-actor default isolation and
-approachable concurrency. Standalone checks compile in Swift 6 mode. Read the
-project settings rather than assuming identical modes.
+### Working in Xcode
 
-`make run` stops a running BetterShot process and opens the Debug build with
-`open -n`. Finish active work before running it.
+```bash
+make generate
+open BetterShot.xcodeproj
+```
 
-### Make targets
+Choose your own signing team or **Sign to Run Locally** for interactive development.
+Keep signing changes local. `make build` and `make run` inherit the signing settings
+in [project.yml](project.yml), which reference the maintainer's identity.
+
+Treat `project.yml` as the project configuration source. `make generate` regenerates
+the project and syncs version/build values from [version.json](version.json), so
+changes made only in the generated project may be overwritten.
+
+The app uses Swift 5 language compatibility with main-actor default isolation and
+approachable concurrency. Standalone checks compile in Swift 6 mode. Keep the
+existing compiler settings unless changing them is the task itself.
+
+### Everyday commands
+
+Run these from the repository root:
 
 | Command | Purpose |
-|---|---|
-| `make generate` | Sync version/build from `version.json`, regenerate Xcode project |
-| `make build` | Debug build with configured signing |
-| `make release` | Unsigned Release build (CI) |
-| `make run` | Debug build, stop old process, launch |
-| `make test` | Unsigned build, standalone checks, editor snapshots, export integration |
-| `make test-build` | Clean Release build |
-| `make dmg` | Unsigned local-test DMG |
+| --- | --- |
+| `make generate` | Sync version/build and regenerate the Xcode project |
+| `make release` | Build unsigned Release, as CI does |
+| `make build` | Build Debug with configured signing |
+| `make run` | Build Debug, stop the running BetterShot process, and launch the new app |
+| `make test` | Build unsigned Debug and run standalone, editor, and export checks |
+| `make test-build` | Clean and build unsigned Release |
 | `make clean` | Remove build artifacts |
-| `make lint` | Print diagnostics (use a real build as the gate) |
-| `make version` | Print version from `version.json` |
-| `make ship` | Maintainer's signed/notarized release (not a dev check) |
+| `make version` | Print the version from `version.json` |
 
-### DMG installer
+**Finish active captures and save your work before `make run`**: it terminates the
+running app. `make lint` can display compiler diagnostics, but its recipe can
+mask a failed build; use a real build or `make test` as the gate.
 
-Install `create-dmg` with `brew install create-dmg`. Packaging needs a
-logged-in desktop session with Finder automation permission.
+### Website development
 
-```bash
-make dmg
-```
-
-Or preview with an existing build:
+[bettershot-landing/](bettershot-landing/) is a separate Next.js/React/Tailwind
+project. It is not part of the native app build. With Node.js and pnpm installed:
 
 ```bash
-bash scripts/create-dmg.sh .build/Build/Products/Release/BetterShot.app release/BetterShot-installer-preview.dmg
-bash Tests/check-dmg.sh release/BetterShot-installer-preview.dmg .build/Build/Products/Release/BetterShot.app
+cd bettershot-landing
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
-`scripts/dmg-background.swift` draws the 660 x 440 pt background at 1x and 2x.
-The clover volume icon comes from the built app. Verify the background and icon
-positions survive remounting, and check the Applications link in both appearances.
+Before submitting website changes, run `pnpm lint` and `pnpm build` from that
+directory. Follow the website rules in [AGENTS.md](AGENTS.md), including use of
+existing Tailwind tokens, `cn`, and installed Radix components. Website-only
+changes do not need README or changelog edits unless explicitly requested.
 
-## Project map
+## Code map
 
-| Location | Responsibility |
-|---|---|
-| `Sources/App/` | App lifecycle, URL scheme handler, onboarding |
-| `Sources/Capture/` | Screenshot capture, region selection, OCR, color picker |
-| `Sources/Preview/` | Capture deck, pinned images, overlay layout |
-| `Sources/History/` | Capture records, retention, path mapping |
-| `Sources/Models/` | Preferences, capture records, gradients, onboarding state |
-| `Sources/Services/` | Shortcut catalog/actions, framing, updater, grading |
-| `Sources/Settings/` | General, Capture, Overlay, Recording, Shortcuts, Sharing, About |
-| `Sources/Sharing/` | R2 credentials, request signing, uploads |
-| `Sources/Views/` | Menu tray, glass surfaces, toasts, onboarding UI |
-| `Sources/BetterShot/` | Image editor, video studio, renderers, geometry |
-| `Resources/Assets.xcassets/` | Clover `AppIcon` and template `MenuBarIcon` |
-| `Tests/` | Standalone checks and integration programs |
-| `bettershot-landing/` | Separate Next.js website |
+| Location | Start here for |
+| --- | --- |
+| [Sources/App/](Sources/App/) | App lifecycle, onboarding, and URL actions |
+| [Sources/Capture/](Sources/Capture/) | Screenshot orchestration, selection, OCR, and color picking |
+| [Sources/Preview/](Sources/Preview/) | Floating capture deck, private staging, and pinned images |
+| [Sources/History/](Sources/History/) | Capture records, retention, and source/export path resolution |
+| [Sources/Models/](Sources/Models/) | Preferences, capture models, backgrounds, and onboarding state |
+| [Sources/Services/](Sources/Services/) | Shortcut catalog and dispatch, image framing, and updater |
+| [Sources/Settings/](Sources/Settings/) | Native settings and preference bindings |
+| [Sources/Sharing/](Sources/Sharing/) | R2 credentials, signed requests, uploads, and share manifests |
+| [Sources/Views/](Sources/Views/) | Menu tray, onboarding views, shared surfaces, and status toasts |
+| [Sources/BetterShot/](Sources/BetterShot/) | Image editor, recording, video studio, and rendering |
+| [Resources/](Resources/) | App/menu icons, backgrounds, entitlements, and onboarding media |
+| [Tests/](Tests/) | Standalone regression checks and integration programs |
+| [bettershot-landing/](bettershot-landing/) | Website and public share viewer |
 
-`Sources/BetterShot/` groups files by prefix: `Anno*`/`Annotation*` for image
-editing, `Recording*` for video capture/studio, and `Teleprompter*` for the
+Inside `Sources/BetterShot/`, look for `Anno*` and `Annotation*` files for image
+editing, `Recording*` for video capture and editing, and `Teleprompter*` for the
 script overlay.
 
-## Key flows
+## Making a change
 
-### Screenshots
+Trace the user action through its callers, storage, preview, and export before
+editing. Reuse existing helpers and native controls; fix shared behavior where
+all affected callers meet. Keep unrelated cleanup out of the diff.
 
-`ShortcutService` > `CaptureOrchestrator` > `ScreenCapture` > history/staging >
-`BeautifierRenderer` > preview deck or image editor.
+### Capture and saving
 
-Region screenshots use `/usr/sbin/screencapture -i`. Source capture is PNG;
-the export-format setting controls saved deliverables. Full-resolution editor
-previews are the default.
+The screenshot path runs through `ShortcutService`, `CaptureOrchestrator`,
+`ScreenCapture`, private staging/history, and the preview or image editor.
+Region screenshots use macOS's native `/usr/sbin/screencapture -i` selector.
+Recording areas use BetterShot's adjustable AppKit selector.
 
-Every screenshot starts in `DeckStaging`, regardless of capture mode or editor
-preferences. Copy writes to the clipboard only, retaining a private temporary
-file for file-based paste targets. Edit, Pin, Share, and drag-out retain source
-pixels and previews inside BetterShot. Save/Export, the explicit capture-and-save
-shortcut, or opt-in automatic saving writes to the configured save folder.
-General > Saving enables automatic saving for normal captures; explicit Copy,
-Edit, and Pin shortcuts bypass it. The new `afterCapture.screenshot.save` key
-defaults off and deliberately ignores dormant legacy `autoSaveScreenshots` values.
-Successful automatic saves retain the preview/editor and associate the export
-with the untouched source; failures keep the card open for Save retry. The deck
-retention preference controls dismissal, not automatic saving.
+Every screenshot starts in `DeckStaging`. Copy only updates the clipboard and
+retains a private file for file-based paste targets. Edit, Pin, Share, and drag-out
+retain working files internally. Only explicit Save/Export, capture-and-save,
+or opt-in automatic saving writes a deliverable to the configured folder.
+Automatic saving defaults off, bypasses explicit Copy/Edit/Pin actions, and
+retains failed captures for retry. Preserve this distinction across all callers.
 
-### Recordings
+Image-editor Save commits to history and creates or atomically replaces the
+associated export, even for an untouched image. Copy and Share do not update
+that export. Export opens a save panel for a new destination.
 
-`RecordingCaptureEntry` > `ScreenRecordingManager` > compact session bar
-(Stop, Pause, Restart, Discard).
+[ScreenshotFileNaming](Sources/BetterShot/ScreenshotFileNaming.swift) is the shared,
+Foundation-only deliverable name renderer. Preserve sanitization and keep
+previews from advancing counters. Recording package directory names identify
+projects and must not change with the deliverable template.
 
-Area recordings use `RecordingAreaSelectionPresenter` with the adjustable AppKit
-`RegionSelectionOverlay` and system crosshair. Screen, camera, pointer events,
-and keys are kept as separate tracks.
+### Editing, rendering, and persistence
 
-### Gallery and Settings
+Image annotations use source-pixel coordinates. `AnnoShapeDrawing` is shared by
+the canvas and export; `AnnotationImageTransform` handles full-resolution rotation
+and reflection while retaining editable annotations and undo history. A
+low-resolution preview must never become an export source.
 
-Media Gallery uses `NavigationSplitView` and a native toolbar with compact icon/list views.
-Keep section titles and search in the detail column, with the system sidebar toggle
-and resizable sidebar. Icon previews fit within 64 pt without cropping; filenames
-carry the blue selection highlight. Grid keyboard movement must use the same
-column width, spacing, and insets as the displayed grid.
-On this Mac and Cloud Shares each expose All Media, Screenshots, and Videos;
-local availability and a saved cloud link are independent, so an item can appear
-in both. Use the shared file-type resolver for legacy/imported videos and resolve
-recording previews from the package when flattened exports change.
-Keep single-click selection, double-click opening, keyboard access, contextual
-actions, and local/cloud deletion confirmations consistent across both views.
-Gallery list view uses SwiftUI Table with native column sorting. Settings uses the
-same native navigation columns with its title above the detail pane, a
-searchable sidebar, neutral SF Symbols, one native toolbar title, and grouped
-native forms; preserve existing preference bindings and the shared InspectorSlider
-controls.
+Recording capture starts at `RecordingCaptureEntry` and `ScreenRecordingManager`.
+Packages retain `screen.mov`, optional `camera.mov`, input/capture/edit metadata,
+and a flattened deliverable. Source movies remain unchanged. Input capture is
+limited to the supported pointer and shortcut events; never record plain typing.
 
-### Editing and persistence
+`RecordingStudioLayout`, in
+[RecordingStudioStyle.swift](Sources/BetterShot/RecordingStudioStyle.swift), supplies
+shared screen/camera geometry. Preview, export, saved projects, undo, and render
+cache invalidation must agree on camera layouts, crop, masks, cursor styling,
+and effects. Camera frame ratio is independent of canvas ratio. Older projects
+must retain compatible defaults and saved artwork, including legacy Hand cursors
+and the `macOS` storage key for Arrow.
 
-Both editor scenes use minimum-content sizing with no content-derived maximum.
-The shared window modifier enables native full screen even when automatic
-full-screen opening is off, and focuses windows opened from overlays. The menu
-tray monitors same-app and other-app clicks, passes editor clicks through, and
-closes synchronously before capture or recording-picker actions. Remove both
-event monitors when the tray closes.
+`GradientPreset.presets` in [BackgroundStyle.swift](Sources/Models/BackgroundStyle.swift)
+is the palette source. General > Default Look initializes new media; editing a
+saved project must not overwrite those defaults. No Background retains framing
+settings for reuse. MP4 has no alpha channel, so uncovered areas render black.
 
-Image annotations live in source-pixel coordinates. Rotation and flips write a private
-full-resolution PNG through `AnnotationImageTransform`, preserving the capture.
-Reflect shapes through `pageTransform` so text, arrows, and redactions follow
-the same pixels; missing `mirrored` values in older documents mean no reflection.
-Image-change snapshots retain the engine’s undo/redo stacks, and new annotation
-edits invalidate image redo. Keep transform actions in the existing image toolbar
-and preserve the shared save/copy/export/share rendering path.
+### UI, shortcuts, and automation
 
-`AnnoShapeDrawing` is shared between the canvas and export. Recording packages
-contain `screen.mov`, optional
-`camera.mov`, input/capture/edit JSON, and a flattened deliverable. Source movies
-are never modified.
+Use the shared editor chrome, inspector components, and `InspectorSlider`; keep
+both inspectors on the left. Preserve keyboard focus, text editing, accessible
+action names, light/dark appearances, and reduced transparency/motion. The full
+interaction requirements live in [AGENTS.md](AGENTS.md).
 
-Saving annotations (Cmd+S) works for untouched screenshots too. It commits to
-internal history, creates the first export in the configured folder, and updates
-the associated export via atomic replace on later saves. Copy and Share do not
-create or update that export. Export opens an NSSavePanel for a new destination.
+Media Gallery treats local availability and cloud links independently: a shared
+item with a local source belongs in both locations. Preserve package-based
+resolution when recording exports move or disappear, native table sorting,
+single-click selection, double-click opening, and deletion confirmations.
+Gallery and Settings use resizable native navigation columns.
 
-General > Default Look supplies background, padding, corner radius, and shadow
-for new images and videos. Saved projects retain their own settings.
+[ShortcutCatalog.swift](Sources/Services/ShortcutCatalog.swift) defines action IDs,
+groups, scopes, and defaults. Do not renumber persisted IDs. New actions start
+unassigned; customized and disabled bindings must survive migration. Active
+editor bindings take priority over matching global bindings without intercepting
+normal text-field behavior.
 
-`ScreenshotFileNaming` names every deliverable from the template stored under
-`bs_fileNameTemplate`. `currentFileName` is the only path that advances
-`{counter}`, so Settings can preview a template without spending a number.
-Recording packages keep their own `BetterShot_<timestamp>_<id>.bettershotrec`
-directory name because that name is the project's identity in the gallery; only
-the copy leaving for the save folder is renamed. The renderer is pure and
-Foundation-only so `Tests/FileNamingCheck.swift` can compile it on its own.
-
-The Arrow cursor choice uses a stemless black arrow with a white outline and a
-2.5× starting size. `PointerArtworkCapture` caches the 32× raster and arrow-tip
-hotspot for preview/export; the `macOS` storage key remains compatible.
-
-Padding accepts 0% in General and both editors. No Background removes decorative
-framing without erasing saved padding/corner/shadow values, so selecting a fill
-restores them. Untouched screenshots keep their pixels; explicit image effects
-still render on transparency. MP4 has no alpha channel: any areas uncovered by
-reframing or camera layouts remain black, consistently in preview and export.
-
-Color picking uses a retained `NSColorSampler`. Convert to sRGB before reading
-components, reject unsupported/non-finite colors, and clamp to six-digit hex.
-Cancellation leaves the clipboard unchanged. Toast panels own their measured
-size with hosting sizing options disabled to avoid recursive window constraints.
-
-Screen/camera layout presets live in `RecordingStudioLayout` and apply to the
-whole edited video. The Camera inspector exposes floating Bubble and Overlap,
-Side-by-Side, Presenter, Camera Only, and Screen Only. Paired layouts can place
-the camera on either side. Presenter fits the screen beside a full-height camera;
-Side-by-Side respects the video Fill/Fit setting. Floating camera ratio/size/
-rounding controls remain available. Selecting Bubble or Overlap restores the
-compact 0.5.2 camera defaults (1:1, 26% size, 25% rounding), including reselection
-of the active preset; undo restores the previous camera settings. Missing layout fields retain the legacy
-bubble, and unavailable/hidden camera footage falls back to the screen. Preview,
-export, project persistence, render-cache invalidation, and undo share the style.
+[CaptureURLAction.swift](Sources/App/CaptureURLAction.swift) parses the supported
+`bettershot://` routes. The app delegate dispatches them. Preserve malformed-URL
+rejection and the guard against starting a second recording session.
 
 ### 3D video shots
 
@@ -234,103 +241,121 @@ Offscreen snapshots do not validate live AVPlayer layers. The optional window
 check plays and seeks the production editor in both appearances using fixture
 media. It does not automate pointer dragging or keyboard entry in the controls.
 
-### Shortcuts
-
-`ShortcutCatalog.swift` is the source for action IDs, groups, scopes, and
-defaults. Never renumber persisted IDs. New actions have no default binding.
-Editor and global scopes may reuse keys; the active editor takes priority.
-Global bindings require Command, Control, or Option.
-
-### URL scheme
-
-`CaptureURLAction` parses `bettershot://` URLs and routes them through
-`BetterShotDelegate.application(_:open:)`. Supported paths: `capture/region`,
-`capture/fullscreen`, `capture/window`, `ocr`, `color-picker`, `record`, and
-`settings`. Unknown or malformed URLs are silently ignored. The recording guard
-prevents stacking on an active session.
-
 ## Validation
+
+### Native changes
 
 ```bash
 make test
 ```
 
-Builds unsigned, runs `scripts/run-checks.sh`, then `Tests/run-exports.sh`.
-Tests use `BETTERSHOT_TESTING=1` to prevent real R2 Keychain access.
+This builds unsigned Debug with testability enabled, runs
+[scripts/run-checks.sh](scripts/run-checks.sh), then
+[Tests/run-exports.sh](Tests/run-exports.sh). The runners set
+`BETTERSHOT_TESTING=1` so tests use isolated storage and do not access real R2
+Keychain credentials. Always use the runners; never substitute production
+credentials to make a test pass.
 
-For the screenshot capture/Copy/Save regression checks alone (plus the build and
-standalone checks), run `BETTERSHOT_CHECK_SCREENSHOT_SAVING=1 make test`. The
-fixture drives the production post-capture pipeline without requesting screen
-capture permission and isolates its history, deck, and save folder.
+For a logic regression, add a small check against production code. Standalone
+checks are `Tests/*Check.swift`; an optional matching `.sources` file lists the
+production files to compile. For example, [FileNamingCheck.sources](Tests/FileNamingCheck.sources)
+points directly to the production filename renderer. Run the standalone suite
+with `bash scripts/run-checks.sh`.
 
-After a Debug test build, run just the compositor and encoded-video checks with
-`BETTERSHOT_CHECK_VIDEO_EXPORTS=1 bash Tests/run-exports.sh`. This covers decoded
-colors, masks, camera ratios, cached frames, both frame rates, audio, saved-render
-invalidation, and cancellation with GPU frames in flight.
+### Focused integration checks
 
-For an export performance comparison, use optimized objects and run the benchmark
-without concurrent builds. It exports synthetic two-minute clips at 1080p60
-(plain and heavy effects) plus a heavy-effects 30 fps variant, with test-only audio
-and upload preparation. It does not upload or read R2 credentials.
+After `make test` has produced Debug objects, these commands reuse them. Rebuild
+with `make test` when production code changes.
+
+| Area | Command |
+| --- | --- |
+| Screenshot Copy/Save and private storage | `BETTERSHOT_CHECK_SCREENSHOT_SAVING=1 bash Tests/run-exports.sh` |
+| Video compositing and encoded exports | `BETTERSHOT_CHECK_VIDEO_EXPORTS=1 bash Tests/run-exports.sh` |
+| Displayed Gallery and Settings windows | `BETTERSHOT_CHECK_LIBRARY_WINDOWS=1 bash Tests/run-exports.sh` |
+| Editor focus, full screen, and tray handoff | `BETTERSHOT_CHECK_EDITOR_WINDOWS=1 bash Tests/run-exports.sh` |
+
+The screenshot check uses the production post-capture path with fixture media;
+it does not request capture permission. Video checks cover decoded colors,
+masks, camera ratios, cached frames, 30/60 fps, audio, render invalidation, and
+cancellation with GPU work in flight.
+
+Editor snapshots are written to `.build/editor-snapshots/`. Review narrow and
+wide layouts in both appearances. Displayed-window checks need a logged-in
+desktop session; Gallery/Settings screenshots also need existing Screen Recording
+permission. Editor-window checks can exercise fullscreen captures with existing
+permission, but do not automate region selection or start microphone/camera
+recordings.
+
+Offscreen snapshots cannot prove live AVPlayer rendering, native toolbars,
+global shortcuts, capture selection, or permissions. Test affected interactions
+manually and state what remains unverified.
+
+### Export performance
+
+Build optimized objects, then run the synthetic export benchmark without another
+build running alongside it:
 
 ```bash
+make generate
 xcodebuild -project BetterShot.xcodeproj -scheme BetterShot -configuration Release \
   -derivedDataPath .build CODE_SIGNING_ALLOWED=NO ENABLE_TESTABILITY=YES \
   SWIFT_COMPILATION_MODE=incremental build
 BETTERSHOT_BUILD_CONFIGURATION=Release BETTERSHOT_BENCHMARK=1 bash Tests/run-exports.sh
 ```
 
-Export cadence and the motion-blur shutter use the same frame-rate setting.
-Missing frame-rate fields in older projects resolve to 60 fps. The shared
-compositor keeps decoded media and filtered masks on the GPU through NV12
-encoder buffers; Quartz supplies static decoration, cursor artwork, and text.
-See [export-performance.md](docs/export-performance.md) for measurements.
+It measures two-minute 1080p clips with plain and heavy effects, including 60/30 fps
+variants and upload preparation. It does not upload or read R2 credentials.
+See [export-performance.md](docs/export-performance.md) for workloads, measurements,
+and their limits.
 
-For focused iteration, run the relevant standalone check directly. For a new
-geometry rule or nontrivial branch, add a small regression check against
-production code using `Tests/NameCheck.sources`.
+### Local installer checks
 
-Editor snapshots appear in `.build/editor-snapshots/`. Check light/dark and
-narrow layouts. Offscreen snapshots cannot validate live AVPlayer layers,
-native toolbars, global shortcuts, capture selection, or permissions. For
-relevant changes, check these manually and report gaps honestly.
+Install `create-dmg` with `brew install create-dmg`, then run `make dmg` for an
+unsigned local-test installer. Packaging needs a logged-in desktop session and
+Finder automation permission.
 
-With existing Screen Recording permission, run
-`BETTERSHOT_CHECK_LIBRARY_WINDOWS=1 make test` to also display and capture the
-gallery icon/list and Settings windows at compact and wide sizes in both
-appearances. These test-only windows use fixture media and isolated credentials.
-Use their `*-window-*-780.png` / `*-window-*-1080.png` images to review native
-materials: offscreen `cacheDisplay` snapshots cannot render the system sidebar
-and search surfaces reliably.
+To package an existing Release build and validate the result:
 
-Run `BETTERSHOT_CHECK_EDITOR_WINDOWS=1 make test` to display the production
-image/video editor views and check overlay opening, focus, automatic/manual full
-screen, exit from full screen, same-app tray dismissal, Escape, and recording
-picker handoff. With existing Screen Recording permission, this also performs
-full-screen screenshots into isolated test storage while each editor is open.
-It does not automate region selection or start a microphone/camera recording.
+```bash
+bash scripts/create-dmg.sh .build/Build/Products/Release/BetterShot.app release/BetterShot-installer-preview.dmg
+bash Tests/check-dmg.sh release/BetterShot-installer-preview.dmg .build/Build/Products/Release/BetterShot.app
+```
 
-For website changes, run `pnpm lint` and `pnpm build` from `bettershot-landing/`.
+Check the background, bundled clover volume icon, icon positions after remounting,
+and Applications link in both appearances.
 
 ## Submitting changes
 
-1. Read the existing code before editing. For maintainer work, commit and push
-   directly to `main` as requested; do not create a PR unless explicitly asked.
-   External contributors should use a focused branch and PR.
-2. Follow [AGENTS.md](AGENTS.md). Preserve user data and native accessibility.
-3. Run `make test`. CI runs `make release` via `.github/workflows/build.yml`.
-4. For UI changes, include screenshots and describe the interactions tested.
-5. Explain the problem, solution, validation, and any limits in the PR.
-6. Update [CHANGELOG.md](CHANGELOG.md) and [README.md](README.md) when behavior changes.
+External contributors should open a focused PR from a branch on their fork.
+Maintainer tasks go directly to `main` unless a PR is explicitly requested.
 
-`version.json` is the version source (`version`, `build`, `minimumOS`).
-`make generate` syncs it into the project. Do not publish binaries or mark a
-version shipped without an explicit release request. Keep historical changelog
-entries and contributor credit.
+Before submitting:
 
-Use short, descriptive commit messages: `fix: preserve cursor hotspot in Retina
-exports`. Do not commit signing credentials, generated builds, or local config.
+- Explain the concrete problem and resulting behavior; link the relevant issue.
+- Run checks appropriate to the change: `make test` for native logic/rendering,
+  and `pnpm lint` plus `pnpm build` for the website. For documentation-only edits,
+  verify commands and links against the repository; no native rebuild is needed.
+- Include screenshots for UI changes and name the appearances, window sizes,
+  and interactions actually tested. Report failures or gaps honestly.
+- Update user and contributor documentation when behavior or workflows change,
+  and add a changelog entry when appropriate. Preserve historical entries and
+  contributor credit. Website-only work follows the documentation exception above.
+- Review the diff for unrelated edits, personal signing identities, credentials,
+  generated build output, and local configuration.
 
-## License
+Use short, descriptive commit messages, such as
+`fix: preserve cursor hotspot in Retina exports`. A PR description should let a
+reviewer understand the problem, change, and validation without reading the
+original conversation.
+
+[CI](.github/workflows/build.yml) currently runs `make release` and checks that the
+app exists. It does **not** run the full regression suite, so a green CI build
+alone does not replace local validation.
+
+[version.json](version.json) is the version source. Do not bump a version or
+publish release binaries as part of a routine contribution. `make ship` is a
+maintainer-only signed/notarized release workflow that depends on local release
+tooling and credentials; it is not a development check. Releases require an
+explicit maintainer request.
 
 Contributions are licensed under the project's [BSD 3-Clause License](LICENSE).

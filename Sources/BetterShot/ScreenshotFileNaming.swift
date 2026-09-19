@@ -62,7 +62,7 @@ nonisolated enum ScreenshotFileNaming {
     /// does, which is what lets Settings preview a template as often as it
     /// likes. Call it once per file, and hold the result in a local rather
     /// than calling it again for the same save.
-    static func currentFileName(
+    @MainActor static func currentFileName(
         extension pathExtension: String,
         kind: Kind = .screenshot,
         date: Date = Date(),
