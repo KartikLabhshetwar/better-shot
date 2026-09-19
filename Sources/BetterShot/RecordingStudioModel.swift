@@ -952,17 +952,12 @@ final class RecordingStudioModel {
             select3DShot(id: shot.id)
             return
         }
-        guard time.isFinite, duration >= Recording3DShot.minimumDuration else { return }
-        let occupied = timeline3D.shots
-        let lower = occupied.filter { $0.end <= time }.last?.end ?? 0
-        let upper = occupied.first { $0.start >= time }?.start ?? duration
-        guard upper - lower >= Recording3DShot.minimumDuration else {
+        guard let range = timeline3D.insertionRange(at: time, duration: duration) else {
             shot3DError = "No room here. Shorten a neighboring 3D shot or choose another time."
             return
         }
-        let length = min(3, upper - lower)
-        let start = min(max(time, lower), upper - length)
-        var shot = Recording3DShot(start: start, end: start + length)
+        let length = range.upperBound - range.lowerBound
+        var shot = Recording3DShot(start: range.lowerBound, end: range.upperBound)
         shot.apply(.glide)
         set3DShots(shots3D + [shot], actionName: "Add 3D Shot")
         select3DShot(id: shot.id)

@@ -25,3 +25,10 @@ application. No Cap trademarks or artwork are included.
 Corresponding source and build instructions:
 https://github.com/KartikLabhshetwar/better-shot
 See CONTRIBUTING.md, project.yml, Makefile, and version.json in that repository.
+
+## TourKit
+
+The bundled TourKit Swift package is Copyright (c) 2026 Ram Patra, used under the
+MIT license in TourKit.txt. Source: https://github.com/rampatra/TourKit at
+4f2b109506650151d87cd5e84bb9fe2623938781. BetterShot's local appearance and
+accessibility adjustments are documented in Vendor/TourKit/BETTERSHOT.md.

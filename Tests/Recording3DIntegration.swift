@@ -18,7 +18,16 @@ func check3DShots(movie: URL, directory: URL) async throws {
     let creationModel = RecordingStudioModel(url: session.directoryURL)
     await creationModel.load()
     precondition(creationModel.isLoaded && creationModel.timeline3D.shots.isEmpty)
+    let proposed = creationModel.timeline3D.insertionRange(at: 0, duration: creationModel.duration)!
+    let wasDirty = creationModel.hasUnsavedChanges
+    let revision = creationModel.previewRenderRevision
+    creationModel.hoverPreviewTime = 0.2
+    creationModel.hoverPreviewTime = nil
+    precondition(creationModel.shots3D.isEmpty && creationModel.hasUnsavedChanges == wasDirty)
+    precondition(creationModel.previewRenderRevision == revision, "Hover must not invalidate decoration or author an effect")
     creationModel.add3DShot(at: 0)
+    precondition(creationModel.shots3D[0].start == proposed.lowerBound && creationModel.shots3D[0].end == proposed.upperBound,
+                 "The insertion must match its hover ghost exactly")
     precondition(creationModel.shots3D.count == 1 && creationModel.selected3DShot != nil)
     creationModel.undo()
     precondition(creationModel.shots3D.isEmpty)

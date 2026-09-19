@@ -180,11 +180,24 @@ open .build/Build/Products/Release/BetterShot.app
 
 `make release` builds unsigned and does not require the maintainer's signing
 identity. The app uses SwiftUI and AppKit, with
-[DockProgress](https://github.com/sindresorhus/DockProgress) as its Swift package
-dependency. The website is a separate Next.js project.
+[DockProgress](https://github.com/sindresorhus/DockProgress) and a locally adapted
+[TourKit](Vendor/TourKit/BETTERSHOT.md) Swift package. The website is a separate Next.js project.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for Xcode setup, the code map, tests, and
 submission guidance.
+
+### Guided setup and update notes
+
+New installs open a short TourKit guide, followed by optional permissions and a
+practice capture. Use **Settings → About → Take the Tour** to revisit it.
+After an update, **What’s New** shows the bundled changelog once, including releases
+you skipped. It also stays available in Settings → About. Closing update notes
+continues your usual capture-bar startup preference; completed setup is preserved.
+
+Hover over empty space in the video editor’s 3D timeline to see where a shot will
+fit before clicking. The dashed preview shows its duration; hovering never saves
+an effect. The **+ Add** menu remains available for Zoom and 3D Shot.
+
 
 ## Help and contribute
 
@@ -202,4 +215,6 @@ If BetterShot helps you, you can [support its development](https://www.buymeacof
 
 ## License
 
-[BSD 3-Clause](LICENSE).
+[BSD 3-Clause](LICENSE) for original BetterShot code; adapted Cap rendering uses
+AGPLv3. See [third-party notices](Resources/Licenses/NOTICE.md) for distribution
+terms and the bundled TourKit MIT license.

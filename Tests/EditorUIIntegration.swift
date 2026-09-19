@@ -2,6 +2,7 @@ import AppKit
 import AVFoundation
 import Carbon
 import SwiftUI
+import TourKit
 @testable import BetterShot
 
 /// Offscreen snapshots and model checks, plus a brief native transfer-toast lifecycle check.
@@ -357,7 +358,33 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
                      "The test runner must never request real permissions or persist setup attempts")
         precondition(permission.settingsURL.scheme == "x-apple.systempreferences")
     }
+    let releaseNotes = try ReleaseNotesWindowController.load(in: appBundle)
+    let releaseVersion = appBundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as! String
+    let currentNotes = releaseNotes.filter { $0.version == releaseVersion }
+    precondition(currentNotes.count == 1 && !currentNotes[0].body.isEmpty, "Every shipped version needs bundled release notes")
+    let tourPages = OnboardingView.tourPages(in: appBundle)
+    precondition(tourPages.count == 3)
+    for page in tourPages {
+        precondition(appBundle.url(forResource: page.imageName, withExtension: nil) != nil, "Tour artwork must ship in the app")
+    }
     for scheme in [ColorScheme.light, .dark] {
+        for width: CGFloat in [420, 640] {
+            try snapshot(ReleaseNotesView(version: releaseVersion, notes: currentNotes, onClose: {}),
+                scheme: scheme, width: width,
+                to: output.appendingPathComponent("release-notes-\(scheme)-\(Int(width)).png"), height: 660)
+        }
+        for index in tourPages.indices {
+            try snapshot(TourSlideshowView(pages: tourPages, width: 472, initialPageIndex: index,
+                finishButtonTitle: "Set Up Permissions", onFinish: {}, onClose: {})
+                .transaction { $0.disablesAnimations = true },
+                scheme: scheme, width: 472,
+                to: output.appendingPathComponent("tour-page-\(index)-\(scheme).png"), height: 510)
+        }
+        try snapshot(ZStack(alignment: .topLeading) {
+            Color.secondary.opacity(0.1)
+            Recording3DInsertionGhost(range: 1...4, pointsPerSecond: 100)
+        }.frame(height: 36).padding(12), scheme: scheme, width: 600,
+            to: output.appendingPathComponent("3d-insertion-ghost-\(scheme).png"), height: 60)
         for step in OnboardingView.Step.allCases {
             for width: CGFloat in [520, 760] {
                 try snapshot(OnboardingView(step: step, resourceBundle: appBundle, isPermissionPreview: false),

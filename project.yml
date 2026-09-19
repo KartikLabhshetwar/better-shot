@@ -16,6 +16,8 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: false
 
 packages:
+  TourKit:
+    path: Vendor/TourKit
   DockProgress:
     url: https://github.com/sindresorhus/DockProgress
     from: 5.0.0
@@ -26,8 +28,11 @@ targets:
     platform: macOS
     dependencies:
       - package: DockProgress
+      - package: TourKit
     sources:
       - Sources
+      - path: CHANGELOG.md
+        buildPhase: resources
       - path: Resources/Assets.xcassets
         buildPhase: resources
       - path: Resources/Backgrounds

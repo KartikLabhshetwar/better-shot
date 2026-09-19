@@ -5,22 +5,78 @@ struct Recording3DLane: View {
     let pointsPerSecond: CGFloat
     let visibleRange: ClosedRange<Double>
 
+    @State private var hoverTime: Double?
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             Color.clear.contentShape(Rectangle())
                 .onTapGesture { location in
                     guard pointsPerSecond > 0 else { return }
+                    clearHover()
                     model.add3DShot(at: Double(location.x / pointsPerSecond))
                 }
+                .onContinuousHover { phase in
+                    switch phase {
+                    case .active(let location):
+                        guard pointsPerSecond > 0 else { return }
+                        let time = Double(location.x / pointsPerSecond)
+                        hoverTime = time
+                        if !model.isPlaying { model.hoverPreviewTime = time }
+                    case .ended: clearHover()
+                    }
+                }
+            if let hoverTime, let range = model.timeline3D.insertionRange(at: hoverTime, duration: model.duration) {
+                Recording3DInsertionGhost(range: range, pointsPerSecond: pointsPerSecond)
+            } else if model.timeline3D.shots.isEmpty {
+                Label("Click to add a 3D shot", systemImage: "plus")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity).frame(height: 36)
+                    .allowsHitTesting(false)
+            }
             ForEach(model.timeline3D.shots.filter { $0.end >= visibleRange.lowerBound && $0.start <= visibleRange.upperBound }) { shot in
                 Recording3DBlock(model: model, shot: shot, pointsPerSecond: pointsPerSecond)
             }
         }
+        .onDisappear { clearHover() }
+        .onChange(of: model.isPlaying) { _, playing in if playing { clearHover() } }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("3D shots timeline")
         .contextMenu {
             Button("Add 3D Shot at Playhead") { model.add3DShot(at: model.currentTime) }
         }
+    }
+
+    private func clearHover() {
+        if model.hoverPreviewTime == hoverTime { model.hoverPreviewTime = nil }
+        hoverTime = nil
+    }
+
+}
+
+/// A lightweight overlay; never intercepts the lane's click or changes the project.
+struct Recording3DInsertionGhost: View {
+    let range: ClosedRange<Double>
+    let pointsPerSecond: CGFloat
+
+    var body: some View {
+        let width = max(2, (range.upperBound - range.lowerBound) * pointsPerSecond)
+        RoundedRectangle(cornerRadius: 5)
+            .fill(Color.accentColor.opacity(0.16))
+            .overlay { RoundedRectangle(cornerRadius: 5).strokeBorder(Color.accentColor.opacity(0.65), style: StrokeStyle(lineWidth: 1, dash: [4, 3])) }
+            .overlay {
+                if width >= 24 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus")
+                        if width >= 150 {
+                            Text("3D shot · \((range.upperBound - range.lowerBound).formatted(.number.precision(.fractionLength(1))))s")
+                        }
+                    }
+                    .font(.system(size: 10, weight: .medium)).lineLimit(1).foregroundStyle(Color.accentColor)
+                }
+            }
+            .frame(width: width, height: 28)
+            .offset(x: range.lowerBound * pointsPerSecond, y: 4)
+            .allowsHitTesting(false).accessibilityHidden(true)
     }
 }
 

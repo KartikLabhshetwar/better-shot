@@ -50,6 +50,21 @@ import QuartzCore
 
     static func main() throws {
         try checkCapReference()
+        let empty = Recording3DTimeline(shots: [], duration: 10)
+        precondition(empty.insertionRange(at: 2, duration: 10) == 2...5)
+        precondition(empty.insertionRange(at: 9.8, duration: 10) == 7...10)
+        precondition(empty.insertionRange(at: .nan, duration: 10) == nil)
+        precondition(empty.insertionRange(at: -1, duration: 10) == nil)
+        precondition(empty.insertionRange(at: 11, duration: 10) == nil)
+        precondition(empty.insertionRange(at: 0, duration: 0.1) == nil)
+        var occupied = Recording3DShot(start: 2, end: 5)
+        occupied.isEnabled = false
+        let gapped = Recording3DTimeline(shots: [occupied, .init(start: 5.1, end: 8)], duration: 10)
+        precondition(gapped.insertionRange(at: 3, duration: 10) == nil, "Disabled shots still occupy the lane")
+        precondition(gapped.insertionRange(at: 5.05, duration: 10) == nil, "No misleading ghost in a gap below minimum duration")
+        precondition(gapped.insertionRange(at: 1, duration: 10) == 0...2)
+        precondition(gapped.insertionRange(at: 8, duration: 10) == 8...10)
+        print("PASS 3D insertion ghost placement, occupied ranges, boundaries, short clips, and invalid times")
         let size = CGSize(width: 1920, height: 1080)
         for point in [CGPoint.zero, CGPoint(x: 1920, y: 1080), CGPoint(x: 230, y: 790)] {
             let projected = Recording3DPose.identity.project(point, in: size)

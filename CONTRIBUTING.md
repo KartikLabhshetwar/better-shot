@@ -404,3 +404,24 @@ tooling and credentials; it is not a development check. Releases require an
 explicit maintainer request.
 
 Contributions are licensed under the project's [BSD 3-Clause License](LICENSE).
+
+### Tour and release notes
+
+TourKit is a local Swift package in `Vendor/TourKit`, pinned to the upstream
+revision and MIT license listed in `BETTERSHOT.md`. Its slideshow is hosted in the
+existing native onboarding window; keep local appearance/accessibility patches
+when updating it. The permission/restart flow and optional video demos remain
+owned by BetterShot. Run `BETTERSHOT_TESTING=1 swift test --package-path Vendor/TourKit`
+for the upstream package checks, and `make test` for app integration.
+
+`CHANGELOG.md` is bundled directly. Every `version.json` version must have a
+`## [x.y.z]` entry. `ReleaseNotes` parses these entries and tracks dismissed versions
+separately from onboarding completion; do not reset either marker on upgrades.
+The launch flow presents pending setup first, otherwise unread release notes,
+then honors the capture-bar startup preference. Offline notes include skipped
+versions; Settings → About can reopen the notes or tour.
+
+3D insertion hover and click share `Recording3DTimeline.insertionRange`. Keep the
+ghost non-interactive and avoid project mutations/render-cache invalidation while
+skimming. Tests cover placement boundaries, undo/persistence, and compact light/dark
+snapshots of the ghost, tour pages, and release notes.

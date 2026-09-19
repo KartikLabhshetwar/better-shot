@@ -464,6 +464,18 @@ nonisolated struct Recording3DTimeline: Equatable, Sendable {
         return low > 0 && time < shots[low - 1].end ? shots[low - 1] : nil
     }
 
+    /// Shared by hover and insertion; occupied shots (including disabled ones) select instead.
+    func insertionRange(at time: Double, duration: Double) -> ClosedRange<Double>? {
+        guard time.isFinite, duration.isFinite, time >= 0, time <= duration,
+              duration >= Recording3DShot.minimumDuration, shot(at: time) == nil else { return nil }
+        let lower = shots.last { $0.end <= time }?.end ?? 0
+        let upper = shots.first { $0.start >= time }?.start ?? duration
+        guard upper - lower >= Recording3DShot.minimumDuration else { return nil }
+        let length = min(3, upper - lower)
+        let start = min(max(time, lower), upper - length)
+        return start...(start + length)
+    }
+
     static func scene(_ presets: [Recording3DPreset], in range: ClosedRange<Double>,
                       weights: [Double]? = nil, showcaseFinish: Bool = false) -> [Recording3DShot] {
         guard !presets.isEmpty, range.lowerBound.isFinite, range.upperBound.isFinite else { return [] }

@@ -7,8 +7,8 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
     static let shared = OnboardingWindowController()
     private var window: NSWindow?
 
-    func show() {
-        guard OnboardingState.shouldPresent() else { return }
+    func show(replay: Bool = false) {
+        guard replay || OnboardingState.shouldPresent() else { return }
         if let window {
             NSApp.activate(ignoringOtherApps: true)
             window.makeKeyAndOrderFront(nil)
