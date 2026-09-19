@@ -26,6 +26,7 @@ final class PreviewOverlay {
     private(set) var position = AppPreferences.overlayPosition
     private var mouseMovedGlobalMonitor: Any?
     private var mouseMovedLocalMonitor: Any?
+    private var panelGeneration: UInt = 0
 
     var currentScreen: NSScreen? { targetScreen }
 
@@ -326,15 +327,18 @@ final class PreviewOverlay {
     }
 
     private func handleMouseMoved() {
+        let generation = panelGeneration
         guard !items.isEmpty, AppPreferences.overlayFollowsMouse else { return }
         guard let newScreen = ActiveDisplayResolver.activeScreen(preferPointer: true),
               newScreen != targetScreen else { return }
+        guard panelGeneration == generation else { return }
 
         targetScreen = newScreen
         teardownPanel()
         createPanel()
         positionPanel()
         panel?.orderFront(nil)
+        startMouseTrackingIfNeeded()
     }
 
     // MARK: - Panel Setup
@@ -350,6 +354,7 @@ final class PreviewOverlay {
     }
 
     private func createPanel() {
+        panelGeneration &+= 1
         let panel = PreviewDeckPanel(
             contentRect: NSRect(x: 0, y: 0, width: 160, height: 130),
             styleMask: [.borderless, .nonactivatingPanel, .fullSizeContentView],

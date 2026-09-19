@@ -3,7 +3,7 @@ import Foundation
 /// The naming template is free text that reaches the file system, so the two
 /// things worth pinning are that every token resolves and that nothing a person
 /// can type produces an illegal, hidden, or over-long name.
-@main
+@main @MainActor
 enum FileNamingCheck {
     static func main() {
         let date = Date(timeIntervalSince1970: 1_758_115_802)
