@@ -234,8 +234,11 @@ use a prefix of the scene; manually authored/legacy shots retain their 0.2-secon
 minimum. Clip boundaries come from cumulative edited durations, including speed.
 `suggested3DScene` is transient: only `previewTimeline3D` reads it. Cancel restores
 the playhead, Apply writes one undoable edit, and save/export never read suggestions.
-Keep the native inspector's Look, Camera, Depth Blur, Keyframes, and Timing pages
-behind the Edit picker; screen fold and lens controls belong in Camera > Advanced.
+Keep Camera, Depth Blur, Keyframes, Timing, and Looks expanded together. The
+fixed section shortcuts above the inspector scroll to their section IDs; do not
+hide granular controls behind an Edit menu. Screen fold and lens controls stay
+visible with the other camera sliders. Animated-property buttons select the
+existing keyframe editor, including its graph and numeric Bézier handles.
 
 `Recording3DAnimation` stores optional focus settings and per-property keyframes.
 Keyframe positions are fractions of a shot, so resizing preserves relative timing.

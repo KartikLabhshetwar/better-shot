@@ -550,11 +550,10 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
         for width: CGFloat in [260, 320] {
-            for panel in Recording3DInspector.Panel.allCases {
-                try snapshot(ScrollView { Recording3DInspector(model: videoModel, panel: panel) }.scrollIndicators(.hidden),
-                    scheme: scheme, width: width,
-                    to: output.appendingPathComponent("video-3d-inspector-\(panel.rawValue)-\(name)-\(Int(width)).png"), height: 1000)
-            }
+            try snapshot(Recording3DInspector(model: videoModel), scheme: scheme, width: width,
+                to: output.appendingPathComponent("video-3d-all-controls-\(name)-\(Int(width)).png"), height: 3400)
+            try snapshot(StudioInspector(model: videoModel, initialTab: .effects), scheme: scheme, width: width + 48,
+                to: output.appendingPathComponent("video-3d-control-shortcuts-\(name)-\(Int(width)).png"), height: 800)
         }
         try snapshot(Recording3DAutoScenePicker(model: videoModel, dismiss: {}), scheme: scheme, width: 360,
             to: output.appendingPathComponent("video-auto-scene-\(name).png"), height: 390)
@@ -580,7 +579,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         for scheme in [ColorScheme.light, .dark] {
             let name = scheme == .light ? "light" : "dark"
             try snapshot(Recording3DKeyframeEditor(model: videoModel).padding(12), scheme: scheme, width: 260,
-                         to: output.appendingPathComponent("video-3d-keyframes-\(name).png"), height: 750)
+                         to: output.appendingPathComponent("video-3d-keyframes-\(name).png"), height: 850)
         }
     }
     if let id = videoModel.selected3DShotID { videoModel.remove3DShot(id: id) }

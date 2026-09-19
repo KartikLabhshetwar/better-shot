@@ -5,11 +5,10 @@ import SwiftUI
 import simd
 
 struct Recording3DInspector: View {
-    enum Panel: String, CaseIterable {
-        case look = "Look", camera = "Camera", blur = "Depth Blur", keyframes = "Keyframes", timing = "Timing"
+    enum Section: String, CaseIterable {
+        case camera = "Camera", blur = "Depth Blur", keyframes = "Keyframes", timing = "Timing", look = "Looks"
     }
     @Bindable var model: RecordingStudioModel
-    @State var panel: Panel = .look
     @State private var showsMoves = true
     @State private var editsEnd = false
     @State private var showsAutoScene = false
@@ -46,15 +45,22 @@ struct Recording3DInspector: View {
                             .accessibilityLabel("Remove 3D shot").help("Remove this shot")
                     }.buttonStyle(EditorButtonStyle())
                     Divider()
-                    Picker("Edit", selection: $panel) {
-                        ForEach(Panel.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                    }.pickerStyle(.menu)
-                    switch panel {
-                    case .look: lookControls(shot)
-                    case .camera: cameraControls(shot)
-                    case .blur: Recording3DBlurInspector(model: model)
-                    case .keyframes: Recording3DKeyframeEditor(model: model)
-                    case .timing: timingControls(shot)
+                    ForEach(Section.allCases, id: \.self) { section in
+                        VStack(alignment: .leading, spacing: 12) {
+                            if section != .blur && section != .keyframes {
+                                Text(section.rawValue).font(.callout.weight(.semibold))
+                                    .accessibilityAddTraits(.isHeader)
+                            }
+                            switch section {
+                            case .camera: cameraControls(shot)
+                            case .blur: Recording3DBlurInspector(model: model)
+                            case .keyframes: Recording3DKeyframeEditor(model: model)
+                            case .timing: timingControls(shot)
+                            case .look: lookControls(shot)
+                            }
+                        }
+                        .id(section)
+                        if section != Section.allCases.last { Divider().padding(.vertical, 4) }
                     }
                 } else {
                     Text(model.timeline3D.shots.isEmpty
@@ -136,7 +142,7 @@ struct Recording3DInspector: View {
                     .disabled(shot.startPose == shot.endPose)
             }.buttonStyle(EditorButtonStyle())
             if shot.tracks?.contains(where: { $0.property.cameraKey != nil }) == true {
-                Text("Keyframes control the animated properties. Open Keyframes to edit them.")
+                Text("Keyframes control the animated properties. Use the Keyframes shortcut above to edit their values and curves.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             if (editsEnd ? shot.endPose : shot.startPose).camera != nil {
@@ -146,13 +152,9 @@ struct Recording3DInspector: View {
                 cameraSlider("Roll", key: \.roll, range: -180...180, format: .degrees(signed: true))
                 cameraSlider("Horizontal", key: \.panX, range: -3...3, format: .decimal(fractionDigits: 2))
                 cameraSlider("Vertical", key: \.panY, range: -3...3, format: .decimal(fractionDigits: 2))
-                DisclosureGroup("Advanced") {
-                    VStack(spacing: 10) {
-                        cameraSlider("Fold X", key: \.rotateX, range: -90...90, format: .degrees(signed: true))
-                        cameraSlider("Fold Y", key: \.rotateY, range: -50...50, format: .degrees(signed: true))
-                        cameraSlider("Field of view", key: \.fieldOfView, range: 10...100, format: .degrees())
-                    }.padding(.top, 8)
-                }
+                cameraSlider("Fold X", key: \.rotateX, range: -90...90, format: .degrees(signed: true))
+                cameraSlider("Fold Y", key: \.rotateY, range: -50...50, format: .degrees(signed: true))
+                cameraSlider("Field of view", key: \.fieldOfView, range: 10...100, format: .degrees())
             } else {
                 poseSlider("Tilt X", key: \.tiltX, range: -65...65, format: .degrees(signed: true))
                 poseSlider("Tilt Y", key: \.tiltY, range: -65...65, format: .degrees(signed: true))
@@ -272,7 +274,7 @@ struct Recording3DBlurInspector: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Depth Blur").font(.caption.weight(.semibold))
+            Text("Depth Blur").font(.callout.weight(.semibold)).accessibilityAddTraits(.isHeader)
             Picker("Focus", selection: Binding(get: { blur.mode }, set: { mode in
                 change { blur in
                     blur.mode = mode

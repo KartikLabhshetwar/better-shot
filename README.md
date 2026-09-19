@@ -55,7 +55,9 @@ permissions and your first capture.
   orbit, screen fold, distance, and lens, or generate a scene. The same menu adds
   zoom segments. **Auto Scene** previews a sequence before applying it, keeps
   generated shots at least one second long, and snaps nearby boundaries to clip cuts.
-  The native **Edit** menu groups Look, Camera, Depth Blur, Keyframes, and Timing.
+  Camera, Depth Blur, Keyframes, Timing, and Looks stay expanded in the inspector,
+  with fixed shortcuts to jump straight to each section. Fold and lens controls
+  are directly visible, and animated properties have one-click curve selection.
   Controls include radial/directional/tilt-shift focus, bokeh highlights, and editable
   Bézier curves. Preview and export share
   the GPU compositor. Zoom enlarges the whole 3D card; separate entry/exit controls

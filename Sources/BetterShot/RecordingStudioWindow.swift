@@ -2883,8 +2883,25 @@ struct StudioInspector: View {
     }
 
     private var inspectorContent: some View {
+        ScrollViewReader { proxy in
         VStack(spacing: 0) {
             inspectorHeader
+            if selectedTab == .effects && model.selected3DShot != nil {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("3D controls").font(.caption.weight(.semibold))
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 85))], spacing: 4) {
+                        ForEach(Recording3DInspector.Section.allCases, id: \.self) { section in
+                            Button { proxy.scrollTo(section, anchor: .top) } label: {
+                                Text(section.rawValue).frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(EditorButtonStyle(horizontalPadding: 6, bordered: true))
+                            .font(.caption)
+                            .accessibilityLabel("Jump to 3D \(section.rawValue)")
+                        }
+                    }
+                }.padding(.horizontal, 12).padding(.vertical, 8)
+                Divider()
+            }
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 10) {
                     if selectedTab == .background {
@@ -3085,6 +3102,7 @@ struct StudioInspector: View {
             }
             .scrollContentBackground(.hidden)
             .scrollEdgeEffectSoftIfAvailable()
+        }
         }
     }
 

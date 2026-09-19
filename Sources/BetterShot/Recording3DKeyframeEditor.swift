@@ -15,7 +15,23 @@ struct Recording3DKeyframeEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Keyframes").font(.caption.weight(.semibold))
+            Text("Keyframes").font(.callout.weight(.semibold)).accessibilityAddTraits(.isHeader)
+            if let tracks = shot?.tracks, !tracks.isEmpty {
+                Text("Animated properties").font(.caption).foregroundStyle(.secondary)
+                ForEach(tracks) { track in
+                    Button { property = track.property } label: {
+                        HStack {
+                            Text(track.property.title).lineLimit(2)
+                            Spacer(minLength: 4)
+                            Text("\(track.keyframes.count)").monospacedDigit()
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(EditorButtonStyle(selected: track.property == property, horizontalPadding: 6, bordered: true))
+                    .font(.caption)
+                    .accessibilityLabel("\(track.property.title), \(track.keyframes.count) keyframes")
+                    .accessibilityAddTraits(track.property == property ? .isSelected : [])
+                }
+            }
             Picker("Property", selection: $property) {
                 ForEach(Recording3DProperty.allCases.filter {
                     $0.blurKey != nil || shot?.startPose.camera != nil || shot?.endPose.camera != nil
