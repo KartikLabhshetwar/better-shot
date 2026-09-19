@@ -351,7 +351,7 @@ nonisolated enum Recording3DPreset: String, CaseIterable, Sendable {
 
     var blur: Recording3DBlur {
         switch self {
-        case .closeUp: .init(mode: .radial, strength: 8, falloff: 0.7, focusX: 0.5, focusY: 0.5, focusSize: 0.65, bokeh: true)
+        case .closeUp: .init(mode: .radial, strength: 20, falloff: 0.76, focusX: 0.11, focusSize: 0.18, bokeh: true)
         case .topDown: .init(mode: .radial, strength: 18, falloff: 0.72, focusX: 0.03, focusY: 0.36, focusSize: 0.55, bokeh: true)
         default: .showcase
         }
@@ -377,10 +377,8 @@ nonisolated enum Recording3DPreset: String, CaseIterable, Sendable {
             a = .init(tiltX: -50, tiltY: 1, distance: 1.5)
             b = a; b.tiltX = -44; b.panY = -0.12
         case .closeUp:
-            // A centered detail view: retain readable screen context instead of
-            // Cap's extreme off-center crop and narrow, left-edge focus region.
-            a = .init(tiltX: 18, tiltY: -12, roll: 1, distance: 1.3, panY: -0.04)
-            b = a; b.tiltY = -16; b.distance = 1.22; b.panX = -0.04
+            a = .init(tiltX: 26, tiltY: -22, roll: 1, distance: 0.8, panX: -0.3, panY: -0.4)
+            b = a; b.tiltY = -27; b.panX = -0.36
         case .glide:
             a = .init(tiltX: -46.65, tiltY: 42.49, rotateX: -1, rotateY: -20,
                       distance: 1.785, fieldOfView: 24, panX: 0.673, panY: -0.133)

@@ -60,8 +60,7 @@ permissions and your first capture.
   are directly visible, and animated properties have one-click curve selection.
   Compare Start/End thumbnails, drag the orbit preview, and refine exact angles
   with the tilt sliders. Scene cards show their shot counts; depth blur has a
-  separate enable switch and focus selection. Close up uses centered framing
-  and a broader sharp area to keep screen content readable.
+  separate enable switch and focus selection.
   Controls include radial/directional/tilt-shift focus, bokeh highlights, and editable
   Bézier curves. Preview and export share
   the GPU compositor. Zoom enlarges the whole 3D card; separate entry/exit controls

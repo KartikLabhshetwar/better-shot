@@ -217,7 +217,7 @@ measure GPU composition, not decoding, encoding, display frame rate, cold shader
 compilation, or every recording workload. Reproduce with the command in
 CONTRIBUTING.md.
 
-Validation compares the 12 unchanged upstream presets and 248 geometry/zoom/transition
+Validation compares all 13 upstream presets and 248 geometry/zoom/transition
 cases generated from the actual Cap Rust renderer (under 0.03 output-pixel error
 at 360 pixels high). It also checks extreme-angle/edge-on safety, resolution
 independence, focus-region pixel checks, bokeh output, masks/crop/cursor/camera
@@ -233,7 +233,4 @@ calculations and adds a native **+ Add** menu for Zoom and 3D Shot. Existing cut
 badges remain visible when there are cuts. Physical mouse gestures and menu
 selection were not automated by these checks.
 
-Close up was subsequently refined to use a centered, gentler push-in and broader
-focus area. Its new framing is checked across landscape, square, and portrait
-canvases; the original upstream renderer fixtures remain unchanged. The orbit
-pad reuses the same pose updates and GPU compositor as numeric camera edits.
+The orbit pad reuses the same pose updates and GPU compositor as numeric camera edits.
