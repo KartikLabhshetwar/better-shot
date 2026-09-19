@@ -460,6 +460,8 @@ must preserve pending media, transfers, and active recording state.
 DynamicNotchKit is vendored at the revision in `Vendor/DynamicNotchKit/BETTERSHOT.md`
 with its MIT notice. Preserve the pre-presentation capture-exclusion hook,
 synchronous lifecycle, transparent-margin hit testing, display selection, and
-accessibility patches when updating it. `make test` exercises mode switching,
+accessibility patches when updating it. Expanded surfaces use the kit’s native
+`NSVisualEffectView` popover material with an opaque Reduce Transparency fallback;
+keep the compact notch black and expanded controls in system colors. `make test` exercises mode switching,
 capture suspension, preview actions, transfer cleanup, and both appearances;
 live recording, selectors, and multi-display hardware still need manual checks.

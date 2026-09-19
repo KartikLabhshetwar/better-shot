@@ -64,7 +64,6 @@ final class NotchPresenter {
                 panel.isOpaque = false
                 panel.hidesOnDeactivate = false
                 panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
-                panel.appearance = (panel.screen?.safeAreaInsets.top ?? 0) > 0 ? NSAppearance(named: .darkAqua) : nil
                 PreviewWindowCaptureExclusion.shared.register(window: panel)
             }
             self.notch = notch
@@ -142,6 +141,8 @@ struct NotchContent: View {
             content
             ScrollView { content }.scrollIndicators(.hidden)
         }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
         .frame(width: 620)
         .frame(maxHeight: max(240, (presenter.screen?.visibleFrame.height ?? 800) - 120))
         .fixedSize(horizontal: false, vertical: true)

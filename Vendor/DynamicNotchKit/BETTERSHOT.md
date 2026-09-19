@@ -8,5 +8,7 @@ Local integration patches provide synchronous presentation/dismissal and a windo
 configuration hook so capture exclusion is applied before showing the panel.
 Screen changes preserve the chosen display. Hosting disables automatic window
 sizing and passes clicks through transparent margins. Presentation is immediate;
-no new motion or blur transitions are used. Floating surfaces respect Reduce
-Transparency. The documentation-only plugin and media are omitted.
+no new motion or blur transitions are used. Expanded notch and floating surfaces
+use AppKit’s native popover material and respect Reduce Transparency. Expanded notch controls follow the app’s light/dark
+appearance; the compact notch and physical camera cutout remain black. The
+documentation-only plugin and media are omitted.

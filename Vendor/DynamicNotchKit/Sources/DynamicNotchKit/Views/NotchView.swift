@@ -9,6 +9,7 @@ import SwiftUI
 
 struct NotchView<Expanded, CompactLeading, CompactTrailing>: View where Expanded: View, CompactLeading: View, CompactTrailing: View {
     @ObservedObject private var dynamicNotch: DynamicNotch<Expanded, CompactLeading, CompactTrailing>
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var compactLeadingWidth: CGFloat = 0
     @State private var compactTrailingWidth: CGFloat = 0
     private let safeAreaInset: CGFloat = 15
@@ -56,9 +57,22 @@ struct NotchView<Expanded, CompactLeading, CompactTrailing>: View where Expanded
     var body: some View {
         notchContent()
             .background {
-                Rectangle()
-                    .foregroundStyle(.black)
-                    .padding(-50) // The opening/closing animation can overshoot, so this makes sure that it's still black
+                if dynamicNotch.state == .expanded {
+                    Group {
+                        if reduceTransparency { Color(nsColor: .windowBackgroundColor) }
+                        else { VisualEffectView(material: .popover, blendingMode: .behindWindow) }
+                    }
+                    .overlay {
+                        NotchShape(topCornerRadius: topCornerRadius, bottomCornerRadius: bottomCornerRadius)
+                            .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                    }
+                    .overlay(alignment: .top) {
+                        // Keep the physical camera cutout black while the controls use native glass.
+                        Color.black.frame(width: dynamicNotch.notchSize.width, height: dynamicNotch.notchSize.height)
+                    }
+                } else {
+                    Color.black.padding(-50)
+                }
             }
             .mask {
                 NotchShape(

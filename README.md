@@ -240,6 +240,8 @@ image/video previews, and transfer status at the top of the capture display.
 Use the preview actions to Copy, Save, Edit, Pin, Cloud Share, or Dismiss; arrow
 buttons browse pending captures. New Capture opens the shared capture tools.
 The image and video editors still open in their full editing windows.
+The expanded notch uses native macOS frosted glass and follows light/dark
+appearance, with an opaque background when Reduce Transparency is enabled.
 
 On a notched display, Collapse hides the expanded controls; hover or click either
 side to reopen them. Other displays use a floating panel at the top. Pending

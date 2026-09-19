@@ -63,10 +63,28 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     if let hosting = window.contentView {
         hosting.layoutSubtreeIfNeeded()
         precondition(hosting.hitTest(CGPoint(x: 1, y: 1)) == nil, "Transparent margins must pass clicks through")
-        if let bitmap = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) {
-            hosting.cacheDisplay(in: hosting.bounds, to: bitmap)
-            try bitmap.representation(using: .png, properties: [:])?.write(to: output.appendingPathComponent("notch-native-window.png"))
+        func hasNativeGlass(_ view: NSView) -> Bool {
+            if let effect = view as? NSVisualEffectView,
+               effect.material == .popover && effect.blendingMode == .behindWindow { return true }
+            return view.subviews.contains(where: hasNativeGlass)
         }
+        if !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency {
+            precondition(hasNativeGlass(hosting), "Expanded notch must use native behind-window glass")
+        }
+        let originalAppearance = window.appearance
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            window.appearance = NSAppearance(named: appearance)
+            try await Task.sleep(for: .milliseconds(80))
+            hosting.layoutSubtreeIfNeeded()
+            if let bitmap = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) {
+                hosting.cacheDisplay(in: hosting.bounds, to: bitmap)
+                try bitmap.representation(using: .png, properties: [:])?.write(to: output.appendingPathComponent("notch-native-\(appearance.rawValue).png"))
+                if appearance == .darkAqua {
+                    try bitmap.representation(using: .png, properties: [:])?.write(to: output.appendingPathComponent("notch-native-window.png"))
+                }
+            }
+        }
+        window.appearance = originalAppearance
     }
     notch.collapse()
     if window.screen?.safeAreaInsets.top ?? 0 > 0 {
