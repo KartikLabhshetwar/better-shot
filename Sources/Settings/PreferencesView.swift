@@ -180,6 +180,7 @@ private struct SettingsSearchField: NSViewRepresentable {
 // MARK: - General
 
 struct GeneralSettingsTab: View {
+    @AppStorage(AppPreferences.presentationModeKey) private var mode = CapturePresentationMode.normal
     @AppStorage(AppPreferences.showCaptureBarAtLaunchKey) private var showCaptureBarAtLaunch = true
     @AppStorage(AppPreferences.showInDockKey) private var showInDock = false
     @AppStorage(AppPreferences.showInMenuBarKey) private var showInMenuBar = true
@@ -227,6 +228,17 @@ struct GeneralSettingsTab: View {
 
     var body: some View {
         Form {
+            Section {
+                Picker("Presentation", selection: $mode) {
+                    ForEach(CapturePresentationMode.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+            } header: {
+                Text("Capture Mode")
+            } footer: {
+                Text("Normal uses the floating capture bar and preview cards. Notch brings screenshot tools, recording controls, and image/video actions to the top of your display. Displays without a notch use a floating panel at the top.")
+            }
+
             Section("Startup") {
                 Toggle("Launch at Login", isOn: Binding(
                     get: { loginStatus == .enabled || loginStatus == .requiresApproval },
@@ -452,6 +464,7 @@ struct GeneralSettingsTab: View {
             }
         }
         .formStyle(.grouped)
+        .onChange(of: mode) { NotchPresenter.shared.refreshMode() }
         .onAppear(perform: refreshLoginStatus)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshLoginStatus()
@@ -503,6 +516,7 @@ struct GeneralSettingsTab: View {
     }
 
     private func restoreDefaults() {
+        mode = .normal
         showInMenuBar = true
         showInDock = false
         AppActivationPolicy.applyVisibility()

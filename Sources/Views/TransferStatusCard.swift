@@ -432,7 +432,12 @@ final class TransferToastAnchorView: NSView {
             panel?.orderOut(nil)
             panel = nil
             hostingView = nil
-            NotchPresenter.shared.updateTransfer(card, id: notchID, on: window.screen)
+            // Keep actions current even when the visible status is unchanged.
+            let notchCard = TransferStatusCard(status: card.status,
+                onCancel: { [weak self] in self?.card?.onCancel() },
+                onRetry: { [weak self] in self?.card?.onRetry() },
+                onDismiss: { [weak self] in self?.card?.onDismiss() })
+            NotchPresenter.shared.updateTransfer(notchCard, id: notchID, on: window.screen)
             return
         }
         NotchPresenter.shared.updateTransfer(nil, id: notchID, on: nil)

@@ -9,10 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Optional Notch Mode:** choose Normal Mode or Notch Mode in Settings > Overlay. Normal remains the default, including on upgrade. DynamicNotchKit hosts the shared screenshot tools (Area, Fullscreen, Window, OCR, Color, and timers), recording options and Stop/Pause/Restart/Discard controls, and image/video previews with Copy, Save, Edit, Pin, Cloud Share, and Dismiss. Browse pending captures without opening a separate overlay. Hardware notches can collapse to a compact capture/recording status; other displays use a top-center floating panel.
+- **Optional Notch Mode:** choose Normal Mode or Notch Mode in Settings > General > Capture Mode. Normal remains the default, including on upgrade. DynamicNotchKit hosts the shared screenshot tools (Area, Fullscreen, Window, OCR, Color, and timers), recording options and Stop/Pause/Restart/Discard controls, and image/video previews with Copy, Save, Edit, Pin, Cloud Share, and Dismiss. Browse pending captures without opening a separate overlay. Hardware notches can collapse to a compact capture/recording status; other displays use a top-center floating panel.
 - Notch mode also hosts countdowns, recording teleprompter text, saved/copied feedback, and export/share progress with existing recovery actions. Pending previews stay available until acted on. Switching modes preserves captures and recording state; the notch hides during selection/capture and follows capture-window exclusion settings.
 
 ### Fixed
+
+- Fix an editor redraw loop in notch transfer-status routing that could consume a CPU core and make video playback controls and scrubbing lag, even with no transfer in progress. Repeated idle/unchanged status updates no longer publish changes; real progress and current Cancel/Retry actions remain available.
 
 - Image and video editors can enter and leave native full screen again. SwiftUI no longer overrides fullscreen support after the window opens; the automatic fullscreen preference remains supported.
 - 3D Scenes now use full-width buttons with readable names, shot counts, and scene descriptions. Consistent padding replaces crowded tiles and clipped shot bars in narrow inspectors.

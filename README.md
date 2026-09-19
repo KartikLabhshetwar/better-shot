@@ -234,7 +234,7 @@ terms and the bundled TourKit MIT license.
 
 ### Optional notch mode (v0.5.5)
 
-In **Settings > Overlay > Capture Mode**, choose **Normal Mode** (the default)
+In **Settings > General > Capture Mode**, choose **Normal Mode** (the default)
 or **Notch Mode**. Notch mode puts the capture tools, recording controls,
 image/video previews, and transfer status at the top of the capture display.
 Use the preview actions to Copy, Save, Edit, Pin, Cloud Share, or Dismiss; arrow

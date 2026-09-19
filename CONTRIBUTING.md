@@ -448,6 +448,9 @@ snapshots of the ghost, tour pages, and release notes.
 
 ### Notch presentation
 
+Settings > General > Capture Mode selects Normal Mode or Notch Mode and applies
+immediately. Overlay settings customize normal mode’s floating preview cards.
+
 `NotchPresenter` hosts the existing capture/session controls, preview cards, and
 transfer cards. Keep actions in `RecordingBarPresenter` / `PreviewOverlay`; do not
 add a second saving, copying, upload, or recording implementation. Normal mode is

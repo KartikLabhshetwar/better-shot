@@ -15,17 +15,6 @@ struct OverlaySettingsTab: View {
 
     var body: some View {
         Form {
-            Section {
-                Picker("Presentation", selection: $mode) {
-                    ForEach(CapturePresentationMode.allCases) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
-            } header: {
-                Text("Capture Mode")
-            } footer: {
-                Text("Normal uses the floating capture bar and preview cards. Notch brings screenshot tools, recording controls, and image/video actions to the top of your display. Displays without a notch use a floating panel at the top.")
-            }
-
             if mode == .normal {
                 Section {
                     Picker("Layout preset", selection: Binding(
@@ -90,11 +79,15 @@ struct OverlaySettingsTab: View {
                 } footer: {
                     Text("Resets only the overlay. Your captures, cloud links, and other settings are kept.")
                 }
+            } else {
+                Section("Notch Mode") {
+                    Text("Capture tools and previews appear at the top of your display. Choose Normal Mode in General > Capture Mode to customize floating overlay cards here.")
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .formStyle(.grouped)
         .scrollIndicators(.hidden)
-        .onChange(of: mode) { NotchPresenter.shared.refreshMode() }
         .onChange(of: position) { PreviewOverlay.shared.refreshSettings() }
         .onChange(of: size) { PreviewOverlay.shared.refreshSettings() }
         .onChange(of: margin) { PreviewOverlay.shared.refreshSettings() }

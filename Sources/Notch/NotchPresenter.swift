@@ -112,10 +112,14 @@ final class NotchPresenter {
 
     func updateTransfer(_ card: TransferStatusCard?, id: UUID, on screen: NSScreen?) {
         if let card {
+            // Representable updates can repeat without a progress change. Publishing
+            // the same card feeds that update straight back into the editor graph.
+            guard transfers[id]?.status != card.status else { return }
             let isNew = transfers[id] == nil
             transfers[id] = card
             if isNew { transferOrder.append(id); show(on: screen) }
         } else {
+            guard transfers[id] != nil else { return }
             transfers.removeValue(forKey: id)
             transferOrder.removeAll { $0 == id }
             refresh()

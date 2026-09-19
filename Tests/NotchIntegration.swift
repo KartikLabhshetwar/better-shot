@@ -1,6 +1,8 @@
 import AppKit
 import SwiftUI
 import DynamicNotchKit
+import Observation
+import Synchronization
 @testable import BetterShot
 
 @MainActor
@@ -78,7 +80,7 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
         let name = scheme == .light ? "light" : "dark"
         try snapshot(NotchContent(), scheme: scheme, width: 660,
                      to: output.appendingPathComponent("notch-captures-\(name).png"), height: 470)
-        try snapshot(PreferencesView(selection: .overlay), scheme: scheme, width: 780,
+        try snapshot(PreferencesView(selection: .general), scheme: scheme, width: 780,
                      to: output.appendingPathComponent("notch-settings-\(name).png"), height: 620)
     }
     // Exercise the kit's non-notched fallback on the same screen without changing display settings.
@@ -152,12 +154,45 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     let anchor = TransferToastAnchorView(frame: .zero)
     owner.contentView!.addSubview(anchor)
     let keyWindow = NSApp.keyWindow
+    let invalidations = Mutex(0)
+    func trackTransfers() {
+        withObservationTracking {
+            _ = notch.transfers
+            _ = notch.transferOrder
+        } onChange: {
+            invalidations.withLock { $0 += 1 }
+        }
+    }
+    trackTransfers()
+    for _ in 0..<20 { anchor.update(card: nil) }
+    precondition(invalidations.withLock { $0 } == 0,
+                 "Idle editor updates must not publish missing-transfer removals")
     anchor.update(card: TransferStatusCard(status: .working(stage: .exporting, progress: 0.5)))
+    precondition(invalidations.withLock { $0 } == 1, "A new transfer must still publish")
+    invalidations.withLock { $0 = 0 }
+    trackTransfers()
+    var lastAction = ""
+    for _ in 0..<20 {
+        anchor.update(card: TransferStatusCard(status: .working(stage: .exporting, progress: 0.5),
+            onCancel: { lastAction = "cancel" }, onRetry: { lastAction = "retry" },
+            onDismiss: { lastAction = "dismiss" }))
+    }
+    precondition(invalidations.withLock { $0 } == 0,
+                 "Unchanged progress must not perpetually invalidate the editor")
+    let activeCard = notch.transfers.values.first!
+    activeCard.onCancel()
+    precondition(lastAction == "cancel", "Deduplicated cards must use the latest actions")
+    activeCard.onRetry()
+    precondition(lastAction == "retry")
+    activeCard.onDismiss()
+    precondition(lastAction == "dismiss")
     precondition(notch.transfers.count == 1 && NSApp.keyWindow === keyWindow)
     anchor.update(card: TransferStatusCard(status: .exported(url: movieURL)))
     precondition(notch.transfers.count == 1, "Progress must update the existing transfer")
+    precondition(invalidations.withLock { $0 } == 1, "Changed progress/completion must still publish")
     owner.close()
     precondition(notch.transfers.isEmpty, "Closing the owner cleans up notch transfer feedback")
     anchor.removeFromSuperview()
+    print("PASS transfer observation settles for idle/unchanged progress, publishes real changes, and retains current callbacks")
     print("PASS notch defaults, mode migration, pending images/video, capture suspension, recording controls, save/share recovery, transfer cleanup, compact light/dark snapshots")
 }
