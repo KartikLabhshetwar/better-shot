@@ -27,7 +27,7 @@ final class RecordingBarPresenter {
 
     private(set) var mode: Mode = .picker
     private(set) var isVisible = false
-    private var displayID: CGDirectDisplayID?
+    private(set) var displayID: CGDirectDisplayID?
 
     /// The bar's frame inside the panel's content view, reported by SwiftUI.
     /// The panel is deliberately much larger than the bar, so this is what
@@ -131,7 +131,7 @@ final class RecordingBarPresenter {
 
         let isMorphing = panel.isVisible && isPositioned(panel, onDisplayID: displayID)
         if isMorphing {
-            withAnimation(BarMetrics.modeChange) {
+            withAnimation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : BarMetrics.modeChange) {
                 mode = .recording
             }
         } else {
@@ -347,6 +347,7 @@ private final class RecordingBarHostingView<Content: View>: NSHostingView<Conten
 // MARK: - Bar
 
 private struct RecordingBarView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var presenter = RecordingBarPresenter.shared
     @State private var tooltip = BarTooltipModel()
 
@@ -413,8 +414,8 @@ private struct RecordingBarView: View {
         // Keyed on the id as well as the text so sliding the pointer along
         // the bar glides the pill from control to control rather than
         // cross-fading it in place.
-        .animation(.easeOut(duration: 0.12), value: tooltip.visible?.id)
-        .animation(.easeOut(duration: 0.12), value: tooltip.visible?.text)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: tooltip.visible?.id)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: tooltip.visible?.text)
     }
 
     private var barShape: RoundedRectangle {

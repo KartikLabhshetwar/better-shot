@@ -244,6 +244,9 @@ toast notifications: Copy confirms on its button, and failures appear as inline
 instructions. Text is selectable; colors show their hex code and swatch. These results stay in memory for this session.
 Use the preview actions to Copy, Save, Edit, Pin, Cloud Share, or Dismiss; arrow
 buttons browse pending captures. New Capture opens the shared capture tools.
+Choose **Record** to set up a video: select Screen, Window, or Area, then choose
+your camera, microphone, system audio, and start delay before pressing **Start
+Recording** (or **Choose Area…**). The capture bar’s **Timer** applies to screenshots.
 The image and video editors still open in their full editing windows.
 The notch uses an opaque black surface to match the camera cutout, with native
 macOS controls and readable dark-appearance labels in either system appearance.

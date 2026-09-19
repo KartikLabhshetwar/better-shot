@@ -2,17 +2,8 @@
 //  RecordingPickerBar.swift
 //  BetterShot
 //
-//  The pre-record mode of the floating bar. "Record" anywhere in the app
-//  brings the bar up at the bottom of the active screen; it picks the source
-//  (display / window / area) and toggles the capture inputs (camera,
-//  microphone, system audio) for the next recording, then hands off to
-//  CaptureCoordinator - at which point the same bar morphs into the in-session
-//  controls (RecordingControlPresenter). Clicks and keystrokes are always
-//  logged to the session sidecar; whether they appear is decided later in
-//  Studio.
-//
-//  The panel, the chrome and the morph live in RecordingBarPresenter.
-//
+//  Shared screenshot controls and native recording setup for the bar and notch.
+//  The panel, chrome, and recording handoff live in RecordingBarPresenter.
 
 import AppKit
 import ScreenCaptureKit
@@ -39,441 +30,247 @@ extension RecordingBarPresenter {
 
 struct RecordingPickerControls: View {
     var showsCloseButton = true
+    @AppStorage("bs_selfTimerDelay") private var screenshotDelay = 0
+    @Bindable private var presenter = RecordingBarPresenter.shared
+
+    private static let screenshotActions: [(BarTooltipID, ShortcutService.Action, String, String)] = [
+        (.screenshotRegion, .region, "Area", "viewfinder"),
+        (.screenshotFullscreen, .fullscreen, "Screen", "desktopcomputer"),
+        (.screenshotWindow, .window, "Window", "macwindow"),
+        (.ocr, .ocr, "Text", "doc.text.viewfinder"),
+        (.colorPicker, .colorPicker, "Color", "eyedropper"),
+    ]
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(Array(Self.screenshotActions.enumerated()), id: \.element.0) { index, item in
+                if index == 3 { BarDivider() }
+                let (id, action, caption, icon) = item
+                let title = ShortcutService.shared.help(action == .ocr ? "Copy text from screen" : caption, for: action)
+                BarActionButton(id: id, title: title, systemImage: icon, caption: caption) {
+                    presenter.showsRecordingOptions = false
+                    let screen = ActiveDisplayResolver.activeScreen(preferPointer: true)
+                    Task { await CaptureOrchestrator.shared.performCapture(action, on: screen) }
+                }
+                .help(title)
+            }
+            BarDivider()
+            Menu {
+                Picker("Screenshot delay", selection: $screenshotDelay) {
+                    ForEach(SelfTimerDelay.allCases, id: \.rawValue) { delay in
+                        Text(delay.label).tag(delay.rawValue)
+                    }
+                }
+            } label: {
+                BarActionLabel(id: .timer, title: "Screenshot delay", systemImage: "timer",
+                    tint: screenshotDelay == 0 ? BarMetrics.activeTint : EditorChrome.accent,
+                    caption: screenshotDelay == 0 ? "Timer" : "\(screenshotDelay)s")
+            }
+            .menuStyle(.button).buttonStyle(BarButtonStyle()).menuIndicator(.hidden)
+            .accessibilityLabel("Screenshot delay")
+            .accessibilityValue(AppPreferences.selfTimerDelay.label)
+            .help("Screenshot delay. Set the recording delay in Record Video.")
+            Button { presenter.showsRecordingOptions.toggle() } label: {
+                BarActionLabel(id: .recording, title: "Set up a video recording", systemImage: "video",
+                               caption: "Record")
+            }
+            .buttonStyle(BarButtonStyle())
+            .accessibilityLabel("Record video — setup")
+            .help(ShortcutService.shared.help("Record video", for: .recordingOptions))
+            .popover(isPresented: $presenter.showsRecordingOptions, arrowEdge: .top) {
+                RecordingOptionsView()
+            }
+            if showsCloseButton {
+                BarActionButton(id: .close, title: "Close", systemImage: "xmark",
+                                accessibility: "Close capture bar — Esc") {
+                    presenter.dismiss()
+                    Task { await CameraRecordingManager.shared.stopPreview() }
+                }
+            }
+        }
+    }
+}
+
+/// One native setup panel shared by the capture bar and notch.
+struct RecordingOptionsView: View {
     @State private var sources = RecordingSourceCatalog.shared
+    @State private var sourceMode: ScreenRecordingSourceMode = .fullscreen
+    @State private var displayID: CGDirectDisplayID?
+    @State private var windowID: CGWindowID?
+    @State private var authorizingInput = false
     @AppStorage(BetterShotPreferences.recordingCameraDeviceIDKey) private var cameraID = ""
     @AppStorage(BetterShotPreferences.recordingMicrophoneDeviceIDKey) private var microphoneID = ""
     @AppStorage(BetterShotPreferences.recordingSystemAudioKey) private var systemAudio = false
     @AppStorage(BetterShotPreferences.recordingStartDelaySecondsKey) private var startDelaySeconds = 0
     @AppStorage(BetterShotPreferences.recordingTeleprompterEnabledKey) private var teleprompterEnabled = false
 
-    @Bindable private var presenter = RecordingBarPresenter.shared
-
-    private static let timerOptions = [0, 1, 3, 5]
+    private var canStart: Bool {
+        !authorizingInput && !ScreenRecordingManager.shared.isActive
+            && sources.containsSelection(sourceMode, displayID: displayID, windowID: windowID)
+    }
 
     var body: some View {
-        HStack(spacing: 4) {
-            screenshotGroup
-            BarDivider()
-            timerMenu
-            Button { presenter.showsRecordingOptions.toggle() } label: {
-                BarActionLabel(id: .recording, title: "Recording options", systemImage: "video",
-                               caption: "Recording")
-            }
-            .buttonStyle(BarButtonStyle())
-            .accessibilityLabel("Recording options")
-            .popover(isPresented: $presenter.showsRecordingOptions, arrowEdge: .top) {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Recording").font(.headline)
-                    Text("Choose a source to start recording.")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                    if sources.isLoading {
-                        ProgressView("Loading recording sources…")
-                    }
-                    if let error = sources.errorMessage {
-                        Text(error).font(.caption).foregroundStyle(.red)
-                        Button("Try Again") { Task { await sources.refresh() } }
-                    }
-                    recordingOptions.disabled(sources.isLoading)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label("Record Video", systemImage: "video").font(.headline)
+                Spacer()
+                Button("Close", systemImage: "xmark") {
+                    RecordingBarPresenter.shared.showsRecordingOptions = false
                 }
-                .controlSize(.regular)
-                .padding(20)
-                .task { await sources.refresh() }
+                .labelStyle(.iconOnly).buttonStyle(.plain).help("Close recording setup")
             }
-            if showsCloseButton {
-                BarActionButton(id: .close, title: "Close", systemImage: "xmark",
-                            accessibility: "Close capture bar — Esc") {
-                    dismissPicker()
+            Picker("Recording source", selection: $sourceMode) {
+                Label("Screen", systemImage: "desktopcomputer").tag(ScreenRecordingSourceMode.fullscreen)
+                Label("Window", systemImage: "macwindow").tag(ScreenRecordingSourceMode.window)
+                Label("Area", systemImage: "viewfinder").tag(ScreenRecordingSourceMode.area)
+            }
+            .pickerStyle(.segmented).labelsHidden().frame(maxWidth: .infinity)
+
+            Group {
+                switch sourceMode {
+                case .fullscreen:
+                    Picker("Screen", selection: $displayID) {
+                        Text("Choose a screen").tag(Optional<CGDirectDisplayID>.none)
+                        ForEach(Array(sources.displays.enumerated()), id: \.element.displayID) { index, display in
+                            Text(RecordingSourceCatalog.displayTitle(display, index: index)).tag(Optional(display.displayID))
+                        }
+                    }
+                case .window:
+                    Picker("Window", selection: $windowID) {
+                        Text("Choose a window").tag(Optional<CGWindowID>.none)
+                        ForEach(sources.windows, id: \.windowID) { window in
+                            Text(RecordingSourceCatalog.windowTitle(window)).tag(Optional(window.windowID))
+                        }
+                    }
+                case .area:
+                    Label("Choose an area on your screen next.", systemImage: "cursorarrow.and.square.on.square.dashed")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
             }
-        }
-    }
+            .frame(minHeight: 28)
 
-    private var recordingOptions: some View {
-        HStack(spacing: 8) {
-            displaySource
-            windowSource
-            BarActionButton(
-                id: .area,
-                title: "Drag to select a region",
-                systemImage: "rectangle.dashed", caption: "Area",
-                accessibility: "Area - drag to select the region to record"
-            ) {
-                startAreaRecording()
-            }
-
-            BarDivider()
-
-            inputToggle(
-                id: .camera,
-                caption: "Camera",
-                title: cameraID.isEmpty ? "Camera off" : "Camera on",
-                isOn: !cameraID.isEmpty,
-                onIcon: "video.fill",
-                offIcon: "video.slash",
-                accessibility: cameraAccessibilityLabel
-            ) {
-                toggleCamera()
-            }
-            .contextMenu {
-                cameraDeviceMenu
-            }
-
-            microphonePicker
-
-            inputToggle(
-                id: .systemAudio,
-                caption: "Audio",
-                title: systemAudio ? "System audio on" : "System audio off",
-                isOn: systemAudio,
-                onIcon: "speaker.wave.2.fill",
-                offIcon: "speaker.slash",
-                accessibility: systemAudio
-                    ? "System audio on - click to stop capturing what you hear"
-                    : "System audio off - click to capture what you hear"
-            ) {
-                systemAudio.toggle()
-            }
-
-            inputToggle(
-                id: .teleprompter,
-                caption: "Script",
-                title: teleprompterEnabled ? "Teleprompter on" : "Teleprompter off",
-                isOn: teleprompterEnabled,
-                onIcon: "text.pad.header",
-                offIcon: "text.pad.header",
-                accessibility: teleprompterEnabled
-                    ? "Teleprompter on - click to edit the script"
-                    : "Teleprompter off - click to write a script"
-            ) {
-                TeleprompterComposerPresenter.shared.toggle()
-            }
-
-        }
-    }
-
-    // MARK: Screenshots
-
-    private static let screenshotActions: [(BarTooltipID, ShortcutService.Action, String, String)] = [
-        (.screenshotRegion, .region, "Area", "viewfinder"),
-        (.screenshotFullscreen, .fullscreen, "Fullscreen", "desktopcomputer"),
-        (.screenshotWindow, .window, "Window", "macwindow"),
-        (.ocr, .ocr, "OCR", "textformat"),
-        (.colorPicker, .colorPicker, "Color", "eyedropper"),
-    ]
-
-    private var screenshotGroup: some View {
-        ForEach(Self.screenshotActions, id: \.0) { id, action, title, icon in
-            BarActionButton(id: id, title: title, systemImage: icon, caption: title) {
-                captureScreenshot(action)
-            }
-        }
-    }
-
-    private func captureScreenshot(_ action: ShortcutService.Action) {
-        presenter.showsRecordingOptions = false
-        let screen = ActiveDisplayResolver.activeScreen(preferPointer: true)
-        Task { await CaptureOrchestrator.shared.performCapture(action, on: screen) }
-    }
-
-    // MARK: Sources
-
-    @ViewBuilder
-    private var displaySource: some View {
-        if sources.displays.count > 1 {
-            Menu {
-                ForEach(Array(sources.displays.enumerated()), id: \.element.displayID) { index, display in
-                    Button(RecordingSourceCatalog.displayTitle(display, index: index)) {
-                        startRecording {
-                            RecordingCaptureEntry.recordFullscreen(display)
+            Form {
+                Section("Include") {
+                    Picker(selection: Binding(get: { cameraID }, set: selectCamera)) {
+                        Text("Off").tag("")
+                        let cameras = RecordingDeviceCatalog.cameras()
+                        if !cameraID.isEmpty && !cameras.contains(where: { $0.uniqueID == cameraID }) {
+                            Text("Camera unavailable").tag(cameraID)
+                        }
+                        ForEach(cameras, id: \.uniqueID) { Text($0.localizedName).tag($0.uniqueID) }
+                    } label: { Label("Camera", systemImage: "video") }
+                    .disabled(authorizingInput)
+                    Picker(selection: Binding(get: { microphoneID }, set: selectMicrophone)) {
+                        Text("Off").tag("")
+                        let microphones = RecordingDeviceCatalog.microphones()
+                        if !microphoneID.isEmpty && !microphones.contains(where: { $0.uniqueID == microphoneID }) {
+                            Text("Microphone unavailable").tag(microphoneID)
+                        }
+                        ForEach(microphones, id: \.uniqueID) { Text($0.localizedName).tag($0.uniqueID) }
+                    } label: { Label("Microphone", systemImage: "mic") }
+                    .disabled(authorizingInput)
+                    Toggle(isOn: $systemAudio) { Label("System Audio", systemImage: "speaker.wave.2") }
+                        .toggleStyle(.switch)
+                }
+                Section {
+                    Picker(selection: $startDelaySeconds) {
+                        ForEach(Array(Set([0, 1, 3, 5, startDelaySeconds])).sorted(), id: \.self) { seconds in
+                            Text(seconds == 0 ? "None" : seconds == 1 ? "1 second" : "\(seconds) seconds").tag(seconds)
+                        }
+                    } label: { Label("Start Delay", systemImage: "timer") }
+                    HStack {
+                        Label("Teleprompter", systemImage: "text.pad.header")
+                        Spacer()
+                        Text(teleprompterEnabled ? "On" : "Off").foregroundStyle(.secondary)
+                        Button(teleprompterEnabled ? "Edit Script…" : "Add Script…") {
+                            TeleprompterComposerPresenter.shared.toggle()
                         }
                     }
                 }
-            } label: {
-                BarActionLabel(
-                    id: .display,
-                    title: "Pick a screen to record",
-                    systemImage: "menubar.rectangle", caption: "Display"
-                )
             }
-            .menuStyle(.button)
-            .buttonStyle(BarButtonStyle())
-            .menuIndicator(.hidden)
-            .accessibilityLabel("Display - choose which screen to record")
-        } else {
-            BarActionButton(
-                id: .display,
-                title: "Record the whole screen",
-                systemImage: "menubar.rectangle", caption: "Display",
-                accessibility: "Display - record the whole screen"
-            ) {
-                guard let display = sources.displays.first else { return }
-                startRecording {
-                    RecordingCaptureEntry.recordFullscreen(display)
+            .formStyle(.grouped).scrollDisabled(true).scrollIndicators(.hidden)
+            .fixedSize(horizontal: false, vertical: true)
+
+            if sources.isLoading || authorizingInput {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text(authorizingInput ? "Waiting for permission…" : "Loading sources…")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
+            if let error = sources.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+            }
+            HStack {
+                Button("Refresh Sources", systemImage: "arrow.clockwise") { Task { await refreshSources() } }
+                    .disabled(sources.isLoading)
+                Spacer()
+                Button(sourceMode == .area ? "Choose Area…" : "Start Recording",
+                       systemImage: sourceMode == .area ? "viewfinder" : "record.circle") {
+                    startRecording()
+                }
+                .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction).disabled(!canStart)
+            }
+        }
+        .controlSize(.regular).padding(18).frame(width: 420)
+        .task { await refreshSources() }
+        .onChange(of: sources.displays.map(\.displayID)) { _, ids in
+            if let displayID, !ids.contains(displayID) { self.displayID = nil }
+        }
+        .onChange(of: sources.windows.map(\.windowID)) { _, ids in
+            if let windowID, !ids.contains(windowID) { self.windowID = nil }
         }
     }
 
-    private var windowSource: some View {
-        Menu {
-            if sources.windows.isEmpty {
-                Text("No app windows found")
-            }
-            ForEach(sources.windows, id: \.windowID) { window in
-                Button(RecordingSourceCatalog.windowTitle(window)) {
-                    startRecording {
-                        RecordingCaptureEntry.recordWindow(window)
-                    }
-                }
-            }
-
-            Divider()
-
-            Button("Refresh Windows") {
-                Task {
-                    await sources.refresh()
-                }
-            }
-        } label: {
-            BarActionLabel(
-                id: .window,
-                title: "Pick an app window",
-                systemImage: "macwindow", caption: "Window"
-            )
+    private func refreshSources() async {
+        await sources.refresh()
+        if displayID == nil {
+            let active = RecordingBarPresenter.shared.displayID
+            displayID = sources.displays.first(where: { $0.displayID == active })?.displayID ?? sources.displays.first?.displayID
         }
-        .menuStyle(.button)
-        .buttonStyle(BarButtonStyle())
-        .menuIndicator(.hidden)
-        .accessibilityLabel("Window - choose an app window to record")
     }
 
-    private func startAreaRecording() {
-        presenter.showsRecordingOptions = false
-        // Area is the one source that can't morph: the bar has to get out of
-        // the way of the selection overlay, so it leaves and comes back as the
-        // session controls.
-        RecordingBarPresenter.shared.hide()
-        RecordingCaptureEntry.recordArea()
-    }
-
-    /// Leaves the bar on screen: it stays as the picker through any start
-    /// delay, then morphs into the session controls the moment capture
-    /// actually begins. The warm camera preview (if any) is left running so it
-    /// flows straight into the recording instead of restarting and refading.
-    private func startRecording(_ start: () -> Void) {
-        presenter.showsRecordingOptions = false
+    private func startRecording() {
+        guard canStart else { return }
+        RecordingBarPresenter.shared.showsRecordingOptions = false
         TeleprompterComposerPresenter.shared.hide()
-        start()
+        switch sourceMode {
+        case .fullscreen:
+            guard let display = sources.displays.first(where: { $0.displayID == displayID }) else { return }
+            RecordingCaptureEntry.recordFullscreen(display)
+        case .window:
+            guard let window = sources.windows.first(where: { $0.windowID == windowID }) else { return }
+            RecordingCaptureEntry.recordWindow(window)
+        case .area:
+            RecordingBarPresenter.shared.hide()
+            RecordingCaptureEntry.recordArea()
+        }
     }
 
-    /// Backs out of the picker without recording: stop any warm camera
-    /// preview so it doesn't keep running in the background.
-    private func dismissPicker() {
-        RecordingBarPresenter.shared.dismiss()
-        Task { await CameraRecordingManager.shared.stopPreview() }
-    }
-
-    // MARK: Input toggles
-
-    private func toggleCamera() {
-        if cameraID.isEmpty {
-            selectCamera(RecordingDeviceCatalog.cameras().first?.uniqueID)
-        } else {
+    private func selectCamera(_ id: String) {
+        guard !id.isEmpty else {
             cameraID = ""
             Task { await CameraRecordingManager.shared.stopPreview() }
+            return
         }
-    }
-
-    private var cameraAccessibilityLabel: String {
-        guard !cameraID.isEmpty else {
-            return "Camera off - click to record your camera, right-click to pick one"
-        }
-        guard let camera = RecordingDeviceCatalog.cameras().first(where: { $0.uniqueID == cameraID }) else {
-            return "Camera unavailable - right-click to choose another camera"
-        }
-        return "Camera on - \(camera.localizedName), right-click to switch"
-    }
-
-    /// The pill only has room for the state, so an attached-but-missing
-    /// device is worth calling out there - it's the one case where the icon
-    /// alone is misleading.
-    private var microphoneTooltip: String {
-        guard !microphoneID.isEmpty else { return "Microphone off" }
-        guard RecordingDeviceCatalog.microphone(withID: microphoneID) != nil else {
-            return "Microphone unavailable"
-        }
-        return "Microphone on"
-    }
-
-    private var microphoneAccessibilityLabel: String {
-        guard !microphoneID.isEmpty else {
-            return "Microphone off - click to choose an input"
-        }
-        guard let microphone = RecordingDeviceCatalog.microphone(withID: microphoneID) else {
-            return "Microphone unavailable - choose another input"
-        }
-        return "Microphone on - \(microphone.localizedName)"
-    }
-
-    @ViewBuilder
-    private var cameraDeviceMenu: some View {
-        ForEach(RecordingDeviceCatalog.cameras(), id: \.uniqueID) { device in
-            Toggle(isOn: Binding(
-                get: { cameraID == device.uniqueID },
-                set: { selected in
-                    if selected {
-                        selectCamera(device.uniqueID)
-                    } else {
-                        cameraID = ""
-                        Task { await CameraRecordingManager.shared.stopPreview() }
-                    }
-                }
-            )) {
-                Text(device.localizedName)
-            }
-        }
-    }
-
-    private var microphonePicker: some View {
-        Menu {
-            Button {
-                microphoneID = ""
-            } label: {
-                menuSelectionLabel("Off", isSelected: microphoneID.isEmpty)
-            }
-
-            Divider()
-
-            ForEach(RecordingDeviceCatalog.microphones(), id: \.uniqueID) { device in
-                Button {
-                    selectMicrophone(device.uniqueID)
-                } label: {
-                    menuSelectionLabel(
-                        device.localizedName,
-                        isSelected: microphoneID == device.uniqueID
-                    )
-                }
-            }
-        } label: {
-            BarActionLabel(
-                id: .microphone,
-                title: microphoneTooltip,
-                systemImage: microphoneID.isEmpty ? "mic.slash" : "mic.fill",
-                tint: microphoneID.isEmpty ? BarMetrics.inactiveTint : BarMetrics.activeTint,
-                caption: "Mic"
-            )
-        }
-        .menuStyle(.button)
-        .buttonStyle(BarButtonStyle())
-        .menuIndicator(.hidden)
-        .accessibilityLabel(microphoneAccessibilityLabel)
-    }
-
-    /// Replaces the old gear button that opened Settings: a self-contained
-    /// menu for options that only matter for the next recording, starting
-    /// with a start-delay timer.
-    private var timerMenu: some View {
-        Menu {
-            Section("Screenshot timer") {
-                ForEach(SelfTimerDelay.allCases, id: \.rawValue) { delay in
-                    Button {
-                        AppPreferences.selfTimerDelay = delay
-                    } label: {
-                        menuSelectionLabel(delay.label, isSelected: AppPreferences.selfTimerDelay == delay)
-                    }
-                }
-            }
-            Section("Recording timer") {
-                ForEach(Self.timerOptions, id: \.self) { seconds in
-                    Button {
-                        startDelaySeconds = seconds
-                    } label: {
-                        menuSelectionLabel(timerLabel(seconds), isSelected: startDelaySeconds == seconds)
-                    }
-                }
-            }
-        } label: {
-            BarActionLabel(
-                id: .timer,
-                title: timerTooltip,
-                systemImage: "timer",
-                tint: BarMetrics.activeTint,
-                caption: "Timer"
-            )
-        }
-        .menuStyle(.button)
-        .buttonStyle(BarButtonStyle())
-        .menuIndicator(.hidden)
-        .accessibilityLabel("Screenshot and recording timers")
-    }
-
-    private func timerLabel(_ seconds: Int) -> String {
-        seconds == 0 ? "None" : "\(seconds) second\(seconds == 1 ? "" : "s")"
-    }
-
-    private var timerTooltip: String {
-        startDelaySeconds == 0 ? "Timer off" : "Timer \(startDelaySeconds)s"
-    }
-
-    @ViewBuilder
-    private func menuSelectionLabel(_ title: String, isSelected: Bool) -> some View {
-        if isSelected {
-            Label(title, systemImage: "checkmark")
-        } else {
-            Text(title)
-        }
-    }
-
-    private func selectCamera(_ deviceID: String?) {
-        guard let deviceID else { return }
+        authorizingInput = true
         Task { @MainActor in
+            defer { authorizingInput = false }
             let authorized = await RecordingInputAuthorization.ensureAccess(for: .camera)
-            cameraID = authorized ? deviceID : ""
+            cameraID = authorized ? id : ""
             if authorized {
-                await warmCameraPreview()
+                await CameraRecordingManager.shared.startPreview(deviceID: id,
+                    displayID: RecordingBarPresenter.shared.displayID)
             }
         }
     }
 
-    /// Starts the camera session (and its floating preview) ahead of "Start
-    /// Recording", so its exposure/white-balance ramp - the fade-in macOS
-    /// shows whenever a capture session starts cold - finishes before
-    /// anything is actually being recorded.
-    private func warmCameraPreview() async {
-        guard !cameraID.isEmpty else { return }
-        let displayID = ActiveDisplayResolver.activeDisplayID(preferPointer: false)
-        await CameraRecordingManager.shared.startPreview(deviceID: cameraID, displayID: displayID)
-    }
-
-    private func selectMicrophone(_ deviceID: String?) {
-        guard let deviceID else { return }
+    private func selectMicrophone(_ id: String) {
+        guard !id.isEmpty else { microphoneID = ""; return }
+        authorizingInput = true
         Task { @MainActor in
-            microphoneID = await RecordingInputAuthorization.ensureAccess(for: .microphone) ? deviceID : ""
+            defer { authorizingInput = false }
+            microphoneID = await RecordingInputAuthorization.ensureAccess(for: .microphone) ? id : ""
         }
-    }
-
-    // MARK: Pieces
-
-    /// An input toggle is the same control as a source button - the "off"
-    /// state is carried by dimming the tint, not by shrinking the target.
-    private func inputToggle(
-        id: BarTooltipID,
-        caption: String,
-        title: String,
-        isOn: Bool,
-        onIcon: String,
-        offIcon: String,
-        accessibility: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        BarActionButton(
-            id: id,
-            title: title,
-            systemImage: isOn ? onIcon : offIcon,
-            tint: isOn ? BarMetrics.activeTint : BarMetrics.inactiveTint,
-            caption: caption,
-            accessibility: accessibility,
-            action: action
-        )
     }
 }

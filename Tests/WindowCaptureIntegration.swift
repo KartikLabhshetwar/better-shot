@@ -41,6 +41,19 @@ struct WindowCaptureIntegration {
             window.close()
             try? FileManager.default.removeItem(at: ScreenshotHistoryStore.applicationSupportDirectory)
         }
+        let sources = RecordingSourceCatalog.shared
+        await sources.refresh()
+        precondition(sources.errorMessage == nil)
+        for display in sources.displays {
+            precondition(sources.containsSelection(.fullscreen, displayID: display.displayID, windowID: nil))
+        }
+        for source in sources.windows {
+            precondition(sources.containsSelection(.window, displayID: nil, windowID: source.windowID))
+        }
+        precondition(!sources.containsSelection(.window, displayID: nil, windowID: .max))
+        precondition(!sources.containsSelection(.fullscreen, displayID: .max, windowID: nil))
+        precondition(sources.containsSelection(.area, displayID: nil, windowID: nil) == !sources.displays.isEmpty)
+        print("PASS recording source availability and missing-source rejection")
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
         let selected = content.windows.first { $0.windowID == CGWindowID(window.windowNumber) }!
         let filter = SCContentFilter(desktopIndependentWindow: selected)

@@ -22,6 +22,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_EDITOR_WINDOWS"] == "1" {
         try await checkEditorWindowInteractions(imageURL: imageURL, movieURL: movieURL)
     }
+    try checkCaptureControlsUI()
     try await checkNotchPresentation(imageURL: imageURL, movieURL: movieURL)
     try checkImageTransforms(imageURL: imageURL)
     try await checkColorPickerAndToast()
@@ -519,13 +520,6 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
             try snapshot(TransferStatusCard(status: status), scheme: scheme, width: 360,
                          to: output.appendingPathComponent("transfer-\(label)-\(name).png"), height: 112)
         }
-        try snapshot(RecordingSessionControls().studioGlass(cornerRadius: BarMetrics.cornerRadius, opacity: 0.78),
-                     scheme: scheme, width: 360,
-                     to: output.appendingPathComponent("recording-\(name).png"), height: 64)
-        try snapshot(RecordingPickerControls().padding(.horizontal, BarMetrics.horizontalPadding)
-            .frame(height: BarMetrics.height).studioGlass(cornerRadius: BarMetrics.cornerRadius, opacity: 0.78)
-            .background(EditorChrome.workspace), scheme: scheme, width: 760,
-                     to: output.appendingPathComponent("capture-\(name).png"), height: 100)
         try snapshot(
             AnnotationEditorWindow(url: .constant(nil), model: imageModel),
             scheme: scheme, width: 1280, to: output.appendingPathComponent("image-\(name).png"))
@@ -867,6 +861,31 @@ private func checkGeneralEditorDefaults(movieURL: URL) async throws {
         reopened.teardown()
     }
     print("PASS General defaults for new recordings/imports, image look parity, reset, and saved project preservation")
+}
+
+/// Static layout checks need no camera/microphone access or encoded video fixture.
+@MainActor
+func checkCaptureControlsUI() throws {
+    let sources = RecordingSourceCatalog.shared
+    precondition(!sources.containsSelection(.fullscreen, displayID: nil, windowID: nil))
+    precondition(!sources.containsSelection(.window, displayID: nil, windowID: nil),
+                 "Recording requires an explicit available source; opening setup must never start capture")
+    let output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        .appendingPathComponent(".build/editor-snapshots")
+    try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+    for scheme in [ColorScheme.light, .dark] {
+        let name = scheme == .light ? "light" : "dark"
+        try snapshot(RecordingSessionControls().studioGlass(cornerRadius: BarMetrics.cornerRadius, opacity: 0.78),
+                     scheme: scheme, width: 360,
+                     to: output.appendingPathComponent("recording-\(name).png"), height: 64)
+        try snapshot(RecordingOptionsView(), scheme: scheme, width: 420,
+                     to: output.appendingPathComponent("recording-setup-\(name).png"), height: 520)
+        try snapshot(RecordingPickerControls().padding(.horizontal, BarMetrics.horizontalPadding)
+            .frame(height: BarMetrics.height).studioGlass(cornerRadius: BarMetrics.cornerRadius, opacity: 0.78)
+            .background(EditorChrome.workspace), scheme: scheme, width: 760,
+                     to: output.appendingPathComponent("capture-\(name).png"), height: 100)
+    }
+    print("PASS missing recording source rejection and capture/setup/transport light and dark layouts")
 }
 
 @MainActor
@@ -1358,6 +1377,7 @@ private func checkPreviewOverlay(imageURL: URL) async throws {
         overlay.refreshSettings()
     }
     AppPreferences.overlayDismissDelay = 0.05
+    AppPreferences.overlayCardSize = .medium
     overlay.show(url: imageURL)
     let panel = NSApp.windows.first { $0.identifier?.rawValue == "BetterShot.CaptureOverlay" }!
     precondition(panel.canBecomeKey && !panel.canBecomeMain, "Overlay actions must support native keyboard focus")

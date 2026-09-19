@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Redesigned the shared capture controls and notch recording setup with native Screen/Window/Area tabs, visible camera and microphone pickers, system audio, recording delay, and an explicit Start Recording action. Screenshot tools stay one click, with a separate visible screenshot timer. Recording controls now label Stop, Paused, Preparing, and Saving; transitions are shorter and respect Reduce Motion.
+
 - Notch Mode never displays toast notifications. Copy confirms directly on the result button; capture and saving failures remain as dismissible inline instructions. Switching modes removes existing toasts immediately. Recent items stay aligned and disabled action icons remain readable.
 
 - Notch shape, hover controls, and interactions reuse Boring Notch code, with contributor attribution, pinned source references, and its GPLv3 license bundled with the app.

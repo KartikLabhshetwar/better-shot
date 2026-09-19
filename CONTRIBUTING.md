@@ -152,6 +152,11 @@ Notch Mode must not show toasts. Mark `ToastWindow.show` failures with `isError:
 so recovery instructions appear inline; successes stay quiet or update their action
 button. Export/share progress continues through the embedded `TransferStatusCard`.
 Recording areas use BetterShot's adjustable AppKit selector.
+`RecordingPickerControls` and `RecordingOptionsView` are shared by the bar and notch.
+Run `BETTERSHOT_CHECK_CAPTURE_UI=1 bash Tests/run-exports.sh` after building for
+focused light/dark capture layout checks without generating a video fixture.
+Keep source selection separate from starting a recording, preserve permission checks
+for camera/microphone, and keep screenshot and recording delays distinct.
 
 Every screenshot starts in `DeckStaging`. Copy only updates the clipboard and
 retains a private file for file-based paste targets. Edit, Pin, Share, and drag-out

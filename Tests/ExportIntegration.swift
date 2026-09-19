@@ -28,6 +28,10 @@ struct ExportIntegration {
         precondition(ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] == "1",
                      "Run through Tests/run-exports.sh to keep the real Keychain isolated")
         precondition(R2CredentialStore.shared.keychainAccess == .empty)
+        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_CAPTURE_UI"] == "1" {
+            try checkCaptureControlsUI()
+            return
+        }
         let succeeded = try ScreenCapture.validateCommandResult(status: 0, diagnostic: "")
         let cancelled = try ScreenCapture.validateCommandResult(status: 1, diagnostic: "\n")
         precondition(succeeded && !cancelled)

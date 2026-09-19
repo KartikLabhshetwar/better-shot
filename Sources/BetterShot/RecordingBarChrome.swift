@@ -61,7 +61,7 @@ enum BarMetrics {
 
     /// The morph between modes. Enough travel to read as one bar changing
     /// shape rather than two bars swapping.
-    static let modeChange = Animation.spring(response: 0.34, dampingFraction: 0.86)
+    static let modeChange = Animation.spring(response: 0.18, dampingFraction: 1)
 }
 
 // MARK: - Tooltips
