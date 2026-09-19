@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Hide capture bar at launch** (#151). Settings > General > Startup toggle to suppress the capture bar on app start. On by default to preserve current behavior. Global shortcuts remain active regardless of the setting.
 
+- **WebP export format** (#148). Screenshots and recordings can now be saved as WebP alongside PNG and JPEG. WebP produces smaller files than JPEG at similar quality with broad browser and editor support. Select it in Settings > General > File Format; the quality slider applies to both WebP and JPEG.
+
 ### Changed
 
 - Media Gallery and Settings now use native navigation columns with resizable, collapsible sidebars and section titles aligned with their content. Gallery icons use Finder-sized previews, more space between rows, and blue filename selection while retaining sortable list view and contextual actions.

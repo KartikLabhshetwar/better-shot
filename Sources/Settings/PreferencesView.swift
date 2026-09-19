@@ -374,7 +374,7 @@ struct GeneralSettingsTab: View {
                 }
                 .pickerStyle(.segmented)
 
-                if exportFormatRaw == ExportFormat.jpeg.rawValue {
+                if (ExportFormat(rawValue: exportFormatRaw) ?? .png).usesLossyQuality {
                     InspectorSlider("Quality", value: Binding(
                         get: { CGFloat(exportQuality) },
                         set: { exportQuality = (Double($0) * 20).rounded() / 20 }
@@ -383,9 +383,14 @@ struct GeneralSettingsTab: View {
             } header: {
                 Text("File Format")
             } footer: {
-                Text(exportFormatRaw == ExportFormat.jpeg.rawValue
-                     ? "JPEG files are much smaller, and a little detail is lost every time one is saved."
-                     : "PNG keeps every pixel exactly as captured, which is the safer default for screenshots of text.")
+                switch ExportFormat(rawValue: exportFormatRaw) ?? .png {
+                case .jpeg:
+                    Text("JPEG files are much smaller, and a little detail is lost every time one is saved.")
+                case .webp:
+                    Text("WebP produces smaller files than JPEG at similar quality, with broad browser and editor support.")
+                case .png:
+                    Text("PNG keeps every pixel exactly as captured, which is the safer default for screenshots of text.")
+                }
             }
 
             Section {
