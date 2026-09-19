@@ -117,22 +117,28 @@ struct Recording3DInspector: View {
             }
             Divider()
             Text("Scenes").font(.caption.weight(.semibold))
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
+            VStack(spacing: 6) {
                 ForEach(Recording3DScene.allCases, id: \.self) { scene in
                     Button {
                         model.apply3DScene(scene.presets, weights: scene.weights, showcaseFinish: scene == .showcase)
                     } label: {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(scene.rawValue).font(.caption.weight(.medium)).lineLimit(2)
-                                .frame(height: 30, alignment: .topLeading)
-                            let count = min(3, max(1, Int(shot.end - shot.start)))
-                            Text("\(count) \(count == 1 ? "shot" : "shots")").font(.caption2).foregroundStyle(.secondary)
-                            HStack(spacing: 3) {
-                                ForEach(0..<count, id: \.self) { _ in Capsule().fill(Color.accentColor.opacity(0.65)).frame(height: 3) }
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(alignment: .firstTextBaseline) {
+                                Text(scene.rawValue).font(.callout.weight(.medium))
+                                Spacer(minLength: 8)
+                                let count = min(3, max(1, Int(shot.end - shot.start)))
+                                Text("\(count) \(count == 1 ? "shot" : "shots")")
+                                    .font(.caption).monospacedDigit().foregroundStyle(.secondary)
                             }
-                        }.frame(maxWidth: .infinity, alignment: .leading)
+                            Text(scene.summary).font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 8)
                     }
-                    .buttonStyle(EditorButtonStyle(horizontalPadding: 7, bordered: true))
+                    .buttonStyle(EditorButtonStyle(bordered: true))
+                    .accessibilityLabel(scene.rawValue)
+                    .accessibilityHint(scene.summary + ". Replaces the selected shot.")
                     .help(scene.summary + ". Replaces this shot’s range; shorter ranges use fewer shots.")
                 }
             }
