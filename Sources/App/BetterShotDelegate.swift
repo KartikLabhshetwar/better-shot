@@ -30,7 +30,7 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async {
             if OnboardingState.shouldPresent() {
                 OnboardingWindowController.shared.show()
-            } else {
+            } else if UserDefaults.standard.object(forKey: AppPreferences.showCaptureBarAtLaunchKey) as? Bool ?? true {
                 RecordingBarPresenter.shared.showPicker(activate: false)
             }
         }

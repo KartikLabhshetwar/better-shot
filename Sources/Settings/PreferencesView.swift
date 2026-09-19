@@ -168,6 +168,7 @@ private struct SettingsSearchField: NSViewRepresentable {
 // MARK: - General
 
 struct GeneralSettingsTab: View {
+    @AppStorage(AppPreferences.showCaptureBarAtLaunchKey) private var showCaptureBarAtLaunch = true
     @AppStorage(AppPreferences.showInDockKey) private var showInDock = false
     @AppStorage(AppPreferences.showInMenuBarKey) private var showInMenuBar = true
     @State private var loginStatus: SMAppService.Status = .notRegistered
@@ -219,6 +220,7 @@ struct GeneralSettingsTab: View {
                     get: { loginStatus == .enabled || loginStatus == .requiresApproval },
                     set: setLaunchAtLogin
                 ))
+                Toggle("Show the capture bar at launch", isOn: $showCaptureBarAtLaunch)
                 if loginStatus == .requiresApproval {
                     Text("Allow BetterShot in System Settings → General → Login Items & Extensions.")
                         .font(.callout).foregroundStyle(.secondary)

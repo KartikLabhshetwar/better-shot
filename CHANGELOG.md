@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Preview follows mouse across displays** (#128). The preview card tracks whichever display the mouse is on, or pins to a chosen display in Settings > Capture. Fixes fullscreen capture grabbing the wrong display on multi-monitor setups, drag/tap gesture interference on preview buttons, and panel reuse across mixed-DPI boundaries.
 
+- **Hide capture bar at launch** (#151). Settings > General > Startup toggle to suppress the capture bar on app start. On by default to preserve current behavior. Global shortcuts remain active regardless of the setting.
+
 ### Changed
 
 - Media Gallery and Settings now use native navigation columns with resizable, collapsible sidebars and section titles aligned with their content. Gallery icons use Finder-sized previews, more space between rows, and blue filename selection while retaining sortable list view and contextual actions.

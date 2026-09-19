@@ -45,6 +45,7 @@ enum AppPreferences {
         NSApp.appearance = appearance.nsAppearance
     }
 
+    static let showCaptureBarAtLaunchKey = "bs_showCaptureBarAtLaunch"
     static let showInDockKey = "bs_showInDock"
     static let showInMenuBarKey = "bs_showInMenuBar"
 
