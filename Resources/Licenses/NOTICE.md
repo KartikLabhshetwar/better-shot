@@ -54,7 +54,7 @@ the complete upstream license is bundled in BoringNotch.txt.
   `Sources/Notch/BoringNotchHoverButton.swift` with accessible labels and shorter,
   reduced-motion-aware hover feedback.
 - `boringNotch/ContentView.swift` supplies the cancellable hover-leave flow in
-  `Sources/Notch/NotchPresenter.swift` and the interruptible spring in the vendored
+  `Sources/Notch/NotchPresenter.swift` and interruptible presentation updates in the vendored
   `DynamicNotch.swift`. BetterShot preserves capture exclusion, keyboard focus,
   native menu/sheet protection, and Reduce Motion; its own capture/editor/media
   actions replace the upstream music, calendar, and shelf integrations.

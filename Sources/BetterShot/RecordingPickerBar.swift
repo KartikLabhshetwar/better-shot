@@ -75,6 +75,7 @@ struct RecordingPickerControls: View {
                     }
                     recordingOptions.disabled(sources.isLoading)
                 }
+                .controlSize(.regular)
                 .padding(20)
                 .task { await sources.refresh() }
             }

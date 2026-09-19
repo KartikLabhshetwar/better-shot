@@ -514,7 +514,7 @@ struct PreviewCardView: View {
         _thumbnail = State(initialValue: thumbnail)
     }
 
-    private var size: OverlayCardSize { usesNotchActions ? .large : overlay.cardSize }
+    private var size: OverlayCardSize { usesNotchActions ? .medium : overlay.cardSize }
     private var cardSize: CGSize { size.thumbnailSize }
     private var controlScale: CGFloat { size.controlScale }
 
@@ -543,7 +543,7 @@ struct PreviewCardView: View {
                     // this only showed up with a mouse.
                     Image(nsImage: image)
                         .resizable()
-                        .aspectRatio(contentMode: .fill)
+                        .aspectRatio(contentMode: usesNotchActions ? .fit : .fill)
                         .frame(width: cardSize.width, height: cardSize.height)
                         .clipped()
                         .onTapGesture {

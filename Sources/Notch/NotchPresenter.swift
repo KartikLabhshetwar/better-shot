@@ -15,6 +15,8 @@ final class NotchPresenter {
     @ObservationIgnored private var hoverTask: Task<Void, Never>?
     @ObservationIgnored private var isHovering = false
     @ObservationIgnored var menuTrackingCount = 0
+    var ocrText: String?
+    var colorHex: String?
     var notification: AnyView?
     var transfers: [UUID: TransferStatusCard] = [:]
     var transferOrder: [UUID] = []
@@ -32,7 +34,7 @@ final class NotchPresenter {
     var isVisible: Bool { window?.isVisible == true }
     var hasContent: Bool {
         RecordingBarPresenter.shared.isVisible || PreviewOverlay.shared.isPresented ||
-            notification != nil || !transfers.isEmpty || script != nil
+            notification != nil || !transfers.isEmpty || script != nil || ocrText != nil || colorHex != nil
     }
 
     private init() {}
@@ -194,7 +196,7 @@ struct NotchContent: View {
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
-        .frame(width: 620)
+        .frame(width: 552)
         .frame(maxHeight: max(240, (presenter.screen?.visibleFrame.height ?? 800) - 120))
         .fixedSize(horizontal: false, vertical: true)
         .onReceive(NotificationCenter.default.publisher(for: NSMenu.didBeginTrackingNotification)) { _ in
@@ -219,6 +221,9 @@ struct NotchContent: View {
         .onChange(of: presenter.countdown) { _, countdown in
             if countdown == nil { presenter.resumeHoverDismissal() }
         }
+        .onChange(of: presenter.captureSuspended) { _, suspended in
+            if !suspended { showsRecent = false }
+        }
         .onChange(of: overlay.items) {
             selectedURL = overlay.items.last
             if !overlay.items.isEmpty { showsRecent = false }
@@ -238,18 +243,18 @@ struct NotchContent: View {
     }
 
     private var content: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
             HStack(spacing: 10) {
                 Image(nsImage: NSImage(named: "MenuBarIcon") ?? NSImage()).resizable().renderingMode(.template)
-                    .scaledToFit().frame(width: 20, height: 20)
+                    .scaledToFit().frame(width: 16, height: 16)
                     .accessibilityHidden(true)
-                Text("BetterShot").font(.headline)
+                Text("BetterShot").font(.subheadline.weight(.semibold))
                 Spacer()
                 Picker("Notch section", selection: $showsRecent) {
                     Text("Capture").tag(false)
                     Text("Recents").tag(true)
                 }
-                .pickerStyle(.segmented).labelsHidden().frame(width: 190)
+                .pickerStyle(.segmented).labelsHidden().frame(width: 160)
                 BoringNotchHoverButton(title: "Settings", icon: "gearshape") {
                     SettingsWindowController.shared.open(section: .general)
                 }
@@ -280,16 +285,29 @@ struct NotchContent: View {
                 if let notification = presenter.notification { notification }
             }
         }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: showsRecent)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: showsRecent)
         .padding(.top, 8)
     }
 
     private var captureContent: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             if !ScreenRecordingManager.shared.isActive {
                 RecordingPickerControls(showsCloseButton: false)
-                    .frame(maxWidth: .infinity).frame(height: BarMetrics.height)
-                    .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                    .controlSize(.mini)
+                    .frame(maxWidth: .infinity).frame(height: 52)
+                Divider().overlay(.white.opacity(0.08))
+            }
+            if let text = presenter.ocrText {
+                NotchTextResult(title: "Recognized Text", value: text, isColor: false) {
+                    presenter.ocrText = nil
+                    presenter.refresh()
+                }
+            }
+            if let hex = presenter.colorHex {
+                NotchTextResult(title: "Picked Color", value: hex, isColor: true) {
+                    presenter.colorHex = nil
+                    presenter.refresh()
+                }
             }
             if overlay.isPresented, let url = selected {
                 HStack {
@@ -313,30 +331,32 @@ struct NotchContent: View {
                 HStack(alignment: .center, spacing: 20) {
                     PreviewCardView(overlay: overlay, url: url, usesNotchActions: true).id(url)
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Ready to edit or share").font(.headline)
-                        Text("Keep capturing. Your captures stay here until you dismiss them.")
-                            .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                            ForEach([OverlayTool.edit, .copy, .save, .share, .pin, .dismiss]) { tool in
+                        Button { overlay.perform(.edit, for: url) } label: {
+                            Label("Open Editor", systemImage: OverlayTool.edit.symbol)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.regular)
+                        HStack(spacing: 8) {
+                            ForEach([OverlayTool.copy, .save]) { tool in
                                 Button { overlay.perform(tool, for: url) } label: {
-                                    Label(tool.title, systemImage: tool.symbol)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    Label(tool.title, systemImage: tool.symbol).frame(maxWidth: .infinity)
                                 }
-                                .buttonStyle(EditorButtonStyle(bordered: true))
-                                .disabled(overlay.savingItems.contains(url) || overlay.transferStatus(for: url) != nil)
                             }
                         }
+                        HStack(spacing: 8) {
+                            ForEach([OverlayTool.share, .pin, .dismiss]) { tool in
+                                BoringNotchHoverButton(title: tool.title, icon: tool.symbol) {
+                                    overlay.perform(tool, for: url)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                        }
                     }
+                    .disabled(overlay.savingItems.contains(url) || overlay.transferStatus(for: url) != nil)
                 }
-            } else if !ScreenRecordingManager.shared.isActive {
-                VStack(spacing: 8) {
-                    Image(systemName: "viewfinder").font(.system(size: 28, weight: .light))
-                    Text("Ready to capture").font(.headline)
-                    Text("Choose an area, display, or window above.")
-                        .font(.callout).foregroundStyle(.secondary)
-                    Button("Browse recent captures") { showsRecent = true }
-                }
-                .frame(maxWidth: .infinity).padding(.vertical, 22)
+            } else if !ScreenRecordingManager.shared.isActive && presenter.ocrText == nil && presenter.colorHex == nil {
+                NotchRecentCaptures()
             }
         }
     }
@@ -344,6 +364,52 @@ struct NotchContent: View {
     private func moveSelection(_ delta: Int) {
         guard let selected, let index = overlay.items.firstIndex(of: selected), !overlay.items.isEmpty else { return }
         selectedURL = overlay.items[(index + delta + overlay.items.count) % overlay.items.count]
+    }
+}
+
+/// Session-only results remain readable after the copied notification disappears.
+private struct NotchTextResult: View {
+    let title: String
+    let value: String
+    let isColor: Bool
+    var dismiss: () -> Void
+    @State private var copyFailed = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                if isColor {
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(Color(nsColor: NSColor(annoHex: value)))
+                        .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(.white.opacity(0.3)))
+                        .frame(width: 24, height: 24).accessibilityHidden(true)
+                    Text(value).font(.system(.body, design: .monospaced)).textSelection(.enabled)
+                        .accessibilityLabel("Picked color \(value)")
+                } else {
+                    Label(title, systemImage: "doc.text.viewfinder").font(.subheadline.weight(.medium))
+                }
+                Spacer()
+                Button("Copy", systemImage: "doc.on.doc") {
+                    copyFailed = !CaptureOrchestrator.copyText(value)
+                    if !copyFailed {
+                        ToastWindow.shared.show(title: "Copied", message: isColor ? value : "Text copied to clipboard",
+                            systemIcon: "checkmark", on: NotchPresenter.shared.screen)
+                    }
+                }
+                .accessibilityLabel(isColor ? "Copy color code" : "Copy recognized text")
+                BoringNotchHoverButton(title: "Dismiss \(title.lowercased())", icon: "xmark", action: dismiss)
+            }
+            if !isColor {
+                ScrollView {
+                    Text(value).font(.body).textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .scrollIndicators(.hidden).frame(maxHeight: 96)
+            }
+            if copyFailed { Text("Couldn’t copy. Try Copy again.").font(.caption).foregroundStyle(.red) }
+        }
+        .padding(12)
+        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
     }
 }
 
@@ -365,7 +431,9 @@ struct NotchCompactTrailing: View {
 
     private var status: (title: String, symbol: String) {
         if editorIsOpen { return ("Editor open", "pencil.and.outline") }
-        if PreviewOverlay.shared.isPresented { return ("Capture ready", "checkmark") }
+        if PreviewOverlay.shared.isPresented || NotchPresenter.shared.ocrText != nil || NotchPresenter.shared.colorHex != nil {
+            return ("Capture ready", "checkmark")
+        }
         return ("Ready to capture", "viewfinder")
     }
 

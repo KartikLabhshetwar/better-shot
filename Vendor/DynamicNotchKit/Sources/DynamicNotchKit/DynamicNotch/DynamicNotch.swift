@@ -102,8 +102,8 @@ public final class DynamicNotch<Expanded, CompactLeading, CompactTrailing>: Obse
             let animation: Animation? = animated && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
                 // Adapted from boring.notch ContentView's interruptible spring.
                 // GPL-3.0; see BetterShot's Resources/Licenses/NOTICE.md.
-                // Shorter, critically damped response for BetterShot's capture controls.
-                ? .interactiveSpring(response: 0.2, dampingFraction: 1, blendDuration: 0) : nil
+                // BetterShot uses a short ease-out with no bounce.
+                ? .easeOut(duration: 0.14) : nil
             withAnimation(animation) { state = target }
         }
         windowController?.window?.alphaValue = 1

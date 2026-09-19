@@ -22,9 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Expanded and compact Notch Mode use an opaque black surface matching the camera cutout, with native macOS controls and readable dark-appearance labels in either system appearance.
 
+- Refined the notch into a compact black capture shelf with smaller SF Symbol controls, an uncropped preview, a clear Open Editor action, and recent media when idle. Expansion uses a subtle 140 ms ease-out; Reduce Motion disables it.
+
+- OCR and color picking automatically copy their results and keep the recognized text or hex color in the notch with Copy and Dismiss actions. Text supports selection and scrolling; colors show a swatch. Empty OCR preserves the clipboard and offers retry guidance.
+
 ### Fixed
 
-- Screenshot failures now show recovery guidance instead of disappearing silently. Window capture checks macOS Screen Recording access before selection. Unsigned test builds use a separate directory so they cannot overwrite the running dev app and invalidate its capture permission.
+- Screenshot failures now show recovery guidance instead of disappearing silently. Window screenshots now use the native macOS window picker and capture directly through ScreenCaptureKit, avoiding command-line window stream failures. Confirm the selected window with “Share This Window”; Cancel creates no screenshot. Unsigned test builds use a separate directory so they cannot overwrite the running dev app and invalidate its capture permission.
 
 - Fix an editor redraw loop in notch transfer-status routing that could consume a CPU core and make video playback controls and scrubbing lag, even with no transfer in progress. Repeated idle/unchanged status updates no longer publish changes; real progress and current Cancel/Retry actions remain available.
 

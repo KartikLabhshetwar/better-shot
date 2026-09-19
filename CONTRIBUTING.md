@@ -144,6 +144,10 @@ all affected callers meet. Keep unrelated cleanup out of the diff.
 The screenshot path runs through `ShortcutService`, `CaptureOrchestrator`,
 `ScreenCapture`, private staging/history, and the preview or image editor.
 Region screenshots use macOS's native `/usr/sbin/screencapture -i` selector.
+Window screenshots use `SCContentSharingPicker` and `SCScreenshotManager.captureImage`
+in the app process; preserve picker cancellation, native pixel dimensions, and private PNG staging.
+OCR and color results share `CaptureOrchestrator.completeTextCapture`: copy the exact
+value and retain session-only notch results. Empty OCR must not erase the clipboard.
 Recording areas use BetterShot's adjustable AppKit selector.
 
 Every screenshot starts in `DeckStaging`. Copy only updates the clipboard and
@@ -336,7 +340,7 @@ with `make test` when production code changes.
 | Area | Command |
 | --- | --- |
 | Notch hover, preview actions, and compact/expanded snapshots | `BETTERSHOT_CHECK_NOTCH=1 bash Tests/run-exports.sh` |
-| Native window selection, preview, and Escape in both modes (moves the pointer; requires existing Screen Recording/Accessibility permission) | `BETTERSHOT_CHECK_WINDOW_CAPTURE=1 bash Tests/run-exports.sh` |
+| ScreenCaptureKit window pixels, native resolution, staging, and preview in both modes (requires existing Screen Recording permission) | `BETTERSHOT_CHECK_WINDOW_CAPTURE=1 bash Tests/run-exports.sh` |
 | Screenshot Copy/Save and private storage | `BETTERSHOT_CHECK_SCREENSHOT_SAVING=1 bash Tests/run-exports.sh` |
 | Video compositing and encoded exports | `BETTERSHOT_CHECK_VIDEO_EXPORTS=1 bash Tests/run-exports.sh` |
 | Displayed Gallery and Settings windows | `BETTERSHOT_CHECK_LIBRARY_WINDOWS=1 bash Tests/run-exports.sh` |
@@ -479,3 +483,7 @@ live recording and multi-display hardware still need manual checks.
 Boring Notch's copied shape and adapted hover button/interaction code retain their
 source credits and GPLv3 notices. See `Resources/Licenses/NOTICE.md` for the pinned
 revision and exact file mapping; bundle `BoringNotch.txt` with distributions.
+
+For window screenshot changes, also select a window and cancel with Escape in the
+signed dev app. Standalone test executables use their terminal’s capture identity
+and cannot establish that the installed app’s picker authorization works.

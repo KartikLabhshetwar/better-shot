@@ -92,14 +92,7 @@ final class CaptureOrchestrator {
         do {
             let overlay = ColorPickerOverlay()
             guard let hex = try await overlay.pickColor() else { return }
-            let pasteboard = NSPasteboard.general
-            pasteboard.clearContents()
-            pasteboard.setString(hex, forType: .string)
-            ScreenCapture.shared.playShutterSound()
-            ToastWindow.shared.show(
-                title: "Copied", message: "\(hex) copied to clipboard",
-                systemIcon: "eyedropper", on: captureScreen
-            )
+            completeTextCapture(hex, action: .colorPicker)
         } catch {
             ToastWindow.shared.show(title: "Couldn’t pick color", message: error.localizedDescription,
                 systemIcon: "eyedropper", on: captureScreen)
@@ -109,19 +102,38 @@ final class CaptureOrchestrator {
     private func performOCR(singleLine: Bool = false) async {
         do {
             guard let text = try await ScreenCapture.shared.captureAndOCR() else { return }
-            let pasteboard = NSPasteboard.general
-            pasteboard.clearContents()
-            pasteboard.setString(singleLine ? text.split(whereSeparator: \.isNewline).joined(separator: " ") : text, forType: .string)
-            ScreenCapture.shared.playShutterSound()
-            ToastWindow.shared.show(
-                title: "Copied",
-                message: "Text copied to clipboard",
-                systemIcon: "doc.text.viewfinder",
-                on: captureScreen
-            )
+            completeTextCapture(text, action: singleLine ? .ocrSingleLine : .ocr)
         } catch {
-            print("OCR failed: \(error.localizedDescription)")
+            ToastWindow.shared.show(title: "Couldn’t recognize text", message: error.localizedDescription,
+                systemIcon: "doc.text.viewfinder", on: captureScreen)
         }
+    }
+
+    /// Keep the exact clipboard value available for copying again from the notch.
+    func completeTextCapture(_ text: String, action: ShortcutService.Action, pasteboard: NSPasteboard = .general) {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            ToastWindow.shared.show(title: "No text found", message: "Try selecting a clearer text area.",
+                systemIcon: "doc.text.viewfinder", on: captureScreen)
+            return
+        }
+        let value = action == .ocrSingleLine ? text.split(whereSeparator: \.isNewline).joined(separator: " ") : text
+        let isColor = action == .colorPicker
+        let notch = NotchPresenter.shared
+        if isColor { notch.colorHex = value } else { notch.ocrText = value }
+        let copied = Self.copyText(value, to: pasteboard)
+        ScreenCapture.shared.playShutterSound()
+        if AppPreferences.presentationMode == .notch {
+            notch.show(on: captureScreen)
+        }
+        ToastWindow.shared.show(title: copied ? "Copied" : "Couldn’t copy",
+            message: copied ? (isColor ? "\(value) copied to clipboard" : "Text copied to clipboard") : "Try Copy again.",
+            systemIcon: isColor ? "eyedropper" : "doc.text.viewfinder", on: captureScreen)
+    }
+
+    @discardableResult
+    static func copyText(_ text: String, to pasteboard: NSPasteboard = .general) -> Bool {
+        pasteboard.clearContents()
+        return pasteboard.setString(text, forType: .string)
     }
 
     /// Every screenshot starts privately; normal captures can opt into automatic saving.

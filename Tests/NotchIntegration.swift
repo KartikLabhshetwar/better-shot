@@ -66,7 +66,7 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     precondition(overlay.items.count == 2, "Notch previews stay available until acted on")
     window.contentView?.layoutSubtreeIfNeeded()
     if let frame = notch.contentFrame, let screen = window.screen {
-        precondition(frame.width > 600 && frame.height > 100)
+        precondition(frame.width >= 552 && frame.height > 100)
         precondition(frame.width < screen.frame.width && frame.height < screen.frame.height)
         precondition(frame.midX > screen.frame.minX && frame.midX < screen.frame.maxX)
     }
@@ -171,9 +171,9 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     print("PASS recent screenshot/video filters and reopening saved media through shared gallery actions")
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
-        try snapshot(NotchContent().environment(\.colorScheme, .dark).padding(16).background(.black), scheme: scheme, width: 660,
+        try snapshot(NotchContent().environment(\.colorScheme, .dark).padding(16).background(.black), scheme: scheme, width: 584,
                      to: output.appendingPathComponent("notch-captures-\(name).png"), height: 700)
-        try snapshot(NotchContent(showsRecent: true).environment(\.colorScheme, .dark).padding(16).background(.black), scheme: scheme, width: 660,
+        try snapshot(NotchContent(showsRecent: true).environment(\.colorScheme, .dark).padding(16).background(.black), scheme: scheme, width: 584,
                      to: output.appendingPathComponent("notch-recents-\(name).png"), height: 360)
         try snapshot(PreferencesView(selection: .general), scheme: scheme, width: 780,
                      to: output.appendingPathComponent("notch-settings-\(name).png"), height: 620)
@@ -232,7 +232,7 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     notch.refreshMode()
     precondition(bar.mode == .recording && notch.isVisible)
     for scheme in [ColorScheme.light, .dark] {
-        try snapshot(NotchContent().environment(\.colorScheme, .dark).padding(16).background(.black), scheme: scheme, width: 660,
+        try snapshot(NotchContent().environment(\.colorScheme, .dark).padding(16).background(.black), scheme: scheme, width: 584,
                      to: output.appendingPathComponent("notch-recording-\(scheme == .light ? "light" : "dark").png"), height: 700)
     }
     bar.hide()
@@ -248,6 +248,34 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     precondition(!savedFiles.isEmpty)
     overlay.perform(.dismiss, for: movieURL)
     precondition(overlay.items.isEmpty)
+
+    let clipboard = NSPasteboard(name: .init("BetterShot.NotchResultTests.\(UUID().uuidString)"))
+    defer { clipboard.releaseGlobally() }
+    let captures = CaptureOrchestrator.shared
+    captures.completeTextCapture("First line\nSecond line", action: .ocr, pasteboard: clipboard)
+    precondition(notch.ocrText == "First line\nSecond line")
+    precondition(clipboard.string(forType: .string) == notch.ocrText)
+    captures.completeTextCapture("First line\nSecond line", action: .ocrSingleLine, pasteboard: clipboard)
+    precondition(notch.ocrText == "First line Second line")
+    captures.completeTextCapture("#27A5E8", action: .colorPicker, pasteboard: clipboard)
+    precondition(notch.colorHex == "#27A5E8" && clipboard.string(forType: .string) == notch.colorHex)
+    ToastWindow.shared.dismiss(animated: false)
+    notch.collapse()
+    notch.show()
+    precondition(notch.ocrText == "First line Second line" && notch.colorHex == "#27A5E8")
+    precondition(CaptureOrchestrator.copyText(notch.ocrText!, to: clipboard))
+    precondition(clipboard.string(forType: .string) == "First line Second line")
+    captures.completeTextCapture(" \n ", action: .ocr, pasteboard: clipboard)
+    precondition(notch.ocrText == "First line Second line", "Empty OCR must preserve the last useful result")
+    precondition(clipboard.string(forType: .string) == "First line Second line")
+    ToastWindow.shared.dismiss(animated: false)
+    for scheme in [ColorScheme.light, .dark] {
+        try snapshot(NotchContent().environment(\.colorScheme, .dark).padding(16).background(.black),
+            scheme: scheme, width: 584, to: output.appendingPathComponent("notch-text-results-\(scheme == .light ? "light" : "dark").png"), height: 440)
+    }
+    notch.ocrText = nil
+    notch.colorHex = nil
+    print("PASS OCR/color auto-copy, single-line normalization, persistent notch results, repeat copy, and empty OCR")
 
     let owner = NSWindow(contentRect: CGRect(x: 30, y: 30, width: 320, height: 240),
                          styleMask: [.titled], backing: .buffered, defer: false)
