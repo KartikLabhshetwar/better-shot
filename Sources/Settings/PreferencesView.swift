@@ -34,6 +34,18 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .about: "info.circle"
         }
     }
+
+    var iconColor: Color {
+        switch self {
+        case .general: Color(nsColor: .systemGray)
+        case .capture: Color(nsColor: .systemOrange)
+        case .overlay: Color(nsColor: .systemIndigo)
+        case .recording: Color(nsColor: .systemRed)
+        case .shortcuts: Color(nsColor: .systemPurple)
+        case .sharing: Color(nsColor: .systemBlue)
+        case .about: Color(nsColor: .systemGray)
+        }
+    }
 }
 
 struct PreferencesView: View {
@@ -116,7 +128,7 @@ struct PreferencesView: View {
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(.white)
                 .frame(width: 24, height: 24)
-                .background(Color(nsColor: .systemGray), in: RoundedRectangle(cornerRadius: 6))
+                .background(section.iconColor, in: RoundedRectangle(cornerRadius: 6))
         }
         .padding(.vertical, 1)
         .tag(section)
