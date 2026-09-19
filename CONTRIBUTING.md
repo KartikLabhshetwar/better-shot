@@ -203,6 +203,37 @@ of the active preset; undo restores the previous camera settings. Missing layout
 bubble, and unavailable/hidden camera footage falls back to the screen. Preview,
 export, project persistence, render-cache invalidation, and undo share the style.
 
+### 3D video shots
+
+`Recording3DShot.swift` owns pose limits, perspective projection, presets, and the
+sorted, binary-searched shot timeline. Times refer to the edited movie, as mask
+ranges do; clip trims/speed changes clamp the effective track without deleting
+authored shots. Missing `shots3D` fields mean no effect in legacy projects.
+`RecordingStudioModel` handles undo, draft/save/discard, and render invalidation.
+`Recording3DInspector` and `Recording3DLane` use the existing inspector controls.
+
+The live content group uses the shared projection through SwiftUI. Export applies
+one Core Image perspective warp to the composed screen, masks, cursor, keystrokes,
+and camera over a cached, fixed background. Subtitles remain in canvas space.
+The flat export path skips the warp. Crop and mask editing temporarily bypass 3D
+in the preview so their source-coordinate handles remain usable.
+
+`make test` includes projection/normalization checks, model persistence/undo,
+compact light/dark snapshots, production compositor checks, and encoded 30/60 fps
+video checks. For focused checks after a build:
+
+```bash
+BETTERSHOT_CHECK_3D_ONLY=1 bash Tests/run-exports.sh
+# With existing Screen Recording permission, capture displayed player windows:
+BETTERSHOT_CHECK_3D_ONLY=1 BETTERSHOT_CHECK_3D_WINDOWS=1 bash Tests/run-exports.sh
+# With optimized Release objects, measure warm 1080p GPU frame times:
+BETTERSHOT_BUILD_CONFIGURATION=Release BETTERSHOT_CHECK_3D_ONLY=1 BETTERSHOT_BENCHMARK_3D=1 bash Tests/run-exports.sh
+```
+
+Offscreen snapshots do not validate live AVPlayer layers. The optional window
+check plays and seeks the production editor in both appearances using fixture
+media. It does not automate pointer dragging or keyboard entry in the controls.
+
 ### Shortcuts
 
 `ShortcutCatalog.swift` is the source for action IDs, groups, scopes, and

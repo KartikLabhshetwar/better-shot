@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **3D shots in the video editor**: Effects > 3D Shots adds eight camera moves and five still angles, custom start/end positions, easing, transitions, flips, and shot playback. Generate one to six shots across a video or split a shot into a three-shot scene. Move and resize shots in their timeline lane or enter exact times in the inspector. Screen, cursor, masks, and camera share the perspective transform over a fixed background; subtitles stay readable. Native GPU preview/export, undo/redo, saved projects, and cloud-share renders carry the edits without modifying source footage.
+
 - Rotate images left or right by 90° and flip horizontally or vertically from the image editor’s native Rotate menu (#144). Full-resolution pixels and editable annotations transform together, persist through saving/reopening, and carry through copy, export, and sharing. Mixed drawing, crop, rotation, and flip edits undo/redo in order; four optional shortcut actions start unassigned.
 
 - Optional automatic screenshot saving in General > Saving (#149). Normal captures can save immediately to the configured folder while keeping the preview or editor available. Defaults off, including on upgrade; explicit Copy, Edit, and Pin shortcuts remain private. Saved files stay linked to their editable originals, and failed saves remain in the deck for retry.

@@ -61,6 +61,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         let fitContentAspect: CGFloat?
         let crop: CGRect
         let masks: [RecordingMaskSegment]
+        let timeline3D: Recording3DTimeline
 
         init(
             screenURL: URL,
@@ -82,7 +83,8 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             reframe: ReframeTrack? = nil,
             fitContentAspect: CGFloat? = nil,
             crop: CGRect = RecordingVideoCrop.unit,
-            masks: [RecordingMaskSegment] = []
+            masks: [RecordingMaskSegment] = [],
+            timeline3D: Recording3DTimeline = .empty
         ) {
             self.screenURL = screenURL
             self.cameraURL = cameraURL
@@ -104,6 +106,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             self.fitContentAspect = fitContentAspect
             self.crop = crop
             self.masks = masks
+            self.timeline3D = timeline3D
         }
     }
 
@@ -327,6 +330,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             fitContentAspect: configuration.fitContentAspect,
             crop: configuration.crop,
             masks: configuration.masks,
+            timeline3D: configuration.timeline3D,
             maximumBlurSamples: configuration.exportSettings.speed.motionBlurSamples
         )
 
@@ -660,6 +664,7 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
     private let reframe: ReframeTrack?
     private let crop: CGRect
     private let masks: [RecordingMaskSegment]
+    private let timeline3D: Recording3DTimeline
     private let renderContext = CIContext(options: [.cacheIntermediates: false])
     private var artworkImageCache: [String: CGImage] = [:]
     // Retain the buffer: decoder pools may recycle its address after release.
@@ -682,6 +687,23 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
     }()
     private lazy var backgroundImage = backdrop.map { CIImage(cgImage: $0) }
         ?? CIImage(color: .black).cropped(to: CGRect(origin: .zero, size: canvasSize))
+    private let style: RecordingStudioStyle
+    private lazy var cleanBackground: CIImage = {
+        var plain = style
+        plain.shadow = 0
+        return Self.renderBackdrop(canvasSize: canvasSize, layout: layout, style: plain,
+                                   colorSpace: colorSpace).map { CIImage(cgImage: $0) } ?? backgroundImage
+    }()
+    private lazy var contentShadow: CIImage? = try? raster { context in
+        guard layout.showsScreen, style.shadow > 0.01, style.background != .none else { return }
+        let dimension = min(canvasSize.width, canvasSize.height)
+        context.setShadow(offset: CGSize(width: 0, height: -dimension * 0.016 * style.shadow),
+                          blur: dimension * 0.045 * style.shadow,
+                          color: CGColor(gray: 0, alpha: 0.55 * style.shadow))
+        context.addPath(roundedPath(for: layout.cardRect, radius: layout.cardCornerRadius))
+        context.setFillColor(CGColor(gray: 0, alpha: 1))
+        context.fillPath()
+    }
     private lazy var cardMask = try? raster { context in
         context.addPath(roundedPath(for: layout.cardRect, radius: layout.cardCornerRadius))
         context.setFillColor(CGColor(gray: 1, alpha: 1))
@@ -727,8 +749,10 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
         fitContentAspect: CGFloat? = nil,
         crop: CGRect = RecordingVideoCrop.unit,
         masks: [RecordingMaskSegment] = [],
+        timeline3D: Recording3DTimeline = .empty,
         maximumBlurSamples: Int = 4
     ) {
+        self.style = style
         self.maximumBlurSamples = max(1, maximumBlurSamples)
         self.canvasSize = canvasSize
         self.layout = RecordingStudioLayout.make(
@@ -749,6 +773,7 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
         self.reframe = reframe
         self.crop = crop
         self.masks = masks
+        self.timeline3D = timeline3D
         self.outputFrameInterval = outputFrameInterval
         self.pointerScale = style.cursorScale
         self.colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
@@ -798,7 +823,12 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
             cachedMasks.removeAll(keepingCapacity: true)
             cachedMaskBytes = 0
         }
-        var result = backgroundImage
+        let pose = timeline3D.pose(at: editorTime)
+        let is3D = pose != .identity
+        let canvas = CGRect(origin: .zero, size: canvasSize)
+        var result = is3D
+            ? (contentShadow ?? CIImage.empty()).cropped(to: canvas)
+            : backgroundImage
         if layout.showsScreen {
             let sourceImage = CIImage(cvPixelBuffer: screenFrame)
             let shutter = outputFrameInterval
@@ -866,7 +896,7 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
             }
             result = screenImage.applyingFilter("CISourceInCompositing", parameters: [
                 kCIInputBackgroundImageKey: cardMask
-            ]).composited(over: backgroundImage)
+            ]).composited(over: result)
 
             // Pointer motion is resolved independently from viewport shutter
             // blur. Its interaction magnification and tilt stay anchored at the
@@ -900,6 +930,20 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
             if layout.decoratesCamera { result = cameraBorder.composited(over: result) }
         }
 
+        if is3D {
+            // Map the composed transparent plane through the same projection as SwiftUI.
+            // A single GPU warp retains source pixels, masks, cursor, and camera alignment.
+            func corner(_ x: CGFloat, _ y: CGFloat) -> CIVector {
+                let point = pose.project(CGPoint(x: x, y: y), in: canvasSize)
+                return CIVector(x: point.x, y: canvasSize.height - point.y)
+            }
+            result = result.cropped(to: canvas).applyingFilter("CIPerspectiveTransform", parameters: [
+                "inputTopLeft": corner(0, 0),
+                "inputTopRight": corner(canvasSize.width, 0),
+                "inputBottomLeft": corner(0, canvasSize.height),
+                "inputBottomRight": corner(canvasSize.width, canvasSize.height)
+            ]).composited(over: cleanBackground).cropped(to: canvas)
+        }
         if subtitleTimeline != nil {
             result = try raster { drawSubtitleBar(at: sourceTime, in: $0) }.composited(over: result)
         }

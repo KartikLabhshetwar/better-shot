@@ -153,7 +153,8 @@ enum RecordingSessionRenderer {
             exportSettings: document?.exportSettings ?? VideoCompressionSettings(),
             reframe: reframe,
             fitContentAspect: fitContentAspect,
-            masks: document?.masks ?? []
+            masks: document?.masks ?? [],
+            timeline3D: Recording3DTimeline(shots: document?.shots3D ?? [], duration: clipTimeline.duration)
         )
 
         let temporaryURL = try await RecordingStudioExporter().export(configuration) { progress in

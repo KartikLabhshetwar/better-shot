@@ -41,6 +41,7 @@ struct RecordingStudioWindow: View {
 struct RecordingStudioContent: View {
     @Bindable var model: RecordingStudioModel
     @State private var isInspectorPresented = true
+    @State private var confirms3DShotRemoval = false
     @State private var closeGuard = EditorCloseGuard()
 
     var body: some View {
@@ -124,6 +125,12 @@ struct RecordingStudioContent: View {
             }
             .sharedBackgroundVisibility(.hidden)
         }
+        .alert("Remove this 3D shot?", isPresented: $confirms3DShotRemoval) {
+            Button("Cancel", role: .cancel) { }
+            Button("Remove Shot", role: .destructive) {
+                if let id = model.selected3DShotID { model.remove3DShot(id: id) }
+            }
+        }
         .editorFullScreenByDefault()
         .navigationTitle(windowTitle)
         .onWindowChange { window in
@@ -154,7 +161,8 @@ struct RecordingStudioContent: View {
         case .videoDelete:
             if model.isEditingMasks { model.deleteSelectedMask() }
             else if !model.isCroppingVideo {
-                if let id = model.selectedCueID { model.removeZoomCue(id: id) }
+                if model.selected3DShotID != nil { confirms3DShotRemoval = true }
+                else if let id = model.selectedCueID { model.removeZoomCue(id: id) }
                 else { model.deleteSelectedClip() }
             }
         default:
@@ -471,58 +479,64 @@ private struct StudioCanvas: View {
                         .frame(width: canvasSize.width, height: canvasSize.height)
                         .clipped()
 
-                    // The recording card: video with the virtual camera
-                    // transform, clipped to the rounded padded card. The
-                    // synthetic cursor overlays inside the same clip so it
-                    // pans, zooms, and crops exactly like the pixels below.
-                    if layout.showsScreen {
-                        StudioPlayerLayerView(player: model.screenPlayer, gravity: .resize)
-                            .frame(
-                                width: layout.contentFillSize.width / crop.width,
-                                height: layout.contentFillSize.height / crop.height
-                            )
-                            .scaleEffect(state.magnification)
-                            .offset(
-                                x: (cropCenter.x - state.anchor.x) * state.magnification * layout.contentFillSize.width,
-                                y: (cropCenter.y - state.anchor.y) * state.magnification * layout.contentFillSize.height
-                            )
-                            .frame(width: layout.cardRect.width, height: layout.cardRect.height)
-                            .overlay {
-                                if let pointer = model.previewPointerFrame(at: model.displayTime) {
-                                    StudioCursorOverlay(
-                                        pointer: pointer,
-                                        artwork: model.artwork(id: pointer.artworkID),
-                                        state: state,
-                                        cardSize: layout.cardRect.size,
-                                        contentSize: layout.contentFillSize,
-                                        cursorScale: model.style.cursorScale,
-                                        showsClickEffect: model.showsPressEffects
-                                    )
+                    ZStack {
+                        // The recording card: video with the virtual camera
+                        // transform, clipped to the rounded padded card. The
+                        // synthetic cursor overlays inside the same clip so it
+                        // pans, zooms, and crops exactly like the pixels below.
+                        if layout.showsScreen {
+                            StudioPlayerLayerView(player: model.screenPlayer, gravity: .resize)
+                                .frame(
+                                    width: layout.contentFillSize.width / crop.width,
+                                    height: layout.contentFillSize.height / crop.height
+                                )
+                                .scaleEffect(state.magnification)
+                                .offset(
+                                    x: (cropCenter.x - state.anchor.x) * state.magnification * layout.contentFillSize.width,
+                                    y: (cropCenter.y - state.anchor.y) * state.magnification * layout.contentFillSize.height
+                                )
+                                .frame(width: layout.cardRect.width, height: layout.cardRect.height)
+                                .overlay {
+                                    if let pointer = model.previewPointerFrame(at: model.displayTime) {
+                                        StudioCursorOverlay(
+                                            pointer: pointer,
+                                            artwork: model.artwork(id: pointer.artworkID),
+                                            state: state,
+                                            cardSize: layout.cardRect.size,
+                                            contentSize: layout.contentFillSize,
+                                            cursorScale: model.style.cursorScale,
+                                            showsClickEffect: model.showsPressEffects
+                                        )
+                                    }
                                 }
-                            }
-                            .clipShape(RoundedRectangle(cornerRadius: layout.cardCornerRadius, style: .continuous))
-                            .overlay {
-                                // Keystroke caption in card space: pinned to its
-                                // edge, unaffected by the zoom transform.
-                                if let caption = model.keystrokeCaption(at: model.displayTime) {
-                                    StudioKeystrokeCaptionView(
-                                        caption: caption,
-                                        placement: model.keystrokePlacement,
-                                        cardSize: layout.cardRect.size
-                                    )
+                                .clipShape(RoundedRectangle(cornerRadius: layout.cardCornerRadius, style: .continuous))
+                                .overlay {
+                                    // Keystroke caption in card space: pinned to its
+                                    // edge, unaffected by the zoom transform.
+                                    if let caption = model.keystrokeCaption(at: model.displayTime) {
+                                        StudioKeystrokeCaptionView(
+                                            caption: caption,
+                                            placement: model.keystrokePlacement,
+                                            cardSize: layout.cardRect.size
+                                        )
+                                    }
                                 }
-                            }
-                            .shadow(
-                                color: .black.opacity(model.style.background == .none ? 0 : 0.55 * model.style.shadow),
-                                radius: min(canvasSize.width, canvasSize.height) * 0.045 * model.style.shadow,
-                                y: min(canvasSize.width, canvasSize.height) * 0.016 * model.style.shadow
-                            )
-                            .position(x: layout.cardRect.midX, y: layout.cardRect.midY)
-                    }
+                                .shadow(
+                                    color: .black.opacity(model.style.background == .none ? 0 : 0.55 * model.style.shadow),
+                                    radius: min(canvasSize.width, canvasSize.height) * 0.045 * model.style.shadow,
+                                    y: min(canvasSize.width, canvasSize.height) * 0.016 * model.style.shadow
+                                )
+                                .position(x: layout.cardRect.midX, y: layout.cardRect.midY)
+                        }
 
-                    if model.isCameraVisible(at: model.displayTime), layout.bubbleRect.width > 0 {
-                        StudioCameraBubble(model: model, layout: layout)
+                        if model.isCameraVisible(at: model.displayTime), layout.bubbleRect.width > 0 {
+                            StudioCameraBubble(model: model, layout: layout)
+                        }
+
                     }
+                    .frame(width: canvasSize.width, height: canvasSize.height)
+                    .clipped()
+                    .projectionEffect(ProjectionTransform(model.preview3DPose(at: model.displayTime).projection(in: canvasSize)))
 
                     // Subtitle bar in canvas space - it can sit over the
                     // background below the card, not just over the video, so
@@ -1423,7 +1437,7 @@ private struct StudioTimelineEditor: View {
                            origin: scale.time(forX: x + scrollX))
             }
         ))
-        .frame(height: StudioTimelineMetrics.lanesHeight(showsMaskLane: model.showsMaskLane))
+        .frame(height: StudioTimelineMetrics.lanesHeight(showsMaskLane: model.showsMaskLane) + (model.timeline3D.shots.isEmpty ? 0 : 44))
         .onChange(of: model.duration, initial: true) { old, duration in
             if old == 0 || old == duration { viewport.fit(duration: duration) }
             else {
@@ -1452,6 +1466,9 @@ private struct StudioTimelineEditor: View {
                 if model.showsMaskLane {
                     StudioZoomLaneBackground()
                         .frame(height: StudioTimelineMetrics.maskLaneHeight)
+                }
+                if !model.timeline3D.shots.isEmpty {
+                    StudioZoomLaneBackground().frame(height: 36)
                 }
                 Color.clear
                     .frame(height: StudioTimelineMetrics.scrollerGutter)
@@ -1490,6 +1507,11 @@ private struct StudioTimelineEditor: View {
                         )
                     }
 
+                    if !model.timeline3D.shots.isEmpty {
+                        Recording3DLane(model: model, pointsPerSecond: scale.pointsPerSecond,
+                                        visibleRange: scale.visibleRange(scrollX: scrollX))
+                            .frame(width: scale.contentWidth, height: 36)
+                    }
                     Color.clear
                         .frame(height: StudioTimelineMetrics.scrollerGutter)
                 }
@@ -1505,7 +1527,7 @@ private struct StudioTimelineEditor: View {
                 }
             }
         }
-        .frame(height: StudioTimelineMetrics.scrollingLanesHeight(showsMaskLane: model.showsMaskLane))
+        .frame(height: StudioTimelineMetrics.scrollingLanesHeight(showsMaskLane: model.showsMaskLane) + (model.timeline3D.shots.isEmpty ? 0 : 44))
         .mask(edgeFadeMask(scale: scale))
         .overlay(alignment: .top) {
             cutMarkerLane
@@ -2793,6 +2815,9 @@ struct StudioInspector: View {
         .onChange(of: model.selectedCueID, initial: true) { _, cue in
             if cue != nil { selectedTab = .zoom }
         }
+        .onChange(of: model.selected3DShotID, initial: true) { _, shot in
+            if shot != nil { selectedTab = .effects }
+        }
         .onChange(of: model.selectedClipID) { _, clip in
             if clip != nil { selectedTab = .zoom }
         }
@@ -2893,6 +2918,10 @@ struct StudioInspector: View {
                         ) {
                             cursorControls
                         }
+                    }
+
+                    if selectedTab == .effects {
+                        Recording3DInspector(model: model)
                     }
 
                     if selectedTab == .effects && model.hasKeystrokes {
@@ -3003,17 +3032,23 @@ struct StudioInspector: View {
     private var effectActions: some View {
         HStack(spacing: 8) {
             Button { model.beginVideoCrop() } label: {
-                Label("Crop", systemImage: "crop")
-                    .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
-                    .frame(maxWidth: .infinity)
+                ViewThatFits(in: .horizontal) {
+                    Label("Crop", systemImage: "crop").fixedSize()
+                    Text("Crop")
+                }
+                .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
+                .frame(maxWidth: .infinity)
             }
             .buttonStyle(EditorButtonStyle(selected: model.isCroppingVideo, horizontalPadding: 4))
             .help("Crop the recording; click again to cancel changes")
             ForEach([RecordingMaskSegment.Effect.blur, .pixelate], id: \.self) { effect in
                 Button { model.toggleMaskTool(effect) } label: {
-                    Label(effect == .blur ? "Blur" : "Pixelate",
-                                systemImage: effect == .blur ? "drop.fill" : "square.grid.3x3.fill")
-                        .frame(maxWidth: .infinity)
+                    ViewThatFits(in: .horizontal) {
+                        Label(effect == .blur ? "Blur" : "Pixelate",
+                              systemImage: effect == .blur ? "drop.fill" : "square.grid.3x3.fill").fixedSize()
+                        Text(effect == .blur ? "Blur" : "Pixelate")
+                    }
+                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(EditorButtonStyle(selected: model.isEditingMasks && model.selectedMask?.effect == effect,
                                                horizontalPadding: 4))

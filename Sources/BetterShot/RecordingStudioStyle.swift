@@ -62,7 +62,7 @@ struct RecordingCameraBubbleSettings: Equatable {
 }
 
 struct RecordingEditDocument: Codable, Equatable {
-    var formatVersion = 5
+    var formatVersion = 6
     var style: StoredRecordingStudioStyle
     var zoomEnabled: Bool
     var zoomCues: [ZoomCue]
@@ -101,6 +101,7 @@ struct RecordingEditDocument: Codable, Equatable {
     var audioExportFormat: String?
     var crop: [Double]?
     var masks: [RecordingMaskSegment]?
+    var shots3D: [Recording3DShot]?
 
     private enum CodingKeys: String, CodingKey {
         case formatVersion
@@ -127,6 +128,7 @@ struct RecordingEditDocument: Codable, Equatable {
         case audioExportFormat
         case crop
         case masks
+        case shots3D
     }
 
     init(
@@ -149,8 +151,10 @@ struct RecordingEditDocument: Codable, Equatable {
         replacementAudioDisplayName: String? = nil,
         audioExportFormat: RecordingAudioFormat? = nil,
         crop: CGRect? = nil,
-        masks: [RecordingMaskSegment]? = nil
+        masks: [RecordingMaskSegment]? = nil,
+        shots3D: [Recording3DShot]? = nil
     ) {
+        self.shots3D = shots3D?.isEmpty == false ? shots3D : nil
         self.style = StoredRecordingStudioStyle(style)
         self.zoomEnabled = zoomEnabled
         self.zoomCues = zoomCues
@@ -268,6 +272,7 @@ struct RecordingEditDocument: Codable, Equatable {
         audioExportFormat = try container.decodeIfPresent(String.self, forKey: .audioExportFormat)
         crop = try container.decodeIfPresent([Double].self, forKey: .crop)
         masks = try container.decodeIfPresent([RecordingMaskSegment].self, forKey: .masks)
+        shots3D = try container.decodeIfPresent([Recording3DShot].self, forKey: .shots3D)
     }
 
     func encode(to encoder: any Encoder) throws {
@@ -299,6 +304,7 @@ struct RecordingEditDocument: Codable, Equatable {
         try container.encodeIfPresent(audioExportFormat, forKey: .audioExportFormat)
         try container.encodeIfPresent(crop, forKey: .crop)
         try container.encodeIfPresent(masks, forKey: .masks)
+        try container.encodeIfPresent(shots3D, forKey: .shots3D)
     }
 }
 

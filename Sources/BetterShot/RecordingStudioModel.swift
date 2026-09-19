@@ -130,6 +130,12 @@ final class RecordingStudioModel {
     private(set) var isCroppingVideo = false
     var cropDraft = RecordingVideoCrop.unit
     var cropAspect: CropAspectRatio = .freeform
+    private(set) var shots3D: [Recording3DShot] = []
+    private(set) var timeline3D = Recording3DTimeline.empty
+    var selected3DShotID: UUID?
+    private var shot3DEditSnapshot: [Recording3DShot]?
+    private var shotPlaybackEnd: Double?
+    private(set) var shot3DError: String?
     private(set) var maskSegments: [RecordingMaskSegment] = []
     private(set) var isEditingMasks = false
     var selectedMaskID: UUID?
@@ -343,6 +349,7 @@ final class RecordingStudioModel {
             )
         }
         duration = clipTimeline.duration
+        rebuild3DTimeline()
         selectedClipID = clipTimeline.segments.first?.id
 
         // Resolve the imported soundtrack before the first player item is
@@ -418,6 +425,8 @@ final class RecordingStudioModel {
         audioExportFormat = document.audioExportFormatValue
         cropRect = document.cropValue
         maskSegments = document.masks ?? []
+        shots3D = document.shots3D ?? []
+        selected3DShotID = nil
         updatePreviewMaskComposition()
     }
 
@@ -477,6 +486,7 @@ final class RecordingStudioModel {
     }
 
     func pause() {
+        shotPlaybackEnd = nil
         guard isPlaying else { return }
         isPlaying = false
         screenPlayer.pause()
@@ -484,6 +494,7 @@ final class RecordingStudioModel {
     }
 
     func seek(to time: TimeInterval) {
+        shotPlaybackEnd = nil
         let clamped = min(max(time, 0), max(duration, 0))
         currentTime = clamped
         updateActiveTranscriptWord()
@@ -530,6 +541,11 @@ final class RecordingStudioModel {
                 guard let self else { return }
                 if self.isPlaying {
                     let seconds = time.seconds
+                    if let end = self.shotPlaybackEnd, seconds >= end {
+                        self.pause()
+                        self.seek(to: end)
+                        return
+                    }
                     if seconds >= self.duration - 0.001 {
                         self.pause()
                         self.currentTime = self.duration
@@ -597,12 +613,14 @@ final class RecordingStudioModel {
         guard clipTimeline.segments.contains(where: { $0.id == id }) else { return }
         selectedClipID = id
         selectedCueID = nil
+        selected3DShotID = nil
     }
 
     func selectZoomCue(id: UUID) {
         guard zoomCues.contains(where: { $0.id == id }) else { return }
         selectedCueID = id
         selectedClipID = nil
+        selected3DShotID = nil
     }
 
     func undo() {
@@ -717,6 +735,7 @@ final class RecordingStudioModel {
         timelineHoverTime = nil
         clipTimeline = next
         duration = next.duration
+        rebuild3DTimeline()
         selectedClipID = selectedID.flatMap { id in
             next.segments.contains(where: { $0.id == id }) ? id : nil
         } ?? next.segments.first?.id
@@ -878,6 +897,126 @@ final class RecordingStudioModel {
     }
 
     // MARK: - Zoom cues
+
+    // MARK: 3D shots
+
+    var selected3DShot: Recording3DShot? {
+        timeline3D.shots.first { $0.id == selected3DShotID }
+    }
+
+    func preview3DPose(at time: Double) -> Recording3DPose {
+        isCroppingVideo || isEditingMasks ? .identity : timeline3D.pose(at: time)
+    }
+
+    private func rebuild3DTimeline() {
+        timeline3D = Recording3DTimeline(shots: shots3D, duration: duration)
+        if !timeline3D.shots.contains(where: { $0.id == selected3DShotID }) { selected3DShotID = nil }
+    }
+
+    func select3DShot(id: UUID) {
+        guard timeline3D.shots.contains(where: { $0.id == id }) else { return }
+        if isCroppingVideo { cancelVideoCrop() }
+        if isEditingMasks { endMaskEditing() }
+        selected3DShotID = id
+        selectedCueID = nil
+        selectedClipID = nil
+        shot3DError = nil
+    }
+
+    private func set3DShots(_ shots: [Recording3DShot], actionName: String) {
+        guard shots != shots3D else { return }
+        let previous = shots3D
+        registerUndo(actionName) { $0.set3DShots(previous, actionName: actionName) }
+        shots3D = shots
+        rebuild3DTimeline()
+        scheduleProjectSave()
+    }
+
+    func begin3DShotEdit() {
+        pause()
+        if shot3DEditSnapshot == nil { shot3DEditSnapshot = shots3D }
+    }
+
+    func end3DShotEdit() {
+        guard let previous = shot3DEditSnapshot else { return }
+        shot3DEditSnapshot = nil
+        if previous != shots3D {
+            registerUndo("Edit 3D Shot") { $0.set3DShots(previous, actionName: "Edit 3D Shot") }
+        }
+    }
+
+    func add3DShot(at time: Double) {
+        if let shot = timeline3D.shots.first(where: { $0.start <= time && time < $0.end }) {
+            select3DShot(id: shot.id)
+            return
+        }
+        guard time.isFinite, duration >= Recording3DShot.minimumDuration else { return }
+        let occupied = timeline3D.shots
+        let lower = occupied.filter { $0.end <= time }.last?.end ?? 0
+        let upper = occupied.first { $0.start >= time }?.start ?? duration
+        guard upper - lower >= Recording3DShot.minimumDuration else {
+            shot3DError = "No room here. Shorten a neighboring 3D shot or choose another time."
+            return
+        }
+        let length = min(3, upper - lower)
+        let start = min(max(time, lower), upper - length)
+        var shot = Recording3DShot(start: start, end: start + length)
+        shot.apply(.glide)
+        set3DShots(shots3D + [shot], actionName: "Add 3D Shot")
+        select3DShot(id: shot.id)
+        pause()
+        seek(to: shot.start + min(0.5, length / 2))
+    }
+
+    func boundsFor3DShot(_ shot: Recording3DShot) -> ClosedRange<Double> {
+        let others = timeline3D.shots.filter { $0.id != shot.id }
+        return (others.filter { $0.end <= shot.start }.last?.end ?? 0)...(others.first { $0.start >= shot.end }?.start ?? duration)
+    }
+
+    func update3DShot(_ requested: Recording3DShot) {
+        guard let current = selected3DShot, requested.id == current.id,
+              requested.start.isFinite, requested.end.isFinite else { return }
+        let bounds = boundsFor3DShot(current)
+        var shot = requested
+        shot.start = min(max(shot.start, bounds.lowerBound), bounds.upperBound - Recording3DShot.minimumDuration)
+        shot.end = min(max(shot.end, shot.start + Recording3DShot.minimumDuration), bounds.upperBound)
+        guard let safe = Recording3DTimeline(shots: [shot], duration: duration).shots.first else { return }
+        let next = shots3D.map { $0.id == safe.id ? safe : $0 }
+        if shot3DEditSnapshot != nil {
+            shots3D = next
+            rebuild3DTimeline()
+            scheduleProjectSave()
+        } else { set3DShots(next, actionName: "Edit 3D Shot") }
+    }
+
+    func remove3DShot(id: UUID) {
+        set3DShots(shots3D.filter { $0.id != id }, actionName: "Remove 3D Shot")
+    }
+
+    /// A scene replaces only the selected range; Auto scene explicitly replaces the whole track.
+    func apply3DScene(_ presets: [Recording3DPreset], wholeMovie: Bool = false) {
+        guard duration > 0 else { return }
+        let replacesAll = wholeMovie || selected3DShot == nil
+        let range = replacesAll ? 0...duration : selected3DShot.map { $0.start...$0.end } ?? 0...duration
+        let shots = Recording3DTimeline.scene(presets, in: range)
+        guard !shots.isEmpty else {
+            shot3DError = "This range is too short. Allow at least 0.2 seconds per shot."
+            return
+        }
+        let remaining = replacesAll ? [] : shots3D.filter { $0.end <= range.lowerBound || $0.start >= range.upperBound }
+        set3DShots(remaining + shots, actionName: "Apply 3D Scene")
+        select3DShot(id: shots[0].id)
+        pause()
+        seek(to: shots[0].start + min(0.5, (shots[0].end - shots[0].start) / 2))
+    }
+
+    func play3DShot() {
+        guard let shot = selected3DShot else { return }
+        pause()
+        seek(to: shot.start)
+        play()
+        shotPlaybackEnd = shot.end
+    }
 
     private func replaceZoomCues(_ cues: [ZoomCue]) {
         zoomCues = cues.sorted { $0.start < $1.start }
@@ -1155,7 +1294,8 @@ final class RecordingStudioModel {
             replacementAudioDisplayName: replacementAudio?.displayName,
             audioExportFormat: audioExportFormat,
             crop: RecordingVideoCrop.isUnit(cropRect) ? nil : cropRect,
-            masks: maskSegments.isEmpty ? nil : maskSegments
+            masks: maskSegments.isEmpty ? nil : maskSegments,
+            shots3D: shots3D
         )
     }
 
@@ -1266,6 +1406,7 @@ final class RecordingStudioModel {
             )
         }
         duration = clipTimeline.duration
+        rebuild3DTimeline()
         selectedClipID = clipTimeline.segments.first?.id
 
         if let fileName = document.replacementAudioFileName {
@@ -1670,7 +1811,8 @@ final class RecordingStudioModel {
             reframe: reframe,
             fitContentAspect: fitContentAspect,
             crop: cropRect,
-            masks: maskSegments
+            masks: maskSegments,
+            timeline3D: timeline3D
         )
     }
 

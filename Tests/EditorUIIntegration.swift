@@ -519,6 +519,17 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         try snapshot(RecordingStudioContent(model: videoModel), scheme: scheme, width: 1100,
                      to: output.appendingPathComponent("video-effects-\(name).png"))
     }
+    videoModel.add3DShot(at: 0)
+    for scheme in [ColorScheme.light, .dark] {
+        let name = scheme == .light ? "light" : "dark"
+        for width: CGFloat in [260, 320] {
+            try snapshot(StudioInspector(model: videoModel, initialTab: .effects), scheme: scheme, width: width,
+                         to: output.appendingPathComponent("video-3d-inspector-\(name)-\(Int(width)).png"), height: 1000)
+        }
+        try snapshot(RecordingStudioContent(model: videoModel), scheme: scheme, width: 1100,
+                     to: output.appendingPathComponent("video-3d-\(name).png"))
+    }
+    if let id = videoModel.selected3DShotID { videoModel.remove3DShot(id: id) }
     videoModel.splitClip(at: videoModel.duration / 2)
     var firstClip = videoModel.clipTimeline.segments[0]
     firstClip.sourceStart += 0.2

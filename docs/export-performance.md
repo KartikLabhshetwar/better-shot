@@ -153,3 +153,41 @@ it under memory pressure. Its key includes source contents, edits, and custom
 wallpaper contents; a missing dependency bypasses reuse. Larger PNGs and JPEG
 exports render normally. Unedited PNGs retain their existing direct-copy path.
 Replacing a wallpaper also refreshes the shared preview/export file signature.
+
+
+## 3D shot rendering — 2026-09-19
+
+Reviewed Cap's repository structure and traced its 3D editor/rendering flow at
+[`c2ee42bda`](https://github.com/CapSoftware/Cap/tree/c2ee42bda0159e51e031356689e00d7ac4d66d11):
+`apps/desktop/src/routes/editor/three-d.ts`, `three-d-panel.tsx`,
+`Timeline/ThreeDTrack.tsx`, `context.ts`, and the Rust `camera3d` modules and WGSL
+shader in `crates/rendering`. This was a feature-focused review, not an audit of
+every file in Cap's web/backend/media monorepo.
+
+BetterShot uses original Swift presets and a shared pinhole projection, with
+native [SwiftUI projection effects](https://developer.apple.com/documentation/swiftui/view/projectioneffect(_:))
+and [Core Image perspective transforms](https://developer.apple.com/documentation/coreimage/ciperspectivetransform).
+No Cap code, shaders, assets, Rust runtime, or web UI dependencies were copied.
+The implementation covers timed start/end camera poses, eight moves, five still
+angles, scenes, easing, transitions, and timeline editing. Cap's per-property
+keyframe curve editor and depth-of-field/bokeh controls are outside this change.
+
+The content plane includes the screen, source masks, cursor, keystrokes, shadows,
+and camera. Backgrounds and subtitles remain in canvas space. Export adds one
+GPU warp only on active frames; the existing flat path remains unchanged.
+Backgrounds/shadows are cached, source frames remain on the GPU, and shot lookup
+uses binary search without per-frame timeline construction.
+
+On this Apple M5 / 32 GB Mac, optimized Release objects measured **1.55 ms/frame
+flat** and **1.89 ms/frame with a moving 3D shot** at 1920×1080: approximately
+**0.34 ms/frame** additional compositor time. These are medians of three warm
+120-frame runs after one warmup, with synchronous GPU completion, a reused
+synthetic source buffer, and no concurrent build. They measure GPU composition,
+not decoding, encoding, display frame rate, or every recording workload. The
+benchmark is reproducible through the command in CONTRIBUTING.md.
+
+Validation includes all presets, extreme-angle near-plane checks, resolution
+independence, masks/crop/cursor/camera alignment, random seeks over a reused source,
+encoded 30/60 fps output, persistence/undo/discard, and render-cache invalidation.
+Displayed production AVPlayer windows were captured in both appearances; compact
+inspector layouts are also covered by offscreen snapshots.

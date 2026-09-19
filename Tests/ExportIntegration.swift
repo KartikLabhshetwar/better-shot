@@ -50,6 +50,12 @@ struct ExportIntegration {
             try await benchmarkExports(image: image, directory: directory)
             return
         }
+        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_3D_ONLY"] == "1" {
+            let movie = directory.appendingPathComponent("source.mov")
+            try await makeMovie(at: movie, image: image)
+            try await check3DShots(movie: movie, directory: directory)
+            return
+        }
         if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_VIDEO_EXPORTS"] == "1" {
             let movie = directory.appendingPathComponent("source.mov")
             try await makeMovie(at: movie, image: image)
@@ -383,6 +389,7 @@ struct ExportIntegration {
                 } catch is CancellationError {} catch RecordingStudioExporter.ExportError.cancelled {}
             }
         }
+        try await check3DShots(movie: movie, directory: directory)
         print("PASS camera + audio + crop + mask, cache invalidation, and cancellation")
     }
 
