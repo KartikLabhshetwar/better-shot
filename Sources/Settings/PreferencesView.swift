@@ -189,7 +189,7 @@ struct GeneralSettingsTab: View {
     @AppStorage(NotchVoiceCapture.actionKey) private var holdAction = "area"
     @AppStorage(NotchVoiceCapture.holdKey) private var captureHoldKey = NotchCaptureHoldKey.control
     @AppStorage(NotchVoiceCapture.controlKey) private var controlCapture = true
-    @AppStorage(NotchVoiceCapture.gestureKey) private var holdOption = false
+    @AppStorage(NotchVoiceCapture.gestureKey) private var holdOption = true
     @State private var confirmClearShelf = false
     @State private var loginStatus: SMAppService.Status = .notRegistered
     @State private var loginError: String?
@@ -274,7 +274,7 @@ struct GeneralSettingsTab: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Keep copied text in Notch Mode", isOn: $clipboardHistory)
                     .onChange(of: clipboardHistory) { NotchShelfStore.shared.refreshMonitoring() }
-                Toggle("Hold Option to draw and speak", isOn: $holdOption)
+                Toggle("Voice annotation: Hold Option", isOn: $holdOption)
                     .disabled(controlCapture && captureHoldKey == .option)
                     .onChange(of: holdOption) { NotchVoiceCapture.shared.refreshGesture() }
                 if controlCapture && captureHoldKey == .option {

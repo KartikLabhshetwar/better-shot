@@ -17,6 +17,7 @@ final class NotchQuickEditor: NSObject, NSWindowDelegate {
     private var originalURL: URL?
     private var previousApp: NSRunningApplication?
     private var limitTask: Task<Void, Never>?
+    private var finishAfterVoiceStarts = false
     var isOpen: Bool { panel != nil }
     var hasVoice: Bool { audioURL != nil }
 
@@ -74,7 +75,13 @@ final class NotchQuickEditor: NSObject, NSWindowDelegate {
         }
         discardVoice()
         busy = true
-        defer { busy = false }
+        defer {
+            busy = false
+            if finishAfterVoiceStarts {
+                finishAfterVoiceStarts = false
+                Task { await finish() }
+            }
+        }
         guard await AVCaptureDevice.requestAccess(for: .audio) else {
             error = "Allow Microphone access in System Settings → Privacy & Security, then try Voice again."
             return
@@ -111,6 +118,16 @@ final class NotchQuickEditor: NSObject, NSWindowDelegate {
         recorder = nil
         listening = false
         status = hasVoice ? "Voice recorded · Done to transcribe" : nil
+    }
+
+    /// Option can be released while microphone permission or startup is still
+    /// finishing. Queue one completion instead of losing the held gesture.
+    func requestFinish() {
+        guard busy else {
+            Task { await finish() }
+            return
+        }
+        finishAfterVoiceStarts = true
     }
 
     func finish() async {

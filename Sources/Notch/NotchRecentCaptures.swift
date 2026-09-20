@@ -73,7 +73,14 @@ enum NotchRecentCaptures {
         let results = entries.filter {
             filter == .all || (filter == .colors && $0.isColor == true) || (filter == .text && $0.isColor != true)
         }.map(ShelfItem.result)
-        return (media(pending: pending, filter: filter).map(ShelfItem.media) + results)
+        let voiceImages = Set(results.compactMap { item -> URL? in
+            guard case .result(let entry) = item else { return nil }
+            return entry.imageURL?.standardizedFileURL
+        })
+        let captures = media(pending: pending, filter: filter)
+            .filter { !voiceImages.contains($0.url.standardizedFileURL) }
+            .map(ShelfItem.media)
+        return (captures + results)
             .sorted { $0.date > $1.date }
     }
 }

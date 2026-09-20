@@ -6,6 +6,9 @@ import Observation
 final class NotchVoiceCapture {
     static let shared = NotchVoiceCapture()
     static let gestureKey = "bs_notchHoldOption"
+    static var optionGestureEnabled: Bool {
+        UserDefaults.standard.object(forKey: gestureKey) as? Bool ?? true
+    }
     static let controlKey = "bs_notchControlCapture"
     static let actionKey = "bs_notchHoldAction"
     static var drawsOnHold: Bool { UserDefaults.standard.string(forKey: actionKey) == "draw" }
@@ -57,7 +60,7 @@ final class NotchVoiceCapture {
         controlGesture = NotchControlGesture()
         controlOverlay?.cancelControlDrag()
         guard AppPreferences.presentationMode == .notch,
-              UserDefaults.standard.bool(forKey: Self.gestureKey), !Self.optionUsedForCapture,
+              Self.optionGestureEnabled, !Self.optionUsedForCapture,
               ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] != "1" else { return }
         // Observe modifier state only; never retain characters or ordinary typing.
         let mask: NSEvent.EventTypeMask = [.flagsChanged, .keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown]
@@ -73,7 +76,7 @@ final class NotchVoiceCapture {
             controlGesture = NotchControlGesture()
             return
         }
-        guard UserDefaults.standard.bool(forKey: Self.gestureKey), !Self.optionUsedForCapture else { return }
+        guard Self.optionGestureEnabled, !Self.optionUsedForCapture else { return }
         let optionOnly = event.modifierFlags.intersection([.option, .command, .control, .shift]) == .option
         if event.type != .flagsChanged {
             holdTask?.cancel() // Option+letter shortcuts and accented typing remain untouched.
@@ -91,7 +94,7 @@ final class NotchVoiceCapture {
             holdTask?.cancel()
             if wasHeld && gestureSession {
                 gestureSession = false
-                Task { await NotchQuickEditor.shared.finish() }
+                NotchQuickEditor.shared.requestFinish()
             }
         }
     }
@@ -263,7 +266,7 @@ final class NotchVoiceCapture {
             if includeVoice { await NotchQuickEditor.shared.startVoice() }
             if whileHolding && !(includeVoice ? holdActive : controlGesture.armed) {
                 gestureSession = false
-                Task { await NotchQuickEditor.shared.finish() }
+                NotchQuickEditor.shared.requestFinish()
             }
         } catch {
             notch.captureIssue = (includeVoice ? "Couldn’t start voice capture" : "Couldn’t start annotation", error.localizedDescription)

@@ -47,6 +47,14 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     AppPreferences.overlayFollowsMouse = false
     AppPreferences.overlayDismissDelay = 0.05
     AppPreferences.saveDirectory = saveFolder.path
+    bar.hide()
+    overlay.dismiss()
+    notch.captureIssue = nil
+    notch.ocrText = nil
+    notch.colorHex = nil
+    notch.script = nil
+    notch.transfers.removeAll()
+    notch.transferOrder.removeAll()
     defaults.set("notch", forKey: AppPreferences.presentationModeKey)
     notch.refreshMode()
     precondition(!notch.isVisible, "Notch Mode must stay hidden until capture is triggered")
@@ -204,6 +212,11 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     guard let first = textFirst.first, case .result(let entry) = first, entry.id == newText.id else {
         preconditionFailure("All must order every capture type by recency")
     }
+    let voice = NotchShelfStore.Entry(text: "Make this smaller", imageURL: imageURL)
+    let combinedVoice = NotchRecentCaptures.shelfItems(pending: [imageURL], entries: [voice], filter: .all)
+    precondition(combinedVoice.contains { $0.id == "result-\(voice.id)" }
+                    && !combinedVoice.contains { $0.id == "media-\(imageURL.standardizedFileURL.path)" },
+                 "A voice annotation must keep its image and transcript in one shelf item")
     print("PASS recent media filters, shared gallery actions, and chronological All ordering")
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
@@ -428,11 +441,18 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
 @MainActor
 func checkLocalShelfFeatures(imageURL: URL, directory: URL, output: URL) async throws {
     let oldMode = UserDefaults.standard.object(forKey: AppPreferences.presentationModeKey)
+    let oldOptionGesture = UserDefaults.standard.object(forKey: NotchVoiceCapture.gestureKey)
     UserDefaults.standard.set("notch", forKey: AppPreferences.presentationModeKey)
     defer {
         if let oldMode { UserDefaults.standard.set(oldMode, forKey: AppPreferences.presentationModeKey) }
         else { UserDefaults.standard.removeObject(forKey: AppPreferences.presentationModeKey) }
+        if let oldOptionGesture { UserDefaults.standard.set(oldOptionGesture, forKey: NotchVoiceCapture.gestureKey) }
+        else { UserDefaults.standard.removeObject(forKey: NotchVoiceCapture.gestureKey) }
     }
+    UserDefaults.standard.removeObject(forKey: NotchVoiceCapture.gestureKey)
+    precondition(NotchVoiceCapture.optionGestureEnabled, "Voice annotation must be available by default")
+    UserDefaults.standard.set(false, forKey: NotchVoiceCapture.gestureKey)
+    precondition(!NotchVoiceCapture.optionGestureEnabled, "Users must be able to disable the Option gesture")
     let oldAction = UserDefaults.standard.object(forKey: NotchVoiceCapture.actionKey)
     defer {
         if let oldAction { UserDefaults.standard.set(oldAction, forKey: NotchVoiceCapture.actionKey) }
