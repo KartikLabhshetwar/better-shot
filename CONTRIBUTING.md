@@ -147,7 +147,7 @@ Region screenshots use macOS's native `/usr/sbin/screencapture -i` selector.
 Window screenshots use `SCContentSharingPicker` and `SCScreenshotManager.captureImage`
 in the app process; preserve picker cancellation, native pixel dimensions, and private PNG staging.
 OCR and color results share `CaptureOrchestrator.completeTextCapture`: copy the exact
-value and retain session-only notch results. Empty OCR must not erase the clipboard.
+value and persist typed text/color results only when Notch Mode is active. Empty OCR must not erase the clipboard.
 Notch Mode must not show toasts. Mark `ToastWindow.show` failures with `isError: true`
 so recovery instructions appear inline; successes stay quiet or update their action
 button. Export/share progress continues through the embedded `TransferStatusCard`.
@@ -160,11 +160,11 @@ media without duplicates. Reuse `PreviewCardView` and `PreviewOverlay.perform` f
 card rendering/actions; notch sizing must not change the normal overlay.
 `NotchQuickEditor` reuses `AnnotationCanvas`, `AnnotationRenderer`, and editable
 history sidecars. Done saves privately; it must not update an exported file.
-`NotchVoiceCapture` observes modifier state only when enabled; never retain plain
+`NotchVoiceCapture` handles Control-drag through the existing `ShortcutService` event tap and `RegionSelectionOverlay`; mouse release routes through `captureLastRegion` and normal private staging/sound. Early modifier release or Escape cancels. The normal screenshot selector is unchanged. Option voice capture observes modifier state only when enabled; never retain plain
 keystrokes. Microphone capture ends before on-device transcription, with temporary
 audio retained only for retry until completion/discard. Reuse
 `RecordingTranscriptionService.transcribeAudio` rather than adding a cloud service.
-`NotchShelfStore` keeps bounded, opt-in text history and checks private pasteboard
+`NotchShelfStore` keeps bounded OCR/color history only in Notch Mode, plus opt-in clipboard text collection, and checks private pasteboard
 markers before reading text. Test with isolated pasteboards and storage only.
 After building, `BETTERSHOT_CHECK_LOCAL_SHELF=1 bash Tests/run-exports.sh` checks
 persistence, copying and quick-edit rendering without live capture. An optional

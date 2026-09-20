@@ -6,7 +6,13 @@ import Observation
 final class NotchVoiceCapture {
     static let shared = NotchVoiceCapture()
     static let gestureKey = "bs_notchHoldOption"
+    static let controlKey = "bs_notchControlCapture"
+    var controlGesture = NotchControlGesture()
+    static var controlEnabled: Bool { UserDefaults.standard.object(forKey: controlKey) as? Bool ?? true }
     private(set) var isPreparing = false
+    private var controlOverlay: RegionSelectionOverlay?
+    private var swallowMouseUp = false
+    private var previousControlApp: NSRunningApplication?
     private var holdActive = false
     private var gestureSession = false
     private var localMonitor: Any?
@@ -20,10 +26,13 @@ final class NotchVoiceCapture {
         globalMonitor = nil
         holdTask?.cancel()
         holdActive = false
-        guard UserDefaults.standard.bool(forKey: Self.gestureKey),
+        controlGesture = NotchControlGesture()
+        controlOverlay?.cancelControlDrag()
+        guard AppPreferences.presentationMode == .notch,
+              UserDefaults.standard.bool(forKey: Self.gestureKey),
               ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] != "1" else { return }
         // Observe modifier state only; never retain characters or ordinary typing.
-        let mask: NSEvent.EventTypeMask = [.flagsChanged, .keyDown]
+        let mask: NSEvent.EventTypeMask = [.flagsChanged, .keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown]
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
             self?.handle(event)
             return event
@@ -32,8 +41,13 @@ final class NotchVoiceCapture {
     }
 
     private func handle(_ event: NSEvent) {
+        guard AppPreferences.presentationMode == .notch, !ShortcutService.shared.isRecordingShortcut else {
+            controlGesture = NotchControlGesture()
+            return
+        }
+        guard UserDefaults.standard.bool(forKey: Self.gestureKey) else { return }
         let optionOnly = event.modifierFlags.intersection([.option, .command, .control, .shift]) == .option
-        if event.type == .keyDown {
+        if event.type != .flagsChanged {
             holdTask?.cancel() // Option+letter shortcuts and accented typing remain untouched.
             return
         }
@@ -54,8 +68,67 @@ final class NotchVoiceCapture {
         }
     }
 
+    func handleControlEvent(type: CGEventType, event: CGEvent) -> Bool {
+        if type == .leftMouseUp && swallowMouseUp {
+            swallowMouseUp = false
+            controlOverlay?.updateControlDrag(at: Self.appKitPoint(event.location), ended: true)
+            return true
+        }
+        guard AppPreferences.presentationMode == .notch, Self.controlEnabled,
+              !ShortcutService.shared.isRecordingShortcut else {
+            controlOverlay?.cancelControlDrag()
+            controlGesture = NotchControlGesture()
+            return false
+        }
+        let flags = NSEvent.ModifierFlags(rawValue: UInt(event.flags.rawValue))
+        if let overlay = controlOverlay {
+            if type == .leftMouseDragged {
+                overlay.updateControlDrag(at: Self.appKitPoint(event.location))
+                return true
+            }
+            if type == .keyDown || (type == .flagsChanged && flags.intersection([.control, .option, .command, .shift]) != .control) {
+                overlay.cancelControlDrag()
+                controlGesture = NotchControlGesture()
+                return type == .keyDown && event.getIntegerValueField(.keyboardEventKeycode) == 53
+            }
+            return false
+        }
+        if type == .leftMouseDown && controlGesture.armed {
+            guard !isPreparing, !NotchQuickEditor.shared.isOpen, !ScreenRecordingManager.shared.isActive,
+                  !CaptureOrchestrator.shared.captureInProgress, !ScreenCapture.shared.isCapturing else { return false }
+            let point = Self.appKitPoint(event.location)
+            let screen = NSScreen.screens.first { $0.frame.contains(point) }
+            let overlay = RegionSelectionOverlay()
+            controlOverlay = overlay
+            swallowMouseUp = true
+            previousControlApp = NSWorkspace.shared.frontmostApplication
+            overlay.beginControlDrag(at: point) { [weak self] outcome in
+                guard let self else { return }
+                self.controlOverlay = nil
+                self.controlGesture = NotchControlGesture()
+                let previousApp = self.previousControlApp
+                self.previousControlApp = nil
+                if case .region = outcome {
+                    Task {
+                        await CaptureOrchestrator.shared.captureLastRegion(on: screen)
+                        previousApp?.activate()
+                    }
+                }
+            }
+            return true
+        }
+        if type == .flagsChanged || type == .keyDown || type == .rightMouseDown {
+            _ = controlGesture.update(flags: flags, modifierChanged: type == .flagsChanged)
+        }
+        return false
+    }
+
+    private static func appKitPoint(_ point: CGPoint) -> CGPoint {
+        CGPoint(x: point.x, y: CGDisplayBounds(CGMainDisplayID()).height - point.y)
+    }
+
     func capture(whileHolding: Bool = false) async {
-        guard !isPreparing, !ScreenCapture.shared.isCapturing, !CaptureOrchestrator.shared.captureInProgress,
+        guard AppPreferences.presentationMode == .notch, !isPreparing, !ScreenCapture.shared.isCapturing, !CaptureOrchestrator.shared.captureInProgress,
               !ScreenRecordingManager.shared.isActive, !NotchQuickEditor.shared.isOpen else { return }
         isPreparing = true
         defer { isPreparing = false }
@@ -74,6 +147,7 @@ final class NotchVoiceCapture {
             guard let url = try await ScreenCapture.shared.captureFullscreen(on: screen) else { return }
             defer { try? FileManager.default.removeItem(at: url) }
             guard !whileHolding || holdActive else { return }
+            ScreenCapture.shared.playShutterSound()
             let retained = ScreenshotHistoryStore.shared.importScreenshot(from: url)
             guard retained != url else { throw CocoaError(.fileWriteUnknown) }
             PreviewOverlay.shared.show(url: retained, on: screen, automaticallyDismiss: false)
@@ -88,5 +162,25 @@ final class NotchVoiceCapture {
             notch.captureIssue = ("Couldn’t start voice capture", error.localizedDescription)
             notch.show(on: screen)
         }
+    }
+}
+
+/// Control alone arms selection; keyboard chords cancel it before a drag.
+struct NotchControlGesture: Equatable {
+    private(set) var armed = false
+    private var tracking = false
+
+    mutating func update(flags: NSEvent.ModifierFlags, modifierChanged: Bool) -> Bool {
+        let modifiers = flags.intersection([.control, .option, .command, .shift])
+        if modifiers.isEmpty {
+            let capture = armed && modifierChanged
+            armed = false
+            tracking = false
+            return capture
+        }
+        if !modifierChanged || modifiers != .control { armed = false }
+        else if !tracking { armed = true }
+        tracking = true
+        return false
     }
 }

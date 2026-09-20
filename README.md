@@ -238,16 +238,16 @@ In **Settings > General > Capture Mode**, choose **Normal Mode** (the default)
 or **Notch Mode**. Notch mode puts the capture tools, recording controls,
 image/video previews, and transfer status at the top of the capture display.
 The expanded notch is a horizontal shelf with **All, Text, Images, Videos, and Colors**
-filters in a compact 560-point panel. Use the grid button to reveal an icon-only capture toolbar; the folder menu
+filters in a compact 560-point panel without a capture toolbar. Hold Control and drag to select an area; the folder menu
 opens the gallery and offers Save All or Dismiss All for pending captures.
 OCR text and picked colors are copied automatically and remain on the shelf
-with Copy and Dismiss actions until replaced or dismissed. Notch Mode shows no
+with Copy and Dismiss actions until removed from history. Notch Mode shows no
 toast notifications: Copy confirms on its button, and failures appear as inline
-instructions. Text is selectable; colors show their hex code and swatch. These results stay in memory for this session.
+instructions. Text is selectable; colors show their hex code and swatch. Text and colors captured in Notch Mode are retained locally across launches. Normal Mode does not add to this history.
 Scroll sideways to browse the cards. Click an image for the quick editor, or a video for the video editor;
 each card has Copy and a menu for Save, Edit, Pin, Cloud Share, and Dismiss.
-Color cards show the sampled color with a readable hex label and Copy button.
-Choose **Record** to set up a video: select Screen, Window, or Area, then choose
+Drag image previews into compatible editors. Drag a text card’s text or title to insert text, or a color card’s hex label/title to insert its color code. Color cards show the sampled color with a readable hex label and Copy button.
+Use your **Recording options** shortcut (default **⌘⇧5**) to set up a video: select Screen, Window, or Area, then choose
 your camera, microphone, system audio, and start delay before pressing **Start
 Recording** (or **Choose Area…**). The capture bar’s **Timer** applies to screenshots.
 The media card’s **Edit** menu action opens the full editor. Quick Edit opens a small native panel beneath the notch with drawing, arrow, blur, crop, background, and undo controls. **Done** retains a lossless image and editable annotations in BetterShot’s private library; **Save** explicitly exports a file.
@@ -265,13 +265,17 @@ captures remain until you act on them. Switching back restores your normal overl
 layout and timing. Capture exclusion and private staging work in both modes.
 
 
+**Control-drag capture**
+
+With Notch Mode and Accessibility access enabled, hold Control alone to light the green indicator. Drag an area, then release the mouse to capture it with BetterShot’s area selector. Releasing Control early or pressing Escape cancels. The shutter sound follows **General > Play Sound**. The capture remains private until explicitly saved/exported (unless automatic saving was separately enabled). Disable the gesture in **General > Notch Shelf** if you need Control-drag for another app. Ordinary Control-key shortcuts cancel the armed gesture and continue normally. Standard region shortcuts still use the macOS screenshot selector.
+
 **Local voice screenshots and copied text**
 
-- Choose the microphone in the notch capture toolbar to capture the current display, draw, and speak. **Done** transcribes on your Mac and keeps the annotated image and text together on the shelf. Microphone permission is requested only when starting voice capture. Speech uses macOS 26’s on-device SpeechAnalyzer; supported Apple silicon/languages and an initial system language-model download are required. There is no cloud transcription fallback.
+- Open an image’s quick editor and choose the microphone to draw and speak. **Done** transcribes on your Mac and keeps the annotated image and text together on the shelf. Microphone permission is requested only when starting voice capture. Speech uses macOS 26’s on-device SpeechAnalyzer; supported Apple silicon/languages and an initial system language-model download are required. There is no cloud transcription fallback.
 - For the gesture, enable **Settings > General > Notch Shelf > Hold Option to draw and speak**. With Accessibility and Microphone access, hold Option briefly without another key, annotate over the captured screen, and release to finish. The gesture is off by default so Option shortcuts keep their usual behavior. Voice sessions stop at two minutes; the microphone is stopped before transcription begins.
 - Copy a voice card to put image, file, and transcript representations on the clipboard. The receiving app chooses which representation to paste; use the card’s context menu **Copy transcript** to paste text separately. The voice note’s **Open image** returns to editing.
-- **Keep copied text on this Mac** is an independent, opt-in setting. It stores up to 50 text/voice entries locally (100 KB per text), skips clipboard content marked concealed/transient/generated by the source app, and starts with your next copy. Unmarked sensitive text can still be saved. Turning it off pauses collection; **Clear Shelf Text** removes retained text and transcripts without deleting screenshots. Clipboard image/file monitoring and keyboard sounds are not included.
-- OCR and sampled colors remain available without enabling clipboard monitoring. Voice audio is temporary: it is removed after successful completion or explicit discard. If transcription fails, the editor retains the audio for retry and offers **Keep image without voice**. Closing an unsaved quick edit asks before discarding it.
+- **Keep copied text in Notch Mode** is an independent, opt-in setting. While Notch Mode is active, it stores up to 50 text/color/voice entries locally (100 KB per text), skips clipboard content marked concealed/transient/generated by the source app, and starts with your next copy. Unmarked sensitive text can still be saved. Turning it off pauses collection; **Clear Shelf Text** removes retained text and transcripts without deleting screenshots. Clipboard image/file monitoring and keyboard sounds are not included.
+- OCR and sampled colors are saved in Notch Mode without enabling clipboard monitoring. Voice audio is temporary: it is removed after successful completion or explicit discard. If transcription fails, the editor retains the audio for retry and offers **Keep image without voice**. Closing an unsaved quick edit asks before discarding it.
 
 Notch UI and hover interactions include code from [Boring Notch](https://github.com/TheBoredTeam/boring.notch), credited to TheBoredTeam and its contributors. See [source and license notices](Resources/Licenses/NOTICE.md).
 

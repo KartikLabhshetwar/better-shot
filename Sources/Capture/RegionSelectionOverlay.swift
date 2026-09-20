@@ -17,6 +17,28 @@ enum RegionSelectionOutcome {
 final class RegionSelectionOverlay {
 
     private var allowsWindowSelection = true
+    private var controlScreen: NSScreen?
+    private var onControlSelection: ((RegionSelectionOutcome) -> Void)?
+
+    func beginControlDrag(at point: CGPoint, completion: @escaping (RegionSelectionOutcome) -> Void) {
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(point) }) else { completion(.cancelled); return }
+        controlScreen = screen
+        onControlSelection = completion
+        allowsWindowSelection = false
+        showOverlays()
+        selectionViews.first?.beginDrag(at: CGPoint(x: point.x - screen.frame.minX, y: point.y - screen.frame.minY))
+    }
+
+    func updateControlDrag(at point: CGPoint, ended: Bool = false) {
+        guard let screen = controlScreen else { return }
+        let local = CGPoint(x: min(max(point.x - screen.frame.minX, 0), screen.frame.width),
+                            y: min(max(point.y - screen.frame.minY, 0), screen.frame.height))
+        if ended { selectionViews.first?.endDrag(at: local) }
+        else { selectionViews.first?.updateDrag(at: local) }
+    }
+
+    func cancelControlDrag() { if controlScreen != nil { finish(.cancelled) } }
+
     private var overlayWindows: [NSWindow] = []
     private var selectionViews: [SelectionView] = []
     private var continuation: CheckedContinuation<RegionSelectionOutcome, Never>?
@@ -31,9 +53,9 @@ final class RegionSelectionOverlay {
 
     private func showOverlays() {
         let crosshair = NSCursor.crosshair
-        let capturesOnRelease = AppPreferences.captureRegionOnRelease
+        let capturesOnRelease = controlScreen != nil || AppPreferences.captureRegionOnRelease
 
-        for screen in NSScreen.screens {
+        for screen in controlScreen.map({ [$0] }) ?? NSScreen.screens {
             let window = OverlayWindow(
                 contentRect: screen.frame,
                 styleMask: .borderless,
@@ -48,7 +70,7 @@ final class RegionSelectionOverlay {
             window.acceptsMouseMovedEvents = true
             window.collectionBehavior = [.canJoinAllSpaces, .fullScreenPrimary]
 
-            let ghost = AppPreferences.lastRegionRect
+            let ghost = (controlScreen == nil ? AppPreferences.lastRegionRect : nil)
                 .flatMap { screen.frame.contains($0) ? RegionGeometry.localRect(global: $0, screenFrame: screen.frame) : nil }
             let overlayView = SelectionView(
                 screen: screen,
@@ -67,12 +89,13 @@ final class RegionSelectionOverlay {
                 self?.selectionViews.forEach { if $0 !== overlayView { $0.clearSelection() } }
             }
             window.contentView = overlayView
-            window.makeKeyAndOrderFront(nil)
+            if controlScreen != nil { window.orderFrontRegardless() }
+            else { window.makeKeyAndOrderFront(nil) }
             overlayWindows.append(window)
             selectionViews.append(overlayView)
         }
 
-        NSApp.activate(ignoringOtherApps: true)
+        if controlScreen == nil { NSApp.activate(ignoringOtherApps: true) }
         crosshair.push()
         crosshair.set()
     }
@@ -94,6 +117,10 @@ final class RegionSelectionOverlay {
         closeOverlays()
         continuation?.resume(returning: outcome)
         continuation = nil
+        let callback = onControlSelection
+        onControlSelection = nil
+        controlScreen = nil
+        callback?(outcome)
     }
 
     private func closeOverlays() {
@@ -344,10 +371,13 @@ private final class SelectionView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        let loc = convert(event.locationInWindow, from: nil)
+        beginDrag(at: convert(event.locationInWindow, from: nil), clickCount: event.clickCount)
+    }
+
+    func beginDrag(at loc: CGPoint, clickCount: Int = 1) {
         mouseLocation = nil
         if let selection, let handle = RegionAdjustment.handle(at: loc, in: selection) {
-            if handle == .move, event.clickCount == 2 {
+            if handle == .move, clickCount == 2 {
                 onSelect(selection)
                 return
             }
@@ -364,7 +394,10 @@ private final class SelectionView: NSView {
     }
 
     override func mouseDragged(with event: NSEvent) {
-        let loc = convert(event.locationInWindow, from: nil)
+        updateDrag(at: convert(event.locationInWindow, from: nil))
+    }
+
+    func updateDrag(at loc: CGPoint) {
         if let handle = activeHandle, let origin = handleDragOrigin, let base = handleDragRect {
             let delta = CGSize(width: loc.x - origin.x, height: loc.y - origin.y)
             selection = RegionAdjustment.apply(handle, delta: delta, to: base, within: bounds)
@@ -376,7 +409,10 @@ private final class SelectionView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
-        let end = convert(event.locationInWindow, from: nil)
+        endDrag(at: convert(event.locationInWindow, from: nil))
+    }
+
+    func endDrag(at end: CGPoint) {
         if activeHandle != nil {
             activeHandle = nil
             handleDragOrigin = nil

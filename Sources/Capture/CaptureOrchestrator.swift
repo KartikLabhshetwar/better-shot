@@ -121,7 +121,10 @@ final class CaptureOrchestrator {
         let isColor = action == .colorPicker
         let notch = NotchPresenter.shared
         notch.captureIssue = nil
-        if isColor { notch.colorHex = value } else { notch.ocrText = value }
+        if AppPreferences.presentationMode == .notch {
+            if isColor { notch.colorHex = value } else { notch.ocrText = value }
+            NotchShelfStore.shared.add(text: value, isColor: isColor)
+        }
         let copied = Self.copyText(value, to: pasteboard)
         ScreenCapture.shared.playShutterSound()
         if AppPreferences.presentationMode == .notch {

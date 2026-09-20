@@ -100,6 +100,8 @@ final class NotchPresenter {
     }
 
     func refreshMode() {
+        NotchShelfStore.shared.refreshMonitoring()
+        NotchVoiceCapture.shared.refreshGesture()
         ToastWindow.shared.dismiss(animated: false)
         hoverTask?.cancel()
         isHovering = false
@@ -181,8 +183,6 @@ struct NotchContent: View {
     @State private var overlay = PreviewOverlay.shared
     @State private var shelfStore = NotchShelfStore.shared
     @State private var filter: NotchShelfFilter
-    @State private var showsTools = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(filter: NotchShelfFilter = .all) {
         _filter = State(initialValue: filter)
@@ -220,15 +220,13 @@ struct NotchContent: View {
         .onChange(of: presenter.countdown) { _, countdown in
             if countdown == nil { presenter.resumeHoverDismissal() }
         }
-        .onChange(of: bar.isVisible, initial: true) { _, visible in
-            if visible { showsTools = true }
-        }
         .onChange(of: presenter.captureSuspended) { _, suspended in
             if !suspended { filter = .all }
         }
         .onChange(of: overlay.items) { filter = .all }
         .onChange(of: presenter.ocrText) { filter = .all }
         .onChange(of: presenter.colorHex) { filter = .all }
+        .popover(isPresented: $bar.showsRecordingOptions, arrowEdge: .top) { RecordingOptionsView() }
         .onExitCommand {
             if bar.isVisible && bar.mode == .picker {
                 bar.dismiss()
@@ -259,12 +257,10 @@ struct NotchContent: View {
                     .accessibilityAddTraits(filter == tab ? .isSelected : [])
                 }
                 Spacer(minLength: 4)
-                BoringNotchHoverButton(title: "Capture tools", icon: "square.grid.2x2",
-                                      iconColor: showsTools ? .white : .secondary) {
-                    showsTools.toggle()
-                    if !showsTools { bar.showsRecordingOptions = false }
+                if NotchVoiceCapture.shared.controlGesture.armed {
+                    Circle().fill(.green).frame(width: 7, height: 7)
+                        .accessibilityLabel("Capture armed — drag an area")
                 }
-                    .accessibilityValue(showsTools ? "Expanded" : "Collapsed")
                 Menu {
                     Button("Open Gallery", systemImage: "folder") {
                         MediaGalleryWindowController.shared.open(on: presenter.screen)
@@ -310,25 +306,24 @@ struct NotchContent: View {
                     TeleprompterOverlayView(model: script).textArea
                         .padding(8).background(.black, in: RoundedRectangle(cornerRadius: 8))
                 }
-                if showsTools && !ScreenRecordingManager.shared.isActive {
-                    RecordingPickerControls(showsCloseButton: false, compact: true)
-                        .controlSize(.small).frame(maxWidth: .infinity).frame(height: 36)
-                        .transition(.opacity)
-                }
                 shelf
                 if let error = shelfStore.error { Text(error).font(.caption).foregroundStyle(.orange) }
                 if let id = presenter.transferOrder.last, let card = presenter.transfers[id] { card }
 
             }
         }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: showsTools)
         .padding(.top, 8)
     }
 
     private var shelf: some View {
         let media = NotchRecentCaptures.mediaURLs(pending: overlay.items, filter: filter)
+        let saved = shelfStore.entries.filter {
+            filter == .all || (filter == .colors && $0.isColor == true) || (filter == .text && $0.isColor != true)
+        }
         let hasText = (filter == .all || filter == .text) && presenter.ocrText != nil
+            && !saved.contains { $0.text == presenter.ocrText }
         let hasColor = (filter == .all || filter == .colors) && presenter.colorHex != nil
+            && !saved.contains { $0.text == presenter.colorHex }
         return ScrollView(.horizontal) {
             LazyHStack(alignment: .top, spacing: 12) {
                 if hasColor, let hex = presenter.colorHex {
@@ -343,25 +338,22 @@ struct NotchContent: View {
                         presenter.refresh()
                     }.id(text)
                 }
-                if filter == .all || filter == .text {
-                    ForEach(shelfStore.entries.filter { $0.text != presenter.ocrText && $0.text != presenter.colorHex }) { entry in
-                        NotchTextResult(title: entry.imageURL == nil ? "Clipboard" : "Voice note",
-                            value: entry.text, isColor: false, imageURL: entry.imageURL) {
-                            shelfStore.remove(entry.id)
-                        }
+                ForEach(saved) { entry in
+                    NotchTextResult(title: entry.isColor == true ? "Color" : entry.imageURL == nil ? "Text" : "Voice note",
+                        value: entry.text, isColor: entry.isColor == true, imageURL: entry.imageURL) {
+                        shelfStore.remove(entry.id)
                     }
                 }
                 ForEach(media, id: \.self) { url in
                     NotchMediaCard(url: url)
                 }
-                if media.isEmpty && !hasText && !hasColor && ((filter != .all && filter != .text) || shelfStore.entries.isEmpty) {
+                if media.isEmpty && !hasText && !hasColor && saved.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Image(systemName: filter.symbol).font(.title2).foregroundStyle(.secondary)
                         Text(filter == .all ? "Your captures, together" : "No \(filter.rawValue.lowercased()) yet")
                             .font(.headline)
-                        Text("Use Capture tools to add something to your shelf.")
+                        Text("Hold Control and drag an area to capture. Drag saved items into another app.")
                             .font(.callout).foregroundStyle(.secondary)
-                        Button("Capture tools", systemImage: "viewfinder") { showsTools = true }
                     }
                     .padding(20).frame(height: 160)
                 }
@@ -397,6 +389,7 @@ private struct NotchTextResult: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(title).font(.caption.weight(.medium))
+                    .onDrag { NSItemProvider(object: value as NSString) }
                 Spacer()
                 Button("Dismiss \(title.lowercased())", systemImage: "xmark", action: dismiss)
                     .labelStyle(.iconOnly).buttonStyle(.plain)
@@ -405,10 +398,14 @@ private struct NotchTextResult: View {
                 Spacer(minLength: 0)
                 Text(value).font(.system(.body, design: .monospaced).weight(.semibold))
                     .textSelection(.enabled)
+                    .onDrag { NSItemProvider(object: value as NSString) }
+                    .help("Drag the color code into another app")
             } else {
                 ScrollView {
                     Text(value).font(.system(size: 13)).textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .onDrag { NSItemProvider(object: value as NSString) }
+                        .help("Drag this text into another app")
                 }.scrollIndicators(.hidden)
             }
             if let imageURL {
@@ -464,8 +461,8 @@ struct NotchCompactLeading: View {
                 .frame(width: 28, height: 22)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("BetterShot — expand capture tools")
-        .help("BetterShot — capture tools and recent media")
+        .accessibilityLabel("BetterShot — open shelf")
+        .help("BetterShot — saved captures, text, and colors")
     }
 }
 
@@ -477,12 +474,15 @@ struct NotchCompactTrailing: View {
         if PreviewOverlay.shared.isPresented || NotchPresenter.shared.ocrText != nil || NotchPresenter.shared.colorHex != nil {
             return ("Capture ready", "checkmark")
         }
-        return ("Ready to capture", "viewfinder")
+        return ("Ready to capture", "circle.fill")
     }
 
     var body: some View {
         Button { NotchPresenter.shared.show() } label: {
-            if ScreenRecordingManager.shared.isActive {
+            if NotchVoiceCapture.shared.controlGesture.armed {
+                Circle().fill(.green).frame(width: 7, height: 7).frame(width: 28, height: 22)
+                    .accessibilityLabel("Capture armed — drag an area")
+            } else if ScreenRecordingManager.shared.isActive {
                 Label(ScreenRecordingManager.shared.formattedElapsedTime, systemImage: "record.circle.fill")
                     .monospacedDigit().foregroundStyle(.red)
             } else {
@@ -491,7 +491,7 @@ struct NotchCompactTrailing: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(ScreenRecordingManager.shared.isActive ? "Expand recording controls" : status.title)
+        .accessibilityLabel(NotchVoiceCapture.shared.controlGesture.armed ? "Capture armed — drag an area" : ScreenRecordingManager.shared.isActive ? "Expand recording controls" : status.title)
         .help(ScreenRecordingManager.shared.isActive ? "Recording in progress" : status.title)
         .onAppear { refreshEditors() }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in refreshEditors() }

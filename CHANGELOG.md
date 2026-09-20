@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Local voice screenshots: use the notch microphone or opt into holding Option to draw and speak, then release to retain an annotated image with an on-device transcript. Copy image/file/text together or copy the transcript separately. Microphone access is explicit, temporary audio is removed after completion/discard, and failed transcription can retry or keep the image without voice.
+- Local voice screenshots: use the quick-editor microphone or opt into holding Option to draw and speak, then release to retain an annotated image with an on-device transcript. Copy image/file/text together or copy the transcript separately. Microphone access is explicit, temporary audio is removed after completion/discard, and failed transcription can retry or keep the image without voice.
 - Optional local text history in General > Notch Shelf, with 50-item retention, duplicate removal, private pasteboard-marker exclusions, per-card dismissal, and a confirmed Clear action. Collection starts with the next copy and defaults off.
 - A compact quick editor below the notch with drawing, arrows, blur, crop, background and undo. Done preserves full-resolution PNGs and editable source/annotations in the private library; the full editor remains available from the card menu.
 
@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Notch mode also hosts countdowns, recording teleprompter text and export/share progress with existing recovery actions. Pending previews stay available until acted on. Switching modes preserves captures and recording state; the notch hides during selection/capture and follows capture-window exclusion settings.
 
 ### Changed
+
+- Simplified the notch to saved cards and filters, removing the capture toolbar and grid/viewfinder controls. Hold Control and drag an area to capture on mouse release, with a green armed indicator and the existing shutter sound. Early Control release or Escape cancels; standard region shortcuts keep the native macOS selector.
+- Notch OCR text and colors now persist across launches and can be dragged into other apps as text/hex values. Image previews retain file drag-out. New OCR/color/clipboard history is collected only in Notch Mode; switching modes stops clipboard monitoring immediately.
 
 - Reworked the notch into a black horizontal shelf inspired by the supplied reference: a 560-point panel, white selected filter pills, 160-point image/video/OCR/color cards, full-color swatches with contrast-aware hex labels, and a collapsible shared capture toolbar. All/Text/Images/Videos/Colors replace Capture/Recents. Cards keep Copy and media action menus; the library menu retains bulk Save/Dismiss. Pending and recent media are deduplicated, while hover opening/closing, inline failures, and no-toast behavior remain.
 

@@ -192,6 +192,21 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     precondition(quickPanel.panel?.canBecomeKey == true && quickPanel.panel!.frame.width <= 640)
     quickPanel.requestClose()
     precondition(!quickPanel.isOpen)
+    if let screen = NSScreen.main {
+        let oldRegion = AppPreferences.lastRegionRect
+        defer { AppPreferences.lastRegionRect = oldRegion }
+        let selector = RegionSelectionOverlay()
+        var outcome: RegionSelectionOutcome?
+        let origin = CGPoint(x: screen.frame.minX + 60, y: screen.frame.minY + 60)
+        selector.beginControlDrag(at: origin) { outcome = $0 }
+        selector.updateControlDrag(at: CGPoint(x: origin.x + 200, y: origin.y + 120), ended: true)
+        guard case .region(let region) = outcome else { preconditionFailure("Control drag must select a region on mouse release") }
+        precondition(region.pointsRect.size == CGSize(width: 200, height: 120))
+        selector.beginControlDrag(at: origin) { outcome = $0 }
+        selector.cancelControlDrag()
+        guard case .cancelled = outcome else { preconditionFailure("Releasing Control early must cancel") }
+    }
+    print("PASS Control-drag rectangle geometry and cancellation")
     // Exercise the kit's non-notched fallback on the same screen without changing display settings.
     if let screen = window.screen {
         let floating = DynamicNotch(hoverBehavior: [], style: .floating) { NotchContent() }
@@ -364,6 +379,27 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
 
 @MainActor
 func checkLocalShelfFeatures(imageURL: URL, directory: URL, output: URL) async throws {
+    let oldMode = UserDefaults.standard.object(forKey: AppPreferences.presentationModeKey)
+    UserDefaults.standard.set("notch", forKey: AppPreferences.presentationModeKey)
+    defer {
+        if let oldMode { UserDefaults.standard.set(oldMode, forKey: AppPreferences.presentationModeKey) }
+        else { UserDefaults.standard.removeObject(forKey: AppPreferences.presentationModeKey) }
+    }
+    var gesture = NotchControlGesture()
+    _ = gesture.update(flags: .control, modifierChanged: true)
+    precondition(gesture.armed)
+    _ = gesture.update(flags: .control, modifierChanged: false)
+    precondition(!gesture.armed, "Control-key chords must cancel capture")
+    _ = gesture.update(flags: [], modifierChanged: true)
+    _ = gesture.update(flags: [.control, .shift], modifierChanged: true)
+    _ = gesture.update(flags: .control, modifierChanged: true)
+    precondition(!gesture.armed, "Releasing another modifier must not arm a held Control")
+    _ = gesture.update(flags: [], modifierChanged: true)
+    _ = gesture.update(flags: .control, modifierChanged: true)
+    precondition(gesture.armed)
+    _ = gesture.update(flags: [], modifierChanged: true)
+    precondition(!gesture.armed)
+
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
     // Bounded clipboard history and private pasteboard markers, using an isolated store/pasteboard.
     let shelfDirectory = directory.appendingPathComponent("shelf")
@@ -397,6 +433,15 @@ func checkLocalShelfFeatures(imageURL: URL, directory: URL, output: URL) async t
         _ = try NotchShelfStore.copy(.init(text: "missing", imageURL: directory.appendingPathComponent("missing.png")), to: clipboard)
         preconditionFailure("Missing images must fail without replacing the clipboard")
     } catch { precondition(clipboard.changeCount == clipboardBeforeFailure) }
+    shelf.add(text: "#FF8800", isColor: true)
+    precondition(NotchShelfStore(directory: shelfDirectory).entries.first?.isColor == true)
+    let countInNotch = shelf.entries.count
+    UserDefaults.standard.set("normal", forKey: AppPreferences.presentationModeKey)
+    shelf.add(text: "must not save")
+    CaptureOrchestrator.copyText("normal clipboard", to: clipboard)
+    shelf.readClipboard(clipboard)
+    precondition(shelf.entries.count == countInNotch && !shelf.entries.contains { $0.text == "must not save" || $0.text == "normal clipboard" })
+    UserDefaults.standard.set("notch", forKey: AppPreferences.presentationModeKey)
     shelf.clear()
     precondition(NotchShelfStore(directory: shelfDirectory).entries.isEmpty)
     print("PASS local clipboard persistence, size limits, deduplication, private markers, clear, and image/transcript copy")
