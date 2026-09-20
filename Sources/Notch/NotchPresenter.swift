@@ -42,7 +42,7 @@ final class NotchPresenter {
     private func observeHoldIndicator() {
         withObservationTracking {
             let active = NotchVoiceCapture.shared.holdIndicatorActive
-            notch?.outlineColor = active ? .green : .clear
+            notch?.outlineColor = active ? .blue : .clear
         } onChange: { [weak self] in
             Task { @MainActor in self?.observeHoldIndicator() }
         }
@@ -84,7 +84,7 @@ final class NotchPresenter {
             }
             self.notch = notch
         }
-        notch?.outlineColor = NotchVoiceCapture.shared.holdIndicatorActive ? .green : .clear
+        notch?.outlineColor = NotchVoiceCapture.shared.holdIndicatorActive ? .blue : .clear
         notch?.presentImmediately(on: screen, expanded: expanded, animated: true)
     }
 
@@ -268,7 +268,7 @@ struct NotchContent: View {
                 }
                 Spacer(minLength: 4)
                 if NotchVoiceCapture.shared.holdIndicatorActive {
-                    Circle().fill(.green).frame(width: 7, height: 7)
+                    Circle().fill(.blue).frame(width: 7, height: 7)
                         .accessibilityLabel("Capture active")
                 }
                 Menu {
@@ -426,7 +426,7 @@ private struct NotchTextResult: View {
                 }.scrollIndicators(.hidden)
             }
             if let imageURL {
-                Button("Open image", systemImage: "photo") { NotchQuickEditor.shared.open(imageURL) }
+                Button("Open image", systemImage: "photo") { PreviewPanelPresenter.shared.openEditor(for: imageURL) }
                     .buttonStyle(.plain).font(.caption)
             }
             Button {
@@ -497,7 +497,7 @@ struct NotchCompactTrailing: View {
     var body: some View {
         Button { NotchPresenter.shared.show() } label: {
             if NotchVoiceCapture.shared.holdIndicatorActive {
-                Circle().fill(.green).frame(width: 7, height: 7).frame(width: 28, height: 22)
+                Circle().fill(.blue).frame(width: 7, height: 7).frame(width: 28, height: 22)
                     .accessibilityLabel("Capture active")
             } else if ScreenRecordingManager.shared.isActive {
                 Label(ScreenRecordingManager.shared.formattedElapsedTime, systemImage: "record.circle.fill")

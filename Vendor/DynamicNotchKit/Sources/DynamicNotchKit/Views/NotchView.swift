@@ -74,6 +74,14 @@ struct NotchView<Expanded, CompactLeading, CompactTrailing>: View where Expanded
                     .padding(1)
                     .allowsHitTesting(false)
             }
+            .overlay(alignment: .top) {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(dynamicNotch.outlineColor, lineWidth: 2)
+                    .frame(width: dynamicNotch.notchSize.width + 8,
+                           height: dynamicNotch.notchSize.height + 8)
+                    .offset(y: -4)
+                    .allowsHitTesting(false)
+            }
             .offset(x: xOffset)
 
     }

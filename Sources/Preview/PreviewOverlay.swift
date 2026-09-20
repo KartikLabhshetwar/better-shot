@@ -652,8 +652,7 @@ struct PreviewCardView: View {
     }
 
     private func openEditor() {
-        if usesNotchActions && !isVideo { NotchQuickEditor.shared.open(url) }
-        else { overlay.openAnnotateEditor(for: url) }
+        overlay.openAnnotateEditor(for: url)
     }
 
     private func loadThumbnail() async {
