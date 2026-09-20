@@ -38,10 +38,10 @@
     <key>NSCameraUsageDescription</key>
     <string>BetterShot shows your camera in a floating bubble when you turn on the face cam, so your face appears in the recording.</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>BetterShot records your microphone when you turn on the mic in the recording bar, so you can narrate what you capture.</string>
+    <string>BetterShot uses your microphone when you start a voice screenshot or enable recording narration.</string>
     <key>NSScreenCaptureUsageDescription</key>
     <string>BetterShot needs screen recording access to capture screenshots and record your screen.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
-    <string>BetterShot transcribes the audio in your recording so it can add captions, on your Mac where it can.</string>
+    <string>BetterShot transcribes voice screenshots and recording captions on your Mac.</string>
 </dict>
 </plist>

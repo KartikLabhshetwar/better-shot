@@ -146,6 +146,10 @@ final class ScreenRecordingManager {
 
     func startRecording(source: ScreenRecordingSource) {
         guard state == .idle else { return }
+        guard !NotchVoiceCapture.shared.isPreparing, !NotchQuickEditor.shared.listening else {
+            errorMessage = "Finish the voice screenshot before starting a recording."
+            return
+        }
         guard Self.ensureScreenCapturePermission() else { return }
 
         let targetDisplayID = source.displayID ?? ActiveDisplayResolver.activeDisplayID(preferPointer: true) ?? CGMainDisplayID()

@@ -61,7 +61,7 @@ enum BarMetrics {
 
     /// The morph between modes. Enough travel to read as one bar changing
     /// shape rather than two bars swapping.
-    static let modeChange = Animation.spring(response: 0.34, dampingFraction: 0.86)
+    static let modeChange = Animation.spring(response: 0.18, dampingFraction: 1)
 }
 
 // MARK: - Tooltips
@@ -212,6 +212,7 @@ struct BarActionLabel: View {
     var tint: Color = BarMetrics.activeTint
     var caption: String? = nil
 
+    @Environment(\.controlSize) private var controlSize
     @Environment(\.isEnabled) private var isEnabled
     @Environment(BarTooltipModel.self) private var tooltip: BarTooltipModel?
     @State private var isHovering = false
@@ -220,7 +221,7 @@ struct BarActionLabel: View {
     var body: some View {
         VStack(spacing: 4) {
             Image(systemName: systemImage)
-                .font(.system(size: caption == nil ? 17 : 22, weight: .regular))
+                .font(.system(size: caption == nil ? 17 : (controlSize == .mini ? 18 : 22), weight: .regular))
             if let caption {
                 Text(caption)
                     .font(.system(size: 11))
@@ -228,8 +229,8 @@ struct BarActionLabel: View {
             }
         }
             .foregroundStyle(tint.opacity(isEnabled ? 1 : 0.3))
-            .frame(width: caption == nil ? BarMetrics.controlSize : 72,
-                   height: caption == nil ? BarMetrics.controlSize : 52)
+            .frame(width: caption == nil ? BarMetrics.controlSize : (controlSize == .mini ? 60 : 72),
+                   height: caption == nil ? BarMetrics.controlSize : (controlSize == .mini ? 46 : 52))
             .background {
                 RoundedRectangle(cornerRadius: 10)
                     .fill(BarMetrics.hoverFill)

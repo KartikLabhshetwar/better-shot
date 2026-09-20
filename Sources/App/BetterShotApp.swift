@@ -63,7 +63,7 @@ struct BetterShotApp: App {
                         ToastWindow.shared.show(message: "Recording saved!", on: ActiveDisplayResolver.screen(for: displayID))
                     } catch {
                         ToastWindow.shared.show(
-                            title: "Couldn't save recording",
+                            isError: true, title: "Couldn't save recording",
                             message: error.localizedDescription,
                             systemIcon: "exclamationmark.triangle",
                             on: ActiveDisplayResolver.screen(for: displayID)

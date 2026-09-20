@@ -10,9 +10,20 @@ import TourKit
 /// AVPlayer layers and interactive capture still require manual testing.
 @MainActor
 func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
+    // A failed notch check may leave the test executable's defaults in notch mode.
+    // The general overlay/toast checks explicitly exercise normal presentation.
+    let defaults = UserDefaults.standard
+    let previousMode = defaults.object(forKey: AppPreferences.presentationModeKey)
+    defaults.set("normal", forKey: AppPreferences.presentationModeKey)
+    defer {
+        if let previousMode { defaults.set(previousMode, forKey: AppPreferences.presentationModeKey) }
+        else { defaults.removeObject(forKey: AppPreferences.presentationModeKey) }
+    }
     if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_EDITOR_WINDOWS"] == "1" {
         try await checkEditorWindowInteractions(imageURL: imageURL, movieURL: movieURL)
     }
+    try checkCaptureControlsUI()
+    try await checkNotchPresentation(imageURL: imageURL, movieURL: movieURL)
     try checkImageTransforms(imageURL: imageURL)
     try await checkColorPickerAndToast()
     try await checkPreviewOverlay(imageURL: imageURL)
@@ -307,7 +318,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
     let buildConfiguration = ProcessInfo.processInfo.environment["BETTERSHOT_BUILD_CONFIGURATION"] ?? "Debug"
     let appBundle = Bundle(url: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-        .appendingPathComponent(".build/Build/Products/\(buildConfiguration)/BetterShot.app"))!
+        .appendingPathComponent("\(ProcessInfo.processInfo.environment["BETTERSHOT_DERIVED_DATA"] ?? ".build/tests")/Build/Products/\(buildConfiguration)/BetterShot.app"))!
     let practiceDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: practiceDirectory) }
     for sample in OnboardingSample.allCases {
@@ -509,13 +520,6 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
             try snapshot(TransferStatusCard(status: status), scheme: scheme, width: 360,
                          to: output.appendingPathComponent("transfer-\(label)-\(name).png"), height: 112)
         }
-        try snapshot(RecordingSessionControls().studioGlass(cornerRadius: BarMetrics.cornerRadius, opacity: 0.78),
-                     scheme: scheme, width: 360,
-                     to: output.appendingPathComponent("recording-\(name).png"), height: 64)
-        try snapshot(RecordingPickerControls().padding(.horizontal, BarMetrics.horizontalPadding)
-            .frame(height: BarMetrics.height).studioGlass(cornerRadius: BarMetrics.cornerRadius, opacity: 0.78)
-            .background(EditorChrome.workspace), scheme: scheme, width: 760,
-                     to: output.appendingPathComponent("capture-\(name).png"), height: 100)
         try snapshot(
             AnnotationEditorWindow(url: .constant(nil), model: imageModel),
             scheme: scheme, width: 1280, to: output.appendingPathComponent("image-\(name).png"))
@@ -859,8 +863,33 @@ private func checkGeneralEditorDefaults(movieURL: URL) async throws {
     print("PASS General defaults for new recordings/imports, image look parity, reset, and saved project preservation")
 }
 
+/// Static layout checks need no camera/microphone access or encoded video fixture.
 @MainActor
-private func snapshot<V: View>(
+func checkCaptureControlsUI() throws {
+    let sources = RecordingSourceCatalog.shared
+    precondition(!sources.containsSelection(.fullscreen, displayID: nil, windowID: nil))
+    precondition(!sources.containsSelection(.window, displayID: nil, windowID: nil),
+                 "Recording requires an explicit available source; opening setup must never start capture")
+    let output = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        .appendingPathComponent(".build/editor-snapshots")
+    try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+    for scheme in [ColorScheme.light, .dark] {
+        let name = scheme == .light ? "light" : "dark"
+        try snapshot(RecordingSessionControls().studioGlass(cornerRadius: BarMetrics.cornerRadius, opacity: 0.78),
+                     scheme: scheme, width: 360,
+                     to: output.appendingPathComponent("recording-\(name).png"), height: 64)
+        try snapshot(RecordingOptionsView(), scheme: scheme, width: 420,
+                     to: output.appendingPathComponent("recording-setup-\(name).png"), height: 520)
+        try snapshot(RecordingPickerControls().padding(.horizontal, BarMetrics.horizontalPadding)
+            .frame(height: BarMetrics.height).studioGlass(cornerRadius: BarMetrics.cornerRadius, opacity: 0.78)
+            .background(EditorChrome.workspace), scheme: scheme, width: 760,
+                     to: output.appendingPathComponent("capture-\(name).png"), height: 100)
+    }
+    print("PASS missing recording source rejection and capture/setup/transport light and dark layouts")
+}
+
+@MainActor
+func snapshot<V: View>(
     _ view: V, scheme: ColorScheme, width: CGFloat, to url: URL, height: CGFloat = 800,
     interact: () -> Void = {}
 ) throws {
@@ -1128,7 +1157,7 @@ private func checkMediaGallery(imageURL: URL, movieURL: URL) async throws {
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
     let configuration = ProcessInfo.processInfo.environment["BETTERSHOT_BUILD_CONFIGURATION"] ?? "Debug"
     let galleryBundle = Bundle(url: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-        .appendingPathComponent(".build/Build/Products/\(configuration)/BetterShot.app"))!
+        .appendingPathComponent("\(ProcessInfo.processInfo.environment["BETTERSHOT_DERIVED_DATA"] ?? ".build/tests")/Build/Products/\(configuration)/BetterShot.app"))!
     let previousIcon = NSApp.applicationIconImage
     NSApp.applicationIconImage = galleryBundle.image(forResource: "AppIcon")
     defer { NSApp.applicationIconImage = previousIcon }
@@ -1348,6 +1377,7 @@ private func checkPreviewOverlay(imageURL: URL) async throws {
         overlay.refreshSettings()
     }
     AppPreferences.overlayDismissDelay = 0.05
+    AppPreferences.overlayCardSize = .medium
     overlay.show(url: imageURL)
     let panel = NSApp.windows.first { $0.identifier?.rawValue == "BetterShot.CaptureOverlay" }!
     precondition(panel.canBecomeKey && !panel.canBecomeMain, "Overlay actions must support native keyboard focus")
@@ -1398,7 +1428,7 @@ private func checkPreviewOverlay(imageURL: URL) async throws {
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
         let bundle = Bundle(url: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-            .appendingPathComponent(".build/Build/Products/\(ProcessInfo.processInfo.environment["BETTERSHOT_BUILD_CONFIGURATION"] ?? "Debug")/BetterShot.app"))!
+            .appendingPathComponent("\(ProcessInfo.processInfo.environment["BETTERSHOT_DERIVED_DATA"] ?? ".build/tests")/Build/Products/\(ProcessInfo.processInfo.environment["BETTERSHOT_BUILD_CONFIGURATION"] ?? "Debug")/BetterShot.app"))!
         try snapshot(OverlaySettingsTab(resourceBundle: bundle), scheme: scheme,
                      width: 540, to: output.appendingPathComponent("overlay-settings-\(name).png"), height: 1050)
         try snapshot(PreferencesView(selection: .overlay), scheme: scheme, width: 780,

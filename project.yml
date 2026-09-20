@@ -16,6 +16,8 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: false
 
 packages:
+  DynamicNotchKit:
+    path: Vendor/DynamicNotchKit
   TourKit:
     path: Vendor/TourKit
   DockProgress:
@@ -27,6 +29,7 @@ targets:
     type: application
     platform: macOS
     dependencies:
+      - package: DynamicNotchKit
       - package: DockProgress
       - package: TourKit
     sources:

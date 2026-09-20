@@ -51,10 +51,17 @@ struct RecordingSessionControls: View {
         HStack(spacing: 0) {
             Button { manager.stopRecording() } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "stop.circle").font(.system(size: 18))
+                    if isSettling {
+                        ProgressView().controlSize(.mini).frame(width: 18)
+                    } else {
+                        Image(systemName: "stop.fill").font(.system(size: 12, weight: .semibold))
+                    }
+                    Text(manager.state == .finishing ? "Saving" : manager.state == .starting ? "Preparing" : "Stop")
+                        .font(.system(size: 12, weight: .semibold))
                     Text(manager.formattedElapsedTime)
                         .font(.system(size: 13, weight: .medium).monospacedDigit())
                         .frame(minWidth: 42, alignment: .leading)
+                    if isPaused { Text("Paused").font(.caption).foregroundStyle(BarMetrics.activeTint) }
                 }
                 .foregroundStyle(BarMetrics.recordTint)
                 .padding(.horizontal, 10)

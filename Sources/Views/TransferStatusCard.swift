@@ -374,6 +374,7 @@ private struct TransferPressStyle: ButtonStyle {
 
 /// Hosts the existing card outside the editor, at the shared screen-toast position.
 struct TransferToast: NSViewRepresentable {
+    @AppStorage(AppPreferences.presentationModeKey) private var mode = CapturePresentationMode.normal.rawValue
     let status: TransferStatus?
     var onCancel: () -> Void = {}
     var onRetry: () -> Void = {}
@@ -384,6 +385,7 @@ struct TransferToast: NSViewRepresentable {
     }
 
     func updateNSView(_ view: TransferToastAnchorView, context: Context) {
+        _ = mode
         view.update(card: status.map {
             TransferStatusCard(status: $0, onCancel: onCancel, onRetry: onRetry, onDismiss: onDismiss)
         })
@@ -397,6 +399,7 @@ struct TransferToast: NSViewRepresentable {
 
 @MainActor
 final class TransferToastAnchorView: NSView {
+    private let notchID = UUID()
     private var card: TransferStatusCard?
     private var panel: NSPanel?
     private var hostingView: NSHostingView<TransferStatusCard>?
@@ -425,6 +428,19 @@ final class TransferToastAnchorView: NSView {
     }
 
     @objc private func refresh() {
+        if AppPreferences.presentationMode == .notch, let card, let window, window.isVisible {
+            panel?.orderOut(nil)
+            panel = nil
+            hostingView = nil
+            // Keep actions current even when the visible status is unchanged.
+            let notchCard = TransferStatusCard(status: card.status,
+                onCancel: { [weak self] in self?.card?.onCancel() },
+                onRetry: { [weak self] in self?.card?.onRetry() },
+                onDismiss: { [weak self] in self?.card?.onDismiss() })
+            NotchPresenter.shared.updateTransfer(notchCard, id: notchID, on: window.screen)
+            return
+        }
+        NotchPresenter.shared.updateTransfer(nil, id: notchID, on: nil)
         guard let card, let window, window.isVisible, let screen = window.screen else {
             panel?.orderOut(nil)
             panel?.contentView = nil

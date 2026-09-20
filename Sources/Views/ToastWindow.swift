@@ -12,10 +12,20 @@ final class ToastWindow {
 
     private var panelGeneration: UInt = 0
 
-    func show(title: String = "Saved", message: String, icon: NSImage? = nil, systemIcon: String? = nil, duration: TimeInterval = 2.5, on preferredScreen: NSScreen? = nil) {
+    func show(isError: Bool = false, title: String = "Saved", message: String, icon: NSImage? = nil, systemIcon: String? = nil, duration: TimeInterval = 2.5, on preferredScreen: NSScreen? = nil) {
         dismiss(animated: false)
         panelGeneration &+= 1
 
+        #if canImport(DynamicNotchKit)
+        // Notch Mode never creates a toast, either inside the notch or above an editor.
+        if AppPreferences.presentationMode == .notch {
+            if isError {
+                NotchPresenter.shared.captureIssue = (title, message)
+                NotchPresenter.shared.show(on: preferredScreen)
+            }
+            return
+        }
+        #endif
         let toastView = ToastContentView(title: title, message: message, icon: icon, systemIcon: systemIcon)
         let hostingView = NSHostingView(rootView: toastView)
 

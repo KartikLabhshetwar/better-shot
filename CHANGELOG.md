@@ -7,11 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.5] - 2026-09-19
 
+- Added a Capture hold key setting with Control, Option, Shift, and Command choices; Option capture takes priority over the optional voice gesture.
+- Refined screenshot/video notch cards with rounded, edge-to-edge thumbnails, a transparent edge, lower title scrim, and actions revealed on hover or keyboard focus; retained consistent circular cloud controls in overlays and Settings, and drag handling confined to the media preview.
+
 ### Added
 
 - **Scroll capture:** select a region, then scroll (manually or with auto-scroll) to stitch a full-page screenshot. Uses Vision framework for pixel-precise alignment, TIFF byte comparison for frame settlement, frozen header detection, scrollbar exclusion, and incremental stitching up to 30,000 pixels. Configurable via UserDefaults for auto-scroll speed and max height.
+- Restored hold-and-drag area screenshots as the default, with compact animated status inside the notch instead of an outline. Drawing over the screen now requires explicitly selecting Draw on screen in Settings; it never starts from the default hold gesture.
+- Copied hex colors appear as persistent swatches in Notch Mode, with a separate collection setting enabled by default; ordinary text history remains opt-in.
+- OCR and Pick Color actions in the notch's folder menu show their configured shortcuts.
+
+- Local voice screenshots: use the quick-editor microphone or opt into holding Option to draw and speak, then release to retain an annotated image with an on-device transcript. Copy image/file/text together or copy the transcript separately. Microphone access is explicit, temporary audio is removed after completion/discard, and failed transcription can retry or keep the image without voice.
+- Optional local text history in General > Notch Shelf, with 50-item retention, duplicate removal, private pasteboard-marker exclusions, per-card dismissal, and a confirmed Clear action. Collection starts with the next copy and defaults off.
+- A compact quick editor below the notch with drawing, arrows, blur, crop, background and undo. Done preserves full-resolution PNGs and editable source/annotations in the private library; shelf cards open in the full editor.
+
+- **Optional Notch Mode:** choose Normal Mode or Notch Mode in Settings > General > Capture Mode. Normal remains the default, including on upgrade. The notch hosts the shared screenshot tools (Area, Fullscreen, Window, OCR, Color, and timers), recording options and Stop/Pause/Restart/Discard controls, and image/video previews with Copy, Save, Edit, Pin, Cloud Share, and Dismiss. Browse pending captures without opening a separate overlay. Hardware notches can collapse to a compact capture/recording status; other displays use a top-center floating panel.
+- Notch mode also hosts countdowns, recording teleprompter text and export/share progress with existing recovery actions. Pending previews stay available until acted on. Switching modes preserves captures and recording state; the notch hides during selection/capture and follows capture-window exclusion settings.
+
+### Changed
+
+- Simplified the notch to saved cards and filters, removing the capture toolbar and grid/viewfinder controls. Hold Control and drag an area to capture on mouse release, with compact Screenshot/Select feedback and the existing shutter sound. Early Control release or Escape cancels; standard region shortcuts keep the native macOS selector.
+- Notch OCR text and colors now persist across launches and can be dragged into other apps as text/hex values. Image previews retain file drag-out. New OCR/color/clipboard history is collected only in Notch Mode; switching modes stops clipboard monitoring immediately.
+
+- Reworked the notch into a black horizontal shelf inspired by the supplied reference: a 560-point panel, white selected filter pills, 160-point image/video/OCR/color cards, full-color swatches with contrast-aware hex labels, and a collapsible shared capture toolbar. All/Text/Images/Videos/Colors replace Capture/Recents. Cards keep Copy and media action menus; the library menu retains bulk Save/Dismiss. Pending and recent media are deduplicated, while hover opening/closing, inline failures, and no-toast behavior remain.
+
+- Redesigned the shared capture controls and notch recording setup with native Screen/Window/Area tabs, visible camera and microphone pickers, system audio, recording delay, and an explicit Start Recording action. Screenshot tools stay one click, with a separate visible screenshot timer. Recording controls now label Stop, Paused, Preparing, and Saving; transitions are shorter and respect Reduce Motion.
+
+- Notch Mode never displays toast notifications. Copy confirms directly on the result button; capture and saving failures remain as dismissible inline instructions. Switching modes removes existing toasts immediately. Recent items stay aligned and disabled action icons remain readable.
+
+- Notch shape, hover controls, and interactions reuse Boring Notch code, with contributor attribution, pinned source references, and its GPLv3 license bundled with the app.
+
+- The notch groups capture tools and provides actions on each media card. Its compact state shows the BetterShot logo and readiness/editor status, or the recording timer. Short, interruptible transitions respect Reduce Motion.
+
+- The notch opens on hover and collapses after the pointer leaves. Menus, recording options, and confirmations prevent premature closing; non-notched displays also have a compact state. Recent Captures shows saved screenshots and videos with type filters, thumbnails, and the existing gallery actions.
+
+- Expanded and compact Notch Mode use an opaque black surface matching the camera cutout, with native macOS controls and readable dark-appearance labels in either system appearance.
+
+- Refined the notch into a compact black capture shelf with smaller SF Symbol controls, an uncropped preview, a clear Open Editor action, and recent media when idle. Expansion uses a subtle 140 ms ease-out; Reduce Motion disables it.
+
+- OCR and color picking automatically copy their results and keep the recognized text or hex color in the notch with Copy and Dismiss actions. Text supports selection and scrolling; colors show a swatch. Empty OCR preserves the clipboard and offers retry guidance.
 
 ### Fixed
+
+- The notch shelf's All filter now places the newest capture first across screenshots, recordings, text, and colors instead of always leading with text history.
+- Screenshot failures now show recovery guidance instead of disappearing silently. Window screenshots now use the native macOS window picker and capture directly through ScreenCaptureKit, avoiding command-line window stream failures. Confirm the selected window with “Share This Window”; Cancel creates no screenshot. Unsigned test builds use a separate directory so they cannot overwrite the running dev app and invalidate its capture permission.
+
+- Fix an editor redraw loop in notch transfer-status routing that could consume a CPU core and make video playback controls and scrubbing lag, even with no transfer in progress. Repeated idle/unchanged status updates no longer publish changes; real progress and current Cancel/Retry actions remain available.
 
 - Image and video editors can enter and leave native full screen again. SwiftUI no longer overrides fullscreen support after the window opens; the automatic fullscreen preference remains supported.
 - 3D Scenes now use full-width buttons with readable names, shot counts, and scene descriptions. Consistent padding replaces crowded tiles and clipped shot bars in narrow inspectors.

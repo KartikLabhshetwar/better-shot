@@ -36,6 +36,15 @@ final class RecordingSourceCatalog {
         isLoading = false
     }
 
+    func containsSelection(_ mode: ScreenRecordingSourceMode, displayID: CGDirectDisplayID?, windowID: CGWindowID?) -> Bool {
+        guard !isLoading, errorMessage == nil else { return false }
+        switch mode {
+        case .fullscreen: return displays.contains { $0.displayID == displayID }
+        case .window: return windows.contains { $0.windowID == windowID }
+        case .area: return !displays.isEmpty
+        }
+    }
+
     static func displayTitle(_ display: SCDisplay, index: Int) -> String {
         let resolution = "\(display.width)x\(display.height)"
         let name = displayName(for: display.displayID) ?? "Display \(index + 1)"

@@ -144,7 +144,34 @@ all affected callers meet. Keep unrelated cleanup out of the diff.
 The screenshot path runs through `ShortcutService`, `CaptureOrchestrator`,
 `ScreenCapture`, private staging/history, and the preview or image editor.
 Region screenshots use macOS's native `/usr/sbin/screencapture -i` selector.
+Window screenshots use `SCContentSharingPicker` and `SCScreenshotManager.captureImage`
+in the app process; preserve picker cancellation, native pixel dimensions, and private PNG staging.
+OCR and color results share `CaptureOrchestrator.completeTextCapture`: copy the exact
+value and persist typed text/color results only when Notch Mode is active. Empty OCR must not erase the clipboard.
+Notch Mode must not show toasts. Mark `ToastWindow.show` failures with `isError: true`
+so recovery instructions appear inline; successes stay quiet or update their action
+button. Export/share progress continues through the embedded `TransferStatusCard`.
 Recording areas use BetterShot's adjustable AppKit selector.
+`RecordingPickerControls` and `RecordingOptionsView` are shared by the bar and notch.
+Run `BETTERSHOT_CHECK_CAPTURE_UI=1 bash Tests/run-exports.sh` after building for
+focused light/dark capture layout checks without generating a video fixture.
+The notch shelf uses `NotchRecentCaptures.shelfItems` to merge pending media and
+saved media/text/colors by recency without duplicates. Reuse `PreviewCardView` and `PreviewOverlay.perform` for
+card rendering/actions; notch sizing must not change the normal overlay. Notch media cards reveal the standard actions on hover or keyboard focus, with drag recognition confined to the preview.
+`NotchQuickEditor` reuses `AnnotationCanvas`, `AnnotationRenderer`, and editable
+history sidecars. Done saves privately; it must not update an exported file.
+`NotchVoiceCapture` handles the configurable hold key through the existing `ShortcutService` event tap. Select an area is the default through `RegionSelectionOverlay` and `captureLastRegion`; unset or unknown hold actions must never start drawing. Draw on screen is opt-in: snapshot the display, open the production canvas full-screen with a red freehand tool, and route held strokes through its model. Buffer mouse events during capture preparation; finish on modifier release after the final mouse-up. Drawing alone must not request microphone access. Escape preserves the editor's discard confirmation. Keyboard chords cancel arming. Active hold feedback belongs inside the notch as compact Screenshot/Select or Screenshot/Draw status, with a short scale-and-fade transition that is disabled by Reduce Motion. The folder menu dispatches OCR/color through `CaptureOrchestrator`, with shortcut labels from `ShortcutService`.
+Option voice capture is enabled by default, observes modifier state only when enabled and when Option is not the capture hold key, and never retains plain keystrokes. Releasing Option during microphone startup must still finish the capture. Keep the annotated image and transcript in one shelf item. Microphone capture ends before on-device transcription, with temporary
+audio retained only for retry until completion/discard. Reuse
+`RecordingTranscriptionService.transcribeAudio` rather than adding a cloud service.
+`NotchShelfStore` keeps bounded OCR/color history only in Notch Mode, plus opt-in clipboard text and separately configurable standalone hex-color collection (on by default), and checks private pasteboard
+markers before reading text. Test with isolated pasteboards and storage only.
+After building, `BETTERSHOT_CHECK_LOCAL_SHELF=1 bash Tests/run-exports.sh` checks
+persistence, copying and quick-edit rendering without live capture. An optional
+`BETTERSHOT_SPEECH_FIXTURE` path can supply synthesized speech saying “button” and
+“smaller” to validate the actual on-device transcription engine.
+Keep source selection separate from starting a recording, preserve permission checks
+for camera/microphone, and keep screenshot and recording delays distinct.
 
 Every screenshot starts in `DeckStaging`. Copy only updates the clipboard and
 retains a private file for file-based paste targets. Edit, Pin, Share, and drag-out
@@ -298,7 +325,7 @@ BETTERSHOT_CHECK_3D_ONLY=1 bash Tests/run-exports.sh
 # With existing Screen Recording permission, capture displayed player windows:
 BETTERSHOT_CHECK_3D_ONLY=1 BETTERSHOT_CHECK_3D_WINDOWS=1 bash Tests/run-exports.sh
 # With optimized Release objects, measure warm 1080p/4K transform, Gaussian, and bokeh GPU frame times:
-BETTERSHOT_BUILD_CONFIGURATION=Release BETTERSHOT_CHECK_3D_ONLY=1 BETTERSHOT_BENCHMARK_3D=1 bash Tests/run-exports.sh
+BETTERSHOT_DERIVED_DATA=.build BETTERSHOT_BUILD_CONFIGURATION=Release BETTERSHOT_CHECK_3D_ONLY=1 BETTERSHOT_BENCHMARK_3D=1 bash Tests/run-exports.sh
 ```
 
 Offscreen snapshots do not validate live AVPlayer layers. The optional window
@@ -313,11 +340,13 @@ media. It does not automate pointer dragging or keyboard entry in the controls.
 make test
 ```
 
-This builds unsigned Debug with testability enabled, runs
+This builds unsigned Debug in `.build/tests` with testability enabled, runs
 [scripts/run-checks.sh](scripts/run-checks.sh), then
 [Tests/run-exports.sh](Tests/run-exports.sh). The runners set
 `BETTERSHOT_TESTING=1` so tests use isolated storage and do not access real R2
-Keychain credentials. Always use the runners; never substitute production
+Keychain credentials. The separate test build directory keeps unsigned tests from replacing
+a running signed dev app and invalidating its Screen Recording permission. Quit the dev
+app before rebuilding its `.build` bundle. Always use the runners; never substitute production
 credentials to make a test pass.
 
 For a logic regression, add a small check against production code. Standalone
@@ -333,6 +362,8 @@ with `make test` when production code changes.
 
 | Area | Command |
 | --- | --- |
+| Notch hover, preview actions, and compact/expanded snapshots | `BETTERSHOT_CHECK_NOTCH=1 bash Tests/run-exports.sh` |
+| ScreenCaptureKit window pixels, native resolution, staging, and preview in both modes (requires existing Screen Recording permission) | `BETTERSHOT_CHECK_WINDOW_CAPTURE=1 bash Tests/run-exports.sh` |
 | Screenshot Copy/Save and private storage | `BETTERSHOT_CHECK_SCREENSHOT_SAVING=1 bash Tests/run-exports.sh` |
 | Video compositing and encoded exports | `BETTERSHOT_CHECK_VIDEO_EXPORTS=1 bash Tests/run-exports.sh` |
 | Displayed Gallery and Settings windows | `BETTERSHOT_CHECK_LIBRARY_WINDOWS=1 bash Tests/run-exports.sh` |
@@ -365,7 +396,7 @@ make generate
 xcodebuild -project BetterShot.xcodeproj -scheme BetterShot -configuration Release \
   -derivedDataPath .build CODE_SIGNING_ALLOWED=NO ENABLE_TESTABILITY=YES \
   SWIFT_COMPILATION_MODE=incremental build
-BETTERSHOT_BUILD_CONFIGURATION=Release BETTERSHOT_BENCHMARK=1 bash Tests/run-exports.sh
+BETTERSHOT_DERIVED_DATA=.build BETTERSHOT_BUILD_CONFIGURATION=Release BETTERSHOT_BENCHMARK=1 bash Tests/run-exports.sh
 ```
 
 It measures two-minute 1080p clips with plain and heavy effects, including 60/30 fps
@@ -445,3 +476,40 @@ versions; Settings → About can reopen the notes or tour.
 ghost non-interactive and avoid project mutations/render-cache invalidation while
 skimming. Tests cover placement boundaries, undo/persistence, and compact light/dark
 snapshots of the ghost, tour pages, and release notes.
+
+### Notch presentation
+
+Cancel pending hover dismissal during capture/mode changes and keep menus and
+popovers open while in use.
+Recent Captures reuses `MediaGalleryItem` resolution and `MediaGalleryCard` actions
+and thumbnail decoding; do not add a second media store.
+
+Settings > General > Capture Mode selects Normal Mode or Notch Mode and applies
+immediately. Overlay settings customize normal mode’s floating preview cards.
+
+`NotchPresenter` hosts the existing capture/session controls, preview cards, and
+transfer cards. Keep actions in `RecordingBarPresenter` / `PreviewOverlay`; do not
+add a second saving, copying, upload, or recording implementation. Normal mode is
+the fallback for missing or unknown `bs_presentationMode` values. Mode changes
+must preserve pending media, transfers, and active recording state. An idle notch
+has no panel: capture gestures and the shared recording bar open it, and clearing
+the final active item dismisses it. Render recording controls from the shared
+bar's visibility and mode, matching Normal Mode's lifecycle.
+
+Preserve capture exclusion before presentation, immediate capture/mode dismissal,
+transparent margin hit testing, display selection, and accessibility. Expanded and
+compact surfaces stay opaque black with native dark-appearance controls. Short
+interruptible transitions respect Reduce Motion. Capture/Recents tabs reuse the
+existing controls and media resolver; compact logo/status never shows a thumbnail
+or capture count. `make test` exercises mode switching, hover cancellation,
+menu/sheet protection, capture suspension, preview actions, transfer cleanup, and
+both appearances. The opt-in window-capture check drives selection and Escape;
+live recording and multi-display hardware still need manual checks.
+
+Boring Notch's copied shape and adapted hover button/interaction code retain their
+source credits and GPLv3 notices. See `Resources/Licenses/NOTICE.md` for the pinned
+revision and exact file mapping; bundle `BoringNotch.txt` with distributions.
+
+For window screenshot changes, also select a window and cancel with Escape in the
+signed dev app. Standalone test executables use their terminal’s capture identity
+and cannot establish that the installed app’s picker authorization works.

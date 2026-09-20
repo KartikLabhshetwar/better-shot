@@ -229,5 +229,62 @@ If BetterShot helps you, you can [support its development](https://www.buymeacof
 ## License
 
 [BSD 3-Clause](LICENSE) for original BetterShot code; adapted Cap rendering uses
-AGPLv3. See [third-party notices](Resources/Licenses/NOTICE.md) for distribution
+AGPLv3; the notch also includes GPLv3 Boring Notch adaptations. See [third-party notices](Resources/Licenses/NOTICE.md) for distribution
 terms and the bundled TourKit MIT license.
+
+### Optional notch mode (v0.5.5)
+
+In **Settings > General > Capture Mode**, choose **Normal Mode** (the default)
+or **Notch Mode**. Notch mode puts the capture tools, recording controls,
+image/video previews, and transfer status at the top of the capture display.
+The expanded notch is a horizontal shelf with **All, Text, Images, Videos, and Colors**
+filters in a compact 560-point panel without a capture toolbar. Hold Control (or your chosen hold key) briefly, draw directly on the frozen screen, then release to save. The compact notch expands into a short Screenshot/Draw status while the gesture is active. The folder menu offers **Copy Text from Screen (⌘⇧O)**, **Pick Color (⌘⇧C)**, the gallery, Save All and Dismiss All. Menu labels reflect customized shortcuts.
+The **All** filter orders screenshots, recordings, text, and colors together by recency, with a pending capture first.
+OCR text and picked colors are copied automatically and remain on the shelf
+with Copy and Dismiss actions until removed from history. Notch Mode shows no
+toast notifications: Copy confirms on its button, and failures appear as inline
+instructions. Text is selectable; colors show their hex code and swatch. Text and colors captured in Notch Mode are retained locally across launches. Normal Mode does not add to this history.
+Scroll sideways to browse the cards. Click an image for the quick editor, or a video for the video editor;
+rounded media cards show a title at rest and reveal Copy, Save, Edit, Pin, Cloud Share, and pending-capture Dismiss on hover or keyboard focus.
+Drag image previews into compatible editors. Drag a text card’s text or title to insert text, or a color card’s hex label/title to insert its color code. Color cards show the sampled color with a readable hex label and Copy button.
+Use your **Recording options** shortcut (default **⌘⇧5**) to set up a video: select Screen, Window, or Area, then choose
+your camera, microphone, system audio, and start delay before pressing **Start
+Recording** (or **Choose Area…**). The capture bar’s **Timer** applies to screenshots.
+The media card’s **Edit** hover action opens the full editor. Quick Edit opens a small native panel beneath the notch with drawing, arrow, blur, crop, background, and undo controls. **Done** retains a lossless image and editable annotations in BetterShot’s private library; **Save** explicitly exports a file.
+The notch uses an opaque black surface to match the camera cutout, with native
+macOS controls and readable dark-appearance labels in either system appearance.
+
+Notch Mode stays hidden while idle. Triggering the capture bar, a hold-key
+capture, or video recording opens it; dismissing the last active capture or
+recording control hides it again. While content is active, moving away collapses
+the notch after a short delay and hover expands it. Brief transitions respect
+Reduce Motion.
+Menus, recording options, and confirmations stay open while you use them. Click
+remains available for keyboard/accessibility use. Other displays use a floating
+panel that collapses to compact capture status. The shelf combines pending captures and recent library images/videos without
+duplicate cards. Open Gallery shows the full library. Pending
+captures remain until you act on them. Switching back restores your normal overlay
+layout and timing. Capture exclusion and private staging work in both modes.
+
+
+**Hold-key capture**
+
+With Notch Mode and Accessibility access enabled, hold Control and drag to select a rectangular screenshot area. The compact notch expands into Screenshot/Select status while the gesture is active. Release the mouse to capture; release the key early or press Escape to cancel. No annotations are drawn on the screen. The shutter sound follows **General > Play Sound**.
+
+Choose Control, Option, Shift, or Command under **Settings > General > Notch Shelf > Capture hold key**. **Hold action** defaults to **Select an area**. **Draw on screen** is an explicit alternative for red freehand annotations: hold the key briefly, draw, then release to save editable strokes. Assigning Option pauses the optional Option voice gesture; voice remains available in the quick editor. Standard region shortcuts still use the macOS screenshot selector.
+
+**Copied colors** are collected automatically while Notch Mode is active: copy a standalone `#RGB` or `#RRGGBB` code and it appears as a swatch under All and Colors, with Copy and drag-out. Turn this off with **Keep copied colors in Notch Mode**. Ordinary clipboard text remains separately opt-in, and private clipboard markers are respected. Normal Mode collects neither.
+
+**Local voice screenshots and copied text**
+
+- Open an image’s quick editor and choose the microphone to draw and speak. **Done** transcribes on your Mac and keeps the annotated image and text together on the shelf. Microphone permission is requested only when starting voice capture. Speech uses macOS 26’s on-device SpeechAnalyzer; supported Apple silicon/languages and an initial system language-model download are required. There is no cloud transcription fallback.
+- **Voice annotation: Hold Option** is enabled by default in Notch Mode. With Accessibility and Microphone access, hold Option briefly without another key, annotate over the captured screen, and release to finish. The annotated image and local transcript stay together as one shelf item. Disable the gesture in **Settings > General > Notch Shelf** if another app needs a held Option key. Voice sessions stop at two minutes; the microphone is stopped before transcription begins.
+- Copy a voice card to put image, file, and transcript representations on the clipboard. The receiving app chooses which representation to paste; use the card’s context menu **Copy transcript** to paste text separately. The voice note’s **Open image** returns to editing.
+- **Keep copied text in Notch Mode** is an independent, opt-in setting. While Notch Mode is active, it stores up to 50 text/color/voice entries locally (100 KB per text), skips clipboard content marked concealed/transient/generated by the source app, and starts with your next copy. Unmarked sensitive text can still be saved. Turning it off pauses collection; **Clear Shelf Text** removes retained text and transcripts without deleting screenshots. Clipboard image/file monitoring and keyboard sounds are not included.
+- OCR and sampled colors are saved in Notch Mode without enabling clipboard monitoring. Voice audio is temporary: it is removed after successful completion or explicit discard. If transcription fails, the editor retains the audio for retry and offers **Keep image without voice**. Closing an unsaved quick edit asks before discarding it.
+
+Notch UI and hover interactions include code from [Boring Notch](https://github.com/TheBoredTeam/boring.notch), credited to TheBoredTeam and its contributors. See [source and license notices](Resources/Licenses/NOTICE.md).
+
+Window screenshots use the native macOS window picker. Choose a window and click
+**Share This Window** to take one screenshot; BetterShot does not start a recording.
+Cancel leaves the current capture unchanged.

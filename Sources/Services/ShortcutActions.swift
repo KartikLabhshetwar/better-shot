@@ -14,7 +14,7 @@ extension ShortcutService {
             if AppPreferences.lastRegionRect != nil {
                 await CaptureOrchestrator.shared.captureLastRegion(on: screen)
             } else {
-                ToastWindow.shared.show(title: "No previous region", message: "Choose a region in the capture bar first.", systemIcon: "rectangle.dashed", on: screen)
+                ToastWindow.shared.show(isError: true, title: "No previous region", message: "Choose a region in the capture bar first.", systemIcon: "rectangle.dashed", on: screen)
             }
         case .recording, .recordingOptions:
             RecordingBarPresenter.shared.showPicker(recordingOptions: action == .recordingOptions)
@@ -43,7 +43,7 @@ extension ShortcutService {
                         return
                     }
                 } catch {
-                    ToastWindow.shared.show(title: "Couldn’t open clipboard image",
+                    ToastWindow.shared.show(isError: true, title: "Couldn’t open clipboard image",
                         message: "The image is still on the clipboard. Check disk space and try again.",
                         systemIcon: "exclamationmark.triangle", on: screen)
                     return
@@ -56,13 +56,13 @@ extension ShortcutService {
                 let message = action == .editClipboard
                     ? "Copy an image or take a screenshot first."
                     : "Take a screenshot or open Media Gallery to find a saved capture."
-                ToastWindow.shared.show(title: "No capture available", message: message, systemIcon: "photo", on: screen)
+                ToastWindow.shared.show(isError: true, title: "No capture available", message: message, systemIcon: "photo", on: screen)
                 return
             }
             if action == .pinLastCapture {
                 let retainedURL = DeckStaging.retain(url)
                 guard !DeckStaging.isStaged(retainedURL) else {
-                    ToastWindow.shared.show(title: "Couldn’t prepare capture",
+                    ToastWindow.shared.show(isError: true, title: "Couldn’t prepare capture",
                         message: "The screenshot is still available. Check disk space and try again.",
                         systemIcon: "exclamationmark.triangle", on: screen)
                     return
