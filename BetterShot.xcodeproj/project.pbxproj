@@ -14,6 +14,7 @@
 		041B87BB64D98E1277AA5C83 /* AfterCaptureActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 016FCFAE69ED3C0FD92C5D3B /* AfterCaptureActions.swift */; };
 		07ADFBC530D80E5AC5AD2B71 /* RecordingPointerStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73C4496D1286F55946F77EBA /* RecordingPointerStream.swift */; };
 		08438912627871CAC2592D71 /* AnnotationInspectorSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC94C1BE0CE4840EE91F1A8C /* AnnotationInspectorSlider.swift */; };
+		0AA73A072B6327A23D08F89E /* ScrollCaptureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 797BDC98FC7C054D427684E4 /* ScrollCaptureController.swift */; };
 		0CA40C2EF632A893F54D7908 /* Recording3DBlurRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B424B7E7026382C1EAD51238 /* Recording3DBlurRenderer.swift */; };
 		0D140B6B419AF8A893C0B34B /* RecordingStudioWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B6E1DB23A94D5FDB76C1577 /* RecordingStudioWindow.swift */; };
 		0D586FAFE45076AE6932CB32 /* AnnotationShadowStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43E39CDD68C8A97E443A6C9E /* AnnotationShadowStyle.swift */; };
@@ -350,6 +351,7 @@
 		7846895DF5BEB0C9BC144710 /* StrokeOutline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrokeOutline.swift; sourceTree = "<group>"; };
 		78E7B35573A11F2C3D1CD1F8 /* VideoCompressionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoCompressionModels.swift; sourceTree = "<group>"; };
 		79187CE18696A103378D33E6 /* EditorChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorChrome.swift; sourceTree = "<group>"; };
+		797BDC98FC7C054D427684E4 /* ScrollCaptureController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollCaptureController.swift; sourceTree = "<group>"; };
 		7C129FF88ACF72C0544AC0D9 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		7C6D5B9A6634007DC09C4A81 /* StudioInspectorTabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioInspectorTabs.swift; sourceTree = "<group>"; };
 		7CF3030FEFF60A9E00ACF22C /* StrokeOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrokeOptions.swift; sourceTree = "<group>"; };
@@ -549,6 +551,7 @@
 				C2B128F33D1CBF0CBB6A6852 /* RegionGeometry.swift */,
 				868F0E1B6C8FC7DF50B4A79B /* RegionSelectionOverlay.swift */,
 				4495302A23BB2192D91C5ED3 /* ScreenCapture.swift */,
+				797BDC98FC7C054D427684E4 /* ScrollCaptureController.swift */,
 			);
 			path = Capture;
 			sourceTree = "<group>";
@@ -1100,6 +1103,7 @@
 				118F7D00871572DFAF7B5E84 /* ScreenshotHistoryStore.swift in Sources */,
 				F66C60BCD81D7024DAA307A0 /* ScreenshotImageLoader.swift in Sources */,
 				BA91FBAAB700FD8A1341F27D /* ScreenshotPreviewItem.swift in Sources */,
+				0AA73A072B6327A23D08F89E /* ScrollCaptureController.swift in Sources */,
 				C46DD6DBAA95F563F2EC6E4E /* SettingsWindowController.swift in Sources */,
 				541183DBA6BB9EC649F2B9BB /* Shape.swift in Sources */,
 				54B7FEFC77CCBC22A4735094 /* ShapeRenderer.swift in Sources */,

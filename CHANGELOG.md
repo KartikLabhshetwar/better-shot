@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Scroll capture:** select a region, then scroll (manually or with auto-scroll) to stitch a full-page screenshot. Uses Vision framework for pixel-precise alignment, TIFF byte comparison for frame settlement, frozen header detection, scrollbar exclusion, and incremental stitching up to 30,000 pixels. Configurable via UserDefaults for auto-scroll speed and max height.
 - Restored hold-and-drag area screenshots as the default, with compact animated status inside the notch instead of an outline. Drawing over the screen now requires explicitly selecting Draw on screen in Settings; it never starts from the default hold gesture.
 - Copied hex colors appear as persistent swatches in Notch Mode, with a separate collection setting enabled by default; ordinary text history remains opt-in.
 - OCR and Pick Color actions in the notch's folder menu show their configured shortcuts.
