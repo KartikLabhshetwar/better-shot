@@ -90,10 +90,12 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
         }
         window.appearance = originalAppearance
     }
+    notch.collapse()
+    try await Task.sleep(for: .milliseconds(200))
     _ = NotchVoiceCapture.shared.controlGesture.update(flags: .control, modifierChanged: true)
     try await Task.sleep(for: .milliseconds(100))
     precondition(NotchVoiceCapture.shared.holdIndicatorActive)
-    try snapshotNativeNotch(notch, to: output.appendingPathComponent("notch-armed-border.png"))
+    try snapshotNativeNotch(notch, to: output.appendingPathComponent("notch-armed-status.png"))
     _ = NotchVoiceCapture.shared.controlGesture.update(flags: [], modifierChanged: true)
     precondition(!NotchVoiceCapture.shared.holdIndicatorActive)
     notch.collapse()

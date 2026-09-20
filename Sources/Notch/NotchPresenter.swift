@@ -37,16 +37,7 @@ final class NotchPresenter {
             captureIssue != nil || !transfers.isEmpty || script != nil || ocrText != nil || colorHex != nil
     }
 
-    private init() { observeHoldIndicator() }
-
-    private func observeHoldIndicator() {
-        withObservationTracking {
-            let active = NotchVoiceCapture.shared.holdIndicatorActive
-            notch?.outlineColor = active ? .blue : .clear
-        } onChange: { [weak self] in
-            Task { @MainActor in self?.observeHoldIndicator() }
-        }
-    }
+    private init() {}
 
     func show(on screen: NSScreen? = nil) {
         if AppPreferences.presentationMode == .notch { enabledSession = true }
@@ -84,7 +75,6 @@ final class NotchPresenter {
             }
             self.notch = notch
         }
-        notch?.outlineColor = NotchVoiceCapture.shared.holdIndicatorActive ? .blue : .clear
         notch?.presentImmediately(on: screen, expanded: expanded, animated: true)
     }
 
@@ -188,6 +178,7 @@ final class NotchPresenter {
 }
 
 struct NotchContent: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var presenter = NotchPresenter.shared
     @State private var bar = RecordingBarPresenter.shared
     @State private var overlay = PreviewOverlay.shared
@@ -268,8 +259,15 @@ struct NotchContent: View {
                 }
                 Spacer(minLength: 4)
                 if NotchVoiceCapture.shared.holdIndicatorActive {
-                    Circle().fill(.blue).frame(width: 7, height: 7)
-                        .accessibilityLabel("Capture active")
+                    Label(NotchVoiceCapture.drawsOnHold ? "Draw" : "Select area",
+                          systemImage: NotchVoiceCapture.drawsOnHold ? "pencil.tip" : "viewfinder")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 10)
+                        .frame(height: 24)
+                        .background(.white, in: Capsule())
+                        .transition(reduceMotion ? .opacity : .scale(scale: 0.92).combined(with: .opacity))
+                        .accessibilityLabel(NotchVoiceCapture.drawsOnHold ? "Drawing active" : "Screenshot selection active")
                 }
                 Menu {
                     Button(ShortcutService.shared.help("Copy Text from Screen", for: .ocr), systemImage: "doc.text.viewfinder") {
@@ -296,6 +294,8 @@ struct NotchContent: View {
                     SettingsWindowController.shared.open(section: .general)
                 }
             }
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.16),
+                       value: NotchVoiceCapture.shared.holdIndicatorActive)
             if let issue = presenter.captureIssue {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "exclamationmark.circle").foregroundStyle(.orange)
@@ -471,20 +471,55 @@ private struct NotchTextResult: View {
 }
 
 struct NotchCompactLeading: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var status: (title: String, symbol: String)? {
+        if NotchVoiceCapture.shared.holdIndicatorActive { return ("Screenshot", "camera.viewfinder") }
+        if let url = PreviewOverlay.shared.items.last {
+            return PreviewOverlay.isVideo(url) ? ("Recording", "video") : ("Screenshot", "photo")
+        }
+        if NotchPresenter.shared.colorHex != nil { return ("Color", "eyedropper") }
+        if NotchPresenter.shared.ocrText != nil { return ("Text", "doc.text.viewfinder") }
+        return nil
+    }
+
     var body: some View {
         Button { NotchPresenter.shared.show() } label: {
-            Image(nsImage: NSImage(named: "MenuBarIcon") ?? NSImage()).resizable().renderingMode(.template)
-                .scaledToFit().frame(width: 18, height: 18)
-                .frame(width: 28, height: 22)
+            if let status {
+                Label(status.title, systemImage: status.symbol)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 4)
+                    .frame(height: 22)
+                    .transition(reduceMotion ? .opacity : .scale(scale: 0.92).combined(with: .opacity))
+            } else {
+                Image(nsImage: NSImage(named: "MenuBarIcon") ?? NSImage()).resizable().renderingMode(.template)
+                    .scaledToFit().frame(width: 18, height: 18)
+                    .frame(width: 28, height: 22)
+                    .transition(.opacity)
+            }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("BetterShot — open shelf")
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: status?.title)
+        .accessibilityLabel(NotchVoiceCapture.shared.holdIndicatorActive
+            ? "Screenshot selection active — open shelf"
+            : status.map { "\($0.title) ready — open shelf" } ?? "BetterShot — open shelf")
         .help("BetterShot — saved captures, text, and colors")
     }
 }
 
 struct NotchCompactTrailing: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var editorIsOpen = false
+
+    private var pillTitle: String? {
+        if NotchVoiceCapture.shared.holdIndicatorActive {
+            return NotchVoiceCapture.drawsOnHold ? "Draw" : "Select"
+        }
+        if !editorIsOpen && (PreviewOverlay.shared.isPresented || NotchPresenter.shared.ocrText != nil
+                            || NotchPresenter.shared.colorHex != nil) { return "Ready" }
+        return nil
+    }
 
     private var status: (title: String, symbol: String) {
         if editorIsOpen { return ("Editor open", "pencil.and.outline") }
@@ -496,9 +531,14 @@ struct NotchCompactTrailing: View {
 
     var body: some View {
         Button { NotchPresenter.shared.show() } label: {
-            if NotchVoiceCapture.shared.holdIndicatorActive {
-                Circle().fill(.blue).frame(width: 7, height: 7).frame(width: 28, height: 22)
-                    .accessibilityLabel("Capture active")
+            if let pillTitle {
+                Text(pillTitle)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 10)
+                    .frame(height: 22)
+                    .background(.white, in: Capsule())
+                    .transition(reduceMotion ? .opacity : .scale(scale: 0.92).combined(with: .opacity))
             } else if ScreenRecordingManager.shared.isActive {
                 Label(ScreenRecordingManager.shared.formattedElapsedTime, systemImage: "record.circle.fill")
                     .monospacedDigit().foregroundStyle(.red)
@@ -508,7 +548,8 @@ struct NotchCompactTrailing: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(NotchVoiceCapture.shared.holdIndicatorActive ? "Capture active" : ScreenRecordingManager.shared.isActive ? "Expand recording controls" : status.title)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: pillTitle)
+        .accessibilityLabel(NotchVoiceCapture.shared.holdIndicatorActive ? "Screenshot selection active" : ScreenRecordingManager.shared.isActive ? "Expand recording controls" : status.title)
         .help(ScreenRecordingManager.shared.isActive ? "Recording in progress" : status.title)
         .onAppear { refreshEditors() }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in refreshEditors() }

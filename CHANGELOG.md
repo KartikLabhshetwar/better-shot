@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Restored hold-and-drag area screenshots as the default, with a blue outline around the notch and camera housing. Drawing over the screen now requires explicitly selecting Draw on screen in Settings; it never starts from the default hold gesture.
+- Restored hold-and-drag area screenshots as the default, with compact animated status inside the notch instead of an outline. Drawing over the screen now requires explicitly selecting Draw on screen in Settings; it never starts from the default hold gesture.
 - Copied hex colors appear as persistent swatches in Notch Mode, with a separate collection setting enabled by default; ordinary text history remains opt-in.
 - OCR and Pick Color actions in the notch's folder menu show their configured shortcuts.
 
@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Simplified the notch to saved cards and filters, removing the capture toolbar and grid/viewfinder controls. Hold Control and drag an area to capture on mouse release, with a blue armed indicator and the existing shutter sound. Early Control release or Escape cancels; standard region shortcuts keep the native macOS selector.
+- Simplified the notch to saved cards and filters, removing the capture toolbar and grid/viewfinder controls. Hold Control and drag an area to capture on mouse release, with compact Screenshot/Select feedback and the existing shutter sound. Early Control release or Escape cancels; standard region shortcuts keep the native macOS selector.
 - Notch OCR text and colors now persist across launches and can be dragged into other apps as text/hex values. Image previews retain file drag-out. New OCR/color/clipboard history is collected only in Notch Mode; switching modes stops clipboard monitoring immediately.
 
 - Reworked the notch into a black horizontal shelf inspired by the supplied reference: a 560-point panel, white selected filter pills, 160-point image/video/OCR/color cards, full-color swatches with contrast-aware hex labels, and a collapsible shared capture toolbar. All/Text/Images/Videos/Colors replace Capture/Recents. Cards keep Copy and media action menus; the library menu retains bulk Save/Dismiss. Pending and recent media are deduplicated, while hover opening/closing, inline failures, and no-toast behavior remain.

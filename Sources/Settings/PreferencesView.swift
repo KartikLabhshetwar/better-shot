@@ -264,7 +264,7 @@ struct GeneralSettingsTab: View {
                 .onChange(of: holdAction) { NotchVoiceCapture.shared.refreshGesture() }
                 Text(holdAction == "area"
                     ? "Hold \(captureHoldKey.title) and drag an area. Release the mouse to capture; release the key early or press Escape to cancel."
-                    : "Hold \(captureHoldKey.title) briefly to freeze the screen, draw your annotations, then release the key to save. A blue border outlines the notch while active. No microphone is needed.")
+                    : "Hold \(captureHoldKey.title) briefly to freeze the screen, draw your annotations, then release the key to save. The notch shows the active drawing state. No microphone is needed.")
                     .font(.caption).foregroundStyle(.secondary)
                 Text("Requires Accessibility access. Keyboard shortcuts remain unchanged; disable this gesture when another app needs \(captureHoldKey.title)-drag.")
                     .font(.caption).foregroundStyle(.secondary)

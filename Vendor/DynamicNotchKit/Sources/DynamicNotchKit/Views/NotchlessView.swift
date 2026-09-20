@@ -28,11 +28,6 @@ struct NotchlessView<Expanded, CompactLeading, CompactTrailing>: View where Expa
         notchContent()
             .background(Color.black)
             .clipShape(.rect(cornerRadius: cornerRadius))
-            .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .strokeBorder(dynamicNotch.outlineColor, lineWidth: 2)
-                    .allowsHitTesting(false)
-            }
             .padding(20)
             .onGeometryChange(for: CGFloat.self, of: \.size.height) { newHeight in
                 // This makes sure that the floating window FULLY slides off before disappearing
