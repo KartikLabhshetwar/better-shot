@@ -441,6 +441,10 @@ The launch flow presents pending setup first, otherwise unread release notes,
 then honors the capture-bar startup preference. Offline notes include skipped
 versions; Settings → About can reopen the notes or tour.
 
+Login-item launches suppress the automatic capture bar, including after closing
+release notes. Read the launch Apple event before deferring startup presentation.
+Preserve manual launch, reopen, menu, and shortcut behavior.
+
 3D insertion hover and click share `Recording3DTimeline.insertionRange`. Keep the
 ghost non-interactive and avoid project mutations/render-cache invalidation while
 skimming. Tests cover placement boundaries, undo/persistence, and compact light/dark

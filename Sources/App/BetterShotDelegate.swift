@@ -16,6 +16,7 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] != "1" else { return }
+        let allowsStartupCaptureBar = !LaunchContext.isLoginItem(NSAppleEventManager.shared().currentAppleEvent)
         DeckStaging.purge()
         AppPreferences.migrateEditorPreferences()
         AppPreferences.applyAppearance()
@@ -30,9 +31,10 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async {
             if OnboardingState.shouldPresent() {
                 OnboardingWindowController.shared.show()
-            } else if ReleaseNotesWindowController.shared.show(onlyIfNew: true) {
+            } else if ReleaseNotesWindowController.shared.show(onlyIfNew: true, opensCaptureBarOnClose: allowsStartupCaptureBar) {
                 // Keep the update notes in focus instead of also opening the capture bar.
-            } else if UserDefaults.standard.object(forKey: AppPreferences.showCaptureBarAtLaunchKey) as? Bool ?? true {
+            } else if allowsStartupCaptureBar,
+                      UserDefaults.standard.object(forKey: AppPreferences.showCaptureBarAtLaunchKey) as? Bool ?? true {
                 RecordingBarPresenter.shared.showPicker(activate: false)
             }
         }

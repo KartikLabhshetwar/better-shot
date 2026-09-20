@@ -15,7 +15,7 @@ final class ReleaseNotesWindowController: NSObject, NSWindowDelegate {
     }
 
     @discardableResult
-    func show(onlyIfNew: Bool = false) -> Bool {
+    func show(onlyIfNew: Bool = false, opensCaptureBarOnClose: Bool = true) -> Bool {
         if let window { window.makeKeyAndOrderFront(nil); return true }
         let version = Self.currentVersion
         let releases = (try? Self.load()) ?? []
@@ -33,7 +33,7 @@ final class ReleaseNotesWindowController: NSObject, NSWindowDelegate {
         window.center()
         self.window = window
         presentedVersion = notes.isEmpty ? nil : version
-        opensCaptureBarOnClose = onlyIfNew
+        self.opensCaptureBarOnClose = onlyIfNew && opensCaptureBarOnClose
         AppActivationPolicy.enter()
         window.makeKeyAndOrderFront(nil)
         return true

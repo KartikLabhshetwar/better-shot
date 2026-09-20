@@ -109,6 +109,10 @@ source movies remain available for editing, with undo and redo in both editors.
 Customize bindings in **Settings > Shortcuts**, including editor tools and
 additional capture and recording actions. Some actions start unassigned.
 
+When BetterShot starts through **Launch at Login**, the capture bar stays hidden.
+**Show the capture bar at launch** still applies when you open the app manually.
+Use the clover menu or `⌘⇧2` to open the bar after login.
+
 ### Where screenshots go
 
 Captures start in BetterShot's private working storage. **Copy** puts an image on

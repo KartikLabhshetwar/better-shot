@@ -161,6 +161,7 @@
 		BA2E35F115F67D7CA6DEE5A9 /* BetterShotApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F74F2F48E0775A96906E180F /* BetterShotApp.swift */; };
 		BA91FBAAB700FD8A1341F27D /* ScreenshotPreviewItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FC7A31E31203B3330CE5AA0 /* ScreenshotPreviewItem.swift */; };
 		BACCC6CAD5B08E0987F79EE4 /* ScreenshotFileNaming.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EC83F060B8C618716847D95 /* ScreenshotFileNaming.swift */; };
+		BC1096DDBF3AD517C358AD97 /* LaunchContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A26A65D72C7F0939E9CB0AC /* LaunchContext.swift */; };
 		BC6170740B05997D27830D0B /* RecordingKeystrokeCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8944EFA56AE64C38C83ED9E1 /* RecordingKeystrokeCapture.swift */; };
 		BC811FEA82E635D6292A80FD /* MenuBarContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE87F338892DCBFEA8FD7BDA /* MenuBarContentView.swift */; };
 		BC91FECA9CA43F0585BE1836 /* StudioInspectorTabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C6D5B9A6634007DC09C4A81 /* StudioInspectorTabs.swift */; };
@@ -360,6 +361,7 @@
 		97939ED1B8AE58C014C685E7 /* TeleprompterComposerPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeleprompterComposerPresenter.swift; sourceTree = "<group>"; };
 		979BD0C592163200160BDC49 /* RecordingClipTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingClipTimelineView.swift; sourceTree = "<group>"; };
 		9822447B9DE8F15B9CC94381 /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesView.swift; sourceTree = "<group>"; };
+		9A26A65D72C7F0939E9CB0AC /* LaunchContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchContext.swift; sourceTree = "<group>"; };
 		9D772C2FACF129B138F38F58 /* RecordingDeliverable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingDeliverable.swift; sourceTree = "<group>"; };
 		9E04FC14B34231EAA0AD9985 /* Recording3DAnimation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Recording3DAnimation.swift; sourceTree = "<group>"; };
 		9E1854845C0B1A123F908A41 /* Mat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Mat.swift; sourceTree = "<group>"; };
@@ -780,6 +782,7 @@
 				F74F2F48E0775A96906E180F /* BetterShotApp.swift */,
 				1A8FF0E5AD713FC1D7E99DE7 /* BetterShotDelegate.swift */,
 				0D024DBA83E8292A232F91B1 /* CaptureURLAction.swift */,
+				9A26A65D72C7F0939E9CB0AC /* LaunchContext.swift */,
 				F486BA8CF557A0B458CBE106 /* OnboardingWindowController.swift */,
 				F95D1700C858D4FFFFA44323 /* ReleaseNotesWindowController.swift */,
 			);
@@ -969,6 +972,7 @@
 				2DE8CBAB2CD9FE740E56F9E6 /* InkPath.swift in Sources */,
 				AAF2ADDD756895F9924447DE /* Intersect.swift in Sources */,
 				FA4BE9A7B6E26F64C88E3DCB /* LastRegionGhostPresenter.swift in Sources */,
+				BC1096DDBF3AD517C358AD97 /* LaunchContext.swift in Sources */,
 				435989A6E7CFD7DC8AE1B593 /* Mat.swift in Sources */,
 				02404D9AD03DCC77348C50CF /* MathUtils.swift in Sources */,
 				4CCE271E5EB887F0148834E0 /* MediaGallery.swift in Sources */,
