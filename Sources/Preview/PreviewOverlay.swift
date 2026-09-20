@@ -236,7 +236,8 @@ final class PreviewOverlay {
     }
 
     func share(_ url: URL) {
-        guard items.contains(url), shareIDs[url] == nil else { return }
+        guard shareIDs[url] == nil else { return }
+        if !items.contains(url) { show(url: url, automaticallyDismiss: false) }
         cancelScheduledDismiss(for: url)
         toastURL = url
         guard CloudUploader.shared.isConfigured else {
@@ -523,6 +524,7 @@ struct PreviewCardView: View {
     private var controlScale: CGFloat { size.controlScale }
 
     private var isVideo: Bool { PreviewOverlay.isVideo(url) }
+    private var showsActions: Bool { isHovered || alwaysShowActions || hasFocus || focusedAction != nil }
 
     var body: some View {
         Group {
@@ -547,7 +549,7 @@ struct PreviewCardView: View {
                     // this only showed up with a mouse.
                     Image(nsImage: image)
                         .resizable()
-                        .aspectRatio(contentMode: .fit)
+                        .aspectRatio(contentMode: usesNotchActions ? .fill : .fit)
                         .frame(width: cardSize.width, height: cardSize.height)
                         .background(Color.black.opacity(0.9))
                         .clipped()
@@ -564,7 +566,7 @@ struct PreviewCardView: View {
                             return NSItemProvider(object: image)
                         }
 
-                    if isVideo {
+                    if isVideo && (!usesNotchActions || !showsActions) {
                         Image(systemName: "play.circle.fill")
                             .font(.system(size: 28 * controlScale))
                             .foregroundStyle(.white.opacity(0.9))
@@ -573,17 +575,23 @@ struct PreviewCardView: View {
                             .accessibilityHidden(true)
                     }
 
-                    if !usesNotchActions { hoverOverlay()
-                        .opacity(isHovered || alwaysShowActions || hasFocus || focusedAction != nil ? 1 : 0)
-                        .allowsHitTesting(isHovered || alwaysShowActions || hasFocus || focusedAction != nil)
-                        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
+                    if usesNotchActions {
+                        notchCaption
+                            .opacity(showsActions ? 0 : 1)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
                     }
+                    hoverOverlay()
+                        .opacity(showsActions ? 1 : 0)
+                        .allowsHitTesting(showsActions)
+                        .accessibilityHidden(!showsActions)
+                        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: showsActions)
 
                 }
                 .frame(width: cardSize.width, height: cardSize.height)
-                .clipShape(RoundedRectangle(cornerRadius: usesNotchActions ? 0 : 12, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: usesNotchActions ? 18 : 12, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: usesNotchActions ? 0 : 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: usesNotchActions ? 18 : 12, style: .continuous)
                         .strokeBorder(Color.white.opacity(usesNotchActions ? 0 : 0.2), lineWidth: 0.5)
                 )
                 .shadow(color: .black.opacity(usesNotchActions ? 0 : 0.25), radius: 10, y: 4)
@@ -628,6 +636,7 @@ struct PreviewCardView: View {
             openEditor()
             return .handled
         }
+        .accessibilityElement(children: .contain)
         .accessibilityLabel(isVideo ? "Recording preview" : "Screenshot preview")
         .task(id: url) { await loadThumbnail() }
         .disabled(overlay.savingItems.contains(url))
@@ -667,12 +676,37 @@ struct PreviewCardView: View {
         isLoadingThumbnail = false
     }
 
+    private var notchCaption: some View {
+        VStack {
+            Spacer(minLength: 0)
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(isVideo ? "Recording" : "Screenshot")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Open in editor")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+                Spacer(minLength: 0)
+
+            }
+            .foregroundStyle(.white)
+            .padding(14)
+        }
+        .background(alignment: .bottom) {
+            LinearGradient(colors: [.clear, .black.opacity(0.85)],
+                           startPoint: .top, endPoint: .bottom)
+                .frame(height: 90)
+        }
+    }
+
     private func hoverOverlay() -> some View {
         ZStack {
             Color.black.opacity(0.28)
                 .allowsHitTesting(false)
             OverlayToolArrangement(scale: controlScale) { slot in
-                if let tool = OverlayToolLayout(data: layoutData).assignments[slot] {
+                if let tool = (usesNotchActions ? OverlayToolLayout.standard : OverlayToolLayout(data: layoutData)).assignments[slot],
+                   tool != .dismiss || !usesNotchActions || overlay.items.contains(url) {
                     Button { overlay.perform(tool, for: url) } label: {
                         OverlayToolLabel(tool: tool, slot: slot, scale: controlScale)
                     }

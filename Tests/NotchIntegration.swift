@@ -9,7 +9,8 @@ import Synchronization
 func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     let defaults = UserDefaults.standard
     let keys = [AppPreferences.presentationModeKey, BetterShotPreferences.recordingCameraDeviceIDKey,
-                "bs_overlayDismissDelay", "bs_saveDirectory", "bs_overlayFollowsMouse"]
+                "bs_overlayDismissDelay", "bs_saveDirectory", "bs_overlayFollowsMouse",
+                AppPreferences.overlayAlwaysShowActionsKey]
     let saved = keys.map { defaults.object(forKey: $0) }
     let configuration = ProcessInfo.processInfo.environment["BETTERSHOT_BUILD_CONFIGURATION"] ?? "Debug"
     let derived = ProcessInfo.processInfo.environment["BETTERSHOT_DERIVED_DATA"] ?? ".build/tests"
@@ -174,6 +175,12 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     overlay.remove(movieURL)
     precondition(recentVideos.first(where: { $0.previewURL == movieURL })!.open(cloud: false) == nil)
     precondition(overlay.items.contains(movieURL), "Recent saved media must reopen the existing preview/actions")
+    precondition(!CloudUploader.shared.isConfigured, "Tests must not access R2 credentials")
+    overlay.remove(movieURL)
+    overlay.share(movieURL)
+    precondition(overlay.items.contains(movieURL) && overlay.transferStatus(for: movieURL) != nil,
+                 "Sharing recent media must enter the shared transfer flow and show setup guidance")
+    overlay.dismissShareStatus(for: movieURL)
     precondition(NotchRecentCaptures.items().count <= 4)
     let shelf = NotchRecentCaptures.mediaURLs(pending: [imageURL, movieURL, imageURL], filter: .all)
     precondition(shelf.prefix(2) == [imageURL, movieURL], "Newest pending captures lead, with no duplicate recent cards")
@@ -189,6 +196,18 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
                      to: output.appendingPathComponent("notch-captures-\(name).png"), height: 700)
         try snapshot(NotchContent(filter: .images).environment(\.colorScheme, .dark).padding(16).background(.black), scheme: scheme, width: 592,
                      to: output.appendingPathComponent("notch-recents-\(name).png"), height: 360)
+        let sample = OnboardingSample.coast.sourceURL(in: bundle).flatMap { NSImage(contentsOf: $0) } ?? NSImage(contentsOf: imageURL)!
+        for actions in [false, true] {
+            defaults.set(actions, forKey: AppPreferences.overlayAlwaysShowActionsKey)
+            try snapshot(HStack(spacing: 16) {
+                PreviewCardView(overlay: overlay, url: imageURL, thumbnail: sample,
+                                usesNotchActions: true, notchCardSize: CGSize(width: 184, height: 160))
+                PreviewCardView(overlay: overlay, url: movieURL, thumbnail: sample,
+                                usesNotchActions: true, notchCardSize: CGSize(width: 184, height: 160))
+            }.padding(20).background(.black), scheme: scheme, width: 424,
+                to: output.appendingPathComponent("notch-media-\(actions ? "actions" : "idle")-\(name).png"), height: 200)
+        }
+        defaults.set(false, forKey: AppPreferences.overlayAlwaysShowActionsKey)
         try snapshot(PreferencesView(selection: .general), scheme: scheme, width: 780,
                      to: output.appendingPathComponent("notch-settings-\(name).png"), height: 620)
         try snapshot(OverlayLayoutEditor(layout: .constant(.standard)), scheme: scheme, width: 298,
@@ -393,6 +412,17 @@ func checkLocalShelfFeatures(imageURL: URL, directory: URL, output: URL) async t
         if let oldMode { UserDefaults.standard.set(oldMode, forKey: AppPreferences.presentationModeKey) }
         else { UserDefaults.standard.removeObject(forKey: AppPreferences.presentationModeKey) }
     }
+    let oldAction = UserDefaults.standard.object(forKey: NotchVoiceCapture.actionKey)
+    defer {
+        if let oldAction { UserDefaults.standard.set(oldAction, forKey: NotchVoiceCapture.actionKey) }
+        else { UserDefaults.standard.removeObject(forKey: NotchVoiceCapture.actionKey) }
+    }
+    for action in [nil, "area", "unknown", "draw"] as [String?] {
+        if let action { UserDefaults.standard.set(action, forKey: NotchVoiceCapture.actionKey) }
+        else { UserDefaults.standard.removeObject(forKey: NotchVoiceCapture.actionKey) }
+        precondition(NotchVoiceCapture.drawsOnHold == (action == "draw"), "Screen drawing must be explicitly selected; area capture is the default")
+    }
+    UserDefaults.standard.set("area", forKey: NotchVoiceCapture.actionKey)
     var gesture = NotchControlGesture()
     _ = gesture.update(flags: .control, modifierChanged: true)
     precondition(gesture.armed)

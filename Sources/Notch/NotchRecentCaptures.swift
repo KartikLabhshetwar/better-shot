@@ -37,45 +37,9 @@ struct NotchMediaCard: View {
     let url: URL
     @State private var overlay = PreviewOverlay.shared
 
-    private var busy: Bool { overlay.savingItems.contains(url) || overlay.transferStatus(for: url) != nil }
-    private var pending: Bool { overlay.items.contains(url) }
-
     var body: some View {
-        VStack(spacing: 0) {
-            PreviewCardView(overlay: overlay, url: url, usesNotchActions: true,
-                            notchCardSize: CGSize(width: 184, height: 120))
-            HStack(spacing: 4) {
-                Text(PreviewOverlay.isVideo(url) ? "Video" : "Image")
-                    .font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-                Button("Copy", systemImage: "doc.on.doc") { overlay.perform(.copy, for: url) }
-                    .labelStyle(.iconOnly).buttonStyle(.borderless)
-                    .frame(width: 28, height: 28).help("Copy capture")
-                Button("Save", systemImage: "square.and.arrow.down") { overlay.perform(.save, for: url) }
-                    .labelStyle(.iconOnly).buttonStyle(.borderless)
-                    .frame(width: 28, height: 28).help("Save capture")
-                Menu {
-                    if !PreviewOverlay.isVideo(url) {
-                        Button("Quick Edit", systemImage: "slider.horizontal.3") { NotchQuickEditor.shared.open(url) }
-                    }
-                    ForEach([OverlayTool.edit, .copy, .save, .share, .pin]) { tool in
-                        Button(tool.title, systemImage: tool.symbol) { overlay.perform(tool, for: url) }
-                    }
-                    if pending {
-                        Divider()
-                        Button("Dismiss", systemImage: "xmark") { overlay.perform(.dismiss, for: url) }
-                    }
-                } label: { Label("Capture actions", systemImage: "ellipsis") }
-                .labelStyle(.iconOnly).menuStyle(.borderlessButton).menuIndicator(.hidden)
-                .frame(width: 28, height: 28)
-            }
-            .padding(.horizontal, 10).frame(height: 40)
-            .disabled(busy)
-        }
-        .frame(width: 184, height: 160)
-        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.white.opacity(0.12)))
-        .help("Open \(url.lastPathComponent) in the editor. Drag the preview into another app, or use the buttons to copy and save.")
+        PreviewCardView(overlay: overlay, url: url, usesNotchActions: true,
+                        notchCardSize: CGSize(width: 184, height: 160))
+            .help("Open \(url.lastPathComponent). Hover for actions, or drag the preview into another app.")
     }
 }

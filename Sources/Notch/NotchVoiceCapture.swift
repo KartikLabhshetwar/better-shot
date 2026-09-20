@@ -8,7 +8,7 @@ final class NotchVoiceCapture {
     static let gestureKey = "bs_notchHoldOption"
     static let controlKey = "bs_notchControlCapture"
     static let actionKey = "bs_notchHoldAction"
-    static var drawsOnHold: Bool { UserDefaults.standard.string(forKey: actionKey) != "area" }
+    static var drawsOnHold: Bool { UserDefaults.standard.string(forKey: actionKey) == "draw" }
     private(set) var drawingSession = false
     private var drawTask: Task<Void, Never>?
     private var drawingPointerDown = false

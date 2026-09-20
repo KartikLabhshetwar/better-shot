@@ -186,7 +186,7 @@ struct GeneralSettingsTab: View {
     @AppStorage(AppPreferences.showInMenuBarKey) private var showInMenuBar = true
     @AppStorage(NotchShelfStore.colorsKey) private var clipboardColors = true
     @AppStorage(NotchShelfStore.enabledKey) private var clipboardHistory = false
-    @AppStorage(NotchVoiceCapture.actionKey) private var holdAction = "draw"
+    @AppStorage(NotchVoiceCapture.actionKey) private var holdAction = "area"
     @AppStorage(NotchVoiceCapture.holdKey) private var captureHoldKey = NotchCaptureHoldKey.control
     @AppStorage(NotchVoiceCapture.controlKey) private var controlCapture = true
     @AppStorage(NotchVoiceCapture.gestureKey) private var holdOption = false
@@ -257,8 +257,8 @@ struct GeneralSettingsTab: View {
                 .disabled(!controlCapture)
                 .onChange(of: captureHoldKey) { NotchVoiceCapture.shared.refreshGesture() }
                 Picker("Hold action", selection: $holdAction) {
-                    Text("Draw on screen").tag("draw")
                     Text("Select an area").tag("area")
+                    Text("Draw on screen").tag("draw")
                 }
                 .disabled(!controlCapture)
                 .onChange(of: holdAction) { NotchVoiceCapture.shared.refreshGesture() }

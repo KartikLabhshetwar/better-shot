@@ -8,17 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.5.5] - 2026-09-19
 
 - Added a Capture hold key setting with Control, Option, Shift, and Command choices; Option capture takes priority over the optional voice gesture.
-- Refined screenshot/video cards with uncropped previews, compact Copy/Save actions in the notch, consistent circular cloud controls in overlays and Settings, and drag handling confined to the media preview.
+- Refined screenshot/video notch cards with rounded, edge-to-edge thumbnails, a transparent edge, lower title scrim, and actions revealed on hover or keyboard focus; retained consistent circular cloud controls in overlays and Settings, and drag handling confined to the media preview.
 
 ### Added
 
-- Hold-to-draw screenshots with a green outline around the whole notch: hold the configured key, draw red freehand marks over a frozen screen, and release to save editable annotations without a microphone. Select an area remains an optional hold action.
+- Restored hold-and-drag area screenshots as the default, with a green outline around the whole notch. Drawing over the screen now requires explicitly selecting Draw on screen in Settings; it never starts from the default hold gesture.
 - Copied hex colors appear as persistent swatches in Notch Mode, with a separate collection setting enabled by default; ordinary text history remains opt-in.
 - OCR and Pick Color actions in the notch's folder menu show their configured shortcuts.
 
 - Local voice screenshots: use the quick-editor microphone or opt into holding Option to draw and speak, then release to retain an annotated image with an on-device transcript. Copy image/file/text together or copy the transcript separately. Microphone access is explicit, temporary audio is removed after completion/discard, and failed transcription can retry or keep the image without voice.
 - Optional local text history in General > Notch Shelf, with 50-item retention, duplicate removal, private pasteboard-marker exclusions, per-card dismissal, and a confirmed Clear action. Collection starts with the next copy and defaults off.
-- A compact quick editor below the notch with drawing, arrows, blur, crop, background and undo. Done preserves full-resolution PNGs and editable source/annotations in the private library; the full editor remains available from the card menu.
+- A compact quick editor below the notch with drawing, arrows, blur, crop, background and undo. Done preserves full-resolution PNGs and editable source/annotations in the private library; the full editor remains available from the card’s Edit hover action.
 
 - **Optional Notch Mode:** choose Normal Mode or Notch Mode in Settings > General > Capture Mode. Normal remains the default, including on upgrade. The notch hosts the shared screenshot tools (Area, Fullscreen, Window, OCR, Color, and timers), recording options and Stop/Pause/Restart/Discard controls, and image/video previews with Copy, Save, Edit, Pin, Cloud Share, and Dismiss. Browse pending captures without opening a separate overlay. Hardware notches can collapse to a compact capture/recording status; other displays use a top-center floating panel.
 - Notch mode also hosts countdowns, recording teleprompter text and export/share progress with existing recovery actions. Pending previews stay available until acted on. Switching modes preserves captures and recording state; the notch hides during selection/capture and follows capture-window exclusion settings.
