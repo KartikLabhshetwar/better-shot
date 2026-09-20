@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.5] - 2026-09-19
 
+- Added a Capture hold key setting with Control, Option, Shift, and Command choices; Option area capture takes priority over the optional voice gesture.
+- Refined screenshot/video cards with uncropped previews, compact Copy/Save actions in the notch, consistent circular cloud controls in overlays and Settings, and drag handling confined to the media preview.
+
 ### Added
 
 - Local voice screenshots: use the quick-editor microphone or opt into holding Option to draw and speak, then release to retain an annotated image with an on-device transcript. Copy image/file/text together or copy the transcript separately. Microphone access is explicit, temporary audio is removed after completion/discard, and failed transcription can retry or keep the image without voice.

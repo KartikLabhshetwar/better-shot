@@ -160,7 +160,7 @@ media without duplicates. Reuse `PreviewCardView` and `PreviewOverlay.perform` f
 card rendering/actions; notch sizing must not change the normal overlay.
 `NotchQuickEditor` reuses `AnnotationCanvas`, `AnnotationRenderer`, and editable
 history sidecars. Done saves privately; it must not update an exported file.
-`NotchVoiceCapture` handles Control-drag through the existing `ShortcutService` event tap and `RegionSelectionOverlay`; mouse release routes through `captureLastRegion` and normal private staging/sound. Early modifier release or Escape cancels. The normal screenshot selector is unchanged. Option voice capture observes modifier state only when enabled; never retain plain
+`NotchVoiceCapture` handles modifier-drag (Control by default; configurable in General > Notch Shelf) through the existing `ShortcutService` event tap and `RegionSelectionOverlay`; mouse release routes through `captureLastRegion` and normal private staging/sound. Early modifier release or Escape cancels. Keyboard chords must not arm capture. When Option is assigned to area capture, suspend the optional Option voice gesture without clearing its preference. The normal screenshot selector is unchanged. Option voice capture observes modifier state only when enabled; never retain plain
 keystrokes. Microphone capture ends before on-device transcription, with temporary
 audio retained only for retry until completion/discard. Reuse
 `RecordingTranscriptionService.transcribeAudio` rather than adding a cloud service.

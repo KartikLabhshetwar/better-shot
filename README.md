@@ -238,7 +238,7 @@ In **Settings > General > Capture Mode**, choose **Normal Mode** (the default)
 or **Notch Mode**. Notch mode puts the capture tools, recording controls,
 image/video previews, and transfer status at the top of the capture display.
 The expanded notch is a horizontal shelf with **All, Text, Images, Videos, and Colors**
-filters in a compact 560-point panel without a capture toolbar. Hold Control and drag to select an area; the folder menu
+filters in a compact 560-point panel without a capture toolbar. Hold Control (or your chosen hold key) and drag to select an area; the folder menu
 opens the gallery and offers Save All or Dismiss All for pending captures.
 OCR text and picked colors are copied automatically and remain on the shelf
 with Copy and Dismiss actions until removed from history. Notch Mode shows no
@@ -265,9 +265,9 @@ captures remain until you act on them. Switching back restores your normal overl
 layout and timing. Capture exclusion and private staging work in both modes.
 
 
-**Control-drag capture**
+**Hold-key capture**
 
-With Notch Mode and Accessibility access enabled, hold Control alone to light the green indicator. Drag an area, then release the mouse to capture it with BetterShot’s area selector. Releasing Control early or pressing Escape cancels. The shutter sound follows **General > Play Sound**. The capture remains private until explicitly saved/exported (unless automatic saving was separately enabled). Disable the gesture in **General > Notch Shelf** if you need Control-drag for another app. Ordinary Control-key shortcuts cancel the armed gesture and continue normally. Standard region shortcuts still use the macOS screenshot selector.
+With Notch Mode and Accessibility access enabled, hold Control alone to light the green indicator. Choose Control, Option, Shift, or Command in **Settings > General > Notch Shelf > Capture hold key**. Drag an area, then release the mouse to capture it with BetterShot’s area selector. Releasing the chosen key early or pressing Escape cancels. The shutter sound follows **General > Play Sound**. The capture remains private until explicitly saved/exported (unless automatic saving was separately enabled). Change or disable the gesture in **General > Notch Shelf** if another app needs the same modifier-drag. Choosing Option for area capture pauses the Option voice gesture; voice remains available in the quick editor. Ordinary keyboard shortcuts cancel the armed gesture and continue normally. Standard region shortcuts still use the macOS screenshot selector.
 
 **Local voice screenshots and copied text**
 

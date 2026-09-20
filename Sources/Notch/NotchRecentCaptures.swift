@@ -43,13 +43,17 @@ struct NotchMediaCard: View {
     var body: some View {
         VStack(spacing: 0) {
             PreviewCardView(overlay: overlay, url: url, usesNotchActions: true,
-                            notchCardSize: CGSize(width: 160, height: 124))
-            HStack(spacing: 8) {
+                            notchCardSize: CGSize(width: 184, height: 120))
+            HStack(spacing: 4) {
                 Text(PreviewOverlay.isVideo(url) ? "Video" : "Image")
                     .font(.caption.weight(.medium)).foregroundStyle(.secondary)
                 Spacer(minLength: 0)
                 Button("Copy", systemImage: "doc.on.doc") { overlay.perform(.copy, for: url) }
-                    .labelStyle(.iconOnly).buttonStyle(.plain).help("Copy capture")
+                    .labelStyle(.iconOnly).buttonStyle(.borderless)
+                    .frame(width: 28, height: 28).help("Copy capture")
+                Button("Save", systemImage: "square.and.arrow.down") { overlay.perform(.save, for: url) }
+                    .labelStyle(.iconOnly).buttonStyle(.borderless)
+                    .frame(width: 28, height: 28).help("Save capture")
                 Menu {
                     if !PreviewOverlay.isVideo(url) {
                         Button("Quick Edit", systemImage: "slider.horizontal.3") { NotchQuickEditor.shared.open(url) }
@@ -62,15 +66,16 @@ struct NotchMediaCard: View {
                         Button("Dismiss", systemImage: "xmark") { overlay.perform(.dismiss, for: url) }
                     }
                 } label: { Label("Capture actions", systemImage: "ellipsis") }
-                .labelStyle(.iconOnly).menuStyle(.borderlessButton).fixedSize()
+                .labelStyle(.iconOnly).menuStyle(.borderlessButton).menuIndicator(.hidden)
+                .frame(width: 28, height: 28)
             }
-            .padding(.horizontal, 12).frame(height: 36)
+            .padding(.horizontal, 10).frame(height: 40)
             .disabled(busy)
         }
-        .frame(width: 160, height: 160)
+        .frame(width: 184, height: 160)
         .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.white.opacity(0.12)))
-        .help("Open \(url.lastPathComponent) in the editor. Use the actions menu to save, share, or pin.")
+        .help("Open \(url.lastPathComponent) in the editor. Drag the preview into another app, or use the buttons to copy and save.")
     }
 }

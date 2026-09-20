@@ -500,6 +500,7 @@ struct PreviewCardView: View {
     let url: URL
     var usesNotchActions = false
     var notchCardSize: CGSize?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovered = false
     @FocusState private var hasFocus: Bool
     @FocusState private var focusedAction: String?
@@ -546,15 +547,17 @@ struct PreviewCardView: View {
                     // this only showed up with a mouse.
                     Image(nsImage: image)
                         .resizable()
-                        .aspectRatio(contentMode: usesNotchActions ? .fit : .fill)
+                        .aspectRatio(contentMode: .fit)
                         .frame(width: cardSize.width, height: cardSize.height)
+                        .background(Color.black.opacity(0.9))
                         .clipped()
+                        .contentShape(Rectangle())
                         .onTapGesture {
                             openEditor()
                         }
                         .onDrag {
                             let retainedURL = DeckStaging.retain(url)
-                            if let provider = NSItemProvider(contentsOf: retainedURL) {
+                            if !DeckStaging.isStaged(retainedURL), let provider = NSItemProvider(contentsOf: retainedURL) {
                                 provider.suggestedName = url.lastPathComponent
                                 return provider
                             }
@@ -566,37 +569,28 @@ struct PreviewCardView: View {
                             .font(.system(size: 28 * controlScale))
                             .foregroundStyle(.white.opacity(0.9))
                             .shadow(radius: 4)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
                     }
 
                     if !usesNotchActions { hoverOverlay()
                         .opacity(isHovered || alwaysShowActions || hasFocus || focusedAction != nil ? 1 : 0)
                         .allowsHitTesting(isHovered || alwaysShowActions || hasFocus || focusedAction != nil)
+                        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
                     }
 
                 }
                 .frame(width: cardSize.width, height: cardSize.height)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: usesNotchActions ? 0 : 12, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
+                    RoundedRectangle(cornerRadius: usesNotchActions ? 0 : 12, style: .continuous)
+                        .strokeBorder(Color.white.opacity(usesNotchActions ? 0 : 0.2), lineWidth: 0.5)
                 )
-                .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
-                .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+                .shadow(color: .black.opacity(usesNotchActions ? 0 : 0.25), radius: 10, y: 4)
                 .onHover { hovering in
                     isHovered = hovering
                     if hovering { overlay.cancelScheduledDismiss(for: url) }
                     else if !hasFocus && focusedAction == nil { overlay.scheduleDismiss(for: url) }
-                }
-                .onTapGesture {
-                    openEditor()
-                }
-                .onDrag {
-                    let retainedURL = DeckStaging.retain(url)
-                    if !DeckStaging.isStaged(retainedURL), let provider = NSItemProvider(contentsOf: retainedURL) {
-                        provider.suggestedName = url.lastPathComponent
-                        return provider
-                    }
-                    return NSItemProvider(object: image)
                 }
             } else {
                 Button {
@@ -675,9 +669,8 @@ struct PreviewCardView: View {
 
     private func hoverOverlay() -> some View {
         ZStack {
-            Color.black.opacity(0.45)
-                .contentShape(Rectangle())
-                .onTapGesture { openEditor() }
+            Color.black.opacity(0.28)
+                .allowsHitTesting(false)
             OverlayToolArrangement(scale: controlScale) { slot in
                 if let tool = OverlayToolLayout(data: layoutData).assignments[slot] {
                     Button { overlay.perform(tool, for: url) } label: {

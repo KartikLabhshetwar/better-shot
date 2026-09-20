@@ -7,6 +7,11 @@ final class NotchVoiceCapture {
     static let shared = NotchVoiceCapture()
     static let gestureKey = "bs_notchHoldOption"
     static let controlKey = "bs_notchControlCapture"
+    static let holdKey = "bs_notchCaptureHoldKey"
+    static var captureHoldKey: NotchCaptureHoldKey {
+        NotchCaptureHoldKey(rawValue: UserDefaults.standard.string(forKey: holdKey) ?? "") ?? .control
+    }
+    static var optionUsedForCapture: Bool { controlEnabled && captureHoldKey == .option }
     var controlGesture = NotchControlGesture()
     static var controlEnabled: Bool { UserDefaults.standard.object(forKey: controlKey) as? Bool ?? true }
     private(set) var isPreparing = false
@@ -29,7 +34,7 @@ final class NotchVoiceCapture {
         controlGesture = NotchControlGesture()
         controlOverlay?.cancelControlDrag()
         guard AppPreferences.presentationMode == .notch,
-              UserDefaults.standard.bool(forKey: Self.gestureKey),
+              UserDefaults.standard.bool(forKey: Self.gestureKey), !Self.optionUsedForCapture,
               ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] != "1" else { return }
         // Observe modifier state only; never retain characters or ordinary typing.
         let mask: NSEvent.EventTypeMask = [.flagsChanged, .keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown]
@@ -45,7 +50,7 @@ final class NotchVoiceCapture {
             controlGesture = NotchControlGesture()
             return
         }
-        guard UserDefaults.standard.bool(forKey: Self.gestureKey) else { return }
+        guard UserDefaults.standard.bool(forKey: Self.gestureKey), !Self.optionUsedForCapture else { return }
         let optionOnly = event.modifierFlags.intersection([.option, .command, .control, .shift]) == .option
         if event.type != .flagsChanged {
             holdTask?.cancel() // Option+letter shortcuts and accented typing remain untouched.
@@ -86,7 +91,7 @@ final class NotchVoiceCapture {
                 overlay.updateControlDrag(at: Self.appKitPoint(event.location))
                 return true
             }
-            if type == .keyDown || (type == .flagsChanged && flags.intersection([.control, .option, .command, .shift]) != .control) {
+            if type == .keyDown || (type == .flagsChanged && flags.intersection([.control, .option, .command, .shift]) != Self.captureHoldKey.modifier) {
                 overlay.cancelControlDrag()
                 controlGesture = NotchControlGesture()
                 return type == .keyDown && event.getIntegerValueField(.keyboardEventKeycode) == 53
@@ -118,7 +123,7 @@ final class NotchVoiceCapture {
             return true
         }
         if type == .flagsChanged || type == .keyDown || type == .rightMouseDown {
-            _ = controlGesture.update(flags: flags, modifierChanged: type == .flagsChanged)
+            _ = controlGesture.update(flags: flags, modifierChanged: type == .flagsChanged, holdKey: Self.captureHoldKey)
         }
         return false
     }
@@ -165,12 +170,41 @@ final class NotchVoiceCapture {
     }
 }
 
-/// Control alone arms selection; keyboard chords cancel it before a drag.
+enum NotchCaptureHoldKey: String, CaseIterable, Identifiable {
+    case control, option, shift, command
+    var id: Self { self }
+    var title: String {
+        switch self {
+        case .control: "Control"
+        case .option: "Option"
+        case .shift: "Shift"
+        case .command: "Command"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .control: "⌃"
+        case .option: "⌥"
+        case .shift: "⇧"
+        case .command: "⌘"
+        }
+    }
+    var modifier: NSEvent.ModifierFlags {
+        switch self {
+        case .control: .control
+        case .option: .option
+        case .shift: .shift
+        case .command: .command
+        }
+    }
+}
+
+/// The chosen modifier alone arms selection; keyboard chords cancel it before a drag.
 struct NotchControlGesture: Equatable {
     private(set) var armed = false
     private var tracking = false
 
-    mutating func update(flags: NSEvent.ModifierFlags, modifierChanged: Bool) -> Bool {
+    mutating func update(flags: NSEvent.ModifierFlags, modifierChanged: Bool, holdKey: NotchCaptureHoldKey = .control) -> Bool {
         let modifiers = flags.intersection([.control, .option, .command, .shift])
         if modifiers.isEmpty {
             let capture = armed && modifierChanged
@@ -178,7 +212,7 @@ struct NotchControlGesture: Equatable {
             tracking = false
             return capture
         }
-        if !modifierChanged || modifiers != .control { armed = false }
+        if !modifierChanged || modifiers != holdKey.modifier { armed = false }
         else if !tracking { armed = true }
         tracking = true
         return false

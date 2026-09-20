@@ -185,6 +185,7 @@ struct GeneralSettingsTab: View {
     @AppStorage(AppPreferences.showInDockKey) private var showInDock = false
     @AppStorage(AppPreferences.showInMenuBarKey) private var showInMenuBar = true
     @AppStorage(NotchShelfStore.enabledKey) private var clipboardHistory = false
+    @AppStorage(NotchVoiceCapture.holdKey) private var captureHoldKey = NotchCaptureHoldKey.control
     @AppStorage(NotchVoiceCapture.controlKey) private var controlCapture = true
     @AppStorage(NotchVoiceCapture.gestureKey) private var holdOption = false
     @State private var confirmClearShelf = false
@@ -244,16 +245,29 @@ struct GeneralSettingsTab: View {
             }
 
             Section("Notch Shelf") {
-                Toggle("Hold Control and drag to capture", isOn: $controlCapture)
+                Toggle("Hold a key and drag to capture", isOn: $controlCapture)
                     .onChange(of: controlCapture) { NotchVoiceCapture.shared.refreshGesture() }
-                Text("In Notch Mode, hold Control and drag an area. Release the mouse to capture; release Control early or press Escape to cancel. Requires Accessibility access and uses BetterShot’s area selector. Control-key shortcuts remain unchanged.")
+                Picker("Capture hold key", selection: $captureHoldKey) {
+                    ForEach(NotchCaptureHoldKey.allCases) { key in
+                        Text("\(key.symbol) \(key.title)").tag(key)
+                    }
+                }
+                .disabled(!controlCapture)
+                .onChange(of: captureHoldKey) { NotchVoiceCapture.shared.refreshGesture() }
+                Text("In Notch Mode, hold \(captureHoldKey.title) and drag an area. Release the mouse to capture; release the key early or press Escape to cancel. Requires Accessibility access. Keyboard shortcuts remain unchanged; disable this gesture when another app needs \(captureHoldKey.title)-drag.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Keep copied text in Notch Mode", isOn: $clipboardHistory)
                     .onChange(of: clipboardHistory) { NotchShelfStore.shared.refreshMonitoring() }
                 Toggle("Hold Option to draw and speak", isOn: $holdOption)
+                    .disabled(controlCapture && captureHoldKey == .option)
                     .onChange(of: holdOption) { NotchVoiceCapture.shared.refreshGesture() }
-                Text("Hold Option briefly, draw over the screen, then release to save with a local transcript. Requires Microphone and Accessibility access. Voice is also available in the quick editor.")
-                    .font(.caption).foregroundStyle(.secondary)
+                if controlCapture && captureHoldKey == .option {
+                    Text("Option is assigned to area capture. Voice remains available in the quick editor.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Text("Hold Option briefly, draw over the screen, then release to save with a local transcript. Requires Microphone and Accessibility access. Voice is also available in the quick editor.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Text("OCR text and colors are saved only in Notch Mode. Text and color history keeps up to 50 items locally. Copies marked private by their source app are skipped; unmarked sensitive text can still be saved. Turning history off stops new copies; Clear removes saved shelf text and transcripts.")
                     .font(.caption).foregroundStyle(.secondary)
                 Button("Clear Shelf Text…", role: .destructive) { confirmClearShelf = true }

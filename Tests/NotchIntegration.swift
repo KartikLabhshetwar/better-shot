@@ -185,6 +185,8 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
                      to: output.appendingPathComponent("notch-recents-\(name).png"), height: 360)
         try snapshot(PreferencesView(selection: .general), scheme: scheme, width: 780,
                      to: output.appendingPathComponent("notch-settings-\(name).png"), height: 620)
+        try snapshot(OverlayLayoutEditor(layout: .constant(.standard)), scheme: scheme, width: 298,
+                     to: output.appendingPathComponent("notch-overlay-controls-\(name).png"), height: 228)
     }
     try await checkLocalShelfFeatures(imageURL: imageURL, directory: saveFolder, output: output)
     let quickPanel = NotchQuickEditor.shared
@@ -399,6 +401,31 @@ func checkLocalShelfFeatures(imageURL: URL, directory: URL, output: URL) async t
     precondition(gesture.armed)
     _ = gesture.update(flags: [], modifierChanged: true)
     precondition(!gesture.armed)
+
+    for key in NotchCaptureHoldKey.allCases {
+        var configured = NotchControlGesture()
+        _ = configured.update(flags: key.modifier, modifierChanged: true, holdKey: key)
+        precondition(configured.armed, "The selected hold key must arm capture")
+        _ = configured.update(flags: key.modifier, modifierChanged: false, holdKey: key)
+        precondition(!configured.armed, "Typing a shortcut must cancel capture")
+        _ = configured.update(flags: [], modifierChanged: true, holdKey: key)
+        let other: NSEvent.ModifierFlags = key == .control ? .shift : .control
+        _ = configured.update(flags: other, modifierChanged: true, holdKey: key)
+        precondition(!configured.armed, "An unassigned modifier must not arm capture")
+        _ = configured.update(flags: key.modifier.union(other), modifierChanged: true, holdKey: key)
+        _ = configured.update(flags: key.modifier, modifierChanged: true, holdKey: key)
+        precondition(!configured.armed, "Releasing a chord must not arm capture")
+    }
+    let oldHoldKey = UserDefaults.standard.object(forKey: NotchVoiceCapture.holdKey)
+    let oldControlEnabled = UserDefaults.standard.object(forKey: NotchVoiceCapture.controlKey)
+    UserDefaults.standard.set(true, forKey: NotchVoiceCapture.controlKey)
+    UserDefaults.standard.set("option", forKey: NotchVoiceCapture.holdKey)
+    precondition(NotchVoiceCapture.optionUsedForCapture, "Area capture must take priority over Option voice")
+    UserDefaults.standard.set("unknown", forKey: NotchVoiceCapture.holdKey)
+    precondition(NotchVoiceCapture.captureHoldKey == .control, "Unknown preferences must retain the default gesture")
+    UserDefaults.standard.set(oldHoldKey, forKey: NotchVoiceCapture.holdKey)
+    UserDefaults.standard.set(oldControlEnabled, forKey: NotchVoiceCapture.controlKey)
+    print("PASS customizable hold keys, chord cancellation and Option voice conflict")
 
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
     // Bounded clipboard history and private pasteboard markers, using an isolated store/pasteboard.

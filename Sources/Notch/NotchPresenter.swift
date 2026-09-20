@@ -352,7 +352,7 @@ struct NotchContent: View {
                         Image(systemName: filter.symbol).font(.title2).foregroundStyle(.secondary)
                         Text(filter == .all ? "Your captures, together" : "No \(filter.rawValue.lowercased()) yet")
                             .font(.headline)
-                        Text("Hold Control and drag an area to capture. Drag saved items into another app.")
+                        Text("Hold \(NotchVoiceCapture.captureHoldKey.title) and drag an area to capture. Drag saved items into another app.")
                             .font(.callout).foregroundStyle(.secondary)
                     }
                     .padding(20).frame(height: 160)
