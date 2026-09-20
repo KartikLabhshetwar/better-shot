@@ -68,6 +68,12 @@ struct NotchView<Expanded, CompactLeading, CompactTrailing>: View where Expanded
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
+            .overlay {
+                NotchShape(topCornerRadius: topCornerRadius, bottomCornerRadius: bottomCornerRadius)
+                    .stroke(dynamicNotch.outlineColor, lineWidth: 2)
+                    .padding(1)
+                    .allowsHitTesting(false)
+            }
             .offset(x: xOffset)
 
     }

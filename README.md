@@ -238,14 +238,13 @@ In **Settings > General > Capture Mode**, choose **Normal Mode** (the default)
 or **Notch Mode**. Notch mode puts the capture tools, recording controls,
 image/video previews, and transfer status at the top of the capture display.
 The expanded notch is a horizontal shelf with **All, Text, Images, Videos, and Colors**
-filters in a compact 560-point panel without a capture toolbar. Hold Control (or your chosen hold key) and drag to select an area; the folder menu
-opens the gallery and offers Save All or Dismiss All for pending captures.
+filters in a compact 560-point panel without a capture toolbar. Hold Control (or your chosen hold key) briefly, draw directly on the frozen screen, then release to save. A green line follows the entire notch border while the gesture is active. The folder menu offers **Copy Text from Screen (⌘⇧O)**, **Pick Color (⌘⇧C)**, the gallery, Save All and Dismiss All. Menu labels reflect customized shortcuts.
 OCR text and picked colors are copied automatically and remain on the shelf
 with Copy and Dismiss actions until removed from history. Notch Mode shows no
 toast notifications: Copy confirms on its button, and failures appear as inline
 instructions. Text is selectable; colors show their hex code and swatch. Text and colors captured in Notch Mode are retained locally across launches. Normal Mode does not add to this history.
 Scroll sideways to browse the cards. Click an image for the quick editor, or a video for the video editor;
-each card has Copy and a menu for Save, Edit, Pin, Cloud Share, and Dismiss.
+each card has Copy, Save and a menu for Edit, Pin, Cloud Share, and Dismiss.
 Drag image previews into compatible editors. Drag a text card’s text or title to insert text, or a color card’s hex label/title to insert its color code. Color cards show the sampled color with a readable hex label and Copy button.
 Use your **Recording options** shortcut (default **⌘⇧5**) to set up a video: select Screen, Window, or Area, then choose
 your camera, microphone, system audio, and start delay before pressing **Start
@@ -267,7 +266,11 @@ layout and timing. Capture exclusion and private staging work in both modes.
 
 **Hold-key capture**
 
-With Notch Mode and Accessibility access enabled, hold Control alone to light the green indicator. Choose Control, Option, Shift, or Command in **Settings > General > Notch Shelf > Capture hold key**. Drag an area, then release the mouse to capture it with BetterShot’s area selector. Releasing the chosen key early or pressing Escape cancels. The shutter sound follows **General > Play Sound**. The capture remains private until explicitly saved/exported (unless automatic saving was separately enabled). Change or disable the gesture in **General > Notch Shelf** if another app needs the same modifier-drag. Choosing Option for area capture pauses the Option voice gesture; voice remains available in the quick editor. Ordinary keyboard shortcuts cancel the armed gesture and continue normally. Standard region shortcuts still use the macOS screenshot selector.
+With Notch Mode and Accessibility access enabled, hold Control briefly to freeze the screen, then drag to draw red freehand annotations. Release the key to save the annotated screenshot privately with editable strokes. If the mouse is still down, saving waits for the stroke to finish. This gesture needs no microphone. Escape opens the normal discard confirmation; keyboard chords pressed before drawing starts cancel arming. The shutter sound follows **General > Play Sound**.
+
+Choose Control, Option, Shift, or Command under **Settings > General > Notch Shelf > Capture hold key**. **Hold action** defaults to **Draw on screen**; choose **Select an area** for rectangular screenshots instead. In area mode, mouse release captures and early key release cancels. Assigning Option pauses the optional Option voice gesture; voice remains available in the quick editor. Standard region shortcuts still use the macOS screenshot selector.
+
+**Copied colors** are collected automatically while Notch Mode is active: copy a standalone `#RGB` or `#RRGGBB` code and it appears as a swatch under All and Colors, with Copy and drag-out. Turn this off with **Keep copied colors in Notch Mode**. Ordinary clipboard text remains separately opt-in, and private clipboard markers are respected. Normal Mode collects neither.
 
 **Local voice screenshots and copied text**
 

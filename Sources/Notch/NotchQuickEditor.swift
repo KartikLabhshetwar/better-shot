@@ -35,6 +35,7 @@ final class NotchQuickEditor: NSObject, NSWindowDelegate {
         if fullScreen {
             model.backgroundSettings = AnnotationBackgroundSettings()
             if model.selectedTool != .freehand { model.selectTool(.freehand) }
+            model.setSwatch(.red)
             model.markSaved()
         }
         error = model.errorMessage
@@ -43,7 +44,7 @@ final class NotchQuickEditor: NSObject, NSWindowDelegate {
         panel.delegate = self
         panel.title = "BetterShot quick editor"
         panel.identifier = .init("BetterShot.QuickEditor")
-        panel.level = .statusBar
+        panel.level = fullScreen ? NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue - 1) : .statusBar
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.backgroundColor = .clear
         panel.isOpaque = false
@@ -208,6 +209,7 @@ struct NotchQuickEditorView: View {
                     .allowsHitTesting(!editor.busy)
                     .padding(fullScreen ? 0 : 12).padding(.bottom, fullScreen ? 0 : 64)
             }
+            if !fullScreen || !NotchVoiceCapture.shared.holdIndicatorActive || editor.error != nil || editor.busy {
             VStack(spacing: 6) {
                 if let error = editor.error ?? editor.model.errorMessage {
                     Text(error).font(.caption).textSelection(.enabled)
@@ -249,8 +251,10 @@ struct NotchQuickEditorView: View {
             }
             .padding(12).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
             .padding(12)
+            }
         }
         .background(fullScreen ? Color.black : Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: fullScreen ? 0 : 22))
+        .ignoresSafeArea()
         .onExitCommand {
             if editor.model.isCropping { editor.model.cancelCrop() } else { editor.requestClose() }
         }

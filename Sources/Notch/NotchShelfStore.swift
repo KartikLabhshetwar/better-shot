@@ -5,6 +5,8 @@ import Observation
 @MainActor @Observable
 final class NotchShelfStore {
     static let shared = NotchShelfStore()
+    static let colorsKey = "bs_notchClipboardColors"
+    static var keepsColors: Bool { UserDefaults.standard.object(forKey: colorsKey) as? Bool ?? true }
     static let enabledKey = "bs_notchClipboardHistory"
     struct Entry: Codable, Identifiable, Equatable {
         var id = UUID()
@@ -34,15 +36,15 @@ final class NotchShelfStore {
         timer = nil
         // Enabling history starts with the *next* copy, not previously copied private content.
         changeCount = NSPasteboard.general.changeCount
-        guard AppPreferences.presentationMode == .notch, UserDefaults.standard.bool(forKey: Self.enabledKey),
+        guard AppPreferences.presentationMode == .notch, (UserDefaults.standard.bool(forKey: Self.enabledKey) || Self.keepsColors),
               ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] != "1" else { return }
         timer = Timer.scheduledTimer(withTimeInterval: 0.75, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.readClipboard() }
+            MainActor.assumeIsolated { self?.readClipboard(includeText: UserDefaults.standard.bool(forKey: Self.enabledKey), includeColors: Self.keepsColors) }
         }
         timer?.tolerance = 0.25
     }
 
-    func readClipboard(_ pasteboard: NSPasteboard = .general) {
+    func readClipboard(_ pasteboard: NSPasteboard = .general, includeText: Bool = true, includeColors: Bool = true) {
         guard AppPreferences.presentationMode == .notch, changeCount != pasteboard.changeCount else { return }
         changeCount = pasteboard.changeCount
         let excluded = ["org.nspasteboard.ConcealedType", "org.nspasteboard.TransientType",
@@ -52,7 +54,16 @@ final class NotchShelfStore {
               let text = pasteboard.string(forType: .string) else { return }
         // Captured OCR/colors have already been retained with their type.
         guard entries.first?.text != text else { return }
-        add(text: text)
+        let isColor = Self.isHexColor(text)
+        guard isColor ? includeColors : includeText else { return }
+        add(text: text, isColor: isColor)
+    }
+
+    /// A standalone CSS hex literal is a color; prose and bare numbers stay text.
+    static func isHexColor(_ text: String) -> Bool {
+        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard value.first == "#", [4, 7].contains(value.count) else { return false }
+        return value.dropFirst().utf8.allSatisfy { (48...57).contains($0) || (65...70).contains($0) || (97...102).contains($0) }
     }
 
     func add(text: String, imageURL: URL? = nil, isColor: Bool = false) {

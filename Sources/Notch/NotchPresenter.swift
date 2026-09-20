@@ -37,7 +37,16 @@ final class NotchPresenter {
             captureIssue != nil || !transfers.isEmpty || script != nil || ocrText != nil || colorHex != nil
     }
 
-    private init() {}
+    private init() { observeHoldIndicator() }
+
+    private func observeHoldIndicator() {
+        withObservationTracking {
+            let active = NotchVoiceCapture.shared.holdIndicatorActive
+            notch?.outlineColor = active ? .green : .clear
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.observeHoldIndicator() }
+        }
+    }
 
     func show(on screen: NSScreen? = nil) {
         if AppPreferences.presentationMode == .notch { enabledSession = true }
@@ -75,6 +84,7 @@ final class NotchPresenter {
             }
             self.notch = notch
         }
+        notch?.outlineColor = NotchVoiceCapture.shared.holdIndicatorActive ? .green : .clear
         notch?.presentImmediately(on: screen, expanded: expanded, animated: true)
     }
 
@@ -118,7 +128,7 @@ final class NotchPresenter {
     func updateHoverState(_ hovering: Bool) {
         isHovering = hovering
         hoverTask?.cancel()
-        guard AppPreferences.presentationMode == .notch, !captureSuspended else { return }
+        guard AppPreferences.presentationMode == .notch, !captureSuspended, !NotchVoiceCapture.shared.drawingSession else { return }
         if hovering {
             if !expanded { show() }
             return
@@ -257,11 +267,18 @@ struct NotchContent: View {
                     .accessibilityAddTraits(filter == tab ? .isSelected : [])
                 }
                 Spacer(minLength: 4)
-                if NotchVoiceCapture.shared.controlGesture.armed {
+                if NotchVoiceCapture.shared.holdIndicatorActive {
                     Circle().fill(.green).frame(width: 7, height: 7)
-                        .accessibilityLabel("Capture armed — drag an area")
+                        .accessibilityLabel("Capture active")
                 }
                 Menu {
+                    Button(ShortcutService.shared.help("Copy Text from Screen", for: .ocr), systemImage: "doc.text.viewfinder") {
+                        Task { await CaptureOrchestrator.shared.performCapture(.ocr, on: presenter.screen) }
+                    }
+                    Button(ShortcutService.shared.help("Pick Color", for: .colorPicker), systemImage: "eyedropper") {
+                        Task { await CaptureOrchestrator.shared.performCapture(.colorPicker, on: presenter.screen) }
+                    }
+                    Divider()
                     Button("Open Gallery", systemImage: "folder") {
                         MediaGalleryWindowController.shared.open(on: presenter.screen)
                     }
@@ -352,7 +369,7 @@ struct NotchContent: View {
                         Image(systemName: filter.symbol).font(.title2).foregroundStyle(.secondary)
                         Text(filter == .all ? "Your captures, together" : "No \(filter.rawValue.lowercased()) yet")
                             .font(.headline)
-                        Text("Hold \(NotchVoiceCapture.captureHoldKey.title) and drag an area to capture. Drag saved items into another app.")
+                        Text(NotchVoiceCapture.drawsOnHold ? "Hold \(NotchVoiceCapture.captureHoldKey.title) briefly, draw on screen, then release to save. Find OCR and Pick Color in the folder menu." : "Hold \(NotchVoiceCapture.captureHoldKey.title) and drag an area to capture. Find OCR and Pick Color in the folder menu.")
                             .font(.callout).foregroundStyle(.secondary)
                     }
                     .padding(20).frame(height: 160)
@@ -377,7 +394,7 @@ private struct NotchTextResult: View {
     @State private var copied = false
 
     private var ink: Color {
-        guard isColor, let color = NSColor(annoHex: value).usingColorSpace(.sRGB) else { return .white }
+        guard isColor, let color = NSColor(annoHex: value.trimmingCharacters(in: .whitespacesAndNewlines)).usingColorSpace(.sRGB) else { return .white }
         func linear(_ channel: CGFloat) -> CGFloat {
             channel <= 0.04045 ? channel / 12.92 : pow((channel + 0.055) / 1.055, 2.4)
         }
@@ -437,7 +454,7 @@ private struct NotchTextResult: View {
         .foregroundStyle(ink)
         .background {
             if isColor {
-                Color(nsColor: NSColor(annoHex: value))
+                Color(nsColor: NSColor(annoHex: value.trimmingCharacters(in: .whitespacesAndNewlines)))
             } else { Color.white.opacity(0.09) }
         }
         .clipShape(RoundedRectangle(cornerRadius: 14))
@@ -479,9 +496,9 @@ struct NotchCompactTrailing: View {
 
     var body: some View {
         Button { NotchPresenter.shared.show() } label: {
-            if NotchVoiceCapture.shared.controlGesture.armed {
+            if NotchVoiceCapture.shared.holdIndicatorActive {
                 Circle().fill(.green).frame(width: 7, height: 7).frame(width: 28, height: 22)
-                    .accessibilityLabel("Capture armed — drag an area")
+                    .accessibilityLabel("Capture active")
             } else if ScreenRecordingManager.shared.isActive {
                 Label(ScreenRecordingManager.shared.formattedElapsedTime, systemImage: "record.circle.fill")
                     .monospacedDigit().foregroundStyle(.red)
@@ -491,7 +508,7 @@ struct NotchCompactTrailing: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(NotchVoiceCapture.shared.controlGesture.armed ? "Capture armed — drag an area" : ScreenRecordingManager.shared.isActive ? "Expand recording controls" : status.title)
+        .accessibilityLabel(NotchVoiceCapture.shared.holdIndicatorActive ? "Capture active" : ScreenRecordingManager.shared.isActive ? "Expand recording controls" : status.title)
         .help(ScreenRecordingManager.shared.isActive ? "Recording in progress" : status.title)
         .onAppear { refreshEditors() }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in refreshEditors() }

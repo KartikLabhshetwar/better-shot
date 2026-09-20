@@ -7,6 +7,13 @@ final class NotchVoiceCapture {
     static let shared = NotchVoiceCapture()
     static let gestureKey = "bs_notchHoldOption"
     static let controlKey = "bs_notchControlCapture"
+    static let actionKey = "bs_notchHoldAction"
+    static var drawsOnHold: Bool { UserDefaults.standard.string(forKey: actionKey) != "area" }
+    private(set) var drawingSession = false
+    private var drawTask: Task<Void, Never>?
+    private var drawingPointerDown = false
+    private var pendingStroke: [(CGEventType, CGPoint)] = []
+    var holdIndicatorActive: Bool { controlGesture.armed || holdActive || drawingSession }
     static let holdKey = "bs_notchCaptureHoldKey"
     static var captureHoldKey: NotchCaptureHoldKey {
         NotchCaptureHoldKey(rawValue: UserDefaults.standard.string(forKey: holdKey) ?? "") ?? .control
@@ -30,6 +37,10 @@ final class NotchVoiceCapture {
         localMonitor = nil
         globalMonitor = nil
         holdTask?.cancel()
+        drawTask?.cancel()
+        pendingStroke.removeAll()
+        drawingSession = false
+        drawingPointerDown = false
         holdActive = false
         controlGesture = NotchControlGesture()
         controlOverlay?.cancelControlDrag()
@@ -74,7 +85,39 @@ final class NotchVoiceCapture {
     }
 
     func handleControlEvent(type: CGEventType, event: CGEvent) -> Bool {
+        let mouseEvent = [.leftMouseDown, .leftMouseDragged, .leftMouseUp].contains(type)
+        if mouseEvent, drawingSession || (!pendingStroke.isEmpty) ||
+            (type == .leftMouseDown && Self.drawsOnHold && controlGesture.armed && (drawTask != nil || isPreparing)) {
+            if type == .leftMouseDown { drawingPointerDown = true; swallowMouseUp = true }
+            if type == .leftMouseUp { drawingPointerDown = false; swallowMouseUp = false }
+            if drawingSession {
+                drawStrokeEvent(type, at: Self.appKitPoint(event.location))
+                if !controlGesture.armed && !drawingPointerDown { finishDrawing() }
+            } else {
+                pendingStroke.append((type, Self.appKitPoint(event.location)))
+            }
+            return true
+        }
+        if drawingSession {
+            if !NotchQuickEditor.shared.isOpen {
+                drawingSession = false
+                drawingPointerDown = false
+            } else {
+                if type == .flagsChanged {
+                    _ = controlGesture.update(flags: NSEvent.ModifierFlags(rawValue: UInt(event.flags.rawValue)),
+                        modifierChanged: true, holdKey: Self.captureHoldKey)
+                }
+                if type == .keyDown && event.getIntegerValueField(.keyboardEventKeycode) == 53 {
+                    drawingSession = false
+                    controlGesture = NotchControlGesture()
+                    return false // The editor offers its normal discard confirmation.
+                }
+                if !controlGesture.armed && !drawingPointerDown { finishDrawing() }
+                return false
+            }
+        }
         if type == .leftMouseUp && swallowMouseUp {
+            drawingPointerDown = false
             swallowMouseUp = false
             controlOverlay?.updateControlDrag(at: Self.appKitPoint(event.location), ended: true)
             return true
@@ -98,7 +141,7 @@ final class NotchVoiceCapture {
             }
             return false
         }
-        if type == .leftMouseDown && controlGesture.armed {
+        if !Self.drawsOnHold && type == .leftMouseDown && controlGesture.armed {
             guard !isPreparing, !NotchQuickEditor.shared.isOpen, !ScreenRecordingManager.shared.isActive,
                   !CaptureOrchestrator.shared.captureInProgress, !ScreenCapture.shared.isCapturing else { return false }
             let point = Self.appKitPoint(event.location)
@@ -122,49 +165,96 @@ final class NotchVoiceCapture {
             }
             return true
         }
+        if Self.drawsOnHold && type == .leftMouseDragged {
+            // A drag that began in another app stays with that app.
+            drawTask?.cancel()
+            controlGesture = NotchControlGesture()
+        }
         if type == .flagsChanged || type == .keyDown || type == .rightMouseDown {
+            let wasArmed = controlGesture.armed
             _ = controlGesture.update(flags: flags, modifierChanged: type == .flagsChanged, holdKey: Self.captureHoldKey)
+            if !controlGesture.armed { drawTask?.cancel(); pendingStroke.removeAll() }
+            if Self.drawsOnHold && controlGesture.armed && !wasArmed,
+               !NotchQuickEditor.shared.isOpen, !ScreenRecordingManager.shared.isActive,
+               !CaptureOrchestrator.shared.captureInProgress, !ScreenCapture.shared.isCapturing {
+                drawTask = Task { [weak self] in
+                    do { try await Task.sleep(for: .milliseconds(300)) } catch { return }
+                    guard let self, self.controlGesture.armed else { return }
+                    await self.capture(whileHolding: true, includeVoice: false)
+                    self.drawTask = nil
+                    self.pendingStroke.removeAll()
+                }
+            }
         }
         return false
+    }
+
+    func beginDrawingSession() {
+        guard NotchQuickEditor.shared.isOpen else { return }
+        drawingSession = true
+        for (type, point) in pendingStroke { drawStrokeEvent(type, at: point) }
+        pendingStroke.removeAll()
+    }
+
+    private func finishDrawing() {
+        drawingSession = false
+        Task { await NotchQuickEditor.shared.finish() }
+    }
+
+    private func drawStrokeEvent(_ type: CGEventType, at point: CGPoint) {
+        let editor = NotchQuickEditor.shared
+        guard let panel = editor.panel else { return }
+        let local = CGPoint(x: point.x - panel.frame.minX, y: panel.frame.maxY - point.y)
+        let frame = editor.model.displayCanvasFrame(in: panel.frame.size)
+        switch type {
+        case .leftMouseDown:
+            editor.model.beginInteraction(at: local, imageFrame: frame, boundaryFrame: frame)
+        case .leftMouseDragged:
+            editor.model.updateInteraction(to: local, imageFrame: frame, boundaryFrame: frame)
+        case .leftMouseUp:
+            editor.model.endInteraction(at: local, imageFrame: frame, boundaryFrame: frame)
+        default: break
+        }
     }
 
     private static func appKitPoint(_ point: CGPoint) -> CGPoint {
         CGPoint(x: point.x, y: CGDisplayBounds(CGMainDisplayID()).height - point.y)
     }
 
-    func capture(whileHolding: Bool = false) async {
+    func capture(whileHolding: Bool = false, includeVoice: Bool = true) async {
         guard AppPreferences.presentationMode == .notch, !isPreparing, !ScreenCapture.shared.isCapturing, !CaptureOrchestrator.shared.captureInProgress,
               !ScreenRecordingManager.shared.isActive, !NotchQuickEditor.shared.isOpen else { return }
         isPreparing = true
         defer { isPreparing = false }
         let screen = ActiveDisplayResolver.activeScreen(preferPointer: true)
         let notch = NotchPresenter.shared
-        guard await AVCaptureDevice.requestAccess(for: .audio) else {
+        if includeVoice, !(await AVCaptureDevice.requestAccess(for: .audio)) {
             notch.captureIssue = ("Microphone access needed", "Allow BetterShot in System Settings → Privacy & Security → Microphone, then try Voice again.")
             notch.show(on: screen)
             return
         }
-        guard !whileHolding || holdActive else { return }
+        guard !whileHolding || (includeVoice ? holdActive : controlGesture.armed) else { return }
         notch.suspendForCapture()
         defer { notch.resumeAfterCapture() }
         await RecordingBarPresenter.shared.hidePickerForCapture()
         do {
             guard let url = try await ScreenCapture.shared.captureFullscreen(on: screen) else { return }
             defer { try? FileManager.default.removeItem(at: url) }
-            guard !whileHolding || holdActive else { return }
+            guard !whileHolding || (includeVoice ? holdActive : controlGesture.armed) else { return }
             ScreenCapture.shared.playShutterSound()
             let retained = ScreenshotHistoryStore.shared.importScreenshot(from: url)
             guard retained != url else { throw CocoaError(.fileWriteUnknown) }
             PreviewOverlay.shared.show(url: retained, on: screen, automaticallyDismiss: false)
             NotchQuickEditor.shared.open(retained, on: screen, fullScreen: whileHolding)
-            gestureSession = whileHolding
-            await NotchQuickEditor.shared.startVoice()
-            if whileHolding && !holdActive {
+            gestureSession = whileHolding && includeVoice
+            if whileHolding && !includeVoice { beginDrawingSession() }
+            if includeVoice { await NotchQuickEditor.shared.startVoice() }
+            if whileHolding && !(includeVoice ? holdActive : controlGesture.armed) {
                 gestureSession = false
                 Task { await NotchQuickEditor.shared.finish() }
             }
         } catch {
-            notch.captureIssue = ("Couldn’t start voice capture", error.localizedDescription)
+            notch.captureIssue = (includeVoice ? "Couldn’t start voice capture" : "Couldn’t start annotation", error.localizedDescription)
             notch.show(on: screen)
         }
     }

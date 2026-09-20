@@ -7,10 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.5] - 2026-09-19
 
-- Added a Capture hold key setting with Control, Option, Shift, and Command choices; Option area capture takes priority over the optional voice gesture.
+- Added a Capture hold key setting with Control, Option, Shift, and Command choices; Option capture takes priority over the optional voice gesture.
 - Refined screenshot/video cards with uncropped previews, compact Copy/Save actions in the notch, consistent circular cloud controls in overlays and Settings, and drag handling confined to the media preview.
 
 ### Added
+
+- Hold-to-draw screenshots with a green outline around the whole notch: hold the configured key, draw red freehand marks over a frozen screen, and release to save editable annotations without a microphone. Select an area remains an optional hold action.
+- Copied hex colors appear as persistent swatches in Notch Mode, with a separate collection setting enabled by default; ordinary text history remains opt-in.
+- OCR and Pick Color actions in the notch's folder menu show their configured shortcuts.
 
 - Local voice screenshots: use the quick-editor microphone or opt into holding Option to draw and speak, then release to retain an annotated image with an on-device transcript. Copy image/file/text together or copy the transcript separately. Microphone access is explicit, temporary audio is removed after completion/discard, and failed transcription can retry or keep the image without voice.
 - Optional local text history in General > Notch Shelf, with 50-item retention, duplicate removal, private pasteboard-marker exclusions, per-card dismissal, and a confirmed Clear action. Collection starts with the next copy and defaults off.

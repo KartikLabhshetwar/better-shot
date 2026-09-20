@@ -85,6 +85,7 @@ public final class DynamicNotch<Expanded, CompactLeading, CompactTrailing>: Obse
     @Published public private(set) var isHovering: Bool = false
 
     /// BetterShot: configure capture visibility before the first visible frame.
+    @Published public var outlineColor: Color = .clear
     public var configureWindow: ((NSPanel) -> Void)?
     /// BetterShot: route hover across the whole surface, including the compact camera gap.
     public var onHoverChanged: ((Bool) -> Void)?

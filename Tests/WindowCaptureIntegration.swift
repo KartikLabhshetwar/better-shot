@@ -81,6 +81,8 @@ struct WindowCaptureIntegration {
         if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_CONTROL_CAPTURE"] == "1" {
             UserDefaults.standard.set("notch", forKey: AppPreferences.presentationModeKey)
             UserDefaults.standard.set(true, forKey: NotchVoiceCapture.controlKey)
+            UserDefaults.standard.set("area", forKey: NotchVoiceCapture.actionKey)
+            UserDefaults.standard.set("control", forKey: NotchVoiceCapture.holdKey)
             UserDefaults.standard.set(0, forKey: "bs_selfTimerDelay")
             window.level = .floating
             NSApp.activate(ignoringOtherApps: true)

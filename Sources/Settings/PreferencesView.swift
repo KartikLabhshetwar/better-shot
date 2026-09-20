@@ -184,7 +184,9 @@ struct GeneralSettingsTab: View {
     @AppStorage(AppPreferences.showCaptureBarAtLaunchKey) private var showCaptureBarAtLaunch = true
     @AppStorage(AppPreferences.showInDockKey) private var showInDock = false
     @AppStorage(AppPreferences.showInMenuBarKey) private var showInMenuBar = true
+    @AppStorage(NotchShelfStore.colorsKey) private var clipboardColors = true
     @AppStorage(NotchShelfStore.enabledKey) private var clipboardHistory = false
+    @AppStorage(NotchVoiceCapture.actionKey) private var holdAction = "draw"
     @AppStorage(NotchVoiceCapture.holdKey) private var captureHoldKey = NotchCaptureHoldKey.control
     @AppStorage(NotchVoiceCapture.controlKey) private var controlCapture = true
     @AppStorage(NotchVoiceCapture.gestureKey) private var holdOption = false
@@ -245,7 +247,7 @@ struct GeneralSettingsTab: View {
             }
 
             Section("Notch Shelf") {
-                Toggle("Hold a key and drag to capture", isOn: $controlCapture)
+                Toggle("Hold a key to capture", isOn: $controlCapture)
                     .onChange(of: controlCapture) { NotchVoiceCapture.shared.refreshGesture() }
                 Picker("Capture hold key", selection: $captureHoldKey) {
                     ForEach(NotchCaptureHoldKey.allCases) { key in
@@ -254,7 +256,21 @@ struct GeneralSettingsTab: View {
                 }
                 .disabled(!controlCapture)
                 .onChange(of: captureHoldKey) { NotchVoiceCapture.shared.refreshGesture() }
-                Text("In Notch Mode, hold \(captureHoldKey.title) and drag an area. Release the mouse to capture; release the key early or press Escape to cancel. Requires Accessibility access. Keyboard shortcuts remain unchanged; disable this gesture when another app needs \(captureHoldKey.title)-drag.")
+                Picker("Hold action", selection: $holdAction) {
+                    Text("Draw on screen").tag("draw")
+                    Text("Select an area").tag("area")
+                }
+                .disabled(!controlCapture)
+                .onChange(of: holdAction) { NotchVoiceCapture.shared.refreshGesture() }
+                Text(holdAction == "area"
+                    ? "Hold \(captureHoldKey.title) and drag an area. Release the mouse to capture; release the key early or press Escape to cancel."
+                    : "Hold \(captureHoldKey.title) briefly to freeze the screen, draw your annotations, then release the key to save. A green border outlines the notch while active. No microphone is needed.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text("Requires Accessibility access. Keyboard shortcuts remain unchanged; disable this gesture when another app needs \(captureHoldKey.title)-drag.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Toggle("Keep copied colors in Notch Mode", isOn: $clipboardColors)
+                    .onChange(of: clipboardColors) { NotchShelfStore.shared.refreshMonitoring() }
+                Text("Copied hex colors, such as #8B5CF6 or #F80, appear as swatches in the shelf. Only standalone color codes are collected.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Keep copied text in Notch Mode", isOn: $clipboardHistory)
                     .onChange(of: clipboardHistory) { NotchShelfStore.shared.refreshMonitoring() }
@@ -262,7 +278,7 @@ struct GeneralSettingsTab: View {
                     .disabled(controlCapture && captureHoldKey == .option)
                     .onChange(of: holdOption) { NotchVoiceCapture.shared.refreshGesture() }
                 if controlCapture && captureHoldKey == .option {
-                    Text("Option is assigned to area capture. Voice remains available in the quick editor.")
+                    Text("Option is assigned to the capture gesture. Voice remains available in the quick editor.")
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
                     Text("Hold Option briefly, draw over the screen, then release to save with a local transcript. Requires Microphone and Accessibility access. Voice is also available in the quick editor.")

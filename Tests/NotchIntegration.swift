@@ -89,6 +89,12 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
         }
         window.appearance = originalAppearance
     }
+    _ = NotchVoiceCapture.shared.controlGesture.update(flags: .control, modifierChanged: true)
+    try await Task.sleep(for: .milliseconds(100))
+    precondition(NotchVoiceCapture.shared.holdIndicatorActive)
+    try snapshotNativeNotch(notch, to: output.appendingPathComponent("notch-armed-border.png"))
+    _ = NotchVoiceCapture.shared.controlGesture.update(flags: [], modifierChanged: true)
+    precondition(!NotchVoiceCapture.shared.holdIndicatorActive)
     notch.collapse()
     try await Task.sleep(for: .milliseconds(350))
     if let hosting = window.contentView {
@@ -471,6 +477,19 @@ func checkLocalShelfFeatures(imageURL: URL, directory: URL, output: URL) async t
     UserDefaults.standard.set("notch", forKey: AppPreferences.presentationModeKey)
     shelf.clear()
     precondition(NotchShelfStore(directory: shelfDirectory).entries.isEmpty)
+    for value in ["#F80", "#aBcDeF", " #123456\n"] { precondition(NotchShelfStore.isHexColor(value)) }
+    for value in ["123456", "#GGG", "color: #ffffff", "#12", "#💚💚💚"] { precondition(!NotchShelfStore.isHexColor(value)) }
+    CaptureOrchestrator.copyText("#8B5CF6", to: clipboard)
+    shelf.readClipboard(clipboard, includeText: false)
+    precondition(shelf.entries.first?.isColor == true)
+    precondition(NotchShelfStore(directory: shelfDirectory).entries.first?.isColor == true)
+    CaptureOrchestrator.copyText("not a color", to: clipboard)
+    shelf.readClipboard(clipboard, includeText: false)
+    precondition(shelf.entries.count == 1, "Color-only collection must not retain ordinary text")
+    CaptureOrchestrator.copyText("#F80", to: clipboard)
+    shelf.readClipboard(clipboard, includeColors: false)
+    precondition(shelf.entries.count == 1, "Disabled color collection must not retain new swatches")
+    shelf.clear()
     print("PASS local clipboard persistence, size limits, deduplication, private markers, clear, and image/transcript copy")
 
     let quickModel = AnnotationEditorModel()
@@ -496,9 +515,49 @@ func checkLocalShelfFeatures(imageURL: URL, directory: URL, output: URL) async t
         try snapshot(NotchQuickEditorView(editor: quick), scheme: scheme, width: 640,
                      to: output.appendingPathComponent("notch-quick-editor-\(scheme == .dark ? "dark" : "light").png"), height: 460)
     }
+    _ = NotchVoiceCapture.shared.controlGesture.update(flags: .control, modifierChanged: true)
+    try snapshot(NotchQuickEditorView(editor: quick, fullScreen: true), scheme: .dark, width: 960,
+                 to: output.appendingPathComponent("notch-screen-annotation.png"), height: 540)
+    _ = NotchVoiceCapture.shared.controlGesture.update(flags: [], modifierChanged: true)
     quick.model.releaseEditorResources()
     quickModel.releaseEditorResources()
     reopenedQuick.releaseEditorResources()
+    if let screen = NSScreen.main {
+        let heldURL = directory.appendingPathComponent("held-drawing-fixture.png")
+        try originalPixels.write(to: heldURL)
+        let before = Set(PreviewOverlay.shared.items)
+        let gesture = NotchVoiceCapture.shared
+        _ = gesture.controlGesture.update(flags: .control, modifierChanged: true)
+        quick.open(heldURL, on: screen, fullScreen: true)
+        gesture.beginDrawingSession()
+        precondition(quick.model.selectedTool == .freehand && !quick.hasVoice && gesture.holdIndicatorActive)
+        func sendStroke(_ type: CGEventType, point: CGPoint, flags: CGEventFlags = .maskControl) -> Bool {
+            let event = CGEvent(source: nil)!
+            event.type = type
+            event.flags = flags
+            event.location = CGPoint(x: screen.frame.minX + point.x,
+                y: CGDisplayBounds(CGMainDisplayID()).height - screen.frame.maxY + point.y)
+            return gesture.handleControlEvent(type: type, event: event)
+        }
+        precondition(sendStroke(.leftMouseDown, point: CGPoint(x: 80, y: 100)))
+        precondition(sendStroke(.leftMouseDragged, point: CGPoint(x: 160, y: 150)))
+        _ = sendStroke(.flagsChanged, point: .zero, flags: [])
+        precondition(quick.isOpen, "Releasing the key during a stroke must wait for mouse-up")
+        precondition(sendStroke(.leftMouseUp, point: CGPoint(x: 200, y: 100), flags: []))
+        for _ in 0..<60 {
+            if !quick.isOpen { break }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        precondition(!quick.isOpen && !gesture.holdIndicatorActive)
+        let saved = PreviewOverlay.shared.items.filter { !before.contains($0) }
+        precondition(saved.count == 1, "One held drawing saves one annotated screenshot")
+        let restored = AnnotationEditorModel()
+        restored.load(url: saved[0])
+        precondition(restored.shapes.count == 1, "The final stroke must remain editable")
+        restored.releaseEditorResources()
+        saved.forEach { PreviewOverlay.shared.remove($0) }
+    }
+    print("PASS held drawing events, deferred mouse-up save, microphone-free annotations and editable persistence")
     print("PASS quick-edit full-resolution render, editable annotations, and compact light/dark layouts")
 
 }
