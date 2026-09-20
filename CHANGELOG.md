@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.5] - 2026-09-19
 
+### Added
+
+- **Scroll capture:** select a region, then scroll (manually or with auto-scroll) to stitch a full-page screenshot. Uses Vision framework for pixel-precise alignment, TIFF byte comparison for frame settlement, frozen header detection, scrollbar exclusion, and incremental stitching up to 30,000 pixels. Configurable via UserDefaults for auto-scroll speed and max height.
+
 ### Fixed
 
 - Image and video editors can enter and leave native full screen again. SwiftUI no longer overrides fullscreen support after the window opens; the automatic fullscreen preference remains supported.
