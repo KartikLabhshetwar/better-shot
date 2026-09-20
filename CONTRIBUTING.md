@@ -155,8 +155,8 @@ Recording areas use BetterShot's adjustable AppKit selector.
 `RecordingPickerControls` and `RecordingOptionsView` are shared by the bar and notch.
 Run `BETTERSHOT_CHECK_CAPTURE_UI=1 bash Tests/run-exports.sh` after building for
 focused light/dark capture layout checks without generating a video fixture.
-The notch shelf uses `NotchRecentCaptures.mediaURLs` to merge pending and recent
-media without duplicates. Reuse `PreviewCardView` and `PreviewOverlay.perform` for
+The notch shelf uses `NotchRecentCaptures.shelfItems` to merge pending media and
+saved media/text/colors by recency without duplicates. Reuse `PreviewCardView` and `PreviewOverlay.perform` for
 card rendering/actions; notch sizing must not change the normal overlay. Notch media cards reveal the standard actions on hover or keyboard focus, with drag recognition confined to the preview.
 `NotchQuickEditor` reuses `AnnotationCanvas`, `AnnotationRenderer`, and editable
 history sidecars. Done saves privately; it must not update an exported file.

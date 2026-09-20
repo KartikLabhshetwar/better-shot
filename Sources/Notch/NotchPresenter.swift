@@ -333,14 +333,11 @@ struct NotchContent: View {
     }
 
     private var shelf: some View {
-        let media = NotchRecentCaptures.mediaURLs(pending: overlay.items, filter: filter)
-        let saved = shelfStore.entries.filter {
-            filter == .all || (filter == .colors && $0.isColor == true) || (filter == .text && $0.isColor != true)
-        }
+        let items = NotchRecentCaptures.shelfItems(pending: overlay.items, entries: shelfStore.entries, filter: filter)
         let hasText = (filter == .all || filter == .text) && presenter.ocrText != nil
-            && !saved.contains { $0.text == presenter.ocrText }
+            && !shelfStore.entries.contains { $0.text == presenter.ocrText }
         let hasColor = (filter == .all || filter == .colors) && presenter.colorHex != nil
-            && !saved.contains { $0.text == presenter.colorHex }
+            && !shelfStore.entries.contains { $0.text == presenter.colorHex }
         return ScrollView(.horizontal) {
             LazyHStack(alignment: .top, spacing: 12) {
                 if hasColor, let hex = presenter.colorHex {
@@ -355,16 +352,18 @@ struct NotchContent: View {
                         presenter.refresh()
                     }.id(text)
                 }
-                ForEach(saved) { entry in
-                    NotchTextResult(title: entry.isColor == true ? "Color" : entry.imageURL == nil ? "Text" : "Voice note",
-                        value: entry.text, isColor: entry.isColor == true, imageURL: entry.imageURL) {
-                        shelfStore.remove(entry.id)
+                ForEach(items) { item in
+                    switch item {
+                    case .result(let entry):
+                        NotchTextResult(title: entry.isColor == true ? "Color" : entry.imageURL == nil ? "Text" : "Voice note",
+                            value: entry.text, isColor: entry.isColor == true, imageURL: entry.imageURL) {
+                            shelfStore.remove(entry.id)
+                        }
+                    case .media(let media):
+                        NotchMediaCard(url: media.url)
                     }
                 }
-                ForEach(media, id: \.self) { url in
-                    NotchMediaCard(url: url)
-                }
-                if media.isEmpty && !hasText && !hasColor && saved.isEmpty {
+                if items.isEmpty && !hasText && !hasColor {
                     VStack(alignment: .leading, spacing: 8) {
                         Image(systemName: filter.symbol).font(.title2).foregroundStyle(.secondary)
                         Text(filter == .all ? "Your captures, together" : "No \(filter.rawValue.lowercased()) yet")

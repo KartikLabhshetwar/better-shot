@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The notch shelf's All filter now places the newest capture first across screenshots, recordings, text, and colors instead of always leading with text history.
 - Screenshot failures now show recovery guidance instead of disappearing silently. Window screenshots now use the native macOS window picker and capture directly through ScreenCaptureKit, avoiding command-line window stream failures. Confirm the selected window with “Share This Window”; Cancel creates no screenshot. Unsigned test builds use a separate directory so they cannot overwrite the running dev app and invalidate its capture permission.
 
 - Fix an editor redraw loop in notch transfer-status routing that could consume a CPU core and make video playback controls and scrubbing lag, even with no transfer in progress. Repeated idle/unchanged status updates no longer publish changes; real progress and current Cancel/Retry actions remain available.

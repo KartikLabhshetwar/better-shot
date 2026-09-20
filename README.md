@@ -239,6 +239,7 @@ or **Notch Mode**. Notch mode puts the capture tools, recording controls,
 image/video previews, and transfer status at the top of the capture display.
 The expanded notch is a horizontal shelf with **All, Text, Images, Videos, and Colors**
 filters in a compact 560-point panel without a capture toolbar. Hold Control (or your chosen hold key) briefly, draw directly on the frozen screen, then release to save. The compact notch expands into a short Screenshot/Draw status while the gesture is active. The folder menu offers **Copy Text from Screen (⌘⇧O)**, **Pick Color (⌘⇧C)**, the gallery, Save All and Dismiss All. Menu labels reflect customized shortcuts.
+The **All** filter orders screenshots, recordings, text, and colors together by recency, with a pending capture first.
 OCR text and picked colors are copied automatically and remain on the shelf
 with Copy and Dismiss actions until removed from history. Notch Mode shows no
 toast notifications: Copy confirms on its button, and failures appear as inline

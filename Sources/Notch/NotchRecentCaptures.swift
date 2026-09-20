@@ -16,20 +16,65 @@ enum NotchShelfFilter: String, CaseIterable, Identifiable {
 
 /// Keep the gallery's project resolution and ordering; pending captures lead the shelf.
 enum NotchRecentCaptures {
+    struct Media: Identifiable {
+        let url: URL
+        let date: Date
+        var id: URL { url.standardizedFileURL }
+    }
+
+    enum ShelfItem: Identifiable {
+        case result(NotchShelfStore.Entry)
+        case media(Media)
+
+        var id: String {
+            switch self {
+            case .result(let entry): "result-\(entry.id)"
+            case .media(let media): "media-\(media.id.path)"
+            }
+        }
+
+        var date: Date {
+            switch self {
+            case .result(let entry): entry.date
+            case .media(let media): media.date
+            }
+        }
+    }
+
     static func items(kind: CaptureKind? = nil) -> [MediaGalleryItem] {
         let all = MediaGalleryItem.collect(history: HistoryStore.shared,
             edits: ScreenshotHistoryStore.shared.items, projects: RecordingProjectStore.shared.projects)
         return Array(MediaGalleryItem.filtered(all, kind: kind, cloud: false, search: "").prefix(4))
     }
 
-    static func mediaURLs(pending: [URL], filter: NotchShelfFilter) -> [URL] {
+    static func media(pending: [URL], filter: NotchShelfFilter) -> [Media] {
         guard filter != .text, filter != .colors else { return [] }
         let kind: CaptureKind? = filter == .images ? .screenshot : filter == .videos ? .recording : nil
         var seen = Set<URL>()
-        return (Array(pending.reversed()) + items(kind: kind).map(\.previewURL)).filter { url in
-            guard seen.insert(url.standardizedFileURL).inserted else { return false }
-            return kind == nil || PreviewOverlay.isVideo(url) == (kind == .recording)
+        var result: [Media] = []
+        for (index, url) in pending.reversed().enumerated() {
+            guard (kind == nil || PreviewOverlay.isVideo(url) == (kind == .recording)),
+                  seen.insert(url.standardizedFileURL).inserted else { continue }
+            result.append(Media(url: url, date: .distantFuture.addingTimeInterval(-Double(index))))
         }
+        for item in items(kind: kind) {
+            let url = item.previewURL
+            guard seen.insert(url.standardizedFileURL).inserted else { continue }
+            result.append(Media(url: url, date: item.createdAt))
+        }
+        return result
+    }
+
+    static func mediaURLs(pending: [URL], filter: NotchShelfFilter) -> [URL] {
+        media(pending: pending, filter: filter).map(\.url)
+    }
+
+    static func shelfItems(pending: [URL], entries: [NotchShelfStore.Entry], filter: NotchShelfFilter) -> [ShelfItem] {
+        let results = entries.filter {
+            filter == .all || (filter == .colors && $0.isColor == true) || (filter == .text && $0.isColor != true)
+        }.map(ShelfItem.result)
+        return (media(pending: pending, filter: filter).map(ShelfItem.media) + results)
+            .sorted { $0.date > $1.date }
     }
 }
 

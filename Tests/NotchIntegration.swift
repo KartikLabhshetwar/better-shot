@@ -191,7 +191,17 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     precondition(NotchRecentCaptures.mediaURLs(pending: [imageURL, movieURL], filter: .videos).allSatisfy { PreviewOverlay.isVideo($0) })
     precondition(NotchRecentCaptures.mediaURLs(pending: [imageURL], filter: .text).isEmpty)
     precondition(NotchRecentCaptures.mediaURLs(pending: [imageURL], filter: .colors).isEmpty)
-    print("PASS recent screenshot/video filters and reopening saved media through shared gallery actions")
+    let oldText = NotchShelfStore.Entry(text: "Older text", date: .distantPast)
+    let mixed = NotchRecentCaptures.shelfItems(pending: [imageURL], entries: [oldText], filter: .all)
+    guard let first = mixed.first, case .media = first else {
+        preconditionFailure("All must put the newest pending capture before older text")
+    }
+    let newText = NotchShelfStore.Entry(text: "Newest text", date: .distantFuture)
+    let textFirst = NotchRecentCaptures.shelfItems(pending: [], entries: [newText], filter: .all)
+    guard let first = textFirst.first, case .result(let entry) = first, entry.id == newText.id else {
+        preconditionFailure("All must order every capture type by recency")
+    }
+    print("PASS recent media filters, shared gallery actions, and chronological All ordering")
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
         try snapshot(NotchContent().environment(\.colorScheme, .dark).padding(16).background(.black), scheme: scheme, width: 592,
