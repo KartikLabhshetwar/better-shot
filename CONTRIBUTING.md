@@ -491,7 +491,10 @@ immediately. Overlay settings customize normal mode’s floating preview cards.
 transfer cards. Keep actions in `RecordingBarPresenter` / `PreviewOverlay`; do not
 add a second saving, copying, upload, or recording implementation. Normal mode is
 the fallback for missing or unknown `bs_presentationMode` values. Mode changes
-must preserve pending media, transfers, and active recording state.
+must preserve pending media, transfers, and active recording state. An idle notch
+has no panel: capture gestures and the shared recording bar open it, and clearing
+the final active item dismisses it. Render recording controls from the shared
+bar's visibility and mode, matching Normal Mode's lifecycle.
 
 Preserve capture exclusion before presentation, immediate capture/mode dismissal,
 transparent margin hit testing, display selection, and accessibility. Expanded and

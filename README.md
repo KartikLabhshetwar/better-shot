@@ -254,9 +254,11 @@ The media card’s **Edit** hover action opens the full editor. Quick Edit opens
 The notch uses an opaque black surface to match the camera cutout, with native
 macOS controls and readable dark-appearance labels in either system appearance.
 
-The compact notch shows the BetterShot logo and a readiness/editor indicator,
-or the timer while recording. Hover to expand; moving away collapses it after a
-short delay. Brief transitions respect Reduce Motion.
+Notch Mode stays hidden while idle. Triggering the capture bar, a hold-key
+capture, or video recording opens it; dismissing the last active capture or
+recording control hides it again. While content is active, moving away collapses
+the notch after a short delay and hover expands it. Brief transitions respect
+Reduce Motion.
 Menus, recording options, and confirmations stay open while you use them. Click
 remains available for keyboard/accessibility use. Other displays use a floating
 panel that collapses to compact capture status. The shelf combines pending captures and recent library images/videos without

@@ -11,7 +11,6 @@ final class NotchPresenter {
     private(set) var expanded = true
     private(set) var captureSuspended = false
     var countdown: Int?
-    @ObservationIgnored private var enabledSession = false
     @ObservationIgnored private var hoverTask: Task<Void, Never>?
     @ObservationIgnored private var isHovering = false
     @ObservationIgnored var menuTrackingCount = 0
@@ -34,20 +33,20 @@ final class NotchPresenter {
     var isVisible: Bool { window?.isVisible == true }
     var hasContent: Bool {
         RecordingBarPresenter.shared.isVisible || PreviewOverlay.shared.isPresented ||
-            captureIssue != nil || !transfers.isEmpty || script != nil || ocrText != nil || colorHex != nil
+            NotchVoiceCapture.shared.holdIndicatorActive || captureIssue != nil || !transfers.isEmpty ||
+            script != nil || ocrText != nil || colorHex != nil
     }
 
     private init() {}
 
     func show(on screen: NSScreen? = nil) {
-        if AppPreferences.presentationMode == .notch { enabledSession = true }
         self.screen = screen ?? self.screen ?? ActiveDisplayResolver.screenForScreenshotCapture()
         expanded = true
         refresh(collapseIfEmpty: false)
     }
 
     func refresh(collapseIfEmpty: Bool = true) {
-        guard AppPreferences.presentationMode == .notch, (!captureSuspended || countdown != nil), hasContent || enabledSession else {
+        guard AppPreferences.presentationMode == .notch, (!captureSuspended || countdown != nil), hasContent else {
             notch?.dismissImmediately()
             return
         }
@@ -106,7 +105,6 @@ final class NotchPresenter {
         hoverTask?.cancel()
         isHovering = false
         menuTrackingCount = 0
-        enabledSession = AppPreferences.presentationMode == .notch
         notch?.dismissImmediately()
         RecordingBarPresenter.shared.refreshPresentation()
         PreviewOverlay.shared.refreshSettings()
@@ -316,7 +314,7 @@ struct NotchContent: View {
                 Label("Starting in \(countdown)", systemImage: "timer")
                     .font(.title2.monospacedDigit()).padding()
             } else {
-                if ScreenRecordingManager.shared.isActive {
+                if bar.isVisible, bar.mode == .recording {
                     RecordingSessionControls().frame(height: BarMetrics.recordingHeight)
                 }
                 if let script = presenter.script {

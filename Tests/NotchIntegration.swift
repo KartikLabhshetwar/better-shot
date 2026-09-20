@@ -49,8 +49,11 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     AppPreferences.saveDirectory = saveFolder.path
     defaults.set("notch", forKey: AppPreferences.presentationModeKey)
     notch.refreshMode()
-    notch.show()
-    precondition(notch.expanded, "An empty compact notch must open the New Capture action")
+    precondition(!notch.isVisible, "Notch Mode must stay hidden until capture is triggered")
+    _ = NotchVoiceCapture.shared.controlGesture.update(flags: .control, modifierChanged: true)
+    precondition(notch.isVisible && notch.expanded, "A still-capture gesture must open the notch")
+    _ = NotchVoiceCapture.shared.controlGesture.update(flags: [], modifierChanged: true)
+    precondition(!notch.isVisible, "Cancelling an idle still-capture gesture must dismiss the notch")
     HistoryStore.shared.referenceCapture(at: imageURL, kind: .screenshot)
     HistoryStore.shared.referenceCapture(at: movieURL, kind: .recording)
     bar.showPicker(activate: false)
@@ -331,6 +334,12 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     precondition(!savedFiles.isEmpty)
     overlay.perform(.dismiss, for: movieURL)
     precondition(overlay.items.isEmpty)
+    precondition(!notch.isVisible, "Dismissing the last capture and capture bar must hide the notch")
+    bar.showRecording(displayID: window.screen.flatMap(ActiveDisplayResolver.displayID(for:)))
+    precondition(bar.mode == .recording && notch.isVisible,
+                 "Recording must use the shared bar state to open the notch")
+    bar.hide()
+    precondition(!notch.isVisible, "Hiding recording controls with no active content must dismiss the notch")
 
     let clipboard = NSPasteboard(name: .init("BetterShot.NotchResultTests.\(UUID().uuidString)"))
     defer { clipboard.releaseGlobally() }
