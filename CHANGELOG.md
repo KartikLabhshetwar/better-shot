@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bare modifier presses no longer open or expand the notch, Option voice capture is opt-in so it does not conflict with tools such as Wispr Flow, and notch scroll indicators remain hidden.
 - Switching between Normal and Notch modes no longer moves the recording bar between unrelated window hierarchies, preventing mode-switch lag and crashes.
 - Switching into Notch Mode now opens its preview shelf immediately, even before the first screenshot is taken, then keeps the compact resting notch available while idle.
+- Closing the final image preview no longer tears down its SwiftUI/AppKit window during the button event, preventing the close-action crash in Normal and Notch modes.
 
 ## [0.5.5] - 2026-09-19
 

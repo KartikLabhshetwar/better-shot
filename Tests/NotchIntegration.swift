@@ -362,6 +362,7 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     precondition(!savedFiles.isEmpty)
     overlay.perform(.dismiss, for: movieURL)
     precondition(overlay.items.isEmpty)
+    await Task.yield()
     precondition(notch.isVisible && !notch.expanded,
                  "Dismissing the last preview must return the notch to its compact resting state")
     bar.showRecording(displayID: window.screen.flatMap(ActiveDisplayResolver.displayID(for:)))
@@ -370,6 +371,21 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     precondition(NSApp.windows.contains { $0.identifier?.rawValue == "BetterShot.RecordingBar" && $0.isVisible })
     bar.hide()
     precondition(notch.isVisible && !notch.expanded)
+
+    // Closing the final card must retire its hosting panel after the button event,
+    // rather than deallocating the SwiftUI control while its action is executing.
+    defaults.set("normal", forKey: AppPreferences.presentationModeKey)
+    notch.refreshMode()
+    overlay.show(url: imageURL, automaticallyDismiss: false)
+    guard let closingPanel = NSApp.windows.first(where: {
+        $0.identifier?.rawValue == "BetterShot.CaptureOverlay" && $0.isVisible
+    }) else { preconditionFailure("Missing normal preview panel") }
+    overlay.perform(.dismiss, for: imageURL)
+    precondition(closingPanel.isVisible)
+    await Task.yield()
+    precondition(!closingPanel.isVisible, "Closing a preview must defer panel teardown past the action event")
+    defaults.set("notch", forKey: AppPreferences.presentationModeKey)
+    notch.refreshMode()
 
     let clipboard = NSPasteboard(name: .init("BetterShot.NotchResultTests.\(UUID().uuidString)"))
     defer { clipboard.releaseGlobally() }

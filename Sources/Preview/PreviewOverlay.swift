@@ -68,13 +68,13 @@ final class PreviewOverlay {
         shareStatuses.removeValue(forKey: url)
         if toastURL == url { toastURL = nil }
         cancelScheduledDismiss(for: url)
-        DeckStaging.discard(url)
         items.removeAll { $0 == url }
         if items.isEmpty {
             dismiss()
         } else {
             positionPanel()
         }
+        discardAfterViewUpdate([url])
     }
 
     func dismiss() {
@@ -87,9 +87,13 @@ final class PreviewOverlay {
         dismissTasks.removeAll()
 
         stopMouseTracking()
-        teardownPanel()
+        let dismissedPanel = panel
+        panel = nil
         items.removeAll()
-        NotchPresenter.shared.refresh()
+        Task { @MainActor in
+            dismissedPanel?.orderOut(nil)
+            NotchPresenter.shared.refresh()
+        }
     }
 
     func hide() {
@@ -123,8 +127,18 @@ final class PreviewOverlay {
     }
 
     func clearAll() {
-        items.forEach(DeckStaging.discard)
+        let discardedItems = items
         dismiss()
+        discardAfterViewUpdate(discardedItems)
+    }
+
+    private func discardAfterViewUpdate(_ urls: [URL]) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            for url in urls where !items.contains(url) {
+                DeckStaging.discard(url)
+            }
+        }
     }
 
     func saveAll() {
