@@ -52,20 +52,25 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     notch.captureIssue = nil
     notch.ocrText = nil
     notch.colorHex = nil
-    notch.script = nil
     notch.transfers.removeAll()
     notch.transferOrder.removeAll()
     defaults.set("notch", forKey: AppPreferences.presentationModeKey)
     notch.refreshMode()
-    precondition(!notch.isVisible, "Notch Mode must stay hidden until capture is triggered")
+    precondition(notch.isVisible && notch.expanded,
+                 "Switching to Notch Mode must immediately open the preview shelf")
+    notch.refresh()
+    precondition(notch.isVisible && !notch.expanded,
+                 "An empty Notch Mode shelf must settle into its compact resting state")
     _ = NotchVoiceCapture.shared.controlGesture.update(flags: .control, modifierChanged: true)
-    precondition(!notch.isVisible && !NotchVoiceCapture.shared.holdIndicatorActive,
-                 "Pressing the capture modifier alone must not open the notch")
+    precondition(!notch.expanded && !NotchVoiceCapture.shared.holdIndicatorActive,
+                 "Pressing the capture modifier alone must not expand the notch")
     _ = NotchVoiceCapture.shared.controlGesture.update(flags: [], modifierChanged: true)
-    precondition(!notch.isVisible, "Releasing an unused capture modifier must keep the notch hidden")
+    precondition(!notch.expanded, "Releasing an unused capture modifier must keep the notch compact")
     HistoryStore.shared.referenceCapture(at: imageURL, kind: .screenshot)
     HistoryStore.shared.referenceCapture(at: movieURL, kind: .recording)
     bar.showPicker(activate: false)
+    precondition(notch.isVisible && !notch.expanded,
+                 "The floating capture bar must not expand the preview-only notch")
     overlay.show(url: imageURL)
     overlay.show(url: movieURL)
     precondition(notch.isVisible && bar.isVisible && overlay.isPresented)
@@ -121,7 +126,7 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     if window.screen?.safeAreaInsets.top ?? 0 > 0 {
         precondition(!notch.expanded && notch.isVisible)
         bar.recordingConfirmation = .restartRecording
-        precondition(notch.expanded, "Recording confirmations must expand a compact notch")
+        precondition(!notch.expanded, "Recording confirmations must stay in the floating recording bar")
         bar.recordingConfirmation = nil
     }
     notch.show()
@@ -291,6 +296,7 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     notch.refreshMode()
     precondition(!notch.isVisible && overlay.items.count == 2 && bar.isVisible)
     precondition(NSApp.windows.contains { $0.identifier?.rawValue == "BetterShot.CaptureOverlay" && $0.isVisible })
+    precondition(NSApp.windows.contains { $0.identifier?.rawValue == "BetterShot.RecordingBar" && $0.isVisible })
     ToastWindow.shared.show(message: "Normal mode toast", duration: 30)
     precondition(NSApp.windows.contains { $0.identifier?.rawValue == "BetterShot.Toast" && $0.isVisible })
     defaults.set("notch", forKey: AppPreferences.presentationModeKey)
@@ -298,6 +304,16 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     precondition(!NSApp.windows.contains { $0.identifier?.rawValue == "BetterShot.Toast" && $0.isVisible },
                  "Switching to Notch Mode must remove an already visible toast")
     precondition(notch.isVisible && overlay.items.count == 2)
+    precondition(NSApp.windows.contains { $0.identifier?.rawValue == "BetterShot.RecordingBar" && $0.isVisible },
+                 "Mode switching must not move or recreate the floating capture bar")
+    for _ in 0..<6 {
+        defaults.set("normal", forKey: AppPreferences.presentationModeKey)
+        notch.refreshMode()
+        precondition(!notch.isVisible && bar.isVisible)
+        defaults.set("notch", forKey: AppPreferences.presentationModeKey)
+        notch.refreshMode()
+        precondition(notch.isVisible && bar.isVisible)
+    }
     notch.collapse()
     ToastWindow.shared.show(message: "Saved", duration: 30)
     precondition(!notch.expanded && notch.captureIssue == nil,
@@ -311,8 +327,6 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     precondition(notch.captureIssue == nil, "Trying a capture again clears stale failure feedback")
     print("PASS no notch toasts, no success expansion, immediate mode-switch dismissal, and inline failure recovery")
     precondition(!notch.isVisible && overlay.items.count == 2)
-    await notch.runCountdown(seconds: 1, on: window.screen)
-    precondition(notch.countdown == nil && !notch.isVisible, "Countdown must disappear before screenshot capture")
     // Updates arriving during capture must not bring the notch back into the image.
     ToastWindow.shared.show(message: "Saved", duration: 30)
     precondition(!notch.isVisible)
@@ -321,7 +335,7 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     precondition(notch.isVisible)
     ToastWindow.shared.dismiss(animated: false)
 
-    // Exercise the actual shared recording presentation without opening capture devices.
+    // Recording stays in its floating bar while the notch remains preview-only.
     bar.showRecording(displayID: window.screen.flatMap(ActiveDisplayResolver.displayID(for:)))
     precondition(bar.mode == .recording && notch.isVisible)
     defaults.set("normal", forKey: AppPreferences.presentationModeKey)
@@ -330,6 +344,7 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     defaults.set("notch", forKey: AppPreferences.presentationModeKey)
     notch.refreshMode()
     precondition(bar.mode == .recording && notch.isVisible)
+    precondition(NSApp.windows.contains { $0.identifier?.rawValue == "BetterShot.RecordingBar" && $0.isVisible })
     for scheme in [ColorScheme.light, .dark] {
         try snapshot(NotchContent().environment(\.colorScheme, .dark).padding(16).background(.black), scheme: scheme, width: 592,
                      to: output.appendingPathComponent("notch-recording-\(scheme == .light ? "light" : "dark").png"), height: 700)
@@ -347,12 +362,14 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     precondition(!savedFiles.isEmpty)
     overlay.perform(.dismiss, for: movieURL)
     precondition(overlay.items.isEmpty)
-    precondition(!notch.isVisible, "Dismissing the last capture and capture bar must hide the notch")
+    precondition(notch.isVisible && !notch.expanded,
+                 "Dismissing the last preview must return the notch to its compact resting state")
     bar.showRecording(displayID: window.screen.flatMap(ActiveDisplayResolver.displayID(for:)))
-    precondition(bar.mode == .recording && notch.isVisible,
-                 "Recording must use the shared bar state to open the notch")
+    precondition(bar.mode == .recording && notch.isVisible && !notch.expanded,
+                 "Recording controls must never expand the preview-only notch")
+    precondition(NSApp.windows.contains { $0.identifier?.rawValue == "BetterShot.RecordingBar" && $0.isVisible })
     bar.hide()
-    precondition(!notch.isVisible, "Hiding recording controls with no active content must dismiss the notch")
+    precondition(notch.isVisible && !notch.expanded)
 
     let clipboard = NSPasteboard(name: .init("BetterShot.NotchResultTests.\(UUID().uuidString)"))
     defer { clipboard.releaseGlobally() }
@@ -435,7 +452,7 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     precondition(notch.transfers.isEmpty, "Closing the owner cleans up notch transfer feedback")
     anchor.removeFromSuperview()
     print("PASS transfer observation settles for idle/unchanged progress, publishes real changes, and retains current callbacks")
-    print("PASS notch defaults, mode migration, pending images/video, capture suspension, recording controls, save/share recovery, transfer cleanup, compact light/dark snapshots")
+    print("PASS notch defaults, mode migration, preview-only content, capture suspension, save/share recovery, transfer cleanup, compact light/dark snapshots")
 }
 
 @MainActor

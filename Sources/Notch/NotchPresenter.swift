@@ -10,7 +10,6 @@ final class NotchPresenter {
 
     private(set) var expanded = true
     private(set) var captureSuspended = false
-    var countdown: Int?
     @ObservationIgnored private var hoverTask: Task<Void, Never>?
     @ObservationIgnored private var isHovering = false
     @ObservationIgnored var menuTrackingCount = 0
@@ -19,7 +18,6 @@ final class NotchPresenter {
     var captureIssue: (title: String, message: String)?
     var transfers: [UUID: TransferStatusCard] = [:]
     var transferOrder: [UUID] = []
-    var script: TeleprompterOverlayModel?
     private(set) var screen: NSScreen?
     @ObservationIgnored private var notch: DynamicNotch<NotchContent, NotchCompactLeading, NotchCompactTrailing>?
 
@@ -32,9 +30,8 @@ final class NotchPresenter {
     }
     var isVisible: Bool { window?.isVisible == true }
     var hasContent: Bool {
-        RecordingBarPresenter.shared.isVisible || PreviewOverlay.shared.isPresented ||
-            NotchVoiceCapture.shared.holdIndicatorActive || captureIssue != nil || !transfers.isEmpty ||
-            script != nil || ocrText != nil || colorHex != nil
+        PreviewOverlay.shared.isPresented || captureIssue != nil || !transfers.isEmpty ||
+            ocrText != nil || colorHex != nil
     }
 
     private init() {}
@@ -46,11 +43,13 @@ final class NotchPresenter {
     }
 
     func refresh(collapseIfEmpty: Bool = true) {
-        guard AppPreferences.presentationMode == .notch, (!captureSuspended || countdown != nil), hasContent else {
+        guard AppPreferences.presentationMode == .notch, !captureSuspended else {
             notch?.dismissImmediately()
             return
         }
-        if collapseIfEmpty && !hasContent && countdown == nil { expanded = false }
+        if collapseIfEmpty && !hasContent {
+            expanded = false
+        }
         guard let screen = NSScreen.screens.first(where: { $0 == self.screen }) ?? NSScreen.main ?? NSScreen.screens.first else { return }
         self.screen = screen
         if notch == nil {
@@ -105,12 +104,10 @@ final class NotchPresenter {
         hoverTask?.cancel()
         isHovering = false
         menuTrackingCount = 0
-        notch?.dismissImmediately()
-        RecordingBarPresenter.shared.refreshPresentation()
+        if AppPreferences.presentationMode == .normal { notch?.dismissImmediately() }
         PreviewOverlay.shared.refreshSettings()
         PreviewOverlay.shared.refreshPresentation()
-        TeleprompterOverlayPresenter.shared.refreshPresentation()
-        refresh()
+        if AppPreferences.presentationMode == .notch, !PreviewOverlay.shared.isPresented { show() }
     }
 
     func updateHoverState(_ hovering: Bool) {
@@ -136,26 +133,12 @@ final class NotchPresenter {
     }
 
     private var canCollapseAfterHover: Bool {
-        let bar = RecordingBarPresenter.shared
-        return countdown == nil && !bar.showsRecordingOptions && bar.recordingConfirmation == nil
-            && menuTrackingCount == 0 && NSApp.modalWindow == nil && window?.attachedSheet == nil
+        menuTrackingCount == 0 && NSApp.modalWindow == nil && window?.attachedSheet == nil
             && !(window?.childWindows?.contains(where: \.isVisible) ?? false)
     }
 
     func resumeHoverDismissal() {
         if !isHovering { updateHoverState(false) }
-    }
-
-    func runCountdown(seconds: Int, on screen: NSScreen?) async {
-        guard seconds > 0 else { return }
-        countdown = seconds
-        show(on: screen)
-        for value in stride(from: seconds, through: 1, by: -1) {
-            countdown = value
-            try? await Task.sleep(for: .seconds(1))
-        }
-        countdown = nil
-        refresh()
     }
 
     func updateTransfer(_ card: TransferStatusCard?, id: UUID, on screen: NSScreen?) {
@@ -176,9 +159,7 @@ final class NotchPresenter {
 }
 
 struct NotchContent: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var presenter = NotchPresenter.shared
-    @State private var bar = RecordingBarPresenter.shared
     @State private var overlay = PreviewOverlay.shared
     @State private var shelfStore = NotchShelfStore.shared
     @State private var filter: NotchShelfFilter
@@ -210,33 +191,14 @@ struct NotchContent: View {
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEndSheetNotification)) { _ in
             presenter.resumeHoverDismissal()
         }
-        .onChange(of: bar.showsRecordingOptions) { _, open in
-            if !open { presenter.resumeHoverDismissal() }
-        }
-        .onChange(of: bar.recordingConfirmation) { _, action in
-            if action == nil { presenter.resumeHoverDismissal() }
-        }
-        .onChange(of: presenter.countdown) { _, countdown in
-            if countdown == nil { presenter.resumeHoverDismissal() }
-        }
         .onChange(of: presenter.captureSuspended) { _, suspended in
             if !suspended { filter = .all }
         }
         .onChange(of: overlay.items) { filter = .all }
         .onChange(of: presenter.ocrText) { filter = .all }
         .onChange(of: presenter.colorHex) { filter = .all }
-        .popover(isPresented: $bar.showsRecordingOptions, arrowEdge: .top) { RecordingOptionsView() }
         .onExitCommand {
-            if bar.isVisible && bar.mode == .picker {
-                bar.dismiss()
-                Task { await CameraRecordingManager.shared.stopPreview() }
-            }
             presenter.collapse()
-        }
-        .onKeyPress("a") {
-            guard !ScreenRecordingManager.shared.isActive else { return .ignored }
-            bar.captureLastRegion()
-            return .handled
         }
     }
 
@@ -256,25 +218,7 @@ struct NotchContent: View {
                     .accessibilityAddTraits(filter == tab ? .isSelected : [])
                 }
                 Spacer(minLength: 4)
-                if NotchVoiceCapture.shared.holdIndicatorActive {
-                    Label(NotchVoiceCapture.drawsOnHold ? "Draw" : "Select area",
-                          systemImage: NotchVoiceCapture.drawsOnHold ? "pencil.tip" : "viewfinder")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 10)
-                        .frame(height: 24)
-                        .background(.white, in: Capsule())
-                        .transition(reduceMotion ? .opacity : .scale(scale: 0.92).combined(with: .opacity))
-                        .accessibilityLabel(NotchVoiceCapture.drawsOnHold ? "Drawing active" : "Screenshot selection active")
-                }
                 Menu {
-                    Button(ShortcutService.shared.help("Copy Text from Screen", for: .ocr), systemImage: "doc.text.viewfinder") {
-                        Task { await CaptureOrchestrator.shared.performCapture(.ocr, on: presenter.screen) }
-                    }
-                    Button(ShortcutService.shared.help("Pick Color", for: .colorPicker), systemImage: "eyedropper") {
-                        Task { await CaptureOrchestrator.shared.performCapture(.colorPicker, on: presenter.screen) }
-                    }
-                    Divider()
                     Button("Open Gallery", systemImage: "folder") {
                         MediaGalleryWindowController.shared.open(on: presenter.screen)
                     }
@@ -287,13 +231,11 @@ struct NotchContent: View {
                     Image(systemName: "folder").frame(width: 30, height: 30)
                 }
                 .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-                .accessibilityLabel("Library and capture actions").help("Library and capture actions")
+                .accessibilityLabel("Library and preview actions").help("Library and preview actions")
                 BoringNotchHoverButton(title: "Settings", icon: "gearshape") {
                     SettingsWindowController.shared.open(section: .general)
                 }
             }
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.16),
-                       value: NotchVoiceCapture.shared.holdIndicatorActive)
             if let issue = presenter.captureIssue {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "exclamationmark.circle").foregroundStyle(.orange)
@@ -310,22 +252,9 @@ struct NotchContent: View {
                     }
                 }
             }
-            if let countdown = presenter.countdown {
-                Label("Starting in \(countdown)", systemImage: "timer")
-                    .font(.title2.monospacedDigit()).padding()
-            } else {
-                if bar.isVisible, bar.mode == .recording {
-                    RecordingSessionControls().frame(height: BarMetrics.recordingHeight)
-                }
-                if let script = presenter.script {
-                    TeleprompterOverlayView(model: script).textArea
-                        .padding(8).background(.black, in: RoundedRectangle(cornerRadius: 8))
-                }
-                shelf
-                if let error = shelfStore.error { Text(error).font(.caption).foregroundStyle(.orange) }
-                if let id = presenter.transferOrder.last, let card = presenter.transfers[id] { card }
-
-            }
+            shelf
+            if let error = shelfStore.error { Text(error).font(.caption).foregroundStyle(.orange) }
+            if let id = presenter.transferOrder.last, let card = presenter.transfers[id] { card }
         }
         .padding(.top, 8)
     }
@@ -366,7 +295,7 @@ struct NotchContent: View {
                         Image(systemName: filter.symbol).font(.title2).foregroundStyle(.secondary)
                         Text(filter == .all ? "Your captures, together" : "No \(filter.rawValue.lowercased()) yet")
                             .font(.headline)
-                        Text(NotchVoiceCapture.drawsOnHold ? "Hold \(NotchVoiceCapture.captureHoldKey.title) briefly, draw on screen, then release to save. Find OCR and Pick Color in the folder menu." : "Hold \(NotchVoiceCapture.captureHoldKey.title) and drag an area to capture. Find OCR and Pick Color in the folder menu.")
+                        Text("New captures appear here for preview and quick editing.")
                             .font(.callout).foregroundStyle(.secondary)
                     }
                     .padding(20).frame(height: 160)
@@ -467,73 +396,37 @@ private struct NotchTextResult: View {
 }
 
 struct NotchCompactLeading: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
         Button { NotchPresenter.shared.show() } label: {
-            if NotchVoiceCapture.shared.holdIndicatorActive {
-                Label("Screenshot", systemImage: "camera.viewfinder")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 4)
-                    .frame(height: 22)
-                    .transition(reduceMotion ? .opacity : .scale(scale: 0.92).combined(with: .opacity))
-            } else {
-                Image(nsImage: NSImage(named: "MenuBarIcon") ?? NSImage()).resizable().renderingMode(.template)
-                    .scaledToFit().frame(width: 18, height: 18)
-                    .frame(width: 28, height: 22)
-                    .transition(.opacity)
-            }
+            Image(nsImage: NSImage(named: "MenuBarIcon") ?? NSImage()).resizable().renderingMode(.template)
+                .scaledToFit().frame(width: 18, height: 18)
+                .frame(width: 28, height: 22)
         }
         .buttonStyle(.plain)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.16),
-                   value: NotchVoiceCapture.shared.holdIndicatorActive)
-        .accessibilityLabel(NotchVoiceCapture.shared.holdIndicatorActive
-            ? "Screenshot selection active — open shelf"
-            : "BetterShot — open shelf")
+        .accessibilityLabel("BetterShot — open previews")
         .help("BetterShot — saved captures, text, and colors")
     }
 }
 
 struct NotchCompactTrailing: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var editorIsOpen = false
-
-    private var pillTitle: String? {
-        guard NotchVoiceCapture.shared.holdIndicatorActive else { return nil }
-        return NotchVoiceCapture.drawsOnHold ? "Draw" : "Select"
-    }
 
     private var status: (title: String, symbol: String) {
         if editorIsOpen { return ("Editor open", "pencil.and.outline") }
         if PreviewOverlay.shared.isPresented || NotchPresenter.shared.ocrText != nil || NotchPresenter.shared.colorHex != nil {
-            return ("Capture ready", "checkmark")
+            return ("Preview ready", "checkmark")
         }
-        return ("Ready to capture", "circle.fill")
+        return ("BetterShot previews", "checkmark")
     }
 
     var body: some View {
         Button { NotchPresenter.shared.show() } label: {
-            if let pillTitle {
-                Text(pillTitle)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.black)
-                    .padding(.horizontal, 10)
-                    .frame(height: 22)
-                    .background(.white, in: Capsule())
-                    .transition(reduceMotion ? .opacity : .scale(scale: 0.92).combined(with: .opacity))
-            } else if ScreenRecordingManager.shared.isActive {
-                Label(ScreenRecordingManager.shared.formattedElapsedTime, systemImage: "record.circle.fill")
-                    .monospacedDigit().foregroundStyle(.red)
-            } else {
-                Image(systemName: status.symbol).font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.blue).frame(width: 28, height: 22)
-            }
+            Image(systemName: status.symbol).font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.blue).frame(width: 28, height: 22)
         }
         .buttonStyle(.plain)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: pillTitle)
-        .accessibilityLabel(NotchVoiceCapture.shared.holdIndicatorActive ? "Screenshot selection active" : ScreenRecordingManager.shared.isActive ? "Expand recording controls" : status.title)
-        .help(ScreenRecordingManager.shared.isActive ? "Recording in progress" : status.title)
+        .accessibilityLabel(status.title)
+        .help(status.title)
         .onAppear { refreshEditors() }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in refreshEditors() }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { notification in

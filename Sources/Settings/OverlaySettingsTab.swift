@@ -81,7 +81,7 @@ struct OverlaySettingsTab: View {
                 }
             } else {
                 Section("Notch Mode") {
-                    Text("Capture tools and previews appear at the top of your display. Choose Normal Mode in General > Capture Mode to customize floating overlay cards here.")
+                    Text("Capture previews and quick editing appear at the top of your display. Capture and recording tools remain in their floating bars. Choose Normal Mode in General > Capture Mode to customize floating preview cards here.")
                         .foregroundStyle(.secondary)
                 }
             }

@@ -24,10 +24,6 @@ final class CaptureCountdownPresenter {
     /// preference applies.
     func runIfNeeded(seconds: Int, displayID: CGDirectDisplayID?) async {
         guard seconds > 0 else { return }
-        if AppPreferences.presentationMode == .notch {
-            await NotchPresenter.shared.runCountdown(seconds: seconds, on: ActiveDisplayResolver.screen(for: displayID))
-            return
-        }
         await run(seconds: seconds, displayID: displayID)
     }
 

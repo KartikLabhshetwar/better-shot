@@ -162,13 +162,6 @@ final class TeleprompterOverlayPresenter {
         model.isExpanded = false
         guard !model.layout.isEmpty else { return }
 
-        if AppPreferences.presentationMode == .notch {
-            panel?.orderOut(nil)
-            model.isExpanded = true
-            NotchPresenter.shared.script = model
-            NotchPresenter.shared.show(on: screen)
-            return
-        }
         let panel = panel ?? makePanel()
         PreviewWindowCaptureExclusion.shared.register(window: panel)
         position(panel, on: screen)
@@ -187,23 +180,14 @@ final class TeleprompterOverlayPresenter {
     func refreshPresentation() {
         guard isShown else { return }
         guard let screen = ActiveDisplayResolver.screen(for: displayID) ?? NSScreen.main else { return }
-        if AppPreferences.presentationMode == .notch {
-            panel?.orderOut(nil)
-            NotchPresenter.shared.script = model
-            NotchPresenter.shared.show(on: screen)
-        } else {
-            NotchPresenter.shared.script = nil
-            let panel = panel ?? makePanel()
-            PreviewWindowCaptureExclusion.shared.register(window: panel)
-            position(panel, on: screen)
-            panel.orderFrontRegardless()
-        }
+        let panel = panel ?? makePanel()
+        PreviewWindowCaptureExclusion.shared.register(window: panel)
+        position(panel, on: screen)
+        panel.orderFrontRegardless()
     }
 
     func hide() {
         isShown = false
-        NotchPresenter.shared.script = nil
-        NotchPresenter.shared.refresh()
         guard let panel, panel.isVisible else { return }
         guard model.isExpanded else {
             panel.orderOut(nil)

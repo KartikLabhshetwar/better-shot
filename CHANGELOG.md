@@ -5,6 +5,20 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.6] - 2026-09-21
+
+### Changed
+
+- Restored the 0.5.4 compact floating recording strip in both capture modes. Its popover again provides Display, Window, Area, Camera, Microphone, System Audio, and Teleprompter controls, while the shared timer menu configures screenshot and recording delays.
+- Limited the notch to capture previews, saved shelf items, quick editing, and related status. Capture, recording, countdown, and teleprompter controls remain in their dedicated floating surfaces.
+- Moved the customizable Notch capture modifier and hold action to Settings > Shortcuts.
+
+### Fixed
+
+- Bare modifier presses no longer open or expand the notch, Option voice capture is opt-in so it does not conflict with tools such as Wispr Flow, and notch scroll indicators remain hidden.
+- Switching between Normal and Notch modes no longer moves the recording bar between unrelated window hierarchies, preventing mode-switch lag and crashes.
+- Switching into Notch Mode now opens its preview shelf immediately, even before the first screenshot is taken, then keeps the compact resting notch available while idle.
+
 ## [0.5.5] - 2026-09-19
 
 - Added a Capture hold key setting with Control, Option, Shift, and Command choices; Option capture takes priority over the optional voice gesture.

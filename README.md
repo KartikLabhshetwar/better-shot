@@ -232,13 +232,13 @@ If BetterShot helps you, you can [support its development](https://www.buymeacof
 AGPLv3; the notch also includes GPLv3 Boring Notch adaptations. See [third-party notices](Resources/Licenses/NOTICE.md) for distribution
 terms and the bundled TourKit MIT license.
 
-### Optional notch mode (v0.5.5)
+### Optional notch mode (v0.5.6)
 
 In **Settings > General > Capture Mode**, choose **Normal Mode** (the default)
-or **Notch Mode**. Notch mode puts the capture tools, recording controls,
-image/video previews, and transfer status at the top of the capture display.
+or **Notch Mode**. Notch mode puts image/video previews, saved shelf items,
+quick editing, and related status at the top of the capture display.
 The expanded notch is a horizontal shelf with **All, Text, Images, Videos, and Colors**
-filters in a compact 560-point panel without a capture toolbar. Hold Control (or your chosen modifier) and drag to capture an area; drawing directly on the frozen screen is an optional alternative. Pressing the modifier alone does not open the notch. The folder menu offers **Copy Text from Screen (⌘⇧O)**, **Pick Color (⌘⇧C)**, the gallery, Save All and Dismiss All. Menu labels reflect customized shortcuts.
+filters in a compact 560-point panel without capture or recording tools. Hold Control (or your chosen modifier) and drag to capture an area; drawing directly on the frozen screen is an optional alternative. Pressing the modifier alone does not open the notch. The folder menu provides the gallery plus Save All and Dismiss All for pending previews.
 The **All** filter orders screenshots, recordings, text, and colors together by recency, with a pending capture first.
 OCR text and picked colors are copied automatically and remain on the shelf
 with Copy and Dismiss actions until removed from history. Notch Mode shows no
@@ -247,21 +247,17 @@ instructions. Text is selectable; colors show their hex code and swatch. Text an
 Scroll sideways to browse the cards. Click an image for the quick editor, or a video for the video editor;
 rounded media cards show a title at rest and reveal Copy, Save, Edit, Pin, Cloud Share, and pending-capture Dismiss on hover or keyboard focus.
 Drag image previews into compatible editors. Drag a text card’s text or title to insert text, or a color card’s hex label/title to insert its color code. Color cards show the sampled color with a readable hex label and Copy button.
-Use your **Recording options** shortcut (default **⌘⇧5**) to set up a video: select Screen, Window, or Area, then choose
-your camera, microphone, system audio, and start delay before pressing **Start
-Recording** (or **Choose Area…**). The capture bar’s **Timer** applies to screenshots.
+Use your **Recording options** shortcut (default **⌘⇧5**) to open the compact floating recording strip in either capture mode. Choose Display, Window, or Area to start, and toggle Camera, Mic, Audio, or Script directly in the popover. The shared Timer menu configures both screenshot and recording delays. Recording controls never move into the notch.
 The media card’s **Edit** hover action opens the full editor. Quick Edit opens a small native panel beneath the notch with drawing, arrow, blur, crop, background, and undo controls. **Done** retains a lossless image and editable annotations in BetterShot’s private library; **Save** explicitly exports a file.
 The notch uses an opaque black surface to match the camera cutout, with native
 macOS controls and readable dark-appearance labels in either system appearance.
 
-Notch Mode stays hidden while idle. A completed hold-key capture, the capture bar,
-or video recording opens it; dismissing the last active capture or
-recording control hides it again. While content is active, moving away collapses
+Switching to Notch Mode opens the preview shelf immediately, including its empty state. Dismissing the last active preview returns it to the compact resting notch. While content is active, moving away collapses
 the notch after a short delay and hover expands it. Brief transitions respect
 Reduce Motion.
-Menus, recording options, and confirmations stay open while you use them. Click
+Preview menus and confirmations stay open while you use them. Click
 remains available for keyboard/accessibility use. Other displays use a floating
-panel that collapses to compact capture status. The shelf combines pending captures and recent library images/videos without
+panel that collapses to compact preview status. The shelf combines pending captures and recent library images/videos without
 duplicate cards. Open Gallery shows the full library. Pending
 captures remain until you act on them. Switching back restores your normal overlay
 layout and timing. Capture exclusion and private staging work in both modes.

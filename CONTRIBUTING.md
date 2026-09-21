@@ -152,7 +152,7 @@ Notch Mode must not show toasts. Mark `ToastWindow.show` failures with `isError:
 so recovery instructions appear inline; successes stay quiet or update their action
 button. Export/share progress continues through the embedded `TransferStatusCard`.
 Recording areas use BetterShot's adjustable AppKit selector.
-`RecordingPickerControls` and `RecordingOptionsView` are shared by the bar and notch.
+`RecordingPickerControls` owns the compact `RecordingOptionsView`. Keep the 0.5.4 Display/Window/Area and Camera/Mic/Audio/Script strip in the floating bar in both capture modes; do not embed it in the notch.
 Run `BETTERSHOT_CHECK_CAPTURE_UI=1 bash Tests/run-exports.sh` after building for
 focused light/dark capture layout checks without generating a video fixture.
 The notch shelf uses `NotchRecentCaptures.shelfItems` to merge pending media and
@@ -487,20 +487,20 @@ and thumbnail decoding; do not add a second media store.
 Settings > General > Capture Mode selects Normal Mode or Notch Mode and applies
 immediately. Overlay settings customize normal mode’s floating preview cards.
 
-`NotchPresenter` hosts the existing capture/session controls, preview cards, and
-transfer cards. Keep actions in `RecordingBarPresenter` / `PreviewOverlay`; do not
+`NotchPresenter` hosts preview cards, saved shelf items, quick-edit entry points, and
+related transfer cards. Keep capture/session controls in `RecordingBarPresenter` and preview actions in `PreviewOverlay`; do not
 add a second saving, copying, upload, or recording implementation. Normal mode is
 the fallback for missing or unknown `bs_presentationMode` values. Mode changes
 must preserve pending media, transfers, and active recording state. An idle notch
-has no panel: completed captures and the shared recording bar open it, and clearing
-the final active item dismisses it. Render recording controls from the shared
-bar's visibility and mode, matching Normal Mode's lifecycle.
+opens when selected so its empty preview state is visible; afterward, clearing the final active item returns it to the compact resting state.
+The floating recording bar keeps the same lifecycle in both capture modes and must
+never be reparented into the notch.
 
 Preserve capture exclusion before presentation, immediate capture/mode dismissal,
 transparent margin hit testing, display selection, and accessibility. Expanded and
 compact surfaces stay opaque black with native dark-appearance controls. Short
-interruptible transitions respect Reduce Motion. Capture/Recents tabs reuse the
-existing controls and media resolver; compact logo/status never shows a thumbnail
+interruptible transitions respect Reduce Motion. Shelf filters reuse the existing
+media resolver; compact logo/status never shows a thumbnail
 or capture count. `make test` exercises mode switching, hover cancellation,
 menu/sheet protection, capture suspension, preview actions, transfer cleanup, and
 both appearances. The opt-in window-capture check drives selection and Escape;

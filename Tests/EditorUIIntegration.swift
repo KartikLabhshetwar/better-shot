@@ -878,8 +878,8 @@ func checkCaptureControlsUI() throws {
         try snapshot(RecordingSessionControls().studioGlass(cornerRadius: BarMetrics.cornerRadius, opacity: 0.78),
                      scheme: scheme, width: 360,
                      to: output.appendingPathComponent("recording-\(name).png"), height: 64)
-        try snapshot(RecordingOptionsView(), scheme: scheme, width: 420,
-                     to: output.appendingPathComponent("recording-setup-\(name).png"), height: 520)
+        try snapshot(RecordingOptionsView(), scheme: scheme, width: 680,
+                     to: output.appendingPathComponent("recording-setup-\(name).png"), height: 180)
         try snapshot(RecordingPickerControls().padding(.horizontal, BarMetrics.horizontalPadding)
             .frame(height: BarMetrics.height).studioGlass(cornerRadius: BarMetrics.cornerRadius, opacity: 0.78)
             .background(EditorChrome.workspace), scheme: scheme, width: 760,

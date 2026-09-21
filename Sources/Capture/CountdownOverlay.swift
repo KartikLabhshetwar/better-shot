@@ -77,11 +77,6 @@ final class CountdownOverlay {
         guard seconds > 0 else { return }
 
         dismiss()
-        if AppPreferences.presentationMode == .notch {
-            await NotchPresenter.shared.runCountdown(seconds: seconds, on: screen)
-            return
-        }
-
         let countdownModel = CountdownModel()
         countdownModel.currentNumber = seconds
         countdownModel.totalSeconds = Double(seconds)

@@ -239,7 +239,7 @@ struct GeneralSettingsTab: View {
             } header: {
                 Text("Capture Mode")
             } footer: {
-                Text("Normal uses the floating capture bar and preview cards. Notch brings screenshot tools, recording controls, and image/video actions to the top of your display. Displays without a notch use a floating panel at the top.")
+                Text("The capture and recording bars stay floating in both modes. Notch moves capture previews, quick editing, and saved shelf items to the top of your display. Displays without a notch use a floating preview panel at the top.")
             }
 
             Section("Notch Shelf") {

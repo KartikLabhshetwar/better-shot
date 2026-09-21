@@ -34,13 +34,7 @@ final class RecordingBarPresenter {
     /// tells the hosting view which part of itself is real and satellite
     /// windows where to anchor.
     var showsRecordingOptions = false
-    var recordingConfirmation: ShortcutService.Action? {
-        didSet {
-            if recordingConfirmation != nil, AppPreferences.presentationMode == .notch {
-                NotchPresenter.shared.show()
-            }
-        }
-    }
+    var recordingConfirmation: ShortcutService.Action?
 
     var barFrameInPanel: CGRect = .zero
 
@@ -75,8 +69,7 @@ final class RecordingBarPresenter {
         guard activate else { return }
         if !NSApp.isActive { previousApp = NSWorkspace.shared.frontmostApplication }
         NSApp.activate(ignoringOtherApps: true)
-        if AppPreferences.presentationMode == .notch { NotchPresenter.shared.window?.makeKey() }
-        else { panel?.makeKey() }
+        panel?.makeKey()
         LastRegionGhostPresenter.shared.show()
         warmCameraPreviewIfEnabled()
     }
@@ -114,15 +107,6 @@ final class RecordingBarPresenter {
     func showRecording(displayID: CGDirectDisplayID?) {
         isVisible = true
         self.displayID = displayID
-        if AppPreferences.presentationMode == .notch {
-            panel?.orderOut(nil)
-            TeleprompterComposerPresenter.shared.hide()
-            LastRegionGhostPresenter.shared.hide()
-            restoreFocus()
-            mode = .recording
-            NotchPresenter.shared.show(on: ActiveDisplayResolver.screen(for: displayID))
-            return
-        }
         let panel = panel ?? makePanel()
         PreviewWindowCaptureExclusion.shared.register(window: panel)
         TeleprompterComposerPresenter.shared.hide()
@@ -154,7 +138,6 @@ final class RecordingBarPresenter {
         // Next appearance should always start as the picker, and without
         // animating out of a mode nobody can see.
         mode = .picker
-        NotchPresenter.shared.refresh()
     }
 
     /// The user backed out of the picker: hide it and give the keyboard
@@ -179,9 +162,6 @@ final class RecordingBarPresenter {
     /// out with transparent slack for the tooltips and shadows, and anchoring
     /// to that would leave satellites floating clear of the bar.
     var barFrame: CGRect? {
-        if AppPreferences.presentationMode == .notch, isVisible {
-            return NotchPresenter.shared.contentFrame
-        }
         guard let panel, panel.isVisible, barFrameInPanel != .zero else { return nil }
         // SwiftUI reports a top-left origin; screen coordinates are bottom-up.
         return CGRect(
@@ -195,13 +175,9 @@ final class RecordingBarPresenter {
     func refreshPresentation() {
         panel?.orderOut(nil)
         guard isVisible else { return }
-        if AppPreferences.presentationMode == .notch {
-            NotchPresenter.shared.show(on: ActiveDisplayResolver.screen(for: displayID))
-        } else {
-            let panel = panel ?? makePanel()
-            position(panel, displayID: displayID)
-            panel.orderFrontRegardless()
-        }
+        let panel = panel ?? makePanel()
+        position(panel, displayID: displayID)
+        panel.orderFrontRegardless()
     }
 
     private func isPositioned(_ panel: NSPanel, onDisplayID displayID: CGDirectDisplayID?) -> Bool {
@@ -246,6 +222,7 @@ final class RecordingBarPresenter {
         )
 
         panel.backgroundColor = .clear
+        panel.identifier = NSUserInterfaceItemIdentifier("BetterShot.RecordingBar")
         panel.isOpaque = false
         // Shadows are drawn in SwiftUI, not by AppKit. The window shadow is
         // derived from the window's alpha silhouette and recomputed lazily,
