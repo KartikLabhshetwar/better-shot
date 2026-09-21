@@ -7,44 +7,32 @@ final class NotchVoiceCapture {
     static let shared = NotchVoiceCapture()
     static let gestureKey = "bs_notchHoldOption"
     static var optionGestureEnabled: Bool {
-        UserDefaults.standard.object(forKey: gestureKey) as? Bool ?? true
+        UserDefaults.standard.object(forKey: gestureKey) as? Bool ?? false
     }
     static let controlKey = "bs_notchControlCapture"
     static let actionKey = "bs_notchHoldAction"
     static var drawsOnHold: Bool { UserDefaults.standard.string(forKey: actionKey) == "draw" }
-    private(set) var drawingSession = false {
-        didSet { updateNotchPresentation(wasActive: controlGesture.armed || holdActive || oldValue) }
-    }
+    private(set) var drawingSession = false
     private var drawTask: Task<Void, Never>?
     private var drawingPointerDown = false
     private var pendingStroke: [(CGEventType, CGPoint)] = []
-    var holdIndicatorActive: Bool { controlGesture.armed || holdActive || drawingSession }
+    var holdIndicatorActive: Bool { controlOverlay != nil || gestureSession || drawingSession }
     static let holdKey = "bs_notchCaptureHoldKey"
     static var captureHoldKey: NotchCaptureHoldKey {
         NotchCaptureHoldKey(rawValue: UserDefaults.standard.string(forKey: holdKey) ?? "") ?? .control
     }
     static var optionUsedForCapture: Bool { controlEnabled && captureHoldKey == .option }
-    var controlGesture = NotchControlGesture() {
-        didSet { updateNotchPresentation(wasActive: oldValue.armed || holdActive || drawingSession) }
-    }
+    var controlGesture = NotchControlGesture()
     static var controlEnabled: Bool { UserDefaults.standard.object(forKey: controlKey) as? Bool ?? true }
     private(set) var isPreparing = false
     private var controlOverlay: RegionSelectionOverlay?
     private var swallowMouseUp = false
     private var previousControlApp: NSRunningApplication?
-    private var holdActive = false {
-        didSet { updateNotchPresentation(wasActive: controlGesture.armed || oldValue || drawingSession) }
-    }
+    private var holdActive = false
     private var gestureSession = false
     private var localMonitor: Any?
     private var globalMonitor: Any?
     private var holdTask: Task<Void, Never>?
-
-    private func updateNotchPresentation(wasActive: Bool) {
-        guard wasActive != holdIndicatorActive else { return }
-        if holdIndicatorActive { NotchPresenter.shared.show() }
-        else { NotchPresenter.shared.refresh() }
-    }
 
     func refreshGesture() {
         if let localMonitor { NSEvent.removeMonitor(localMonitor) }

@@ -160,8 +160,8 @@ saved media/text/colors by recency without duplicates. Reuse `PreviewCardView` a
 card rendering/actions; notch sizing must not change the normal overlay. Notch media cards reveal the standard actions on hover or keyboard focus, with drag recognition confined to the preview.
 `NotchQuickEditor` reuses `AnnotationCanvas`, `AnnotationRenderer`, and editable
 history sidecars. Done saves privately; it must not update an exported file.
-`NotchVoiceCapture` handles the configurable hold key through the existing `ShortcutService` event tap. Select an area is the default through `RegionSelectionOverlay` and `captureLastRegion`; unset or unknown hold actions must never start drawing. Draw on screen is opt-in: snapshot the display, open the production canvas full-screen with a red freehand tool, and route held strokes through its model. Buffer mouse events during capture preparation; finish on modifier release after the final mouse-up. Drawing alone must not request microphone access. Escape preserves the editor's discard confirmation. Keyboard chords cancel arming. Active hold feedback belongs inside the notch as compact Screenshot/Select or Screenshot/Draw status, with a short scale-and-fade transition that is disabled by Reduce Motion. The folder menu dispatches OCR/color through `CaptureOrchestrator`, with shortcut labels from `ShortcutService`.
-Option voice capture is enabled by default, observes modifier state only when enabled and when Option is not the capture hold key, and never retains plain keystrokes. Releasing Option during microphone startup must still finish the capture. Keep the annotated image and transcript in one shelf item. Microphone capture ends before on-device transcription, with temporary
+`NotchVoiceCapture` handles the configurable hold key through the existing `ShortcutService` event tap. Select an area is the default through `RegionSelectionOverlay` and `captureLastRegion`; pressing the modifier alone must not open the notch, and unset or unknown hold actions must never start drawing. Draw on screen is opt-in: snapshot the display, open the production canvas full-screen with a red freehand tool, and route held strokes through its model. Buffer mouse events during capture preparation; finish on modifier release after the final mouse-up. Drawing alone must not request microphone access. Escape preserves the editor's discard confirmation. Keyboard chords cancel arming. The folder menu dispatches OCR/color through `CaptureOrchestrator`, with shortcut labels from `ShortcutService`.
+Option voice capture is opt-in, observes modifier state only when enabled and when Option is not the capture hold key, and never retains plain keystrokes. Releasing Option during microphone startup must still finish the capture. Keep the annotated image and transcript in one shelf item. Microphone capture ends before on-device transcription, with temporary
 audio retained only for retry until completion/discard. Reuse
 `RecordingTranscriptionService.transcribeAudio` rather than adding a cloud service.
 `NotchShelfStore` keeps bounded OCR/color history only in Notch Mode, plus opt-in clipboard text and separately configurable standalone hex-color collection (on by default), and checks private pasteboard
@@ -492,7 +492,7 @@ transfer cards. Keep actions in `RecordingBarPresenter` / `PreviewOverlay`; do n
 add a second saving, copying, upload, or recording implementation. Normal mode is
 the fallback for missing or unknown `bs_presentationMode` values. Mode changes
 must preserve pending media, transfers, and active recording state. An idle notch
-has no panel: capture gestures and the shared recording bar open it, and clearing
+has no panel: completed captures and the shared recording bar open it, and clearing
 the final active item dismisses it. Render recording controls from the shared
 bar's visibility and mode, matching Normal Mode's lifecycle.
 

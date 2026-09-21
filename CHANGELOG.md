@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Scroll capture:** select a region, then scroll (manually or with auto-scroll) to stitch a full-page screenshot. Uses Vision framework for pixel-precise alignment, TIFF byte comparison for frame settlement, frozen header detection, scrollbar exclusion, and incremental stitching up to 30,000 pixels. Configurable via UserDefaults for auto-scroll speed and max height.
-- Restored hold-and-drag area screenshots as the default, with compact animated status inside the notch instead of an outline. Drawing over the screen now requires explicitly selecting Draw on screen in Settings; it never starts from the default hold gesture.
+- Restored hold-and-drag area screenshots as the default. Pressing the configured modifier alone leaves the notch hidden; drawing over the screen requires explicitly selecting Draw on screen in Settings.
 - Copied hex colors appear as persistent swatches in Notch Mode, with a separate collection setting enabled by default; ordinary text history remains opt-in.
 - OCR and Pick Color actions in the notch's folder menu show their configured shortcuts.
 
@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Simplified the notch to saved cards and filters, removing the capture toolbar and grid/viewfinder controls. Hold Control and drag an area to capture on mouse release, with compact Screenshot/Select feedback and the existing shutter sound. Early Control release or Escape cancels; standard region shortcuts keep the native macOS selector.
+- Simplified the notch to saved cards and filters, removing the capture toolbar and grid/viewfinder controls. Hold Control and drag an area to capture on mouse release; a bare modifier press does nothing. Early Control release or Escape cancels; standard region shortcuts keep the native macOS selector.
 - Notch OCR text and colors now persist across launches and can be dragged into other apps as text/hex values. Image previews retain file drag-out. New OCR/color/clipboard history is collected only in Notch Mode; switching modes stops clipboard monitoring immediately.
 
 - Reworked the notch into a black horizontal shelf inspired by the supplied reference: a 560-point panel, white selected filter pills, 160-point image/video/OCR/color cards, full-color swatches with contrast-aware hex labels, and a collapsible shared capture toolbar. All/Text/Images/Videos/Colors replace Capture/Recents. Cards keep Copy and media action menus; the library menu retains bulk Save/Dismiss. Pending and recent media are deduplicated, while hover opening/closing, inline failures, and no-toast behavior remain.
@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Bare modifier presses no longer open or expand the notch, Option voice capture is opt-in so it does not conflict with tools such as Wispr Flow, hold-gesture controls now live with keyboard shortcuts, and notch scroll indicators remain hidden.
 - The notch shelf's All filter now places the newest capture first across screenshots, recordings, text, and colors instead of always leading with text history.
 - Screenshot failures now show recovery guidance instead of disappearing silently. Window screenshots now use the native macOS window picker and capture directly through ScreenCaptureKit, avoiding command-line window stream failures. Confirm the selected window with “Share This Window”; Cancel creates no screenshot. Unsigned test builds use a separate directory so they cannot overwrite the running dev app and invalidate its capture permission.
 

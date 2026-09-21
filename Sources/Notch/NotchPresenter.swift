@@ -190,7 +190,7 @@ struct NotchContent: View {
     var body: some View {
         ViewThatFits(in: .vertical) {
             content
-            ScrollView { content }.scrollIndicators(.hidden)
+            ScrollView(.vertical, showsIndicators: false) { content }
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
@@ -336,7 +336,7 @@ struct NotchContent: View {
             && !shelfStore.entries.contains { $0.text == presenter.ocrText }
         let hasColor = (filter == .all || filter == .colors) && presenter.colorHex != nil
             && !shelfStore.entries.contains { $0.text == presenter.colorHex }
-        return ScrollView(.horizontal) {
+        return ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(alignment: .top, spacing: 12) {
                 if hasColor, let hex = presenter.colorHex {
                     NotchTextResult(title: "Color", value: hex, isColor: true) {
@@ -374,7 +374,6 @@ struct NotchContent: View {
             }
             .padding(.vertical, 2)
         }
-        .scrollIndicators(.hidden)
         .frame(height: 164)
         .id(filter)
     }
@@ -415,12 +414,12 @@ private struct NotchTextResult: View {
                     .onDrag { NSItemProvider(object: value as NSString) }
                     .help("Drag the color code into another app")
             } else {
-                ScrollView {
+                ScrollView(.vertical, showsIndicators: false) {
                     Text(value).font(.system(size: 13)).textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .onDrag { NSItemProvider(object: value as NSString) }
                         .help("Drag this text into another app")
-                }.scrollIndicators(.hidden)
+                }
             }
             if let imageURL {
                 Button("Open image", systemImage: "photo") { PreviewPanelPresenter.shared.openEditor(for: imageURL) }
@@ -470,20 +469,10 @@ private struct NotchTextResult: View {
 struct NotchCompactLeading: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var status: (title: String, symbol: String)? {
-        if NotchVoiceCapture.shared.holdIndicatorActive { return ("Screenshot", "camera.viewfinder") }
-        if let url = PreviewOverlay.shared.items.last {
-            return PreviewOverlay.isVideo(url) ? ("Recording", "video") : ("Screenshot", "photo")
-        }
-        if NotchPresenter.shared.colorHex != nil { return ("Color", "eyedropper") }
-        if NotchPresenter.shared.ocrText != nil { return ("Text", "doc.text.viewfinder") }
-        return nil
-    }
-
     var body: some View {
         Button { NotchPresenter.shared.show() } label: {
-            if let status {
-                Label(status.title, systemImage: status.symbol)
+            if NotchVoiceCapture.shared.holdIndicatorActive {
+                Label("Screenshot", systemImage: "camera.viewfinder")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 4)
@@ -497,10 +486,11 @@ struct NotchCompactLeading: View {
             }
         }
         .buttonStyle(.plain)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: status?.title)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.16),
+                   value: NotchVoiceCapture.shared.holdIndicatorActive)
         .accessibilityLabel(NotchVoiceCapture.shared.holdIndicatorActive
             ? "Screenshot selection active — open shelf"
-            : status.map { "\($0.title) ready — open shelf" } ?? "BetterShot — open shelf")
+            : "BetterShot — open shelf")
         .help("BetterShot — saved captures, text, and colors")
     }
 }
@@ -510,12 +500,8 @@ struct NotchCompactTrailing: View {
     @State private var editorIsOpen = false
 
     private var pillTitle: String? {
-        if NotchVoiceCapture.shared.holdIndicatorActive {
-            return NotchVoiceCapture.drawsOnHold ? "Draw" : "Select"
-        }
-        if !editorIsOpen && (PreviewOverlay.shared.isPresented || NotchPresenter.shared.ocrText != nil
-                            || NotchPresenter.shared.colorHex != nil) { return "Ready" }
-        return nil
+        guard NotchVoiceCapture.shared.holdIndicatorActive else { return nil }
+        return NotchVoiceCapture.drawsOnHold ? "Draw" : "Select"
     }
 
     private var status: (title: String, symbol: String) {

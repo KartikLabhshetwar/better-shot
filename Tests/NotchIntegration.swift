@@ -59,9 +59,10 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     notch.refreshMode()
     precondition(!notch.isVisible, "Notch Mode must stay hidden until capture is triggered")
     _ = NotchVoiceCapture.shared.controlGesture.update(flags: .control, modifierChanged: true)
-    precondition(notch.isVisible && notch.expanded, "A still-capture gesture must open the notch")
+    precondition(!notch.isVisible && !NotchVoiceCapture.shared.holdIndicatorActive,
+                 "Pressing the capture modifier alone must not open the notch")
     _ = NotchVoiceCapture.shared.controlGesture.update(flags: [], modifierChanged: true)
-    precondition(!notch.isVisible, "Cancelling an idle still-capture gesture must dismiss the notch")
+    precondition(!notch.isVisible, "Releasing an unused capture modifier must keep the notch hidden")
     HistoryStore.shared.referenceCapture(at: imageURL, kind: .screenshot)
     HistoryStore.shared.referenceCapture(at: movieURL, kind: .recording)
     bar.showPicker(activate: false)
@@ -105,10 +106,9 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     try await Task.sleep(for: .milliseconds(200))
     _ = NotchVoiceCapture.shared.controlGesture.update(flags: .control, modifierChanged: true)
     try await Task.sleep(for: .milliseconds(100))
-    precondition(NotchVoiceCapture.shared.holdIndicatorActive)
-    try snapshotNativeNotch(notch, to: output.appendingPathComponent("notch-armed-status.png"))
+    precondition(!notch.expanded && !NotchVoiceCapture.shared.holdIndicatorActive,
+                 "Pressing the capture modifier alone must not expand compact content")
     _ = NotchVoiceCapture.shared.controlGesture.update(flags: [], modifierChanged: true)
-    precondition(!NotchVoiceCapture.shared.holdIndicatorActive)
     notch.collapse()
     try await Task.sleep(for: .milliseconds(350))
     if let hosting = window.contentView {
@@ -450,9 +450,9 @@ func checkLocalShelfFeatures(imageURL: URL, directory: URL, output: URL) async t
         else { UserDefaults.standard.removeObject(forKey: NotchVoiceCapture.gestureKey) }
     }
     UserDefaults.standard.removeObject(forKey: NotchVoiceCapture.gestureKey)
-    precondition(NotchVoiceCapture.optionGestureEnabled, "Voice annotation must be available by default")
-    UserDefaults.standard.set(false, forKey: NotchVoiceCapture.gestureKey)
-    precondition(!NotchVoiceCapture.optionGestureEnabled, "Users must be able to disable the Option gesture")
+    precondition(!NotchVoiceCapture.optionGestureEnabled, "Option voice capture must be opt-in")
+    UserDefaults.standard.set(true, forKey: NotchVoiceCapture.gestureKey)
+    precondition(NotchVoiceCapture.optionGestureEnabled, "Users must be able to enable the Option gesture")
     let oldAction = UserDefaults.standard.object(forKey: NotchVoiceCapture.actionKey)
     defer {
         if let oldAction { UserDefaults.standard.set(oldAction, forKey: NotchVoiceCapture.actionKey) }
