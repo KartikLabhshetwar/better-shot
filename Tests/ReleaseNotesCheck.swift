@@ -2,8 +2,10 @@ import Foundation
 
 @main struct ReleaseNotesCheck {
     static func main() throws {
-        let suite = "BetterShot-release-notes-\(UUID().uuidString)"
+        // A fixed suite, cleared first: a UUID name left one plist per run behind.
+        let suite = "BetterShotTests-release-notes"
         let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
         defer { defaults.removePersistentDomain(forName: suite) }
         let source = """
         # Changelog
