@@ -6,7 +6,11 @@ import UniformTypeIdentifiers
 struct CaptureRecord: Identifiable, Codable, Equatable {
     let id: UUID
     let createdAt: Date
+    /// Where the file is stored; may carry a storage number (`Name-2.png`).
     var filename: String
+    /// The name the capture was given when it was taken. Nil for records from
+    /// builds that only stored a filename.
+    var name: String?
     var pixelWidth: Int
     var pixelHeight: Int
     var kind: CaptureKind
@@ -19,6 +23,7 @@ struct CaptureRecord: Identifiable, Codable, Equatable {
 
     init(
         filename: String,
+        name: String? = nil,
         pixelWidth: Int,
         pixelHeight: Int,
         kind: CaptureKind = .screenshot,
@@ -30,6 +35,7 @@ struct CaptureRecord: Identifiable, Codable, Equatable {
         self.id = UUID()
         self.createdAt = Date()
         self.filename = filename
+        self.name = name
         self.pixelWidth = pixelWidth
         self.pixelHeight = pixelHeight
         self.kind = kind
@@ -40,6 +46,9 @@ struct CaptureRecord: Identifiable, Codable, Equatable {
     }
 
     var isManaged: Bool { sourcePath == nil }
+
+    /// What the capture is called in the library, Copy, Save, and Share.
+    var displayName: String { name ?? filename }
 }
 
 enum CaptureKind: String, Codable {

@@ -1409,7 +1409,7 @@ private func checkPreviewOverlay(imageURL: URL) async throws {
 
     let id = UUID()
     let cancelledUpload = Task {
-        try await CloudUploader.shared.upload(itemID: id, fileURL: imageURL)
+        try await CloudUploader.shared.upload(itemID: id, fileURL: imageURL, named: "cancelled")
     }
     cancelledUpload.cancel()
     do {

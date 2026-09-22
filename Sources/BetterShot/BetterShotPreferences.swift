@@ -400,8 +400,13 @@ enum ScreenshotFileActions {
     /// Derived files (the raw source, the deck preview, edited copies) resolve
     /// to it through the capture's record; any other file keeps its own name.
     static func captureFileName(for url: URL, extension pathExtension: String) -> String {
-        let captureName = HistoryStore.shared.record(matching: url)?.filename ?? url.lastPathComponent
-        return ScreenshotFileNaming.fileName(of: URL(fileURLWithPath: captureName), extension: pathExtension)
+        ScreenshotFileNaming.fileName(of: URL(fileURLWithPath: captureName(for: url)), extension: pathExtension)
+    }
+
+    /// The capture's name without an extension.
+    static func captureName(for url: URL) -> String {
+        let fileName = HistoryStore.shared.record(matching: url)?.displayName ?? url.lastPathComponent
+        return URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent
     }
 
     static func exportFileName(for captureURL: URL) -> String {

@@ -72,7 +72,7 @@ struct MediaGalleryItem: Identifiable {
             }
             for path in paths { representedPaths[URL(fileURLWithPath: path).standardizedFileURL.path] = result.count }
             if let session { representedPaths[session.screenURL.standardizedFileURL.path] = result.count }
-            result.append(Self(id: record.id.uuidString, title: record.filename,
+            result.append(Self(id: record.id.uuidString, title: record.displayName,
                 createdAt: record.createdAt, kind: record.kind, localURL: display,
                 editorURL: record.kind == .recording
                     ? ScreenshotHistoryStore.shared.editorURL(for: display)

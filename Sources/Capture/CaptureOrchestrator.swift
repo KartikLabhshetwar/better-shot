@@ -196,24 +196,45 @@ final class CaptureOrchestrator {
         // every later Copy or Save keep this name.
         let fileName = ScreenshotFileNaming.currentFileName(extension: AppPreferences.exportFormat.fileExtension)
         let stagedURL = await Task.detached { () -> URL? in
-            guard (try? DeckStaging.prepareDirectory()) != nil,
-                  let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+            guard let folder = try? DeckStaging.makeCaptureDirectory() else { return nil }
+            guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
                   let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil),
-                  let rendered = BeautifierRenderer.render(image: cgImage, config: config) else { return nil }
-            return Self.saveImage(rendered, named: fileName, in: DeckStaging.directory.path)
+                  let rendered = BeautifierRenderer.render(image: cgImage, config: config),
+                  let staged = Self.saveImage(rendered, named: fileName, in: folder.path) else {
+                try? FileManager.default.removeItem(at: folder)
+                return nil
+            }
+            return staged
         }.value
 
         guard let stagedURL else {
             ToastWindow.shared.show(isError: true, title: "Couldn’t prepare capture",
                 message: "The original screenshot is still available in the preview.",
                 systemIcon: "exclamationmark.triangle", on: captureScreen)
-            return url
+            return Self.unstagedCapture(url, named: fileName)
         }
         do {
             try FileManager.default.moveItem(at: url, to: DeckStaging.rawURL(for: stagedURL))
             return stagedURL
         } catch {
-            try? FileManager.default.removeItem(at: stagedURL)
+            DeckStaging.discard(stagedURL)
+            return Self.unstagedCapture(url, named: fileName)
+        }
+    }
+
+    /// When staging fails the original is shown as-is; it still carries the
+    /// capture's name, in a private folder of its own.
+    private static func unstagedCapture(_ url: URL, named fileName: String) -> URL {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BetterShot-Unstaged", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let named = folder.appendingPathComponent(
+            ScreenshotFileNaming.fileName(of: URL(fileURLWithPath: fileName), extension: url.pathExtension))
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try FileManager.default.moveItem(at: url, to: named)
+            return named
+        } catch {
             return url
         }
     }

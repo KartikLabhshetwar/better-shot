@@ -25,6 +25,14 @@ enum DeckStaging {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 
+    /// A folder for one capture, so its staged file carries exactly the
+    /// capture's name even when another card in the deck has the same one.
+    nonisolated static func makeCaptureDirectory() throws -> URL {
+        let folder = directory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder
+    }
+
     static func savedURL(for url: URL) -> URL? { savedCopies[url] }
 
     /// Keep the editable source and preview inside BetterShot for Edit, Pin, Share, or drag-out.
@@ -75,6 +83,10 @@ enum DeckStaging {
         retainedCopies.removeValue(forKey: url)
         try? FileManager.default.removeItem(at: url)
         try? FileManager.default.removeItem(at: rawURL(for: url))
+        let folder = url.deletingLastPathComponent()
+        if folder.standardizedFileURL != directory.standardizedFileURL {
+            try? FileManager.default.removeItem(at: folder)
+        }
     }
 
     static func purge() {

@@ -645,6 +645,7 @@ struct AnnotationEditorWindow: View {
                 let result = try await CloudUploader.shared.upload(
                     itemID: itemID,
                     fileURL: resultURL,
+                    named: ScreenshotFileActions.captureName(for: sourceURL),
                     title: options.trimmedTitleOrNil
                 )
                 NSPasteboard.general.clearContents()

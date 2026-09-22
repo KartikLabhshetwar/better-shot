@@ -851,7 +851,50 @@ private func checkCapturesKeepTheirName(
         PreviewOverlay.shared.clearAll()
         await Task.yield()
     }
-    print("PASS captures keep the name they were given when taken, across Copy, Save, and the editor")
+
+    // A template without tokens names every capture the same. Library storage
+    // numbers the files, but the capture's name stays the name it was given.
+    AppPreferences.keepInDeckUntilSaved = false
+    UserDefaults.standard.set("static", forKey: templateKey)
+    let storedLimit = AppPreferences.historyRetentionLimit
+    defer { AppPreferences.historyRetentionLimit = storedLimit }
+    let first = try await capture(.region)
+    let second = try await capture(.region)
+    precondition(!DeckStaging.isStaged(first) && !DeckStaging.isStaged(second), "Both captures reach the library")
+    PreviewOverlay.shared.copy(second)
+    precondition(clipboardFileName() == "static.png",
+                 "Storage numbering must not rename a capture, got \(clipboardFileName() ?? "nil")")
+    // Retention frees the first capture's name. Its preview companion goes with
+    // it, or the next capture that reuses the name can never be retained.
+    AppPreferences.historyRetentionLimit = 1
+    HistoryStore.shared.trimToRetentionLimit()
+    let afterTrim = try await capture(.region)
+    precondition(!DeckStaging.isStaged(afterTrim), "A capture reusing a trimmed name must still be retained")
+    PreviewOverlay.shared.clearAll()
+    await Task.yield()
+
+    // A capture whose staging fails still carries its name.
+    UserDefaults.standard.set("unrenderable", forKey: templateKey)
+    let broken = FileManager.default.temporaryDirectory.appendingPathComponent("broken-\(UUID().uuidString).png")
+    try Data("not an image".utf8).write(to: broken)
+    await CaptureOrchestrator.shared.processCapturedImage(broken, action: .region)
+    let unstaged = CaptureOrchestrator.shared.lastCaptureURL
+    precondition(unstaged?.lastPathComponent == "unrenderable.png",
+                 "A failed staging keeps the capture's name, got \(unstaged?.lastPathComponent ?? "nil")")
+    PreviewOverlay.shared.clearAll()
+    await Task.yield()
+
+    // Share uploads the file under the capture's name, whether or not it compresses.
+    let shareDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("share-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: shareDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: shareDirectory) }
+    let preview = DeckStaging.retain(try await capture(.region))
+    let upload = await CloudUploader.prepareUpload(of: preview, named: "shared", into: shareDirectory)
+    precondition(upload.deletingPathExtension().lastPathComponent == "shared",
+                 "Share uploads under the capture's name, got \(upload.lastPathComponent)")
+    PreviewOverlay.shared.clearAll()
+    await Task.yield()
+    print("PASS captures keep the name they were given when taken, across Copy, Save, Share, retention, and the editor")
 }
 
 /// Exercises production persistence in an isolated directory; never alters the user's captures.
@@ -911,7 +954,8 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
             for action in [ShortcutService.Action.region, .timedRegion, .fullscreen, .window, .previousRegion, .regionCopy, .regionEdit] {
                 editorURL = nil
                 let staged = try await capture(action)
-                precondition(savedFiles().isEmpty, "Capture and opening the editor must never export automatically")
+                precondition(savedFiles().isEmpty,
+                             "Capture and opening the editor must never export automatically, found \(savedFiles().map(\.lastPathComponent)) after \(action)")
                 if let editorURL {
                     precondition((try? Data(contentsOf: editorURL)) == originalData, "The editor opens untouched source pixels")
                     precondition(HistoryStore.shared.annotationExportURL(for: editorURL) == nil)

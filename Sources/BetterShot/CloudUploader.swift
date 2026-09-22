@@ -37,9 +37,12 @@ final class CloudUploader {
         R2Uploader.shared.uploadProgress
     }
 
+    /// `name` is the capture's name without an extension; the uploaded file,
+    /// and so the share page's download, carries it.
     func upload(
         itemID: UUID,
         fileURL: URL,
+        named name: String,
         title: String? = nil
     ) async throws -> CloudUploadResult {
         try Task.checkCancellation()
@@ -48,17 +51,7 @@ final class CloudUploader {
         try? FileManager.default.createDirectory(at: stagingDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: stagingDir) }
 
-        let mimeType = ShareBundle.mimeType(for: fileURL)
-        let uploadFile: URL
-        if mimeType.hasPrefix("video/") {
-            uploadFile = await Self.compressedVideo(at: fileURL, into: stagingDir)
-        } else if mimeType.hasPrefix("image/") {
-            uploadFile = await Task.detached {
-                Self.compressedImage(at: fileURL, into: stagingDir)
-            }.value
-        } else {
-            uploadFile = fileURL
-        }
+        let uploadFile = await Self.prepareUpload(of: fileURL, named: name, into: stagingDir)
 
         try Task.checkCancellation()
         let pageURL = try await R2Uploader.shared.uploadShare(
@@ -81,15 +74,37 @@ final class CloudUploader {
 
     // MARK: - Local compression
 
+    /// The file to upload, named `name`: a compressed copy when that is
+    /// smaller, otherwise a clone of the original, in `directory`. The
+    /// uploaded file's name is what the share page offers for download.
+    nonisolated static func prepareUpload(of fileURL: URL, named name: String, into directory: URL) async -> URL {
+        let mimeType = ShareBundle.mimeType(for: fileURL)
+        let prepared: URL
+        if mimeType.hasPrefix("video/") {
+            prepared = await compressedVideo(at: fileURL, named: name, into: directory)
+        } else if mimeType.hasPrefix("image/") {
+            prepared = await Task.detached { compressedImage(at: fileURL, named: name, into: directory) }.value
+        } else {
+            prepared = fileURL
+        }
+        guard prepared.deletingPathExtension().lastPathComponent != name else { return prepared }
+        let renamed = directory.appendingPathComponent(name).appendingPathExtension(prepared.pathExtension)
+        do {
+            try FileManager.default.copyItem(at: prepared, to: renamed)
+            return renamed
+        } catch {
+            return prepared
+        }
+    }
+
     /// Downscales and re-encodes the render before a single byte is uploaded;
     /// the original file always wins when it is already the smaller one.
-    nonisolated private static func compressedImage(at url: URL, into directory: URL) -> URL {
+    nonisolated private static func compressedImage(at url: URL, named name: String, into directory: URL) -> URL {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
             return url
         }
 
-        let name = url.deletingPathExtension().lastPathComponent
         guard let compressed = try? ShareImageCompressor.write(
             image,
             named: name,
@@ -107,10 +122,10 @@ final class CloudUploader {
     /// actually plays. The cloud copy is always an MP4: when the re-encode
     /// fails or does not get smaller, a passthrough remux still rewraps a
     /// QuickTime master so the share page never serves a `.mov`.
-    nonisolated static func compressedVideo(at url: URL, into directory: URL) async -> URL {
+    nonisolated static func compressedVideo(at url: URL, named name: String? = nil, into directory: URL) async -> URL {
         let asset = AVURLAsset(url: url)
         let output = directory
-            .appendingPathComponent(url.deletingPathExtension().lastPathComponent)
+            .appendingPathComponent(name ?? url.deletingPathExtension().lastPathComponent)
             .appendingPathExtension("mp4")
 
         if let session = AVAssetExportSession(
