@@ -25,9 +25,12 @@ final class HistoryStore {
 
     // MARK: - Import
 
-    func importCapture(from tempURL: URL, deleteSource: Bool = true, kind: CaptureKind = .screenshot) -> CaptureRecord? {
+    /// Copies a capture into the library under `fileName`, the name the capture
+    /// was given when it was taken; defaults to the source file's own name.
+    func importCapture(from tempURL: URL, named fileName: String? = nil, deleteSource: Bool = true,
+                       kind: CaptureKind = .screenshot) -> CaptureRecord? {
         let kind = CaptureKind.resolved(for: tempURL, fallback: kind)
-        let destURL = ScreenshotFileNaming.scratchURL("Capture", extension: tempURL.pathExtension, in: storageDir)
+        let destURL = ScreenshotFileNaming.uniqueURL(for: fileName ?? tempURL.lastPathComponent, in: storageDir, separator: "-")
 
         do {
             try FileManager.default.copyItem(at: tempURL, to: destURL)

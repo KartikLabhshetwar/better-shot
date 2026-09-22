@@ -543,7 +543,7 @@ struct AnnotationEditorWindow: View {
                 )
                 // The clipboard helper keeps a private snapshot for terminals
                 // and apps that paste files, independent of future edits or Save.
-                try ScreenshotFileActions.copyPNGToClipboard(from: renderedURL)
+                try ScreenshotFileActions.copyPNGToClipboard(from: renderedURL, of: sourceURL)
                 flashCopyConfirmation()
             } catch {
                 model.errorMessage = "Failed to copy annotation: \(error.localizedDescription)"

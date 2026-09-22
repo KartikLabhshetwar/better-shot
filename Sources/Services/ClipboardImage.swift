@@ -4,8 +4,11 @@ import UniformTypeIdentifiers
 /// An image file or image data on the pasteboard, as a file the editor can open.
 enum ClipboardImage {
     /// Returns nil when the pasteboard holds no image. Throws when the image can't be written to disk.
+    /// Image data becomes a new capture named by `fileName`, which receives the
+    /// chosen extension; an image file on the pasteboard keeps its own name.
     static func fileURL(from pasteboard: NSPasteboard = .general,
-                        in directory: URL = FileManager.default.temporaryDirectory) throws -> URL? {
+                        in directory: URL = FileManager.default.temporaryDirectory,
+                        fileName: (_ pathExtension: String) -> String) throws -> URL? {
         let fileOptions: [NSPasteboard.ReadingOptionKey: Any] = [
             .urlReadingFileURLsOnly: true,
             .urlReadingContentsConformToTypes: [UTType.image.identifier]
@@ -27,7 +30,7 @@ enum ClipboardImage {
             data = png
             ext = "png"
         }
-        let url = ScreenshotFileNaming.scratchURL("Clipboard", extension: ext, in: directory)
+        let url = ScreenshotFileNaming.uniqueURL(for: fileName(ext), in: directory, separator: "-")
         try data.write(to: url, options: .atomic)
         return url
     }

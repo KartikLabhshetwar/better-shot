@@ -18,29 +18,14 @@ enum FileNamingCheck {
         checkCounter(context: context)
         checkKind(date: date)
         checkCounterSpending()
-        checkScratchNames()
+        checkUniqueURL()
 
         print("file naming: 10 groups checked")
     }
 
-    /// Working files must be recognisable so Save never ships a UUID name,
-    /// including captures stored by builds that used `bettershot_<UUID>`.
-    private static func checkScratchNames() {
+    /// Two captures can render the same name; the second must not overwrite the first.
+    private static func checkUniqueURL() {
         let directory = FileManager.default.temporaryDirectory
-        let fresh = ScreenshotFileNaming.scratchURL("Capture", extension: "png", in: directory)
-        assert(ScreenshotFileNaming.isScratch(fresh), "a generated working file is scratch: \(fresh.lastPathComponent)")
-        assert(fresh.pathExtension == "png" && fresh.deletingLastPathComponent() == directory)
-        assert(ScreenshotFileNaming.isScratch(URL(fileURLWithPath: "/x/bettershot_6F1C2B8E-3C1D-4E55-9A0B-1D2E3F4A5B6C.png")),
-               "legacy capture names are scratch")
-        assert(ScreenshotFileNaming.isScratch(URL(fileURLWithPath: "/x/BetterShot_Annotated_6F1C2B8E-3C1D-4E55-9A0B-1D2E3F4A5B6C.png")),
-               "legacy working names are scratch")
-        for suffix in ["preview.png", "raw.png", "base.png"] {
-            let companion = fresh.deletingPathExtension().appendingPathExtension(suffix)
-            assert(ScreenshotFileNaming.isScratch(companion), "\(companion.lastPathComponent) is scratch")
-        }
-        for name in ["BetterShot_2026-09-23-10-00-00.png", "vacation.png", "BetterShot-hello.png", "hello-a3f9c2.png"] {
-            assert(!ScreenshotFileNaming.isScratch(URL(fileURLWithPath: "/x/\(name)")), "\(name) is a real name")
-        }
         let taken = directory.appendingPathComponent("FileNamingCheck-\(UUID().uuidString)", isDirectory: true)
         try? FileManager.default.createDirectory(at: taken, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: taken) }
@@ -54,11 +39,13 @@ enum FileNamingCheck {
     /// not a property. Pin the contract: one call spends exactly one number,
     /// and a template without `{counter}` spends none.
     private static func checkCounterSpending() {
-        let suite = "FileNamingCheck-\(UUID().uuidString)"
+        // A fixed suite, cleared first: a UUID name left one plist per run behind.
+        let suite = "BetterShotTests-file-naming"
         guard let defaults = UserDefaults(suiteName: suite) else {
             fatalError("could not open a scratch defaults suite")
         }
-        defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
 
         assert(ScreenshotFileNaming.counter(in: defaults) == 1, "an untouched counter starts at 1")
         assert(
@@ -83,11 +70,6 @@ enum FileNamingCheck {
             context: ScreenshotFileNaming.Context(counter: ScreenshotFileNaming.counter(in: defaults))
         )
         assert(ScreenshotFileNaming.counter(in: defaults) == 3, "previewing must not spend a number")
-
-        // Clipboard copies name their file from the template without spending.
-        let peeked = ScreenshotFileNaming.peekFileName(extension: "png", in: defaults)
-        assert(peeked == "shot-003.png", "a clipboard copy renders the next number, got \(peeked)")
-        assert(ScreenshotFileNaming.counter(in: defaults) == 3, "a clipboard copy must not spend a number")
 
         defaults.set("shot-{hex:8}", forKey: ScreenshotFileNaming.templateKey)
         _ = ScreenshotFileNaming.currentFileName(extension: "png", in: defaults)

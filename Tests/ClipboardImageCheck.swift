@@ -11,7 +11,7 @@ enum ClipboardImageCheck {
         // A private pasteboard; the check must never touch the user's clipboard.
         let pasteboard = NSPasteboard(name: .init("ClipboardImageCheck-\(UUID().uuidString)"))
         defer { pasteboard.releaseGlobally() }
-        func read() -> URL? { try! ClipboardImage.fileURL(from: pasteboard, in: dir) }
+        func read() -> URL? { try! ClipboardImage.fileURL(from: pasteboard, in: dir) { "pasted.\($0)" } }
 
         let source = pngImage(width: 7, height: 5)
         let tiff = NSBitmapImageRep(data: source)!.tiffRepresentation!
@@ -26,6 +26,8 @@ enum ClipboardImageCheck {
         let fromPNG = read()
         assert(fromPNG?.pathExtension == "png", "PNG data should stay PNG, got \(String(describing: fromPNG))")
         assert(fromPNG.flatMap { try? Data(contentsOf: $0) } == source, "PNG bytes must not be re-encoded")
+        assert(fromPNG?.lastPathComponent == "pasted.png", "pasted image data takes the given name, got \(String(describing: fromPNG))")
+        assert(read()?.lastPathComponent == "pasted-1.png", "a second paste with the same name must not overwrite the first")
 
         // MARK: - TIFF-only clipboards become lossless PNG
 
@@ -78,9 +80,10 @@ enum ClipboardImageCheck {
         pasteboard.clearContents()
         pasteboard.setData(source, forType: .png)
         let unwritable = file.appendingPathComponent("inside-a-file")
-        assert((try? ClipboardImage.fileURL(from: pasteboard, in: unwritable)) == nil, "write failure must not return a URL")
+        assert((try? ClipboardImage.fileURL(from: pasteboard, in: unwritable) { "x.\($0)" }) == nil,
+               "write failure must not return a URL")
         var threw = false
-        do { _ = try ClipboardImage.fileURL(from: pasteboard, in: unwritable) } catch { threw = true }
+        do { _ = try ClipboardImage.fileURL(from: pasteboard, in: unwritable) { "x.\($0)" } } catch { threw = true }
         assert(threw, "write failure must throw")
 
         print("ClipboardImageCheck: PNG/JPEG bytes kept, TIFF to PNG, file references, fallbacks, and write failures verified")

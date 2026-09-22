@@ -266,7 +266,8 @@ enum ScreenshotExportFormat: String, CaseIterable, Identifiable {
 }
 
 enum ScreenshotFileActions {
-    static func copyImageToClipboard(from url: URL) throws {
+    /// `captureURL` names the pasted file when `url` is a rendering of it.
+    static func copyImageToClipboard(from url: URL, of captureURL: URL? = nil) throws {
         let contentType = UTType(filenameExtension: url.pathExtension)
         let dataType: NSPasteboard.PasteboardType
         if contentType?.conforms(to: .jpeg) == true {
@@ -277,25 +278,26 @@ enum ScreenshotFileActions {
             dataType = .png
         }
 
-        try copyImageToClipboard(from: url, dataType: dataType)
+        try copyImageToClipboard(from: url, of: captureURL ?? url, dataType: dataType)
     }
 
-    static func copyPNGToClipboard(from url: URL, text: String? = nil, to pasteboard: NSPasteboard = .general) throws {
-        try copyImageToClipboard(from: url, dataType: .png, text: text, pasteboard: pasteboard)
+    static func copyPNGToClipboard(from url: URL, of captureURL: URL? = nil, text: String? = nil,
+                                   to pasteboard: NSPasteboard = .general) throws {
+        try copyImageToClipboard(from: url, of: captureURL ?? url, dataType: .png, text: text, pasteboard: pasteboard)
     }
 
-    private static func copyImageToClipboard(from url: URL, dataType: NSPasteboard.PasteboardType,
+    private static func copyImageToClipboard(from url: URL, of captureURL: URL, dataType: NSPasteboard.PasteboardType,
                                               text: String? = nil, pasteboard: NSPasteboard = .general) throws {
         let imageData = try Data(contentsOf: url, options: .mappedIfSafe)
         // Keep a clipboard snapshot independent of later dismissal, edits, or Save.
-        // Paste targets show the file name, so it follows the naming template;
-        // a per-copy folder keeps two copies with the same name apart.
+        // Paste targets show the file name, so it carries the capture's name;
+        // a per-copy folder keeps two copies of one capture apart.
         let clipboardDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("BetterShot-Clipboard", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: clipboardDirectory, withIntermediateDirectories: true)
         let clipboardURL = clipboardDirectory
-            .appendingPathComponent(ScreenshotFileNaming.peekFileName(extension: url.pathExtension))
+            .appendingPathComponent(captureFileName(for: captureURL, extension: url.pathExtension))
         try imageData.write(to: clipboardURL, options: .atomic)
         pasteboard.clearContents()
 
@@ -361,7 +363,7 @@ enum ScreenshotFileActions {
                                       compressionQuality: BetterShotPreferences.compressionQuality)
             destination = existing
         } else {
-            destination = try saveToDefaultLocation(from: renderedURL)
+            destination = try saveToDefaultLocation(from: renderedURL, suggestedFileName: exportFileName(for: captureURL))
         }
         if let record { HistoryStore.shared.setBeautifiedPath(destination.path, for: record.id) }
         return destination
@@ -394,15 +396,16 @@ enum ScreenshotFileActions {
         }
     }
     
-    /// Library files already carry a template name, spent when they were
-    /// imported, and opened files keep their own. Only a private working file
-    /// (a deck card, an internal capture) takes a fresh template name here.
-    static func exportFileName(for sourceURL: URL) -> String {
-        let pathExtension = BetterShotPreferences.exportFormat.fileExtension
-        guard ScreenshotFileNaming.isScratch(sourceURL) else {
-            return ScreenshotFileNaming.fileName(of: sourceURL, extension: pathExtension)
-        }
-        return ScreenshotFileNaming.currentFileName(extension: pathExtension)
+    /// The name a capture was given when it was taken, carrying `pathExtension`.
+    /// Derived files (the raw source, the deck preview, edited copies) resolve
+    /// to it through the capture's record; any other file keeps its own name.
+    static func captureFileName(for url: URL, extension pathExtension: String) -> String {
+        let captureName = HistoryStore.shared.record(matching: url)?.filename ?? url.lastPathComponent
+        return ScreenshotFileNaming.fileName(of: URL(fileURLWithPath: captureName), extension: pathExtension)
+    }
+
+    static func exportFileName(for captureURL: URL) -> String {
+        captureFileName(for: captureURL, extension: BetterShotPreferences.exportFormat.fileExtension)
     }
     
     static var exportContentType: UTType {

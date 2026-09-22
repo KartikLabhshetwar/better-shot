@@ -31,7 +31,9 @@ enum DeckStaging {
     static func retain(_ url: URL) -> URL {
         guard isStaged(url) else { return url }
         if let retained = retainedCopies[url] { return retained }
-        guard let record = HistoryStore.shared.importCapture(from: rawURL(for: url), deleteSource: false) else { return url }
+        let stagedRaw = rawURL(for: url)
+        let name = ScreenshotFileNaming.fileName(of: url, extension: stagedRaw.pathExtension)
+        guard let record = HistoryStore.shared.importCapture(from: stagedRaw, named: name, deleteSource: false) else { return url }
         let raw = HistoryStore.shared.urlForRecord(record)
         let preview = raw.deletingPathExtension().appendingPathExtension("preview." + url.pathExtension)
         do {

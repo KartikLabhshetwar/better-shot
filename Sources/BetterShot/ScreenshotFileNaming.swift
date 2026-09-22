@@ -9,8 +9,8 @@
 //
 //  The renderer is pure. It never reads preferences and never advances the
 //  counter, so Settings can preview a template as often as it likes without
-//  taking a number out of the sequence. `AppPreferences.captureFileName` is
-//  the one path that spends one.
+//  taking a number out of the sequence. `currentFileName` is the one path that
+//  spends one, and it runs once per capture, when the capture is taken.
 //
 
 import Foundation
@@ -56,38 +56,27 @@ nonisolated enum ScreenshotFileNaming {
         max(defaults.object(forKey: counterKey) as? Int ?? 1, 1)
     }
 
-    /// Names one deliverable from the stored template.
+    /// Names one new capture or recording from the stored template.
     ///
     /// Calling this SPENDS one `{counter}` number. It is the only path that
     /// does, which is what lets Settings preview a template as often as it
-    /// likes. Call it once per file, and hold the result in a local rather
-    /// than calling it again for the same save.
+    /// likes. Call it once, when the capture is taken; Copy and Save reuse
+    /// the capture's name instead of calling it again.
     @MainActor static func currentFileName(
         extension pathExtension: String,
         kind: Kind = .screenshot,
         date: Date = Date(),
         in defaults: UserDefaults = .standard
     ) -> String {
-        let name = peekFileName(extension: pathExtension, kind: kind, date: date, in: defaults)
         let template = template(in: defaults)
-        if usesCounter(template) { defaults.set(counter(in: defaults) + 1, forKey: counterKey) }
-        return name
-    }
-
-    /// Names a file from the stored template WITHOUT spending a `{counter}`
-    /// number. Clipboard copies use it: they are not deliverables, so copying
-    /// the same capture twice must not skip numbers in the save folder.
-    static func peekFileName(
-        extension pathExtension: String,
-        kind: Kind = .screenshot,
-        date: Date = Date(),
-        in defaults: UserDefaults = .standard
-    ) -> String {
-        fileName(
-            template: template(in: defaults),
+        let counter = counter(in: defaults)
+        let name = fileName(
+            template: template,
             extension: pathExtension,
-            context: Context(date: date, kind: kind, counter: counter(in: defaults))
+            context: Context(date: date, kind: kind, counter: counter)
         )
+        if usesCounter(template) { defaults.set(counter + 1, forKey: counterKey) }
+        return name
     }
 
     // MARK: - Paths
@@ -117,7 +106,8 @@ nonisolated enum ScreenshotFileNaming {
     }
 
     /// A private working file nobody sees by name: `BetterShot-<purpose>-<UUID>.<ext>`.
-    /// Deliverables and anything a paste target shows use the template instead.
+    /// Captures are named from the template when taken; deliverables and
+    /// clipboard files carry that capture name, never a scratch name.
     static func scratchURL(
         _ purpose: String,
         extension pathExtension: String,
@@ -126,16 +116,6 @@ nonisolated enum ScreenshotFileNaming {
         directory
             .appendingPathComponent("BetterShot-\(purpose)-\(UUID().uuidString)")
             .appendingPathExtension(pathExtension.isEmpty ? "png" : pathExtension)
-    }
-
-    /// Whether BetterShot generated this name for a working file, now or in an
-    /// older build (`bettershot_<UUID>`, `BetterShot_Crop_<UUID>`). Such a name
-    /// must never become a deliverable's name. Companions such as
-    /// `<name>.preview.png` and `<name>.raw.png` count too.
-    static func isScratch(_ url: URL) -> Bool {
-        String(url.lastPathComponent.prefix { $0 != "." })
-            .range(of: #"^BetterShot[-_]([A-Za-z]+[-_])?[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12}$"#,
-                   options: [.regularExpression, .caseInsensitive]) != nil
     }
 
     // MARK: - Rendering
