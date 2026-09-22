@@ -5,6 +5,12 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Removed WebP from Settings > General > File Format. macOS can open WebP images but cannot write them, so every capture and editor Save failed while it was selected. A saved WebP choice now falls back to PNG.
+
 ## [0.5.6] - 2026-09-21
 
 ### Changed

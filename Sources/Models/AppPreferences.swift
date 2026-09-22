@@ -357,14 +357,15 @@ enum OverlayCardSize: String, CaseIterable, Identifiable {
     }
 }
 
+/// Only formats ImageIO can encode. WebP was offered once, but macOS decodes
+/// it without an encoder; a stored "webp" no longer matches and reads as PNG.
 enum ExportFormat: String, CaseIterable {
-    case png, jpeg, webp
+    case png, jpeg
 
     var utType: String {
         switch self {
         case .png: return "public.png"
         case .jpeg: return "public.jpeg"
-        case .webp: return "public.webp"
         }
     }
 
@@ -372,7 +373,6 @@ enum ExportFormat: String, CaseIterable {
         switch self {
         case .png: return "png"
         case .jpeg: return "jpg"
-        case .webp: return "webp"
         }
     }
 
