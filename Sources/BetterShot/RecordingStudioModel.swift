@@ -2674,7 +2674,8 @@ final class RecordingStudioModel {
                 let result = try await CloudUploader.shared.upload(
                     itemID: itemID,
                     fileURL: uploadURL,
-                    named: uploadURL.deletingPathExtension().lastPathComponent,
+                    named: session.map(RecordingDeliverable.name(for:))
+                        ?? uploadURL.deletingPathExtension().lastPathComponent,
                     title: options.trimmedTitleOrNil
                 )
 

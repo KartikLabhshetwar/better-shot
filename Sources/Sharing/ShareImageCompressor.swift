@@ -31,6 +31,15 @@ enum ShareImageCompressor {
         return winner
     }
 
+    /// The smaller of a compressed `candidate` and the `original`. A losing
+    /// candidate is deleted, so it cannot sit in the staging folder under the
+    /// capture's name and block the original from being staged there.
+    nonisolated static func smaller(_ candidate: URL, orOriginal original: URL) -> URL {
+        guard byteCount(candidate) >= byteCount(original) else { return candidate }
+        try? FileManager.default.removeItem(at: candidate)
+        return original
+    }
+
     /// Retina captures land four to five thousand pixels wide, which no share page ever displays.
     nonisolated static func downscaled(_ image: CGImage) -> CGImage? {
         let longEdge = max(image.width, image.height)

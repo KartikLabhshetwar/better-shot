@@ -118,6 +118,14 @@ struct RecordingSaveCheck {
         assert(VideoFileActions.lastSuggestedFileName == firstName,
                "saving again keeps the recording's name, got \(VideoFileActions.lastSuggestedFileName ?? "nil")")
         assert(ScreenshotFileNaming.counter() == 2, "one recording spends one number, counter is \(ScreenshotFileNaming.counter())")
+
+        // Share, drag-out, and the tooltip use the name without an extension;
+        // a dot inside the name is part of it, not an extension.
+        defaults.set("launch v2.1", forKey: ScreenshotFileNaming.templateKey)
+        let dotted = RecordingSession(directoryURL: root.appendingPathComponent("Dotted.bettershotrec"))
+        assert(RecordingDeliverable.name(for: dotted) == "launch v2.1",
+               "a dotted name must survive, got \(RecordingDeliverable.name(for: dotted))")
+        assert(RecordingDeliverable.fileName(for: dotted, extension: "mov") == "launch v2.1.mov")
         print("RecordingSaveCheck: flattened output, concurrent saves, failure retry, template naming, one name per recording, and source preservation verified")
     }
 }

@@ -83,9 +83,15 @@ nonisolated enum ScreenshotFileNaming {
 
     /// `fileName` in `directory`, or the first free "name 1.png", "name 2.png".
     /// Every export and library write resolves collisions through here.
-    static func uniqueURL(for fileName: String, in directory: URL, separator: String = " ") -> URL {
+    /// `isTaken` lets a caller also reserve files that travel with the name.
+    static func uniqueURL(
+        for fileName: String,
+        in directory: URL,
+        separator: String = " ",
+        isTaken: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }
+    ) -> URL {
         let originalURL = directory.appendingPathComponent(fileName)
-        guard FileManager.default.fileExists(atPath: originalURL.path) else { return originalURL }
+        guard isTaken(originalURL) else { return originalURL }
 
         let baseName = originalURL.deletingPathExtension().lastPathComponent
         let pathExtension = originalURL.pathExtension
@@ -93,7 +99,7 @@ nonisolated enum ScreenshotFileNaming {
             let candidateURL = directory
                 .appendingPathComponent("\(baseName)\(separator)\(index)")
                 .appendingPathExtension(pathExtension)
-            if !FileManager.default.fileExists(atPath: candidateURL.path) { return candidateURL }
+            if !isTaken(candidateURL) { return candidateURL }
         }
         return directory
             .appendingPathComponent("\(baseName)\(separator)\(UUID().uuidString)")

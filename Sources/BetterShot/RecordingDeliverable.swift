@@ -45,6 +45,13 @@ enum RecordingDeliverable {
         return ScreenshotFileNaming.fileName(of: URL(fileURLWithPath: name), extension: pathExtension)
     }
 
+    /// The recording's name without an extension, for Share, drag-out, and
+    /// tooltips. Only the stored name's own extension is dropped.
+    static func name(for session: RecordingSession) -> String {
+        // Any extension works here: it is appended, then dropped again.
+        URL(fileURLWithPath: fileName(for: session, extension: "mp4")).deletingPathExtension().lastPathComponent
+    }
+
     /// The session a recording media URL belongs to, if any. Bare movies
     /// opened from disk have none and are already their own deliverable.
     static func session(for mediaURL: URL) -> RecordingSession? {

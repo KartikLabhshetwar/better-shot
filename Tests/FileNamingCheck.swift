@@ -33,6 +33,13 @@ enum FileNamingCheck {
         assert(ScreenshotFileNaming.uniqueURL(for: "b.png", in: taken).lastPathComponent == "b.png")
         assert(ScreenshotFileNaming.uniqueURL(for: "a.png", in: taken).lastPathComponent == "a 1.png")
         assert(ScreenshotFileNaming.uniqueURL(for: "a.png", in: taken, separator: "-").lastPathComponent == "a-1.png")
+        // A leftover companion (`c.preview.png`) reserves its name too.
+        FileManager.default.createFile(atPath: taken.appendingPathComponent("c.preview.png").path, contents: Data())
+        let companionFree = ScreenshotFileNaming.uniqueURL(for: "c.png", in: taken, separator: "-") { url in
+            [url, url.deletingPathExtension().appendingPathExtension("preview.png")]
+                .contains { FileManager.default.fileExists(atPath: $0.path) }
+        }
+        assert(companionFree.lastPathComponent == "c-1.png", "a name whose companion exists is taken, got \(companionFree.lastPathComponent)")
     }
 
     /// `currentFileName` has a side effect, which is why it is a function and

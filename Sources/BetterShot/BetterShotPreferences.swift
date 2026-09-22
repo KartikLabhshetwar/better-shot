@@ -405,6 +405,9 @@ enum ScreenshotFileActions {
 
     /// The capture's name without an extension.
     static func captureName(for url: URL) -> String {
+        if let session = RecordingDeliverable.session(for: url) {
+            return RecordingDeliverable.name(for: session)
+        }
         let fileName = HistoryStore.shared.record(matching: url)?.displayName ?? url.lastPathComponent
         return URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent
     }

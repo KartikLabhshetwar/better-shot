@@ -27,11 +27,16 @@ final class HistoryStore {
 
     /// Copies a capture into the library under `fileName`, the name the capture
     /// was given when it was taken; defaults to the source file's own name.
+    /// `companion` maps a storage URL to a file that will be written beside it;
+    /// the chosen name leaves that path free too.
     func importCapture(from tempURL: URL, named fileName: String? = nil, deleteSource: Bool = true,
-                       kind: CaptureKind = .screenshot) -> CaptureRecord? {
+                       kind: CaptureKind = .screenshot, companion: ((URL) -> URL)? = nil) -> CaptureRecord? {
         let kind = CaptureKind.resolved(for: tempURL, fallback: kind)
         let name = fileName ?? tempURL.lastPathComponent
-        let destURL = ScreenshotFileNaming.uniqueURL(for: name, in: storageDir, separator: "-")
+        let exists = { (url: URL) in FileManager.default.fileExists(atPath: url.path) }
+        let destURL = ScreenshotFileNaming.uniqueURL(for: name, in: storageDir, separator: "-") { url in
+            exists(url) || companion.map { exists($0(url)) } == true
+        }
 
         do {
             try FileManager.default.copyItem(at: tempURL, to: destURL)
@@ -321,7 +326,9 @@ final class HistoryStore {
             try? FileManager.default.removeItem(at: urlForRecord(record))
             // The deck preview companion is library-owned too; leaving it behind
             // would block the next capture that reuses this name.
-            if let companion = record.beautifiedPath, isInLibrary(companion) {
+            if let companion = record.beautifiedPath,
+               URL(fileURLWithPath: companion).deletingLastPathComponent().standardizedFileURL
+                   == storageDir.standardizedFileURL {
                 try? FileManager.default.removeItem(atPath: companion)
             }
         }

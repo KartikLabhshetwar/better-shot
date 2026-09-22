@@ -114,8 +114,7 @@ final class CloudUploader {
             return url
         }
 
-        return ShareImageCompressor.byteCount(compressed) < ShareImageCompressor.byteCount(url)
-            ? compressed : url
+        return ShareImageCompressor.smaller(compressed, orOriginal: url)
     }
 
     /// Screen masters are enormous; a 1080p H.264 pass is what a share page
@@ -135,7 +134,7 @@ final class CloudUploader {
             session.shouldOptimizeForNetworkUse = true
             do {
                 try await session.export(to: output, as: .mp4)
-                if ShareImageCompressor.byteCount(output) < ShareImageCompressor.byteCount(url) {
+                if ShareImageCompressor.smaller(output, orOriginal: url) == output {
                     return output
                 }
             } catch {}
