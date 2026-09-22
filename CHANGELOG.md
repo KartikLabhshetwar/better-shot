@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Copied screenshots now paste as files named from the file name template instead of `BetterShot-Clipboard-<UUID>`. Copying does not advance `{counter}`.
-- Saving a card kept in the deck, or saving it from the editor, names the export from the template instead of an internal `bettershot_<UUID>` name.
+- A screenshot is named from the file name template once, when it is taken, and spends one `{counter}` number then. Copy, Save, Export, Share, and drag-out all use that name, so copied files no longer paste as `BetterShot-Clipboard-<UUID>` and deck saves no longer ship as `bettershot_<UUID>`.
+- Two captures taken in the same second no longer overwrite each other; the second gets a number.
 
 ## [0.5.6] - 2026-09-21
 
