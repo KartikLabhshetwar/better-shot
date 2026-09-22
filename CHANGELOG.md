@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A screenshot is named from the file name template once, when it is taken, and spends one `{counter}` number then. Copy, Save, Export, Share, and drag-out all use that name, so copied files no longer paste as `BetterShot-Clipboard-<UUID>` and deck saves no longer ship as `bettershot_<UUID>`.
 - Two captures taken in the same second no longer overwrite each other; the second gets a number.
+- A recording is named once, when it is recorded. Saving or exporting it again reuses that name instead of taking a new one and another `{counter}` number.
 
 ## [0.5.6] - 2026-09-21
 

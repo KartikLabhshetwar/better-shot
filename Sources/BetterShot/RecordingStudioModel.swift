@@ -2309,16 +2309,19 @@ final class RecordingStudioModel {
     }
 
     /// The package keeps its own name because that name is the project's
-    /// identity in the gallery. What leaves for the save folder is a
-    /// deliverable, so it is named from the template like everything else.
-    ///
-    /// A function rather than a property because each call spends one
-    /// `{counter}` number. Call it once per export and hold the result.
+    /// identity in the gallery. What leaves for the save folder carries the
+    /// recording's name, rendered from the template once, when it was made.
     private func makeExportFileName() -> String {
-        ScreenshotFileNaming.currentFileName(
-            extension: exportSettings.effectiveContainer.fileExtension,
-            kind: .recording
-        )
+        recordingFileName(extension: exportSettings.effectiveContainer.fileExtension)
+    }
+
+    /// A movie opened without a package has no stored name, so each export
+    /// takes a new one from the template.
+    private func recordingFileName(extension pathExtension: String) -> String {
+        guard let session else {
+            return ScreenshotFileNaming.currentFileName(extension: pathExtension, kind: .recording)
+        }
+        return RecordingDeliverable.fileName(for: session, extension: pathExtension)
     }
 
     /// Entry point for the export options popover. Assigning settings marks
@@ -2430,12 +2433,8 @@ final class RecordingStudioModel {
         return abs(drift) > 0.25 ? drift : nil
     }
 
-    /// Spends one `{counter}` number per call, like `makeExportFileName`.
     private func makeAudioExportFileName() -> String {
-        ScreenshotFileNaming.currentFileName(
-            extension: audioExportFormat.fileExtension,
-            kind: .recording
-        )
+        recordingFileName(extension: audioExportFormat.fileExtension)
     }
 
     /// Writes the edited soundtrack on its own, for cleanup in a tool that
