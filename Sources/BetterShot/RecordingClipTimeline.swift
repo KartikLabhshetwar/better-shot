@@ -397,3 +397,30 @@ nonisolated struct RecordingClipTimeline: Codable, Equatable, Sendable {
             && abs(only.speed - 1) < 0.000_001
     }
 }
+
+/// Holds a Speed slider drag until release, so the timeline is rebuilt and
+/// one undo step registered per drag instead of per tick.
+nonisolated struct RecordingClipSpeedDraft: Equatable, Sendable {
+    private(set) var clipID: UUID?
+    private(set) var speed: Double?
+    private var isEditing = false
+
+    mutating func begin() { isEditing = true }
+
+    /// Returns true when the change should apply now rather than on `end()`.
+    mutating func propose(_ speed: Double, forClipID id: UUID) -> Bool {
+        guard isEditing else { return true }
+        clipID = id
+        self.speed = speed
+        return false
+    }
+
+    /// Ends the edit, returning the held change to apply once.
+    mutating func end() -> (clipID: UUID, speed: Double)? {
+        defer { self = Self() }
+        guard let clipID, let speed else { return nil }
+        return (clipID, speed)
+    }
+
+    func speed(forClipID id: UUID) -> Double? { clipID == id ? speed : nil }
+}

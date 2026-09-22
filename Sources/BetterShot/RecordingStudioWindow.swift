@@ -3462,11 +3462,14 @@ struct StudioInspector: View {
             InspectorSlider(
                 "Speed",
                 value: Binding(
-                    get: { CGFloat(clip.speed) },
+                    get: { CGFloat(model.clipSpeedDraft.speed(forClipID: clip.id) ?? clip.speed) },
                     set: { model.setClipSpeed(Double($0), forClipID: clip.id) }
                 ),
                 range: CGFloat(RecordingClipSegment.minimumSpeed)...CGFloat(RecordingClipSegment.maximumSpeed),
-                format: .magnification(fractionDigits: 2)
+                format: .magnification(fractionDigits: 2),
+                onEditingChanged: { editing in
+                    if editing { model.beginClipSpeedEdit() } else { model.endClipSpeedEdit() }
+                }
             )
 
             if clip.speed != 1 {

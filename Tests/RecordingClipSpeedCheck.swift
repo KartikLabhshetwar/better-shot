@@ -28,6 +28,35 @@ struct RecordingClipSpeedCheck {
         let legacy = try JSONDecoder().decode(RecordingClipSegment.self,
             from: Data(#"{"sourceStart":0,"sourceEnd":10}"#.utf8))
         precondition(legacy.speed == 1 && legacy.editorDuration == 10)
-        print("RecordingClipSpeedCheck: fractional timing, split, persistence, and legacy decoding passed")
+
+        // A Speed slider drag applies once on release: one timeline rebuild
+        // and one undo step. Each drag tick is its own input event in the app,
+        // so every applied change gets its own undo group here.
+        var timeline = RecordingClipTimeline(segments: [RecordingClipSegment(sourceStart: 0, sourceEnd: 10)])
+        let clipID = timeline.segments[0].id
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        func apply(_ speed: Double) {
+            let previous = timeline
+            undo.beginUndoGrouping()
+            undo.registerUndo(withTarget: undo) { _ in timeline = previous }
+            undo.endUndoGrouping()
+            timeline = timeline.replacing(.init(id: clipID, sourceStart: 0, sourceEnd: 10, speed: speed))
+        }
+        var draft = RecordingClipSpeedDraft()
+        draft.begin()
+        for speed in [1.25, 1.5, 1.75, 2] {
+            if draft.propose(speed, forClipID: clipID) { apply(speed) }
+            precondition(draft.speed(forClipID: clipID) == speed, "The slider shows the dragged speed")
+            precondition(timeline.duration == 10, "A drag tick must not rebuild the timeline")
+        }
+        if let change = draft.end() { apply(change.speed) }
+        precondition(timeline.duration == 5 && draft.speed(forClipID: clipID) == nil)
+        undo.undo()
+        precondition(timeline.segments[0].speed == 1 && timeline.duration == 10,
+                     "One undo restores the pre-drag speed")
+        precondition(!undo.canUndo, "A drag is exactly one undo step")
+        precondition(draft.propose(3, forClipID: clipID), "Outside a drag, a change applies immediately")
+        print("RecordingClipSpeedCheck: fractional timing, split, persistence, legacy decoding, and one-step speed drags passed")
     }
 }
