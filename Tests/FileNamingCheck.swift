@@ -34,6 +34,10 @@ enum FileNamingCheck {
                "legacy capture names are scratch")
         assert(ScreenshotFileNaming.isScratch(URL(fileURLWithPath: "/x/BetterShot_Annotated_6F1C2B8E-3C1D-4E55-9A0B-1D2E3F4A5B6C.png")),
                "legacy working names are scratch")
+        for suffix in ["preview.png", "raw.png", "base.png"] {
+            let companion = fresh.deletingPathExtension().appendingPathExtension(suffix)
+            assert(ScreenshotFileNaming.isScratch(companion), "\(companion.lastPathComponent) is scratch")
+        }
         for name in ["BetterShot_2026-09-23-10-00-00.png", "vacation.png", "BetterShot-hello.png", "hello-a3f9c2.png"] {
             assert(!ScreenshotFileNaming.isScratch(URL(fileURLWithPath: "/x/\(name)")), "\(name) is a real name")
         }

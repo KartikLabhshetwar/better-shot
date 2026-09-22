@@ -130,9 +130,10 @@ nonisolated enum ScreenshotFileNaming {
 
     /// Whether BetterShot generated this name for a working file, now or in an
     /// older build (`bettershot_<UUID>`, `BetterShot_Crop_<UUID>`). Such a name
-    /// must never become a deliverable's name.
+    /// must never become a deliverable's name. Companions such as
+    /// `<name>.preview.png` and `<name>.raw.png` count too.
     static func isScratch(_ url: URL) -> Bool {
-        url.deletingPathExtension().lastPathComponent
+        String(url.lastPathComponent.prefix { $0 != "." })
             .range(of: #"^BetterShot[-_]([A-Za-z]+[-_])?[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12}$"#,
                    options: [.regularExpression, .caseInsensitive]) != nil
     }
