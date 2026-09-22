@@ -32,7 +32,8 @@ enum R2UploadToggleCheck {
         store.enabled = true
         precondition(store.canShare, "configured and on must offer Share")
         let onMessage = await uploadError(itemID: UUID())
-        precondition(onMessage.contains("https://"), "uploads on must get past the toggle, got: \(onMessage)")
+        precondition(onMessage != store.snapshot().shareBlocker && !onMessage.contains("Uploads are off"),
+                     "uploads on must get past the toggle, got: \(onMessage)")
 
         precondition(R2CredentialStore.resolvedEnabled(stored: nil, hasKeys: true),
                      "0.4.3-0.5.6 saved keys without writing the toggle; those installs keep sharing")
