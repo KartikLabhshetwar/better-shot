@@ -92,6 +92,6 @@ struct NotchMediaCard: View {
     var body: some View {
         PreviewCardView(overlay: overlay, url: url, usesNotchActions: true,
                         notchCardSize: CGSize(width: 184, height: 160))
-            .help("Open \(url.lastPathComponent). Hover for actions, or drag the preview into another app.")
+            .help("Open \(ScreenshotFileActions.captureFileName(for: url, extension: url.pathExtension)). Hover for actions, or drag the preview into another app.")
     }
 }

@@ -833,6 +833,9 @@ private func checkCapturesKeepTheirName(
         }
         UserDefaults.standard.set("later-{kind}", forKey: templateKey)
 
+        // Drag-out and the notch tooltip name the card, which may be a `.preview` companion.
+        precondition(ScreenshotFileActions.captureFileName(for: copied, extension: copied.pathExtension) == name(0),
+                     "A card resolves to its capture's name (keep: \(keep)), got \(copied.lastPathComponent)")
         PreviewOverlay.shared.copy(copied)
         precondition(clipboardFileName() == name(0),
                      "Copy pastes the capture's own name (keep: \(keep)), got \(clipboardFileName() ?? "nil")")

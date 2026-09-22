@@ -574,7 +574,8 @@ struct PreviewCardView: View {
                         .onDrag {
                             let retainedURL = DeckStaging.retain(url)
                             if !DeckStaging.isStaged(retainedURL), let provider = NSItemProvider(contentsOf: retainedURL) {
-                                provider.suggestedName = url.lastPathComponent
+                                provider.suggestedName = ScreenshotFileActions.captureFileName(
+                                    for: url, extension: retainedURL.pathExtension)
                                 return provider
                             }
                             return NSItemProvider(object: image)
