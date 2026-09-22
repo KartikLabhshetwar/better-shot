@@ -819,10 +819,7 @@ extension AnnotationEditorModel {
     private func stableImageSnapshotURL(for url: URL) -> URL? {
         if ownedImageURLs.contains(url) { return url }
 
-        let fileExtension = url.pathExtension.isEmpty ? "png" : url.pathExtension
-        let destinationURL = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("BetterShot_ImageSnapshot_\(UUID().uuidString)")
-            .appendingPathExtension(fileExtension)
+        let destinationURL = ScreenshotFileNaming.scratchURL("ImageSnapshot", extension: url.pathExtension)
 
         do {
             try FileManager.default.copyItem(at: url, to: destinationURL)

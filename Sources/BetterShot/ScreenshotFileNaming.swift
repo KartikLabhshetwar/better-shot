@@ -68,15 +68,73 @@ nonisolated enum ScreenshotFileNaming {
         date: Date = Date(),
         in defaults: UserDefaults = .standard
     ) -> String {
+        let name = peekFileName(extension: pathExtension, kind: kind, date: date, in: defaults)
         let template = template(in: defaults)
-        let counter = counter(in: defaults)
-        let name = fileName(
-            template: template,
-            extension: pathExtension,
-            context: Context(date: date, kind: kind, counter: counter)
-        )
-        if usesCounter(template) { defaults.set(counter + 1, forKey: counterKey) }
+        if usesCounter(template) { defaults.set(counter(in: defaults) + 1, forKey: counterKey) }
         return name
+    }
+
+    /// Names a file from the stored template WITHOUT spending a `{counter}`
+    /// number. Clipboard copies use it: they are not deliverables, so copying
+    /// the same capture twice must not skip numbers in the save folder.
+    static func peekFileName(
+        extension pathExtension: String,
+        kind: Kind = .screenshot,
+        date: Date = Date(),
+        in defaults: UserDefaults = .standard
+    ) -> String {
+        fileName(
+            template: template(in: defaults),
+            extension: pathExtension,
+            context: Context(date: date, kind: kind, counter: counter(in: defaults))
+        )
+    }
+
+    // MARK: - Paths
+
+    /// `fileName` in `directory`, or the first free "name 1.png", "name 2.png".
+    /// Every export and library write resolves collisions through here.
+    static func uniqueURL(for fileName: String, in directory: URL, separator: String = " ") -> URL {
+        let originalURL = directory.appendingPathComponent(fileName)
+        guard FileManager.default.fileExists(atPath: originalURL.path) else { return originalURL }
+
+        let baseName = originalURL.deletingPathExtension().lastPathComponent
+        let pathExtension = originalURL.pathExtension
+        for index in 1...10_000 {
+            let candidateURL = directory
+                .appendingPathComponent("\(baseName)\(separator)\(index)")
+                .appendingPathExtension(pathExtension)
+            if !FileManager.default.fileExists(atPath: candidateURL.path) { return candidateURL }
+        }
+        return directory
+            .appendingPathComponent("\(baseName)\(separator)\(UUID().uuidString)")
+            .appendingPathExtension(pathExtension)
+    }
+
+    /// `sourceURL`'s file name carrying `pathExtension` instead of its own.
+    static func fileName(of sourceURL: URL, extension pathExtension: String) -> String {
+        sourceURL.deletingPathExtension().appendingPathExtension(pathExtension).lastPathComponent
+    }
+
+    /// A private working file nobody sees by name: `BetterShot-<purpose>-<UUID>.<ext>`.
+    /// Deliverables and anything a paste target shows use the template instead.
+    static func scratchURL(
+        _ purpose: String,
+        extension pathExtension: String,
+        in directory: URL = FileManager.default.temporaryDirectory
+    ) -> URL {
+        directory
+            .appendingPathComponent("BetterShot-\(purpose)-\(UUID().uuidString)")
+            .appendingPathExtension(pathExtension.isEmpty ? "png" : pathExtension)
+    }
+
+    /// Whether BetterShot generated this name for a working file, now or in an
+    /// older build (`bettershot_<UUID>`, `BetterShot_Crop_<UUID>`). Such a name
+    /// must never become a deliverable's name.
+    static func isScratch(_ url: URL) -> Bool {
+        url.deletingPathExtension().lastPathComponent
+            .range(of: #"^BetterShot[-_]([A-Za-z]+[-_])?[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12}$"#,
+                   options: [.regularExpression, .caseInsensitive]) != nil
     }
 
     // MARK: - Rendering

@@ -27,9 +27,7 @@ enum ClipboardImage {
             data = png
             ext = "png"
         }
-        let url = directory
-            .appendingPathComponent("BetterShot-Clipboard-\(UUID().uuidString)")
-            .appendingPathExtension(ext)
+        let url = ScreenshotFileNaming.scratchURL("Clipboard", extension: ext, in: directory)
         try data.write(to: url, options: .atomic)
         return url
     }

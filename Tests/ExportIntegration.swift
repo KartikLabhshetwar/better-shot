@@ -863,9 +863,11 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
                     precondition(!DeckStaging.isStaged(clipboardURL)
                         && (try? Data(contentsOf: clipboardURL)) == previewData,
                         "Clipboard file pastes must survive dismissing the card")
+                    // Removing a card discards its staged file after the view update.
+                    await Task.yield()
                     precondition(FileManager.default.fileExists(atPath: staged.path) != keep,
                                  "Normal captures stay available for Restore Last Capture; staged cards are discarded")
-                    try FileManager.default.removeItem(at: clipboardURL)
+                    try FileManager.default.removeItem(at: clipboardURL.deletingLastPathComponent())
                 }
                 PreviewOverlay.shared.clearAll()
                 precondition(savedFiles().isEmpty, "Deck Copy is clipboard-only")
@@ -895,7 +897,14 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
                                   destinationURL: rendered, contentType: .png)
     let editedData = try Data(contentsOf: rendered)
     precondition(editedData != savedData, "The editor fixture must actually change the image")
+    let storedTemplate = UserDefaults.standard.string(forKey: ScreenshotFileNaming.templateKey)
+    UserDefaults.standard.set("copied-{kind}", forKey: ScreenshotFileNaming.templateKey)
     try ScreenshotFileActions.copyPNGToClipboard(from: rendered)
+    UserDefaults.standard.set(storedTemplate, forKey: ScreenshotFileNaming.templateKey)
+    let copiedFile = NSPasteboard.general.pasteboardItems?.first?.string(forType: .fileURL).flatMap(URL.init(string:))
+    precondition(copiedFile?.lastPathComponent == "copied-Screenshot.png"
+                 && copiedFile.map { FileManager.default.fileExists(atPath: $0.path) } == true,
+                 "Clipboard files follow the naming template, got \(copiedFile?.lastPathComponent ?? "nil")")
     precondition(savedFiles().count == 1 && (try? Data(contentsOf: saved)) == savedData,
                  "Editor Copy must not create or update an export")
     let savedAgain = try ScreenshotFileActions.saveCapture(from: rendered, for: raw)
@@ -904,8 +913,13 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
     precondition((try? Data(contentsOf: raw)) == originalData, "Saving preserves the editable source")
 
     let toSave = try await capture()
+    precondition(DeckStaging.isStaged(toSave), "The deck Save fixture must start from a staged card")
+    UserDefaults.standard.set("deck-{kind}", forKey: ScreenshotFileNaming.templateKey)
     PreviewOverlay.shared.save(toSave)
+    UserDefaults.standard.set(storedTemplate, forKey: ScreenshotFileNaming.templateKey)
     precondition(savedFiles().count == 2 && !PreviewOverlay.shared.items.contains(toSave))
+    precondition(savedFiles().contains { $0.lastPathComponent.hasPrefix("deck-Screenshot") },
+                 "Saving a deck card names the export from the template, got \(savedFiles().map(\.lastPathComponent))")
     _ = try await capture(.regionSave)
     precondition(savedFiles().count == 3, "Capture-and-save remains an explicit Save action")
     let retry = try await capture()

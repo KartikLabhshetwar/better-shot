@@ -218,7 +218,7 @@ final class CaptureOrchestrator {
     nonisolated static func saveImage(_ cgImage: CGImage, in dir: String) -> URL? {
         let format = AppPreferences.exportFormat
         let directory = URL(fileURLWithPath: dir, isDirectory: true)
-        let url = directory.appendingPathComponent("bettershot_\(UUID().uuidString).\(format.fileExtension)")
+        let url = ScreenshotFileNaming.scratchURL("Capture", extension: format.fileExtension, in: directory)
         let stagingURL = directory.appendingPathComponent(".\(url.lastPathComponent)")
         defer { try? FileManager.default.removeItem(at: stagingURL) }
 

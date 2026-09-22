@@ -5,6 +5,13 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Copied screenshots now paste as files named from the file name template instead of `BetterShot-Clipboard-<UUID>`. Copying does not advance `{counter}`.
+- Saving a card kept in the deck, or saving it from the editor, names the export from the template instead of an internal `bettershot_<UUID>` name.
+
 ## [0.5.6] - 2026-09-21
 
 ### Changed

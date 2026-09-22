@@ -90,8 +90,7 @@ enum AnnotationImageTransform: CaseIterable {
         context.scaleBy(x: 1, y: -1)
         context.draw(image, in: CGRect(origin: .zero, size: sourceSize))
         guard let transformed = context.makeImage() else { return nil }
-        let destinationURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("BetterShot_Transform_\(UUID().uuidString).png")
+        let destinationURL = ScreenshotFileNaming.scratchURL("Transform", extension: "png")
         guard let destination = CGImageDestinationCreateWithURL(destinationURL as CFURL,
             UTType.png.identifier as CFString, 1, nil) else { return nil }
         CGImageDestinationAddImage(destination, transformed, nil)

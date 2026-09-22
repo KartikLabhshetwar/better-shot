@@ -123,7 +123,8 @@ Automatic screenshot saving is **off by default**. Enable it under
 **Settings > General > Saving** to save normal captures while keeping the preview
 or editor available. Explicit Capture & Copy, Edit, and Pin shortcuts bypass it.
 The same settings section lets you customize file names with templates such as
-`standup-{date}-{counter:3}`.
+`standup-{date}-{counter:3}`. The template names saved files and the file that
+Copy puts on the clipboard. Copying does not advance `{counter}`.
 
 ### Permissions
 

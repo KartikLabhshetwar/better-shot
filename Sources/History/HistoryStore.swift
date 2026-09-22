@@ -27,9 +27,7 @@ final class HistoryStore {
 
     func importCapture(from tempURL: URL, deleteSource: Bool = true, kind: CaptureKind = .screenshot) -> CaptureRecord? {
         let kind = CaptureKind.resolved(for: tempURL, fallback: kind)
-        let ext = tempURL.pathExtension.isEmpty ? "png" : tempURL.pathExtension
-        let filename = "bettershot_\(UUID().uuidString).\(ext)"
-        let destURL = storageDir.appendingPathComponent(filename)
+        let destURL = ScreenshotFileNaming.scratchURL("Capture", extension: tempURL.pathExtension, in: storageDir)
 
         do {
             try FileManager.default.copyItem(at: tempURL, to: destURL)
@@ -40,7 +38,7 @@ final class HistoryStore {
 
         let size = Self.pixelSize(of: destURL, kind: kind)
         let record = CaptureRecord(
-            filename: filename,
+            filename: destURL.lastPathComponent,
             pixelWidth: size.width,
             pixelHeight: size.height,
             kind: kind

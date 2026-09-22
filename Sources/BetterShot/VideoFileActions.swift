@@ -98,15 +98,8 @@ enum VideoFileActions {
 
     @discardableResult
     static func saveToDefaultLocation(from url: URL, suggestedFileName: String? = nil) async throws -> URL {
-        let destinationDirectory = BetterShotPreferences.exportDirectory
-        try FileManager.default.createDirectory(
-            at: destinationDirectory,
-            withIntermediateDirectories: true
-        )
-
-        let destinationURL = uniqueDestinationURL(
-            for: suggestedFileName ?? exportFileName(for: url),
-            in: destinationDirectory
+        let destinationURL = try ScreenshotFileActions.exportDestination(
+            named: suggestedFileName ?? exportFileName(for: url)
         )
         try await save(from: url, to: destinationURL)
         return destinationURL
@@ -146,36 +139,7 @@ enum VideoFileActions {
         for sourceURL: URL,
         container: VideoExportContainer = .default
     ) -> String {
-        sourceURL
-            .deletingPathExtension()
-            .appendingPathExtension(container.fileExtension)
-            .lastPathComponent
-    }
-
-    static func uniqueDestinationURL(for fileName: String, in directory: URL) -> URL {
-        let originalURL = directory.appendingPathComponent(fileName)
-
-        guard FileManager.default.fileExists(atPath: originalURL.path) else {
-            return originalURL
-        }
-
-        let baseName = originalURL.deletingPathExtension().lastPathComponent
-        let pathExtension = originalURL.pathExtension
-
-        for index in 1...10_000 {
-            let numberedName = "\(baseName) \(index)"
-            let candidateURL = directory
-                .appendingPathComponent(numberedName)
-                .appendingPathExtension(pathExtension)
-
-            if !FileManager.default.fileExists(atPath: candidateURL.path) {
-                return candidateURL
-            }
-        }
-
-        return directory
-            .appendingPathComponent("\(baseName) \(UUID().uuidString)")
-            .appendingPathExtension(pathExtension)
+        ScreenshotFileNaming.fileName(of: sourceURL, extension: container.fileExtension)
     }
 }
 

@@ -603,25 +603,7 @@ final class ScreenshotHistoryStore {
             extension: pathExtension,
             kind: isVideo ? .recording : .screenshot
         )
-        let initialURL = Self.historyDirectory.appendingPathComponent(fileName)
-
-        guard FileManager.default.fileExists(atPath: initialURL.path) else {
-            return initialURL
-        }
-
-        let baseName = initialURL.deletingPathExtension().lastPathComponent
-        for index in 1...10_000 {
-            let candidateURL = Self.historyDirectory
-                .appendingPathComponent("\(baseName)-\(index)")
-                .appendingPathExtension(pathExtension)
-            if !FileManager.default.fileExists(atPath: candidateURL.path) {
-                return candidateURL
-            }
-        }
-
-        return Self.historyDirectory
-            .appendingPathComponent("BetterShot_\(UUID().uuidString)")
-            .appendingPathExtension(pathExtension)
+        return ScreenshotFileNaming.uniqueURL(for: fileName, in: Self.historyDirectory, separator: "-")
     }
 
     private func videoMetadata(at url: URL) async -> (width: Int, height: Int, duration: Double?) {

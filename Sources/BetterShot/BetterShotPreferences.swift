@@ -288,9 +288,14 @@ enum ScreenshotFileActions {
                                               text: String? = nil, pasteboard: NSPasteboard = .general) throws {
         let imageData = try Data(contentsOf: url, options: .mappedIfSafe)
         // Keep a clipboard snapshot independent of later dismissal, edits, or Save.
-        let clipboardURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("BetterShot-Clipboard-\(UUID().uuidString)")
-            .appendingPathExtension(url.pathExtension)
+        // Paste targets show the file name, so it follows the naming template;
+        // a per-copy folder keeps two copies with the same name apart.
+        let clipboardDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BetterShot-Clipboard", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: clipboardDirectory, withIntermediateDirectories: true)
+        let clipboardURL = clipboardDirectory
+            .appendingPathComponent(ScreenshotFileNaming.peekFileName(extension: url.pathExtension))
         try imageData.write(to: clipboardURL, options: .atomic)
         pasteboard.clearContents()
 
@@ -320,19 +325,18 @@ enum ScreenshotFileActions {
     }
     
     @discardableResult
-    static func saveToDefaultLocation(from url: URL) throws -> URL {
-        let destinationDirectory = BetterShotPreferences.exportDirectory
-        try FileManager.default.createDirectory(
-            at: destinationDirectory,
-            withIntermediateDirectories: true
-        )
-        
-        let destinationURL = uniqueDestinationURL(
-            for: exportFileName(for: url),
-            in: destinationDirectory
-        )
+    static func saveToDefaultLocation(from url: URL, suggestedFileName: String? = nil) throws -> URL {
+        let destinationURL = try exportDestination(named: suggestedFileName ?? exportFileName(for: url))
         try save(from: url, to: destinationURL)
         return destinationURL
+    }
+
+    /// A free path for `fileName` in the save folder, creating the folder if
+    /// needed. Image and video saves both resolve their destination here.
+    static func exportDestination(named fileName: String) throws -> URL {
+        let directory = BetterShotPreferences.exportDirectory
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return ScreenshotFileNaming.uniqueURL(for: fileName, in: directory)
     }
     
     static func save(from sourceURL: URL, to destinationURL: URL) throws {
@@ -390,11 +394,15 @@ enum ScreenshotFileActions {
         }
     }
     
+    /// Library files already carry a template name, spent when they were
+    /// imported, and opened files keep their own. Only a private working file
+    /// (a deck card, an internal capture) takes a fresh template name here.
     static func exportFileName(for sourceURL: URL) -> String {
-        return sourceURL
-            .deletingPathExtension()
-            .appendingPathExtension(BetterShotPreferences.exportFormat.fileExtension)
-            .lastPathComponent
+        let pathExtension = BetterShotPreferences.exportFormat.fileExtension
+        guard ScreenshotFileNaming.isScratch(sourceURL) else {
+            return ScreenshotFileNaming.fileName(of: sourceURL, extension: pathExtension)
+        }
+        return ScreenshotFileNaming.currentFileName(extension: pathExtension)
     }
     
     static var exportContentType: UTType {
@@ -454,31 +462,5 @@ enum ScreenshotFileActions {
         if type.conforms(to: .jpeg) { return .jpeg }
         if type.conforms(to: .heic) { return .heic }
         return type
-    }
-    
-    private static func uniqueDestinationURL(for fileName: String, in directory: URL) -> URL {
-        let originalURL = directory.appendingPathComponent(fileName)
-        
-        guard FileManager.default.fileExists(atPath: originalURL.path) else {
-            return originalURL
-        }
-        
-        let baseName = originalURL.deletingPathExtension().lastPathComponent
-        let pathExtension = originalURL.pathExtension
-        
-        for index in 1...10_000 {
-            let numberedName = "\(baseName) \(index)"
-            let candidateURL = directory
-                .appendingPathComponent(numberedName)
-                .appendingPathExtension(pathExtension)
-            
-            if !FileManager.default.fileExists(atPath: candidateURL.path) {
-                return candidateURL
-            }
-        }
-        
-        return directory
-            .appendingPathComponent("\(baseName) \(UUID().uuidString)")
-            .appendingPathExtension(pathExtension)
     }
 }
