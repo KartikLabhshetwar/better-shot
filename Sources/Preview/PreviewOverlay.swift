@@ -254,7 +254,7 @@ final class PreviewOverlay {
         if !items.contains(url) { show(url: url, automaticallyDismiss: false) }
         cancelScheduledDismiss(for: url)
         toastURL = url
-        guard CloudUploader.shared.isConfigured else {
+        guard CloudUploader.shared.canShare else {
             shareStatuses[url] = R2CredentialStore.shared.isConfigured
                 ? .failed(headline: "Uploads are off",
                     message: "Turn on Upload when I share in Settings \u{2192} Sharing, then try again.", canRetry: true)
@@ -550,7 +550,7 @@ struct PreviewCardView: View {
                     onCancel: { overlay.cancelShare(for: url) },
                     onRetry: { overlay.share(url) },
                     onDismiss: { overlay.dismissShareStatus(for: url) }, compactSize: cardSize,
-                    onSettings: CloudUploader.shared.isConfigured ? nil : {
+                    onSettings: CloudUploader.shared.canShare ? nil : {
                         SettingsWindowController.shared.open(section: .sharing)
                     })
             } else if let image = thumbnail {

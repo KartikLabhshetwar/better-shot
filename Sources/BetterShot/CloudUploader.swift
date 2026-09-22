@@ -27,7 +27,7 @@ final class CloudUploader {
 
     private init() {}
 
-    var isConfigured: Bool {
+    var canShare: Bool {
         R2CredentialStore.shared.canShare
     }
 
