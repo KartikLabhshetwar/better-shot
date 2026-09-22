@@ -28,7 +28,7 @@ final class CloudUploader {
     private init() {}
 
     var isConfigured: Bool {
-        R2CredentialStore.shared.isConfigured
+        R2CredentialStore.shared.canShare
     }
 
     /// Progress keyed by item ID; only the network leg reports, the local

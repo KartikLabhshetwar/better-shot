@@ -130,8 +130,8 @@ final class R2Uploader {
 
     func uploadShare(itemID: UUID, fileURL: URL, title: String?) async throws -> URL {
         let credentials = R2CredentialStore.shared.snapshot()
-        guard credentials.isConfigured else {
-            throw R2UploadError(message: "R2 sharing is not configured. Add your credentials in Settings > Sharing.")
+        if let blocker = credentials.shareBlocker {
+            throw R2UploadError(message: blocker)
         }
 
         uploadingItems.insert(itemID)

@@ -153,6 +153,7 @@ account and R2 storage that you manage.
 2. In **Settings > Sharing**, enter your Account ID, Access Key ID, Secret Access
    Key, Bucket, and HTTPS Public Bucket URL.
 3. Click **Test Connection**. A successful test enables **Upload when I share**.
+   While it is off, Share uploads nothing.
 4. Choose **Share** from a capture or editor to upload and copy its link.
 
 Credentials are stored in your Mac's login Keychain. Shared media is served from

@@ -14,6 +14,12 @@ struct R2Credentials: Sendable {
     var isConfigured: Bool {
         !accountID.isEmpty && !bucket.isEmpty && !publicBaseURL.isEmpty && !accessKeyID.isEmpty && !secretAccessKey.isEmpty
     }
+
+    /// Why Share must not upload; nil when it may. "Upload when I share" is the consent to publish.
+    var shareBlocker: String? {
+        if !isConfigured { return "R2 sharing is not configured. Add your credentials in Settings > Sharing." }
+        return enabled ? nil : "Uploads are off. Turn on Upload when I share in Settings > Sharing."
+    }
 }
 
 /// Keychain-backed R2 config: secrets go to the Keychain, non-secret settings to UserDefaults.
@@ -116,6 +122,13 @@ final class R2CredentialStore {
         !_accountID.isEmpty && !_bucket.isEmpty && !_publicBaseURL.isEmpty && !_accessKeyID.isEmpty && !_secretAccessKey.isEmpty
     }
 
+    var canShare: Bool { snapshot().shareBlocker == nil }
+
+    /// 0.4.3 to 0.5.6 saved keys without writing the toggle and uploaded anyway; a missing value keeps those installs sharing.
+    nonisolated static func resolvedEnabled(stored: Bool?, hasKeys: Bool) -> Bool {
+        stored ?? hasKeys
+    }
+
     func snapshot() -> R2Credentials {
         R2Credentials(
             accountID: _accountID,
@@ -133,13 +146,13 @@ final class R2CredentialStore {
         _bucket = defaults.string(forKey: Keys.bucket) ?? ""
         _publicBaseURL = defaults.string(forKey: Keys.publicBaseURL) ?? ""
         _useDirectLinks = defaults.bool(forKey: Keys.useDirectLinks)
-        _enabled = defaults.bool(forKey: Keys.enabled)
 
         let accessKey = Self.getKeychainItem(key: Keys.accessKeyID)
         let secret = Self.getKeychainItem(key: Keys.secretAccessKey)
         _accessKeyID = accessKey.value ?? ""
         _secretAccessKey = secret.value ?? ""
         keychainAccess = Self.access(of: [accessKey.status, secret.status])
+        _enabled = Self.resolvedEnabled(stored: defaults.object(forKey: Keys.enabled) as? Bool, hasKeys: isConfigured)
     }
 
     /// Wipes the stored keys so the next save writes a fresh item owned by this build, which is the only way past an access list a re-signed app no longer matches.

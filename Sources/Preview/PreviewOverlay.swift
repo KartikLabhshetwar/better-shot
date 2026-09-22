@@ -255,8 +255,11 @@ final class PreviewOverlay {
         cancelScheduledDismiss(for: url)
         toastURL = url
         guard CloudUploader.shared.isConfigured else {
-            shareStatuses[url] = .failed(headline: "Set up cloud sharing",
-                message: "Add your cloud account in Settings \u{2192} Sharing, then try again.", canRetry: true)
+            shareStatuses[url] = R2CredentialStore.shared.isConfigured
+                ? .failed(headline: "Uploads are off",
+                    message: "Turn on Upload when I share in Settings \u{2192} Sharing, then try again.", canRetry: true)
+                : .failed(headline: "Set up cloud sharing",
+                    message: "Add your cloud account in Settings \u{2192} Sharing, then try again.", canRetry: true)
             return
         }
         let savedURL = DeckStaging.retain(url)
