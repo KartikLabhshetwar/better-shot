@@ -866,6 +866,7 @@ private func checkGeneralEditorDefaults(movieURL: URL) async throws {
 /// Static layout checks need no camera/microphone access or encoded video fixture.
 @MainActor
 func checkCaptureControlsUI() throws {
+    try checkScrollCaptureStitching()
     let sources = RecordingSourceCatalog.shared
     precondition(!sources.containsSelection(.fullscreen, displayID: nil, windowID: nil))
     precondition(!sources.containsSelection(.window, displayID: nil, windowID: nil),
@@ -875,6 +876,23 @@ func checkCaptureControlsUI() throws {
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
+        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_CAPTURE_UI"] == "1" {
+            try snapshot(MenuBarContentView(dismissPopover: {}), scheme: scheme, width: 296,
+                         to: output.appendingPathComponent("capture-menu-\(name).png"), height: 540)
+            let startingModel = ScrollCaptureSessionModel()
+            try snapshot(ScrollCaptureSessionView(model: startingModel,
+                toggleAutoScroll: {}, stop: {}, cancel: {}), scheme: scheme, width: 280,
+                to: output.appendingPathComponent("scroll-session-starting-\(name).png"), height: 142)
+
+            let activeModel = ScrollCaptureSessionModel()
+            activeModel.isStarting = false
+            activeModel.isAutoScrolling = true
+            activeModel.stripCount = 4
+            activeModel.pixelHeight = 2_160
+            try snapshot(ScrollCaptureSessionView(model: activeModel,
+                toggleAutoScroll: {}, stop: {}, cancel: {}), scheme: scheme, width: 280,
+                to: output.appendingPathComponent("scroll-session-active-\(name).png"), height: 142)
+        }
         try snapshot(RecordingSessionControls().studioGlass(cornerRadius: BarMetrics.cornerRadius, opacity: 0.78),
                      scheme: scheme, width: 360,
                      to: output.appendingPathComponent("recording-\(name).png"), height: 64)
@@ -885,7 +903,51 @@ func checkCaptureControlsUI() throws {
             .background(EditorChrome.workspace), scheme: scheme, width: 760,
                      to: output.appendingPathComponent("capture-\(name).png"), height: 100)
     }
-    print("PASS missing recording source rejection and capture/setup/transport light and dark layouts")
+    print("PASS scrolling capture menu entry, missing recording source rejection, and capture/setup/transport light and dark layouts")
+}
+
+/// Exercises the production strip merger with synthetic frames, without live screen capture.
+@MainActor
+private func checkScrollCaptureStitching() throws {
+    func solidFrame(width: Int, height: Int, color: CGColor) -> CGImage {
+        let context = CGContext(data: nil, width: width, height: height,
+            bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.setFillColor(color)
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        return context.makeImage()!
+    }
+
+    let existing = solidFrame(width: 12, height: 6, color: CGColor(red: 1, green: 0, blue: 0, alpha: 1))
+    let current = solidFrame(width: 12, height: 8, color: CGColor(red: 0, green: 0, blue: 1, alpha: 1))
+    guard let merged = ScrollCaptureController.mergedImage(
+        existing: existing, currentFrame: current, offsetPx: 3
+    ) else { preconditionFailure("Valid scroll strips should merge") }
+    precondition(merged.width == 12 && merged.height == 9,
+                 "Each scroll strip should add only the newly exposed three rows")
+
+    func pixelCounts(_ image: CGImage) -> (red: Int, blue: Int) {
+        let bitmap = NSBitmapImageRep(cgImage: image)
+        var redPixels = 0
+        var bluePixels = 0
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
+                if color.redComponent > 0.8 && color.blueComponent < 0.2 { redPixels += 1 }
+                if color.blueComponent > 0.8 && color.redComponent < 0.2 { bluePixels += 1 }
+            }
+        }
+        return (redPixels, bluePixels)
+    }
+    let counts = pixelCounts(merged)
+    precondition(counts.red == 12 * 6 && counts.blue == 12 * 3,
+                 "The merger should retain all prior pixels and append only the new strip")
+    if case .some = ScrollCaptureController.mergedImage(
+        existing: existing, currentFrame: current, offsetPx: 0
+    ) {
+        preconditionFailure("A zero-height strip must not create a duplicate capture")
+    }
+    print("PASS scroll capture stitching dimensions, preserved pixels, and invalid shift rejection")
 }
 
 @MainActor
