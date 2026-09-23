@@ -328,7 +328,7 @@ enum ScreenshotFileActions {
         )
         
         let destinationURL = uniqueDestinationURL(
-            for: exportFileName(for: url),
+            for: ScreenshotFileNaming.currentFileName(extension: BetterShotPreferences.exportFormat.fileExtension),
             in: destinationDirectory
         )
         try save(from: url, to: destinationURL)
