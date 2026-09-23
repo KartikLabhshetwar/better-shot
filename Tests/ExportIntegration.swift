@@ -1119,6 +1119,12 @@ private func checkCaptureStorage(image: CGImage, source: URL, directory: URL) as
     precondition(first.filename != second.filename)
     precondition(history.importCapture(from: directory.appendingPathComponent("missing.png")) == nil)
     precondition(history.records.count == 2, "A failed import must not insert a capture")
+    for format in ["jpg", "heic"] {
+        let named = history.importCapture(from: source, named: "Capture.\(format)", deleteSource: false)!
+        precondition(named.displayName == "Capture.\(format)" && named.filename == "Capture.\(source.pathExtension)",
+                     "A \(format) capture keeps its name, while its source is stored in its own format; got \(named.displayName), \(named.filename)")
+        history.deleteRecord(named)
+    }
     let childDirectory = directory.appendingPathComponent("project")
     let siblingDirectory = directory.appendingPathComponent("project-copy")
     for folder in [childDirectory, siblingDirectory] {

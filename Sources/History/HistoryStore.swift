@@ -25,16 +25,18 @@ final class HistoryStore {
 
     // MARK: - Import
 
-    /// Copies a capture into the library under `fileName`, the name the capture
+    /// Copies a capture into the library as `fileName`, the name the capture
     /// was given when it was taken; defaults to the source file's own name.
+    /// The stored copy keeps the source's extension, since that is its format.
     /// `companion` maps a storage URL to a file that will be written beside it;
     /// the chosen name leaves that path free too.
     func importCapture(from tempURL: URL, named fileName: String? = nil, deleteSource: Bool = true,
                        kind: CaptureKind = .screenshot, companion: ((URL) -> URL)? = nil) -> CaptureRecord? {
         let kind = CaptureKind.resolved(for: tempURL, fallback: kind)
         let name = fileName ?? tempURL.lastPathComponent
+        let storedName = ScreenshotFileNaming.fileName(of: URL(fileURLWithPath: name), extension: tempURL.pathExtension)
         let exists = { (url: URL) in FileManager.default.fileExists(atPath: url.path) }
-        let destURL = ScreenshotFileNaming.uniqueURL(for: name, in: storageDir, separator: "-") { url in
+        let destURL = ScreenshotFileNaming.uniqueURL(for: storedName, in: storageDir, separator: "-") { url in
             exists(url) || companion.map { exists($0(url)) } == true
         }
 
