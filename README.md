@@ -97,6 +97,17 @@ Capture Region & Pin or Edit Clipboard Image, start unassigned.
 Set the background, padding, corner radius, and shadow for new captures in
 **Settings > General > Default Look**.
 
+### Scrolling capture
+
+Choose **Scrolling Capture** in the menu bar popover, then drag over the
+scrollable content you want to capture. Scroll through it as usual, or turn on
+**Auto Scroll** in the floating panel. The panel reports the stitched capture's
+strip count and height. Choose **Stop Scrolling Capture** to send the finished
+image to the capture preview, or **Cancel Scrolling Capture** to discard it.
+Keep the selected area over the same content as it scrolls; the result is
+assembled from overlapping screen frames, so fixed headers are handled
+automatically when detected.
+
 ### Where files go
 
 Captures stay in BetterShot's private storage until you save them.

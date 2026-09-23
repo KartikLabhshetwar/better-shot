@@ -11,6 +11,7 @@ final class ScrollCaptureController {
     private(set) var isActive: Bool = false
     private(set) var frozenTopHeight: CGFloat = 0
     private var isCancelled: Bool = false
+    private var didFinishSession: Bool = false
 
     var estimatedTotalHeight: CGFloat {
         guard let merged = mergedImage else { return 0 }
@@ -80,7 +81,7 @@ final class ScrollCaptureController {
     }
 
     func startSession() async {
-        guard !isActive, !isCancelled else { return }
+        guard !isActive, !isCancelled, !didFinishSession else { return }
 
         let ud = UserDefaults.standard
         autoScrollEnabled = ud.object(forKey: "scrollAutoScrollEnabled") as? Bool ?? false
@@ -88,7 +89,7 @@ final class ScrollCaptureController {
         maxScrollHeight = ud.object(forKey: "scrollMaxHeight") as? Int ?? 30000
         frozenDetectionEnabled = ud.object(forKey: "scrollFrozenDetection") as? Bool ?? true
 
-        let primaryScreenH = NSScreen.screens.first?.frame.height ?? screen.frame.height
+        let primaryScreenH = CGDisplayBounds(CGMainDisplayID()).height
         captureRectCG = CGRect(
             x: captureRect.origin.x,
             y: primaryScreenH - captureRect.maxY,
@@ -100,13 +101,15 @@ final class ScrollCaptureController {
         resolveTargetWindow()
         resolveTargetApp()
 
+        // Mark the session active before the first awaited frame so Stop can
+        // cancel a capture that is still settling.
+        isActive = true
+
         guard let firstFrame = await captureSettledFrame() else {
-            if !isCancelled { onSessionDone?(nil) }
+            if !isCancelled { finishSession(with: nil) }
             return
         }
-        guard !isCancelled else { return }
-
-        isActive = true
+        guard isActive, !isCancelled else { return }
         shotA = nil
         shotB = nil
         lastComparedTIFF = nil
@@ -137,35 +140,34 @@ final class ScrollCaptureController {
 
     func stopSession() {
         guard isActive else { return }
-        isActive = false
-
-        autoScrollTask?.cancel(); autoScrollTask = nil
-        settlementTimer?.invalidate(); settlementTimer = nil
-        pendingCaptureTask?.cancel(); pendingCaptureTask = nil
-        if let m = scrollMonitorGlobal { NSEvent.removeMonitor(m); scrollMonitorGlobal = nil }
-        if let m = scrollMonitorLocal { NSEvent.removeMonitor(m); scrollMonitorLocal = nil }
-        autoScrollActive = false
-
-        let finalImage: NSImage?
-        if let cg = mergedImage {
-            let ptSize = CGSize(width: CGFloat(cg.width) / backingScale,
-                                height: CGFloat(cg.height) / backingScale)
-            finalImage = NSImage(cgImage: cg, size: ptSize)
-        } else {
-            finalImage = nil
-        }
-        onSessionDone?(finalImage)
+        finishSession(with: mergedImage)
     }
 
     func cancelSession() {
         isCancelled = true
-        isActive = false
+        endSession()
+    }
 
+    private func finishSession(with image: CGImage?) {
+        guard !didFinishSession else { return }
+        didFinishSession = true
+        endSession()
+        guard let image else {
+            onSessionDone?(nil)
+            return
+        }
+        let ptSize = CGSize(width: CGFloat(image.width) / backingScale,
+                            height: CGFloat(image.height) / backingScale)
+        onSessionDone?(NSImage(cgImage: image, size: ptSize))
+    }
+
+    private func endSession() {
+        isActive = false
         autoScrollTask?.cancel(); autoScrollTask = nil
         settlementTimer?.invalidate(); settlementTimer = nil
         pendingCaptureTask?.cancel(); pendingCaptureTask = nil
-        if let m = scrollMonitorGlobal { NSEvent.removeMonitor(m); scrollMonitorGlobal = nil }
-        if let m = scrollMonitorLocal { NSEvent.removeMonitor(m); scrollMonitorLocal = nil }
+        if let monitor = scrollMonitorGlobal { NSEvent.removeMonitor(monitor); scrollMonitorGlobal = nil }
+        if let monitor = scrollMonitorLocal { NSEvent.removeMonitor(monitor); scrollMonitorLocal = nil }
         autoScrollActive = false
     }
 
@@ -253,7 +255,7 @@ final class ScrollCaptureController {
     private func captureFrame() async -> CGImage? {
         guard let filter = await resolveContentFilter() else { return nil }
 
-        let sourceRect = captureRectCG.intersection(filter.contentRect)
+        let sourceRect = sourceRect(in: filter.contentRect)
         guard sourceRect.width > 1, sourceRect.height > 1 else { return nil }
 
         let scale = CGFloat(filter.pointPixelScale)
@@ -264,6 +266,28 @@ final class ScrollCaptureController {
         config.showsCursor = false
 
         return try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+    }
+
+    /// Converts the global AppKit selection into this display's ScreenCaptureKit
+    /// coordinates. Displays can have negative origins and do not share a single
+    /// AppKit-to-Quartz Y origin.
+    private func sourceRect(in contentRect: CGRect) -> CGRect {
+        guard screen.frame.width > 0, screen.frame.height > 0,
+              contentRect.width > 0, contentRect.height > 0 else { return .zero }
+
+        let localMinX = min(max(captureRect.minX - screen.frame.minX, 0), screen.frame.width)
+        let localMaxX = min(max(captureRect.maxX - screen.frame.minX, 0), screen.frame.width)
+        let localMinY = min(max(captureRect.minY - screen.frame.minY, 0), screen.frame.height)
+        let localMaxY = min(max(captureRect.maxY - screen.frame.minY, 0), screen.frame.height)
+        let scaleX = contentRect.width / screen.frame.width
+        let scaleY = contentRect.height / screen.frame.height
+        let rect = CGRect(
+            x: contentRect.minX + localMinX * scaleX,
+            y: contentRect.minY + (screen.frame.height - localMaxY) * scaleY,
+            width: (localMaxX - localMinX) * scaleX,
+            height: (localMaxY - localMinY) * scaleY
+        )
+        return rect.intersection(contentRect)
     }
 
     private func captureSettledFrame() async -> CGImage? {
@@ -341,6 +365,10 @@ final class ScrollCaptureController {
 
     private func autoScrollLoop(linesPerTick: Int32, burstCount: Int) async {
         while isActive && autoScrollActive {
+            if hasReachedMaximumHeight {
+                stopSession()
+                return
+            }
             for _ in 0..<burstCount {
                 if let event = CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1,
                                        wheel1: -linesPerTick, wheel2: 0, wheel3: 0) {
@@ -385,6 +413,7 @@ final class ScrollCaptureController {
                 try? await Task.sleep(nanoseconds: 30_000_000)
                 continue
             }
+            guard isActive else { return false }
 
             let tiffData: Data? = await withCheckedContinuation { cont in
                 captureQueue.async {
@@ -392,6 +421,7 @@ final class ScrollCaptureController {
                     cont.resume(returning: bitmapRep.tiffRepresentation)
                 }
             }
+            guard isActive else { return false }
             guard let currentTIFF = tiffData else {
                 try? await Task.sleep(nanoseconds: waitNs)
                 waitNs = min(waitNs * 3 / 2, 80_000_000)
@@ -450,7 +480,10 @@ final class ScrollCaptureController {
 
         let safeOffset = max(1, offsetPx - 1)
 
-        mergeNewContent(currentFrame: currentFrame, offsetPx: safeOffset)
+        guard mergeNewContent(currentFrame: currentFrame, offsetPx: safeOffset) else {
+            if hasReachedMaximumHeight { stopSession() }
+            return false
+        }
 
         shotA = currentFrame
         stripCount += 1
@@ -462,41 +495,55 @@ final class ScrollCaptureController {
         return true
     }
 
-    private func mergeNewContent(currentFrame: CGImage, offsetPx: Int) {
+    private var hasReachedMaximumHeight: Bool {
+        maxScrollHeight > 0 && (mergedImage?.height ?? 0) >= maxScrollHeight
+    }
+
+    @discardableResult
+    private func mergeNewContent(currentFrame: CGImage, offsetPx: Int) -> Bool {
         guard let existing = mergedImage else {
             mergedImage = currentFrame
-            return
+            return true
         }
 
-        let w = currentFrame.width
-        let existingH = existing.height
-        let newRows = offsetPx
-        guard newRows > 0, newRows <= currentFrame.height else { return }
-
-        let totalH = existingH + newRows
-
-        let cs = existing.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
-        let bitmapInfo = CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
-        guard let ctx = CGContext(data: nil, width: w, height: totalH,
-                                  bitsPerComponent: 8, bytesPerRow: w * 4,
-                                  space: cs, bitmapInfo: bitmapInfo) else { return }
-
-        ctx.draw(existing, in: CGRect(x: 0, y: newRows, width: w, height: existingH))
-
-        if headerDetectionDone && headerHeight > 0 {
-            let stripY = currentFrame.height - newRows
-            if let strip = currentFrame.cropping(to: CGRect(
-                x: 0, y: stripY, width: w, height: newRows)) {
-                ctx.draw(strip, in: CGRect(x: 0, y: 0, width: w, height: newRows))
-            }
-        } else {
-            ctx.draw(currentFrame, in: CGRect(x: 0, y: 0, width: w, height: currentFrame.height))
-        }
-
-        guard let merged = ctx.makeImage() else { return }
+        let newRows = maxScrollHeight > 0
+            ? min(offsetPx, max(0, maxScrollHeight - existing.height))
+            : offsetPx
+        guard newRows > 0, newRows <= currentFrame.height else { return false }
+        guard let merged = Self.mergedImage(
+            existing: existing,
+            currentFrame: currentFrame,
+            offsetPx: newRows
+        ) else { return false }
         mergedImage = merged
         stitchedImage = merged
-        stitchedPixelSize = CGSize(width: CGFloat(w), height: CGFloat(totalH))
+        stitchedPixelSize = CGSize(width: CGFloat(merged.width), height: CGFloat(merged.height))
+        return true
+    }
+
+    static func mergedImage(
+        existing: CGImage,
+        currentFrame: CGImage,
+        offsetPx: Int
+    ) -> CGImage? {
+        guard existing.width == currentFrame.width,
+              offsetPx > 0, offsetPx <= currentFrame.height else { return nil }
+
+        let width = currentFrame.width
+        let totalHeight = existing.height + offsetPx
+        let colorSpace = existing.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
+        let bitmapInfo = CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        guard let context = CGContext(data: nil, width: width, height: totalHeight,
+                                      bitsPerComponent: 8, bytesPerRow: width * 4,
+                                      space: colorSpace, bitmapInfo: bitmapInfo) else { return nil }
+
+        context.draw(existing, in: CGRect(x: 0, y: offsetPx, width: width, height: existing.height))
+        let stripY = currentFrame.height - offsetPx
+        guard let strip = currentFrame.cropping(to: CGRect(
+            x: 0, y: stripY, width: width, height: offsetPx
+        )) else { return nil }
+        context.draw(strip, in: CGRect(x: 0, y: 0, width: width, height: offsetPx))
+        return context.makeImage()
     }
 
     private func stopAutoScroll() {
@@ -548,6 +595,7 @@ final class ScrollCaptureController {
         defer { isCapturing = false }
 
         guard let currentFrame = await captureFrame() else { return }
+        guard isActive else { return }
         guard let previousFrame = shotA else {
             shotA = currentFrame
             return
@@ -579,7 +627,10 @@ final class ScrollCaptureController {
         }
 
         let safeOffset = max(1, offsetPx - 1)
-        mergeNewContent(currentFrame: currentFrame, offsetPx: safeOffset)
+        guard mergeNewContent(currentFrame: currentFrame, offsetPx: safeOffset) else {
+            if hasReachedMaximumHeight { stopSession() }
+            return
+        }
 
         shotA = currentFrame
         stripCount += 1
@@ -620,18 +671,30 @@ final class ScrollCaptureController {
         return obs.alignmentTransform.ty
     }
 
-    private func pixelData(for image: CGImage) -> UnsafePointer<UInt8>? {
-        guard let dataProvider = image.dataProvider,
-              let data = dataProvider.data else { return nil }
-        return CFDataGetBytePtr(data)
+    private func normalizedPixelData(for image: CGImage) -> Data? {
+        let bytesPerRow = image.width * 4
+        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+        let bitmapInfo = CGImageAlphaInfo.premultipliedFirst.rawValue
+            | CGBitmapInfo.byteOrder32Little.rawValue
+        guard let context = CGContext(
+            data: nil,
+            width: image.width,
+            height: image.height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo
+        ) else { return nil }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        guard let data = context.data else { return nil }
+        return Data(bytes: data, count: bytesPerRow * image.height)
     }
 
     private func detectRightMargin(current: CGImage, previous: CGImage) {
-        rightMarginDetected = true
-
         guard current.width == previous.width, current.height == previous.height else { return }
-        guard let curData = pixelData(for: current),
-              let prevData = pixelData(for: previous) else { return }
+        guard let curData = normalizedPixelData(for: current),
+              let prevData = normalizedPixelData(for: previous) else { return }
+        rightMarginDetected = true
 
         let w = current.width
         let h = current.height
@@ -679,8 +742,8 @@ final class ScrollCaptureController {
         let w = current.width
         let h = current.height
 
-        guard let curData = pixelData(for: current),
-              let prevData = pixelData(for: previous) else { return }
+        guard let curData = normalizedPixelData(for: current),
+              let prevData = normalizedPixelData(for: previous) else { return }
 
         let bytesPerRow = w * 4
         let compareBytes = max(4, (w - rightMarginPx)) * 4

@@ -103,23 +103,34 @@ struct MenuBarContentView: View {
     ]
 
     private var captureGrid: some View {
-        LazyVGrid(columns: Self.columns, spacing: 6) {
-            TrayGridButton(title: "Region", icon: "rectangle.dashed", action: .region) {
-                dismissAndRun(.region)
+        VStack(spacing: 6) {
+            LazyVGrid(columns: Self.columns, spacing: 6) {
+                TrayGridButton(title: "Region", icon: "rectangle.dashed", action: .region) {
+                    dismissAndRun(.region)
+                }
+
+                TrayGridButton(title: "Screen", icon: "desktopcomputer", action: .fullscreen) {
+                    dismissAndRun(.fullscreen)
+                }
+
+                TrayGridButton(title: "Window", icon: "macwindow", action: .window) {
+                    dismissAndRun(.window)
+                }
+
+                TrayGridButton(title: "Record", icon: "record.circle", action: .recordingOptions) {
+                    dismissPopover()
+                    RecordingBarPresenter.shared.showPicker(recordingOptions: true)
+                }
             }
 
-            TrayGridButton(title: "Screen", icon: "desktopcomputer", action: .fullscreen) {
-                dismissAndRun(.fullscreen)
-            }
-
-            TrayGridButton(title: "Window", icon: "macwindow", action: .window) {
-                dismissAndRun(.window)
-            }
-
-            TrayGridButton(title: "Record", icon: "record.circle", action: .recordingOptions) {
+            TrayFullWidthButton(title: "Scrolling Capture", icon: "arrow.down.to.line") {
+                let screen = ActiveDisplayResolver.screenForScreenshotCapture() ?? originScreen
                 dismissPopover()
-                RecordingBarPresenter.shared.showPicker(recordingOptions: true)
+                Task { @MainActor in
+                    await CaptureOrchestrator.shared.performScrollCapture(on: screen)
+                }
             }
+            .accessibilityIdentifier("scrollCaptureStart")
         }
     }
 
