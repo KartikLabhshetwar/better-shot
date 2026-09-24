@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Adapts Cap 3D rendering, Copyright (c) 2023-present Cap Software, Inc.
 // Swift/Metal adaptation Copyright (c) 2026 Kartik Labhshetwar.
-// See Resources/Licenses/NOTICE.md for upstream source and full license.
+// See Resources/Licenses/Cap.txt for the full license.
 
 import Foundation
 import QuartzCore

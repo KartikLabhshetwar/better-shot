@@ -313,8 +313,8 @@ transparent padding, shadow suppression, and whole-card zoom.
 
 Adapted rendering code carries Cap's AGPLv3 attribution and license in
 `Resources/Licenses/`, bundled with the application. Keep those notices and the
-corresponding-source/build instructions with distributions; see that folder's
-`NOTICE.md` and the repository `LICENSE`.
+corresponding-source/build instructions with distributions; see the repository
+`LICENSE`.
 
 `make test` includes projection/normalization checks, model persistence/undo,
 compact light/dark snapshots, production compositor checks, and encoded 30/60 fps
@@ -507,8 +507,8 @@ both appearances. The opt-in window-capture check drives selection and Escape;
 live recording and multi-display hardware still need manual checks.
 
 Boring Notch's copied shape and adapted hover button/interaction code retain their
-source credits and GPLv3 notices. See `Resources/Licenses/NOTICE.md` for the pinned
-revision and exact file mapping; bundle `BoringNotch.txt` with distributions.
+source credits and GPLv3 notices. Bundle `Resources/Licenses/BoringNotch.txt`
+with distributions.
 
 For window screenshot changes, also select a window and cancel with Escape in the
 signed dev app. Standalone test executables use their terminal’s capture identity
