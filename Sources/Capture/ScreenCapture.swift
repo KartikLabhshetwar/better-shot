@@ -46,7 +46,7 @@ final class ScreenCapture {
         }
         args.append(tempPath)
 
-        let success = try await runScreencapture(args)
+        let success = try await runScreencapture(args, output: tempPath)
         guard success, FileManager.default.fileExists(atPath: tempPath) else { return nil }
         return URL(fileURLWithPath: tempPath)
     }
@@ -59,7 +59,7 @@ final class ScreenCapture {
         defer { isCapturing = false }
 
         let tempPath = makeTempPath()
-        let success = try await runScreencapture(["-i", "-o", "-x", "-t", "png", tempPath])
+        let success = try await runScreencapture(["-i", "-o", "-x", "-t", "png", tempPath], output: tempPath)
         guard success, FileManager.default.fileExists(atPath: tempPath) else { return nil }
         return URL(fileURLWithPath: tempPath)
     }
@@ -77,7 +77,7 @@ final class ScreenCapture {
         try? await Task.sleep(for: .milliseconds(80))
         let tempPath = makeTempPath()
         let region = RegionGeometry.screencaptureArgument(pointsRect)
-        let success = try await runScreencapture(["-R", region, "-x", "-t", "png", tempPath])
+        let success = try await runScreencapture(["-R", region, "-x", "-t", "png", tempPath], output: tempPath)
         guard success, FileManager.default.fileExists(atPath: tempPath) else { return nil }
         return URL(fileURLWithPath: tempPath)
     }
@@ -191,24 +191,10 @@ final class ScreenCapture {
         return "\(dir)bettershot_\(UUID().uuidString).png"
     }
 
-    private func runScreencapture(_ arguments: [String]) async throws -> Bool {
-        try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-                process.arguments = arguments
-                let errors = Pipe()
-                process.standardError = errors
-                do {
-                    try process.run()
-                    let data = errors.fileHandleForReading.readDataToEndOfFile()
-                    process.waitUntilExit()
-                    continuation.resume(returning: try Self.validateCommandResult(
-                        status: process.terminationStatus, diagnostic: String(decoding: data, as: UTF8.self)))
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
+    private func runScreencapture(_ arguments: [String], output: String) async throws -> Bool {
+        switch try await ScreencaptureRunner.run(arguments, output: output) {
+        case .saved: true
+        case let .exited(status, diagnostic): try Self.validateCommandResult(status: status, diagnostic: diagnostic)
         }
     }
 
