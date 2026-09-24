@@ -186,11 +186,3 @@ before opening a pull request.
 Built by [Kartik Labhshetwar](https://x.com/code_kartik) and
 [contributors](https://github.com/KartikLabhshetwar/better-shot/graphs/contributors).
 If BetterShot helps you, consider [supporting its development](https://www.buymeacoffee.com/code_kartik).
-
-## License
-
-Original BetterShot code is [BSD 3-Clause](LICENSE). The 3D renderer adapts
-[Cap](https://github.com/CapSoftware/Cap) under AGPLv3, and Notch Mode adapts
-[Boring Notch](https://github.com/TheBoredTeam/boring.notch) under GPLv3. The
-bundled [TourKit](https://github.com/rampatra/TourKit) package is MIT. See the
-[third-party notices](Resources/Licenses/NOTICE.md) for distribution terms.
