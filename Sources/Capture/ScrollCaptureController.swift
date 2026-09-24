@@ -1,6 +1,5 @@
 import Cocoa
 import ScreenCaptureKit
-import Vision
 
 @MainActor
 final class ScrollCaptureController {
@@ -110,7 +109,7 @@ final class ScrollCaptureController {
             return
         }
         guard isActive, !isCancelled else { return }
-        shotA = nil
+        shotA = firstFrame
         shotB = nil
         lastComparedTIFF = nil
         mergedImage = firstFrame
@@ -451,18 +450,15 @@ final class ScrollCaptureController {
             detectRightMargin(current: currentFrame, previous: previousFrame)
         }
 
-        guard let offset = visionShift(current: currentFrame, previous: previousFrame) else {
-            shotA = currentFrame
+        guard let offsetPx = Self.matchedScrollOffset(
+            previous: previousFrame, current: currentFrame,
+            excludedTop: headerDetectionDone ? headerHeight : 0,
+            excludedRight: rightMarginPx
+        ) else {
             consecutiveZeroShifts += 1
             if hasScrolledOnce && consecutiveZeroShifts >= maxZeroShiftsBeforeStop {
                 stopSession()
             }
-            return false
-        }
-
-        let offsetPx = Int(round(offset))
-        guard offsetPx > 0 else {
-            shotA = currentFrame
             return false
         }
 
@@ -478,9 +474,7 @@ final class ScrollCaptureController {
             detectHeader(current: currentFrame, previous: previousFrame, shiftPx: offsetPx)
         }
 
-        let safeOffset = max(1, offsetPx - 1)
-
-        guard mergeNewContent(currentFrame: currentFrame, offsetPx: safeOffset) else {
+        guard mergeNewContent(currentFrame: currentFrame, offsetPx: offsetPx) else {
             if hasReachedMaximumHeight { stopSession() }
             return false
         }
@@ -513,7 +507,8 @@ final class ScrollCaptureController {
         guard let merged = Self.mergedImage(
             existing: existing,
             currentFrame: currentFrame,
-            offsetPx: newRows
+            offsetPx: offsetPx,
+            rowsToAppend: newRows
         ) else { return false }
         mergedImage = merged
         stitchedImage = merged
@@ -524,25 +519,28 @@ final class ScrollCaptureController {
     static func mergedImage(
         existing: CGImage,
         currentFrame: CGImage,
-        offsetPx: Int
+        offsetPx: Int,
+        rowsToAppend: Int? = nil
     ) -> CGImage? {
+        let newRows = rowsToAppend ?? offsetPx
         guard existing.width == currentFrame.width,
-              offsetPx > 0, offsetPx <= currentFrame.height else { return nil }
+              offsetPx > 0, offsetPx <= currentFrame.height,
+              newRows > 0, newRows <= offsetPx else { return nil }
 
         let width = currentFrame.width
-        let totalHeight = existing.height + offsetPx
+        let totalHeight = existing.height + newRows
         let colorSpace = existing.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
         let bitmapInfo = CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
         guard let context = CGContext(data: nil, width: width, height: totalHeight,
                                       bitsPerComponent: 8, bytesPerRow: width * 4,
                                       space: colorSpace, bitmapInfo: bitmapInfo) else { return nil }
 
-        context.draw(existing, in: CGRect(x: 0, y: offsetPx, width: width, height: existing.height))
+        context.draw(existing, in: CGRect(x: 0, y: newRows, width: width, height: existing.height))
         let stripY = currentFrame.height - offsetPx
         guard let strip = currentFrame.cropping(to: CGRect(
-            x: 0, y: stripY, width: width, height: offsetPx
+            x: 0, y: stripY, width: width, height: newRows
         )) else { return nil }
-        context.draw(strip, in: CGRect(x: 0, y: 0, width: width, height: offsetPx))
+        context.draw(strip, in: CGRect(x: 0, y: 0, width: width, height: newRows))
         return context.makeImage()
     }
 
@@ -605,14 +603,11 @@ final class ScrollCaptureController {
             detectRightMargin(current: currentFrame, previous: previousFrame)
         }
 
-        guard let offset = visionShift(current: currentFrame, previous: previousFrame) else {
-            shotA = currentFrame
-            return
-        }
-
-        let offsetPx = Int(round(offset))
-        guard offsetPx > 0 else {
-            shotA = currentFrame
+        guard let offsetPx = Self.matchedScrollOffset(
+            previous: previousFrame, current: currentFrame,
+            excludedTop: headerDetectionDone ? headerHeight : 0,
+            excludedRight: rightMarginPx
+        ) else {
             return
         }
 
@@ -626,8 +621,7 @@ final class ScrollCaptureController {
             detectHeader(current: currentFrame, previous: previousFrame, shiftPx: offsetPx)
         }
 
-        let safeOffset = max(1, offsetPx - 1)
-        guard mergeNewContent(currentFrame: currentFrame, offsetPx: safeOffset) else {
+        guard mergeNewContent(currentFrame: currentFrame, offsetPx: offsetPx) else {
             if hasReachedMaximumHeight { stopSession() }
             return
         }
@@ -648,30 +642,129 @@ final class ScrollCaptureController {
         let _ = await captureAndCompare()
     }
 
-    private func visionShift(current: CGImage, previous: CGImage) -> CGFloat? {
-        var curImg = current
-        var prevImg = previous
-        let maxCropY = current.height / 5
-        let cropY = headerDetectionDone ? min(headerHeight, maxCropY) : 0
-        let cropW = current.width - rightMarginPx
-        let cropH = current.height - cropY
-        if cropY > 0 || rightMarginPx > 0 {
-            guard cropH > 20 && cropW > 20 else { return nil }
-            let cropRect = CGRect(x: 0, y: cropY, width: cropW, height: cropH)
-            guard let cc = current.cropping(to: cropRect),
-                  let pc = previous.cropping(to: cropRect) else { return nil }
-            curImg = cc
-            prevImg = pc
-        }
-
-        let request = VNTranslationalImageRegistrationRequest(targetedCGImage: prevImg)
-        let handler = VNImageRequestHandler(cgImage: curImg, options: [:])
-        guard (try? handler.perform([request])) != nil,
-              let obs = request.results?.first as? VNImageTranslationAlignmentObservation else { return nil }
-        return obs.alignmentTransform.ty
+    /// A scrolling frame overlaps the previous one at current[y] == previous[y + offset].
+    /// Compare only pixels that changed at the same screen location, so fixed
+    /// toolbars and empty backgrounds cannot vote for a false zero shift.
+    static func validatedScrollOffset(
+        previous: CGImage, current: CGImage, candidate: Int,
+        excludedTop: Int, excludedRight: Int
+    ) -> Int? {
+        guard let match = ScrollMatch(previous: previous, current: current,
+                                      excludedTop: excludedTop, excludedRight: excludedRight),
+              let score = match.score(candidate), score.isConfident else { return nil }
+        return candidate
     }
 
-    private func normalizedPixelData(for image: CGImage) -> Data? {
+    static func matchedScrollOffset(
+        previous: CGImage, current: CGImage,
+        excludedTop: Int, excludedRight: Int
+    ) -> Int? {
+        guard let match = ScrollMatch(previous: previous, current: current,
+                                      excludedTop: excludedTop, excludedRight: excludedRight) else { return nil }
+        let minimum = max(2, current.height / 10)
+        let maximum = min(current.height * 4 / 5,
+                          current.height - match.top - max(12, current.height / 5))
+        guard minimum <= maximum else { return nil }
+
+        let step = max(1, current.height / 500)
+        var coarse: [(offset: Int, score: ScrollMatch.Score)] = []
+        for offset in stride(from: minimum, through: maximum, by: step) {
+            if let score = match.score(offset) { coarse.append((offset, score)) }
+        }
+        let likely = coarse.sorted { $0.score.error < $1.score.error }.prefix(24)
+        var candidates: [Int: ScrollMatch.Score] = [:]
+        for entry in coarse where entry.score.isConfident {
+            candidates[entry.offset] = entry.score
+        }
+        for entry in likely {
+            for offset in max(minimum, entry.offset - step)...min(maximum, entry.offset + step) {
+                guard let score = match.score(offset), score.isConfident else { continue }
+                candidates[offset] = score
+            }
+        }
+        let ranked = candidates.sorted { $0.value.error < $1.value.error }
+        guard let best = ranked.first else { return nil }
+        // Repeated rows can match at several offsets. Wait for another frame
+        // rather than permanently joining it at an arbitrary repeated row.
+        if let runnerUp = ranked.first(where: { abs($0.key - best.key) > max(1, step) }),
+           runnerUp.value.error - best.value.error <= max(2, best.value.error * 0.5) {
+            return nil
+        }
+        return best.key
+    }
+
+    private struct ScrollMatch {
+        struct Score {
+            let error: Double
+            let relativeError: Double
+            let support: Int
+
+            var isConfident: Bool {
+                support >= 20 && error <= 8 && relativeError <= 0.12
+            }
+        }
+
+        let previous: Data
+        let current: Data
+        let width: Int
+        let height: Int
+        let top: Int
+        let right: Int
+
+        init?(previous: CGImage, current: CGImage, excludedTop: Int, excludedRight: Int) {
+            guard previous.width == current.width, previous.height == current.height,
+                  previous.width > 20, previous.height > 20,
+                  let previousPixels = ScrollCaptureController.normalizedPixelData(for: previous),
+                  let currentPixels = ScrollCaptureController.normalizedPixelData(for: current) else { return nil }
+            self.previous = previousPixels
+            self.current = currentPixels
+            width = current.width
+            height = current.height
+            top = min(max(0, excludedTop), height / 5)
+            right = min(max(0, excludedRight), width / 5)
+        }
+
+        func score(_ offset: Int) -> Score? {
+            let overlapEnd = height - offset
+            guard offset > 0, overlapEnd - top >= max(12, height / 5) else { return nil }
+            let sampledWidth = width - right
+            let xStep = max(1, sampledWidth / 96)
+            let yStep = max(1, (overlapEnd - top) / 64)
+            let rowBytes = width * 4
+            return previous.withUnsafeBytes { previousRaw in
+                current.withUnsafeBytes { currentRaw in
+                    let old = previousRaw.bindMemory(to: UInt8.self)
+                    let new = currentRaw.bindMemory(to: UInt8.self)
+                    var changed = 0
+                    var unchangedPositionError = 0
+                    var alignedError = 0
+                    for y in stride(from: top, to: overlapEnd, by: yStep) {
+                        for x in stride(from: 0, to: sampledWidth, by: xStep) {
+                            let currentIndex = y * rowBytes + x * 4
+                            let sameIndex = currentIndex
+                            let shiftedIndex = (y + offset) * rowBytes + x * 4
+                            let same = abs(Int(old[sameIndex]) - Int(new[currentIndex]))
+                                + abs(Int(old[sameIndex + 1]) - Int(new[currentIndex + 1]))
+                                + abs(Int(old[sameIndex + 2]) - Int(new[currentIndex + 2]))
+                            guard same >= 36 else { continue }
+                            let aligned = abs(Int(old[shiftedIndex]) - Int(new[currentIndex]))
+                                + abs(Int(old[shiftedIndex + 1]) - Int(new[currentIndex + 1]))
+                                + abs(Int(old[shiftedIndex + 2]) - Int(new[currentIndex + 2]))
+                            changed += 1
+                            unchangedPositionError += same
+                            alignedError += aligned
+                        }
+                    }
+                    guard changed >= 20, unchangedPositionError > 0 else { return nil }
+                    return Score(error: Double(alignedError) / Double(changed * 3),
+                                 relativeError: Double(alignedError) / Double(unchangedPositionError),
+                                 support: changed)
+                }
+            }
+        }
+    }
+
+    private static func normalizedPixelData(for image: CGImage) -> Data? {
         let bytesPerRow = image.width * 4
         let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
         let bitmapInfo = CGImageAlphaInfo.premultipliedFirst.rawValue
@@ -692,8 +785,8 @@ final class ScrollCaptureController {
 
     private func detectRightMargin(current: CGImage, previous: CGImage) {
         guard current.width == previous.width, current.height == previous.height else { return }
-        guard let curData = normalizedPixelData(for: current),
-              let prevData = normalizedPixelData(for: previous) else { return }
+        guard let curData = Self.normalizedPixelData(for: current),
+              let prevData = Self.normalizedPixelData(for: previous) else { return }
         rightMarginDetected = true
 
         let w = current.width
@@ -742,8 +835,8 @@ final class ScrollCaptureController {
         let w = current.width
         let h = current.height
 
-        guard let curData = normalizedPixelData(for: current),
-              let prevData = normalizedPixelData(for: previous) else { return }
+        guard let curData = Self.normalizedPixelData(for: current),
+              let prevData = Self.normalizedPixelData(for: previous) else { return }
 
         let bytesPerRow = w * 4
         let compareBytes = max(4, (w - rightMarginPx)) * 4
@@ -777,8 +870,6 @@ final class ScrollCaptureController {
 
             if headerDetectionSamples == 1 {
                 headerHeight = frozenRows
-                frozenTopHeight = CGFloat(headerHeight) / backingScale
-                headerDetectionDone = true
             } else {
                 if abs(frozenRows - headerHeight) <= 5 {
                     headerHeight = min(headerHeight, frozenRows)
@@ -790,6 +881,8 @@ final class ScrollCaptureController {
                 headerDetectionDone = true
             }
         } else if frozenRows < 10 {
+            headerHeight = 0
+            frozenTopHeight = 0
             headerDetectionDone = true
         }
     }
