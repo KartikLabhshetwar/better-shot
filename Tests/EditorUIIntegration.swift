@@ -1212,6 +1212,59 @@ private func checkScrollCaptureStitching() throws {
         current: horizontalReverseSecond, excludedTop: 0, excludedRight: 0,
         direction: horizontalLeft) == -33,
         "A capture starting on the right must match leftward scrolling")
+
+    func horizontalFrameWithMovingScrollbar(at column: Int, thumbY: Int) -> CGImage {
+        let context = CGContext(data: nil, width: horizontalWidth, height: horizontalHeight,
+            bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.draw(horizontalFrame(at: column), in: CGRect(x: 0, y: 0,
+            width: horizontalWidth, height: horizontalHeight))
+        context.setFillColor(CGColor(gray: 0.16, alpha: 1))
+        context.fill(CGRect(x: horizontalWidth - 10, y: 0, width: 10, height: horizontalHeight))
+        context.setFillColor(CGColor(gray: 0.9, alpha: 1))
+        context.fill(CGRect(x: horizontalWidth - 10, y: thumbY, width: 10, height: 24))
+        return context.makeImage()!
+    }
+    let scrollbarPrevious = horizontalFrameWithMovingScrollbar(at: 64, thumbY: 8)
+    let scrollbarCurrent = horizontalFrameWithMovingScrollbar(at: 31, thumbY: 52)
+    precondition(ScrollCaptureController.matchedScrollOffset(
+        previous: scrollbarPrevious, current: scrollbarCurrent,
+        excludedTop: 0, excludedRight: 10, direction: horizontalLeft) == -33,
+        "The moving right scrollbar must not disturb leftward content alignment")
+
+    func scrollbarOnlyFrame(shift: Int) -> CGImage {
+        let context = CGContext(data: nil, width: horizontalWidth, height: horizontalHeight,
+            bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.setFillColor(CGColor(gray: 0.1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: horizontalWidth, height: horizontalHeight))
+        for x in (horizontalWidth - 10)..<horizontalWidth {
+            let sourceX = x - shift
+            guard sourceX >= horizontalWidth - 10 else { continue }
+            context.setFillColor(sourceX.isMultiple(of: 2)
+                ? CGColor(gray: 0.9, alpha: 1) : CGColor(gray: 0.3, alpha: 1))
+            context.fill(CGRect(x: x, y: 0, width: 1, height: horizontalHeight))
+        }
+        return context.makeImage()!
+    }
+    let scrollbarOnlyPrevious = scrollbarOnlyFrame(shift: 0)
+    let scrollbarOnlyCurrent = scrollbarOnlyFrame(shift: 5)
+    precondition(ScrollCaptureController.validatedScrollOffset(
+        previous: scrollbarOnlyPrevious, current: scrollbarOnlyCurrent,
+        candidate: -5, excludedTop: 0, excludedRight: 0,
+        direction: horizontalLeft) == -5,
+        "The moving scrollbar can resemble a false horizontal shift")
+    precondition(ScrollCaptureController.validatedScrollOffset(
+        previous: scrollbarOnlyPrevious, current: scrollbarOnlyCurrent,
+        candidate: -5, excludedTop: 0, excludedRight: 10,
+        direction: horizontalLeft) == nil,
+        "Scrollbar-only motion must not append a false strip")
+    precondition(ScrollCaptureController.matchedScrollOffset(
+        previous: scrollbarOnlyPrevious, current: scrollbarOnlyCurrent,
+        excludedTop: 0, excludedRight: 10,
+        direction: horizontalLeft) == nil,
+        "Automatic horizontal matching must ignore scrollbar-only motion")
+
     guard let horizontalReverseJoined = ScrollCaptureController.mergedHorizontalImage(
         existing: horizontalReverseFirst, currentFrame: horizontalReverseSecond, offsetPx: -33),
           let horizontalReverseExpected = horizontalPage.cropping(to: CGRect(

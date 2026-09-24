@@ -595,11 +595,12 @@ final class ScrollCaptureController {
 
         private func scoreHorizontal(_ offset: Int) -> Score? {
             let overlapStart = max(0, -offset)
-            let overlapEnd = min(width, width - offset)
+            // Keep the right margin out of both frames after alignment.
+            let overlapEnd = min(width - right, width - right - offset)
             guard offset != 0,
                   overlapEnd - overlapStart >= max(12, width / 5) else { return nil }
             let xStep = max(1, (overlapEnd - overlapStart) / 64)
-            let yStep = max(1, height / 96)
+            let yStep = max(1, (height - top) / 96)
             let rowBytes = width * 4
             return previous.withUnsafeBytes { previousRaw in
                 current.withUnsafeBytes { currentRaw in
@@ -608,7 +609,7 @@ final class ScrollCaptureController {
                     var changed = 0
                     var unchangedPositionError = 0
                     var alignedError = 0
-                    for y in stride(from: 0, to: height, by: yStep) {
+                    for y in stride(from: top, to: height, by: yStep) {
                         for x in stride(from: overlapStart, to: overlapEnd, by: xStep) {
                             let currentIndex = y * rowBytes + x * 4
                             let shiftedIndex = y * rowBytes + (x + offset) * 4
