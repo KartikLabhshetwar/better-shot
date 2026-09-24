@@ -947,7 +947,176 @@ private func checkScrollCaptureStitching() throws {
     ) {
         preconditionFailure("A zero-height strip must not create a duplicate capture")
     }
-    print("PASS scroll capture stitching dimensions, preserved pixels, and invalid shift rejection")
+
+    // Each row has a distinct color and text-like bars, so repeated or omitted
+    // rows at a seam cannot hide inside a solid-color fixture.
+    let width = 96
+    let viewportHeight = 80
+    let headerHeight = 10
+    let documentHeight = 180
+    let colorSpace = CGColorSpaceCreateDeviceRGB()
+    func bitmap(_ height: Int) -> CGContext {
+        CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
+            bytesPerRow: 0, space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    }
+    let pageContext = bitmap(documentHeight)
+    for row in 0..<documentHeight {
+        let color = CGColor(red: CGFloat((row * 37 + 17) % 256) / 255,
+            green: CGFloat((row * 71 + 31) % 256) / 255,
+            blue: CGFloat((row * 113 + 47) % 256) / 255, alpha: 1)
+        pageContext.setFillColor(color)
+        pageContext.fill(CGRect(x: 0, y: documentHeight - row - 1, width: width, height: 1))
+        pageContext.setFillColor(CGColor(gray: row.isMultiple(of: 2) ? 0.1 : 0.9, alpha: 1))
+        pageContext.fill(CGRect(x: 5 + row % 7, y: documentHeight - row - 1,
+            width: 12 + row % 29, height: 1))
+    }
+    let page = pageContext.makeImage()!
+    func frame(at row: Int) -> CGImage {
+        let content = page.cropping(to: CGRect(x: 0, y: row,
+            width: width, height: viewportHeight))!
+        let context = bitmap(viewportHeight)
+        context.draw(content, in: CGRect(x: 0, y: 0, width: width, height: viewportHeight))
+        context.setFillColor(CGColor(red: 0.12, green: 0.16, blue: 0.2, alpha: 1))
+        context.fill(CGRect(x: 0, y: viewportHeight - headerHeight,
+            width: width, height: headerHeight))
+        context.setFillColor(CGColor(gray: 0.85, alpha: 1))
+        context.fill(CGRect(x: 8, y: viewportHeight - 6, width: 37, height: 2))
+        return context.makeImage()!
+    }
+    let first = frame(at: 0)
+    let second = frame(at: 23)
+    let third = frame(at: 49)
+    precondition(ScrollCaptureController.matchedScrollOffset(previous: first,
+        current: second, excludedTop: headerHeight, excludedRight: 0) == 23,
+        "The matcher must find the content shift beneath a fixed header")
+    precondition(ScrollCaptureController.matchedScrollOffset(previous: first,
+        current: first, excludedTop: headerHeight, excludedRight: 0) == nil,
+        "An unchanged frame must not add a strip")
+    let accepted = ScrollCaptureController.validatedScrollOffset(previous: first,
+        current: second, candidate: 23, excludedTop: headerHeight, excludedRight: 0)
+    precondition(accepted == 23, "The content shift must survive a fixed header")
+    precondition(ScrollCaptureController.validatedScrollOffset(previous: first,
+        current: second, candidate: 37, excludedTop: headerHeight, excludedRight: 0) == nil,
+        "A wrong offset must not create repeated or missing rows")
+    precondition(ScrollCaptureController.validatedScrollOffset(previous: first,
+        current: solidFrame(width: width, height: viewportHeight,
+            color: CGColor(gray: 0.5, alpha: 1)), candidate: 23,
+        excludedTop: headerHeight, excludedRight: 0) == nil,
+        "An unrelated frame must not be appended")
+    precondition(ScrollCaptureController.matchedScrollOffset(previous: first,
+        current: solidFrame(width: width, height: viewportHeight,
+            color: CGColor(gray: 0.5, alpha: 1)),
+        excludedTop: headerHeight, excludedRight: 0) == nil,
+        "The matcher must reject unrelated frames")
+
+    // Sparse text on a dark page resembles a conversation capture: most of
+    // the viewport is unchanged background, with a stationary top bar.
+    let darkWidth = 256
+    let darkHeight = 160
+    let darkHeader = 14
+    func darkBitmap(_ height: Int) -> CGContext {
+        CGContext(data: nil, width: darkWidth, height: height, bitsPerComponent: 8,
+            bytesPerRow: 0, space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    }
+    let darkPageContext = darkBitmap(480)
+    darkPageContext.setFillColor(CGColor(red: 0.08, green: 0.08, blue: 0.09, alpha: 1))
+    darkPageContext.fill(CGRect(x: 0, y: 0, width: darkWidth, height: 480))
+    for line in 0..<38 {
+        let top = 8 + line * 12 + line % 3
+        let barColor = line.isMultiple(of: 4)
+            ? CGColor(red: 0.86, green: 0.42, blue: 0.19, alpha: 1)
+            : CGColor(gray: 0.76, alpha: 1)
+        darkPageContext.setFillColor(barColor)
+        darkPageContext.fill(CGRect(x: 12 + line % 9, y: 480 - top - 2,
+            width: 28 + (line * 17) % 150, height: 2))
+    }
+    let darkPage = darkPageContext.makeImage()!
+    func darkFrame(at row: Int) -> CGImage {
+        let context = darkBitmap(darkHeight)
+        context.draw(darkPage.cropping(to: CGRect(x: 0, y: row,
+            width: darkWidth, height: darkHeight))!,
+            in: CGRect(x: 0, y: 0, width: darkWidth, height: darkHeight))
+        context.setFillColor(CGColor(gray: 0.17, alpha: 1))
+        context.fill(CGRect(x: 0, y: darkHeight - darkHeader,
+            width: darkWidth, height: darkHeader))
+        return context.makeImage()!
+    }
+    let darkFirst = darkFrame(at: 0)
+    let darkSecond = darkFrame(at: 42)
+    precondition(ScrollCaptureController.matchedScrollOffset(previous: darkFirst,
+        current: darkSecond, excludedTop: darkHeader, excludedRight: 0) == 42,
+        "The matcher must align sparse text on a dark page")
+    precondition(ScrollCaptureController.validatedScrollOffset(previous: darkFirst,
+        current: darkSecond, candidate: 54, excludedTop: darkHeader,
+        excludedRight: 0) == nil,
+        "A wrong shift on a sparse dark page must be rejected")
+
+    // A repeated list can align perfectly at several offsets. There is no
+    // safe seam until a distinctive row comes into view.
+    let repeatingContext = darkBitmap(400)
+    repeatingContext.setFillColor(CGColor(gray: 0.08, alpha: 1))
+    repeatingContext.fill(CGRect(x: 0, y: 0, width: darkWidth, height: 400))
+    for top in stride(from: 0, to: 400, by: 20) {
+        repeatingContext.setFillColor(CGColor(red: 0.86, green: 0.42, blue: 0.19, alpha: 1))
+        repeatingContext.fill(CGRect(x: 14, y: 400 - top - 5, width: 116, height: 2))
+        repeatingContext.setFillColor(CGColor(gray: 0.72, alpha: 1))
+        repeatingContext.fill(CGRect(x: 14, y: 400 - top - 12, width: 181, height: 2))
+    }
+    let repeatingPage = repeatingContext.makeImage()!
+    let repeatingFirst = repeatingPage.cropping(to: CGRect(x: 0, y: 0,
+        width: darkWidth, height: darkHeight))!
+    let repeatingSecond = repeatingPage.cropping(to: CGRect(x: 0, y: 48,
+        width: darkWidth, height: darkHeight))!
+    precondition(ScrollCaptureController.validatedScrollOffset(previous: repeatingFirst,
+        current: repeatingSecond, candidate: 28, excludedTop: 0, excludedRight: 0) == 28)
+    precondition(ScrollCaptureController.validatedScrollOffset(previous: repeatingFirst,
+        current: repeatingSecond, candidate: 48, excludedTop: 0, excludedRight: 0) == 48)
+    precondition(ScrollCaptureController.matchedScrollOffset(previous: repeatingFirst,
+        current: repeatingSecond, excludedTop: 0, excludedRight: 0) == nil,
+        "Equally aligned repeating rows must not select an arbitrary seam")
+
+    guard let joined = ScrollCaptureController.mergedImage(existing: first,
+        currentFrame: second, offsetPx: 23),
+          let stitched = ScrollCaptureController.mergedImage(existing: joined,
+        currentFrame: third, offsetPx: 26) else {
+        preconditionFailure("Overlapping page frames should stitch")
+    }
+    guard let capped = ScrollCaptureController.mergedImage(existing: first,
+        currentFrame: second, offsetPx: 23, rowsToAppend: 10),
+          let expectedCapped = joined.cropping(to: CGRect(x: 0, y: 0,
+            width: width, height: viewportHeight + 10)) else {
+        preconditionFailure("The height cap should retain the first newly exposed rows")
+    }
+    let cappedPixels = NSBitmapImageRep(cgImage: capped)
+    let expectedCappedPixels = NSBitmapImageRep(cgImage: expectedCapped)
+    precondition(capped.height == viewportHeight + 10)
+    for y in 0..<capped.height {
+        for x in 0..<width {
+            precondition(cappedPixels.colorAt(x: x, y: y) == expectedCappedPixels.colorAt(x: x, y: y),
+                "The height cap skipped early content at (\(x), \(y))")
+        }
+    }
+    let expectedContext = bitmap(viewportHeight + 49)
+    let expectedContent = page.cropping(to: CGRect(x: 0, y: 0,
+        width: width, height: viewportHeight + 49))!
+    expectedContext.draw(expectedContent, in: CGRect(x: 0, y: 0,
+        width: width, height: viewportHeight + 49))
+    expectedContext.draw(first.cropping(to: CGRect(x: 0, y: 0,
+        width: width, height: headerHeight))!,
+        in: CGRect(x: 0, y: viewportHeight + 49 - headerHeight,
+            width: width, height: headerHeight))
+    let expected = NSBitmapImageRep(cgImage: expectedContext.makeImage()!)
+    let actual = NSBitmapImageRep(cgImage: stitched)
+    precondition(stitched.width == width && stitched.height == viewportHeight + 49)
+    for y in 0..<stitched.height {
+        for x in 0..<width {
+            precondition(actual.colorAt(x: x, y: y) == expected.colorAt(x: x, y: y),
+                "Stitch changed a page pixel at (\(x), \(y)); check the seams")
+        }
+    }
+    print("PASS scroll capture alignment with fixed header, rejected bad matches, and ordered stitched rows")
 }
 
 @MainActor
