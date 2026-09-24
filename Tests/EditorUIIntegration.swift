@@ -881,17 +881,16 @@ func checkCaptureControlsUI() throws {
                          to: output.appendingPathComponent("capture-menu-\(name).png"), height: 540)
             let startingModel = ScrollCaptureSessionModel()
             try snapshot(ScrollCaptureSessionView(model: startingModel,
-                toggleAutoScroll: {}, stop: {}, cancel: {}), scheme: scheme, width: 280,
-                to: output.appendingPathComponent("scroll-session-starting-\(name).png"), height: 142)
+                stop: {}, cancel: {}), scheme: scheme, width: 312,
+                to: output.appendingPathComponent("scroll-session-starting-\(name).png"), height: 116)
 
-            let activeModel = ScrollCaptureSessionModel()
-            activeModel.isStarting = false
-            activeModel.isAutoScrolling = true
-            activeModel.stripCount = 4
-            activeModel.pixelHeight = 2_160
-            try snapshot(ScrollCaptureSessionView(model: activeModel,
-                toggleAutoScroll: {}, stop: {}, cancel: {}), scheme: scheme, width: 280,
-                to: output.appendingPathComponent("scroll-session-active-\(name).png"), height: 142)
+            let capturingModel = ScrollCaptureSessionModel()
+            capturingModel.isStarting = false
+            capturingModel.stripCount = 4
+            capturingModel.pixelHeight = 2_160
+            try snapshot(ScrollCaptureSessionView(model: capturingModel,
+                stop: {}, cancel: {}), scheme: scheme, width: 312,
+                to: output.appendingPathComponent("scroll-session-capturing-\(name).png"), height: 116)
         }
         try snapshot(RecordingSessionControls().studioGlass(cornerRadius: BarMetrics.cornerRadius, opacity: 0.78),
                      scheme: scheme, width: 360,
@@ -985,8 +984,12 @@ private func checkScrollCaptureStitching() throws {
         return context.makeImage()!
     }
     let first = frame(at: 0)
+    let smallStep = frame(at: 5)
     let second = frame(at: 23)
     let third = frame(at: 49)
+    precondition(ScrollCaptureController.matchedScrollOffset(previous: first,
+        current: smallStep, excludedTop: headerHeight, excludedRight: 0) == 5,
+        "A small manual scroll must still add its new rows")
     precondition(ScrollCaptureController.matchedScrollOffset(previous: first,
         current: second, excludedTop: headerHeight, excludedRight: 0) == 23,
         "The matcher must find the content shift beneath a fixed header")

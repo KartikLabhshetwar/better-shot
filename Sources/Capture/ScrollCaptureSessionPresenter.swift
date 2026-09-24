@@ -30,7 +30,6 @@ final class ScrollCaptureSessionPresenter {
             model.stripCount = count
             model.pixelHeight = Int(controller.stitchedPixelSize.height)
         }
-        controller.onAutoScrollStarted = { model.isAutoScrolling = true }
         controller.onSessionDone = { [weak self, weak controller] image in
             guard let self else { return }
             if image != nil, let pixels = controller?.stitchedImage {
@@ -51,18 +50,13 @@ final class ScrollCaptureSessionPresenter {
 
     private func present(model: ScrollCaptureSessionModel, on screen: NSScreen) {
         let view = ScrollCaptureSessionView(model: model,
-            toggleAutoScroll: { [weak self] in
-                guard let controller = self?.controller else { return }
-                controller.toggleAutoScroll()
-                model.isAutoScrolling = controller.autoScrollActive
-            },
             stop: { [weak self] in self?.controller?.stopSession() },
             cancel: { [weak self] in
                 self?.controller?.cancelSession()
                 self?.finish(.cancelled)
             })
         let hostingView = NSHostingView(rootView: view)
-        let size = NSSize(width: 280, height: 142)
+        let size = NSSize(width: 312, height: 116)
         let panel = NSPanel(contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.identifier = NSUserInterfaceItemIdentifier("BetterShot.ScrollCaptureControls")
@@ -85,7 +79,6 @@ final class ScrollCaptureSessionPresenter {
         guard let continuation else { return }
         self.continuation = nil
         controller?.onStripAdded = nil
-        controller?.onAutoScrollStarted = nil
         controller?.onSessionDone = nil
         panel?.orderOut(nil)
         panel = nil
@@ -98,14 +91,12 @@ final class ScrollCaptureSessionPresenter {
 @Observable
 final class ScrollCaptureSessionModel {
     var isStarting = true
-    var isAutoScrolling = false
     var stripCount = 0
     var pixelHeight = 0
 }
 
 struct ScrollCaptureSessionView: View {
     @State var model: ScrollCaptureSessionModel
-    let toggleAutoScroll: () -> Void
     let stop: () -> Void
     let cancel: () -> Void
 
@@ -120,20 +111,10 @@ struct ScrollCaptureSessionView: View {
                 Spacer()
             }
 
-            Text(model.isStarting ? "Preparing area…" :
-                model.isAutoScrolling ? "Capturing as page scrolls…" : "Scroll the area, then Stop.")
+            Text(model.isStarting ? "Preparing area…" : "Scroll the area, then Stop.")
                 .font(.system(size: 11))
                 .foregroundStyle(BarMetrics.activeTint.opacity(0.75))
                 .lineLimit(1)
-
-            Toggle("Auto Scroll", isOn: Binding(
-                get: { model.isAutoScrolling },
-                set: { _ in toggleAutoScroll() }))
-                .toggleStyle(.checkbox)
-                .disabled(model.isStarting)
-                .font(.system(size: 11))
-                .foregroundStyle(BarMetrics.activeTint)
-                .accessibilityIdentifier("scrollCaptureAutoScroll")
 
             HStack(spacing: 8) {
                 Text("\(model.stripCount) strips · \(model.pixelHeight) px")
@@ -154,7 +135,7 @@ struct ScrollCaptureSessionView: View {
             .controlSize(.small)
         }
         .padding(12)
-        .frame(width: 280, height: 142)
+        .frame(width: 312, height: 116)
         .glassSurface(cornerRadius: 12, depth: .raised)
     }
 
