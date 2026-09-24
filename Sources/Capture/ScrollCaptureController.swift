@@ -4,6 +4,13 @@ import ScreenCaptureKit
 @MainActor
 final class ScrollCaptureController {
 
+    enum ScrollDirection {
+        case down, right, left
+
+        var isHorizontal: Bool { self != .down }
+        var sign: Int { self == .left ? -1 : 1 }
+    }
+
     private(set) var stripCount: Int = 0
     private(set) var stitchedImage: CGImage?
     private(set) var stitchedPixelSize: CGSize = .zero
@@ -35,6 +42,9 @@ final class ScrollCaptureController {
 
     private var shotA: CGImage?
     private var mergedImage: CGImage?
+    private var scrollDirection: ScrollDirection?
+    private var prefersHorizontal = false
+    var isHorizontalCapture: Bool { scrollDirection?.isHorizontal == true }
     private var headerHeight: Int = 0
     private var headerDetectionDone: Bool = false
     private var headerDetectionSamples: Int = 0
@@ -80,6 +90,8 @@ final class ScrollCaptureController {
         guard isActive, !isCancelled else { return }
         shotA = firstFrame
         mergedImage = firstFrame
+        scrollDirection = nil
+        prefersHorizontal = false
         headerHeight = 0
         headerDetectionDone = false
         headerDetectionSamples = 0
@@ -228,34 +240,57 @@ final class ScrollCaptureController {
 
     private func captureAndCompare() async -> Bool {
         guard let currentFrame = await captureSettledFrame(), isActive else { return false }
-        return processFrame(currentFrame)
+        return processFrame(currentFrame, allowAxisFallback: true)
     }
 
     @discardableResult
-    private func processFrame(_ currentFrame: CGImage) -> Bool {
+    private func processFrame(_ currentFrame: CGImage,
+                              allowAxisFallback: Bool = false) -> Bool {
         guard let previousFrame = shotA else { return false }
 
         if !rightMarginDetected {
             detectRightMargin(current: currentFrame, previous: previousFrame)
         }
 
-        guard let offsetPx = Self.matchedScrollOffset(
-            previous: previousFrame, current: currentFrame,
-            excludedTop: headerDetectionDone ? headerHeight : 0,
-            excludedRight: rightMarginPx
-        ) else {
-            return false
+        let directionGroups: [[ScrollDirection]]
+        if let scrollDirection {
+            directionGroups = [[scrollDirection]]
+        } else if prefersHorizontal {
+            directionGroups = allowAxisFallback ? [[.right, .left], [.down]] : [[.right, .left]]
+        } else {
+            directionGroups = allowAxisFallback ? [[.down], [.right, .left]] : [[.down]]
         }
+        var chosen: (ScrollDirection, Int)?
+        for directions in directionGroups {
+            let matches = directions.compactMap { direction -> (ScrollDirection, Int, ScrollMatch.Score)? in
+                guard let match = Self.matchedScroll(
+                    previous: previousFrame, current: currentFrame,
+                    excludedTop: headerDetectionDone ? headerHeight : 0,
+                    excludedRight: rightMarginPx, direction: direction
+                ) else { return nil }
+                return (direction, match.offset, match.score)
+            }.sorted { $0.2.error < $1.2.error }
+            guard let best = matches.first else { continue }
+            if matches.count > 1,
+               matches[1].2.error - best.2.error <= max(2, best.2.error * 0.5) {
+                return false
+            }
+            chosen = (best.0, best.1)
+            break
+        }
+        guard let (direction, offsetPx) = chosen else { return false }
 
-        if frozenDetectionEnabled && !headerDetectionDone {
+        if direction == .down && frozenDetectionEnabled && !headerDetectionDone {
             detectHeader(current: currentFrame, previous: previousFrame, shiftPx: offsetPx)
         }
 
-        guard mergeNewContent(currentFrame: currentFrame, offsetPx: offsetPx) else {
-            if hasReachedMaximumHeight { stopSession() }
+        guard mergeNewContent(currentFrame: currentFrame, offsetPx: offsetPx,
+                              direction: direction) else {
+            if hasReachedMaximumDimension(for: direction) { stopSession() }
             return false
         }
 
+        scrollDirection = direction
         shotA = currentFrame
         stripCount += 1
 
@@ -265,27 +300,34 @@ final class ScrollCaptureController {
         return true
     }
 
-    private var hasReachedMaximumHeight: Bool {
-        maxScrollHeight > 0 && (mergedImage?.height ?? 0) >= maxScrollHeight
+    private func hasReachedMaximumDimension(for direction: ScrollDirection) -> Bool {
+        guard let mergedImage else { return false }
+        let length = direction.isHorizontal ? mergedImage.width : mergedImage.height
+        return maxScrollHeight > 0 && length >= maxScrollHeight
     }
 
     @discardableResult
-    private func mergeNewContent(currentFrame: CGImage, offsetPx: Int) -> Bool {
+    private func mergeNewContent(currentFrame: CGImage, offsetPx: Int,
+                                 direction: ScrollDirection) -> Bool {
         guard let existing = mergedImage else {
             mergedImage = currentFrame
             return true
         }
 
-        let newRows = maxScrollHeight > 0
-            ? min(offsetPx, max(0, maxScrollHeight - existing.height))
-            : offsetPx
-        guard newRows > 0, newRows <= currentFrame.height else { return false }
-        guard let merged = Self.mergedImage(
-            existing: existing,
-            currentFrame: currentFrame,
-            offsetPx: offsetPx,
-            rowsToAppend: newRows
-        ) else { return false }
+        let existingLength = direction.isHorizontal ? existing.width : existing.height
+        let newPixels = maxScrollHeight > 0
+            ? min(abs(offsetPx), max(0, maxScrollHeight - existingLength))
+            : abs(offsetPx)
+        guard newPixels > 0 else { return false }
+        let merged: CGImage?
+        if direction.isHorizontal {
+            merged = Self.mergedHorizontalImage(existing: existing, currentFrame: currentFrame,
+                                                offsetPx: offsetPx, columnsToAppend: newPixels)
+        } else {
+            merged = Self.mergedImage(existing: existing, currentFrame: currentFrame,
+                                      offsetPx: offsetPx, rowsToAppend: newPixels)
+        }
+        guard let merged else { return false }
         mergedImage = merged
         stitchedImage = merged
         stitchedPixelSize = CGSize(width: CGFloat(merged.width), height: CGFloat(merged.height))
@@ -320,18 +362,60 @@ final class ScrollCaptureController {
         return context.makeImage()
     }
 
+    static func mergedHorizontalImage(
+        existing: CGImage, currentFrame: CGImage,
+        offsetPx: Int, columnsToAppend: Int? = nil
+    ) -> CGImage? {
+        let newColumns = columnsToAppend ?? abs(offsetPx)
+        guard existing.height == currentFrame.height,
+              offsetPx != 0, abs(offsetPx) <= currentFrame.width,
+              newColumns > 0, newColumns <= abs(offsetPx) else { return nil }
+
+        let height = currentFrame.height
+        let colorSpace = existing.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
+        let bitmapInfo = CGImageAlphaInfo.premultipliedFirst.rawValue
+            | CGBitmapInfo.byteOrder32Little.rawValue
+        guard let context = CGContext(data: nil, width: existing.width + newColumns,
+                                      height: height, bitsPerComponent: 8,
+                                      bytesPerRow: (existing.width + newColumns) * 4,
+                                      space: colorSpace, bitmapInfo: bitmapInfo) else { return nil }
+
+        let stripX = offsetPx > 0 ? currentFrame.width - offsetPx : -offsetPx - newColumns
+        guard let strip = currentFrame.cropping(to: CGRect(
+            x: stripX, y: 0, width: newColumns, height: height
+        )) else { return nil }
+        if offsetPx > 0 {
+            context.draw(existing, in: CGRect(x: 0, y: 0,
+                                               width: existing.width, height: height))
+            context.draw(strip, in: CGRect(x: existing.width, y: 0,
+                                            width: newColumns, height: height))
+        } else {
+            context.draw(strip, in: CGRect(x: 0, y: 0,
+                                            width: newColumns, height: height))
+            context.draw(existing, in: CGRect(x: newColumns, y: 0,
+                                               width: existing.width, height: height))
+        }
+        return context.makeImage()
+    }
+
     private func startManualScrollMonitors() {
-        scrollMonitorGlobal = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] _ in
-            self?.onManualScrollEvent()
+        scrollMonitorGlobal = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            self?.onManualScrollEvent(event)
         }
         scrollMonitorLocal = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
-            self?.onManualScrollEvent()
+            self?.onManualScrollEvent(event)
             return event
         }
     }
 
-    private func onManualScrollEvent() {
+    private func onManualScrollEvent(_ event: NSEvent) {
         guard isActive, !isStopping else { return }
+        if event.modifierFlags.contains(.shift)
+            || abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) {
+            prefersHorizontal = true
+        } else if abs(event.scrollingDeltaY) > abs(event.scrollingDeltaX) {
+            prefersHorizontal = false
+        }
 
         settlementTimer?.invalidate()
         settlementTimer = Timer.scheduledTimer(withTimeInterval: settlementInterval, repeats: false) { [weak self] _ in
@@ -367,34 +451,52 @@ final class ScrollCaptureController {
         _ = await captureAndCompare()
     }
 
-    /// A scrolling frame overlaps the previous one at current[y] == previous[y + offset].
     /// Compare only pixels that changed at the same screen location, so fixed
-    /// toolbars and empty backgrounds cannot vote for a false zero shift.
+    /// toolbars and empty backgrounds cannot vote for a false shift.
     static func validatedScrollOffset(
         previous: CGImage, current: CGImage, candidate: Int,
-        excludedTop: Int, excludedRight: Int
+        excludedTop: Int, excludedRight: Int,
+        direction: ScrollDirection = .down
     ) -> Int? {
         guard let match = ScrollMatch(previous: previous, current: current,
                                       excludedTop: excludedTop, excludedRight: excludedRight),
-              let score = match.score(candidate), score.isConfident else { return nil }
+              candidate * direction.sign > 0,
+              let score = match.score(candidate, direction: direction),
+              score.isConfident else { return nil }
         return candidate
     }
 
     static func matchedScrollOffset(
         previous: CGImage, current: CGImage,
-        excludedTop: Int, excludedRight: Int
+        excludedTop: Int, excludedRight: Int,
+        direction: ScrollDirection = .down
     ) -> Int? {
+        matchedScroll(previous: previous, current: current,
+                      excludedTop: excludedTop, excludedRight: excludedRight,
+                      direction: direction)?.offset
+    }
+
+    private static func matchedScroll(
+        previous: CGImage, current: CGImage,
+        excludedTop: Int, excludedRight: Int,
+        direction: ScrollDirection
+    ) -> (offset: Int, score: ScrollMatch.Score)? {
         guard let match = ScrollMatch(previous: previous, current: current,
                                       excludedTop: excludedTop, excludedRight: excludedRight) else { return nil }
-        let minimum = max(2, current.height / 50)
-        let maximum = min(current.height * 4 / 5,
-                          current.height - match.top - max(12, current.height / 5))
+        let length = direction.isHorizontal ? current.width : current.height
+        let minimum = max(2, length / 50)
+        let maximum = min(length * 4 / 5,
+                          length - (direction.isHorizontal ? 0 : match.top)
+                              - max(12, length / 5))
         guard minimum <= maximum else { return nil }
 
-        let step = max(1, current.height / 500)
+        let step = max(1, length / 500)
         var coarse: [(offset: Int, score: ScrollMatch.Score)] = []
-        for offset in stride(from: minimum, through: maximum, by: step) {
-            if let score = match.score(offset) { coarse.append((offset, score)) }
+        for distance in stride(from: minimum, through: maximum, by: step) {
+            let offset = distance * direction.sign
+            if let score = match.score(offset, direction: direction) {
+                coarse.append((offset, score))
+            }
         }
         let likely = coarse.sorted { $0.score.error < $1.score.error }.prefix(24)
         var candidates: [Int: ScrollMatch.Score] = [:]
@@ -402,20 +504,22 @@ final class ScrollCaptureController {
             candidates[entry.offset] = entry.score
         }
         for entry in likely {
-            for offset in max(minimum, entry.offset - step)...min(maximum, entry.offset + step) {
-                guard let score = match.score(offset), score.isConfident else { continue }
+            for distance in max(minimum, abs(entry.offset) - step)...min(maximum, abs(entry.offset) + step) {
+                let offset = distance * direction.sign
+                guard let score = match.score(offset, direction: direction),
+                      score.isConfident else { continue }
                 candidates[offset] = score
             }
         }
         let ranked = candidates.sorted { $0.value.error < $1.value.error }
         guard let best = ranked.first else { return nil }
-        // Repeated rows can match at several offsets. Wait for another frame
-        // rather than permanently joining it at an arbitrary repeated row.
+        // Repeated content can match at several offsets. Wait for another frame
+        // rather than permanently joining at an arbitrary row or column.
         if let runnerUp = ranked.first(where: { abs($0.key - best.key) > max(1, step) }),
            runnerUp.value.error - best.value.error <= max(2, best.value.error * 0.5) {
             return nil
         }
-        return best.key
+        return (best.key, best.value)
     }
 
     private struct ScrollMatch {
@@ -449,7 +553,8 @@ final class ScrollCaptureController {
             right = min(max(0, excludedRight), width / 5)
         }
 
-        func score(_ offset: Int) -> Score? {
+        func score(_ offset: Int, direction: ScrollDirection) -> Score? {
+            if direction.isHorizontal { return scoreHorizontal(offset) }
             let overlapEnd = height - offset
             guard offset > 0, overlapEnd - top >= max(12, height / 5) else { return nil }
             let sampledWidth = width - right
@@ -471,6 +576,45 @@ final class ScrollCaptureController {
                             let same = abs(Int(old[sameIndex]) - Int(new[currentIndex]))
                                 + abs(Int(old[sameIndex + 1]) - Int(new[currentIndex + 1]))
                                 + abs(Int(old[sameIndex + 2]) - Int(new[currentIndex + 2]))
+                            guard same >= 36 else { continue }
+                            let aligned = abs(Int(old[shiftedIndex]) - Int(new[currentIndex]))
+                                + abs(Int(old[shiftedIndex + 1]) - Int(new[currentIndex + 1]))
+                                + abs(Int(old[shiftedIndex + 2]) - Int(new[currentIndex + 2]))
+                            changed += 1
+                            unchangedPositionError += same
+                            alignedError += aligned
+                        }
+                    }
+                    guard changed >= 20, unchangedPositionError > 0 else { return nil }
+                    return Score(error: Double(alignedError) / Double(changed * 3),
+                                 relativeError: Double(alignedError) / Double(unchangedPositionError),
+                                 support: changed)
+                }
+            }
+        }
+
+        private func scoreHorizontal(_ offset: Int) -> Score? {
+            let overlapStart = max(0, -offset)
+            let overlapEnd = min(width, width - offset)
+            guard offset != 0,
+                  overlapEnd - overlapStart >= max(12, width / 5) else { return nil }
+            let xStep = max(1, (overlapEnd - overlapStart) / 64)
+            let yStep = max(1, height / 96)
+            let rowBytes = width * 4
+            return previous.withUnsafeBytes { previousRaw in
+                current.withUnsafeBytes { currentRaw in
+                    let old = previousRaw.bindMemory(to: UInt8.self)
+                    let new = currentRaw.bindMemory(to: UInt8.self)
+                    var changed = 0
+                    var unchangedPositionError = 0
+                    var alignedError = 0
+                    for y in stride(from: 0, to: height, by: yStep) {
+                        for x in stride(from: overlapStart, to: overlapEnd, by: xStep) {
+                            let currentIndex = y * rowBytes + x * 4
+                            let shiftedIndex = y * rowBytes + (x + offset) * 4
+                            let same = abs(Int(old[currentIndex]) - Int(new[currentIndex]))
+                                + abs(Int(old[currentIndex + 1]) - Int(new[currentIndex + 1]))
+                                + abs(Int(old[currentIndex + 2]) - Int(new[currentIndex + 2]))
                             guard same >= 36 else { continue }
                             let aligned = abs(Int(old[shiftedIndex]) - Int(new[currentIndex]))
                                 + abs(Int(old[shiftedIndex + 1]) - Int(new[currentIndex + 1]))

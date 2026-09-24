@@ -887,10 +887,14 @@ func checkCaptureControlsUI() throws {
             let capturingModel = ScrollCaptureSessionModel()
             capturingModel.isStarting = false
             capturingModel.stripCount = 4
-            capturingModel.pixelHeight = 2_160
+            capturingModel.pixelLength = 2_160
             try snapshot(ScrollCaptureSessionView(model: capturingModel,
                 stop: {}, cancel: {}), scheme: scheme, width: 312,
                 to: output.appendingPathComponent("scroll-session-capturing-\(name).png"), height: 116)
+            capturingModel.isHorizontal = true
+            try snapshot(ScrollCaptureSessionView(model: capturingModel,
+                stop: {}, cancel: {}), scheme: scheme, width: 312,
+                to: output.appendingPathComponent("scroll-session-horizontal-\(name).png"), height: 116)
         }
         try snapshot(RecordingSessionControls().studioGlass(cornerRadius: BarMetrics.cornerRadius, opacity: 0.78),
                      scheme: scheme, width: 360,
@@ -1079,6 +1083,167 @@ private func checkScrollCaptureStitching() throws {
     precondition(ScrollCaptureController.matchedScrollOffset(previous: repeatingFirst,
         current: repeatingSecond, excludedTop: 0, excludedRight: 0) == nil,
         "Equally aligned repeating rows must not select an arbitrary seam")
+
+    let horizontalWidth = 120
+    let horizontalHeight = 96
+    let horizontalPageContext = CGContext(data: nil, width: 300, height: horizontalHeight,
+        bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace,
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    for column in 0..<300 {
+        horizontalPageContext.setFillColor(CGColor(
+            red: CGFloat((column * 37 + 17) % 256) / 255,
+            green: CGFloat((column * 71 + 31) % 256) / 255,
+            blue: CGFloat((column * 113 + 47) % 256) / 255, alpha: 1))
+        horizontalPageContext.fill(CGRect(x: column, y: 0,
+                                          width: 1, height: horizontalHeight))
+        horizontalPageContext.setFillColor(CGColor(gray: column.isMultiple(of: 3) ? 0.1 : 0.9,
+                                                   alpha: 1))
+        horizontalPageContext.fill(CGRect(x: column, y: column % 13,
+                                          width: 1, height: 12 + column % 19))
+    }
+    let horizontalPage = horizontalPageContext.makeImage()!
+    func horizontalFrame(at column: Int) -> CGImage {
+        horizontalPage.cropping(to: CGRect(x: column, y: 0,
+            width: horizontalWidth, height: horizontalHeight))!
+    }
+    let horizontalFirst = horizontalFrame(at: 0)
+    let horizontalSecond = horizontalFrame(at: 31)
+    let horizontalRight = ScrollCaptureController.ScrollDirection.right
+    let horizontalLeft = ScrollCaptureController.ScrollDirection.left
+    precondition(ScrollCaptureController.matchedScrollOffset(previous: horizontalFirst,
+        current: horizontalSecond, excludedTop: 0, excludedRight: 0,
+        direction: horizontalRight) == 31,
+        "Horizontal capture must find newly exposed right-hand columns")
+    precondition(ScrollCaptureController.validatedScrollOffset(previous: horizontalFirst,
+        current: horizontalSecond, candidate: 47, excludedTop: 0, excludedRight: 0,
+        direction: horizontalRight) == nil,
+        "A wrong horizontal offset must not create a seam")
+    precondition(ScrollCaptureController.matchedScrollOffset(previous: horizontalFirst,
+        current: horizontalFirst, excludedTop: 0, excludedRight: 0,
+        direction: horizontalRight) == nil,
+        "An unchanged frame must not add horizontal columns")
+    precondition(ScrollCaptureController.matchedScrollOffset(previous: horizontalFirst,
+        current: solidFrame(width: horizontalWidth, height: horizontalHeight,
+            color: CGColor(gray: 0.5, alpha: 1)),
+        excludedTop: 0, excludedRight: 0, direction: horizontalRight) == nil,
+        "An unrelated frame must not add horizontal columns")
+
+    let repeatingColumnsContext = CGContext(data: nil, width: 260,
+        height: horizontalHeight, bitsPerComponent: 8, bytesPerRow: 0,
+        space: colorSpace, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    for column in 0..<260 {
+        repeatingColumnsContext.setFillColor((column % 20) < 10
+            ? CGColor(red: 0.86, green: 0.42, blue: 0.19, alpha: 1)
+            : CGColor(gray: 0.1, alpha: 1))
+        repeatingColumnsContext.fill(CGRect(x: column, y: 0,
+            width: 1, height: horizontalHeight))
+    }
+    let repeatingColumns = repeatingColumnsContext.makeImage()!
+    let repeatingColumnsFirst = repeatingColumns.cropping(to: CGRect(x: 0, y: 0,
+        width: horizontalWidth, height: horizontalHeight))!
+    let repeatingColumnsSecond = repeatingColumns.cropping(to: CGRect(x: 48, y: 0,
+        width: horizontalWidth, height: horizontalHeight))!
+    precondition(ScrollCaptureController.matchedScrollOffset(previous: repeatingColumnsFirst,
+        current: repeatingColumnsSecond, excludedTop: 0, excludedRight: 0,
+        direction: horizontalRight) == nil,
+        "Repeated columns must not choose an arbitrary horizontal seam")
+
+    func horizontalFrameWithRail(at column: Int) -> CGImage {
+        let context = CGContext(data: nil, width: horizontalWidth, height: horizontalHeight,
+            bitsPerComponent: 8, bytesPerRow: 0, space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.draw(horizontalFrame(at: column), in: CGRect(x: 0, y: 0,
+            width: horizontalWidth, height: horizontalHeight))
+        context.setFillColor(CGColor(gray: 0.15, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: 10, height: horizontalHeight))
+        context.setFillColor(CGColor(gray: 0.35, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: horizontalWidth, height: 6))
+        return context.makeImage()!
+    }
+    precondition(ScrollCaptureController.matchedScrollOffset(
+        previous: horizontalFrameWithRail(at: 0),
+        current: horizontalFrameWithRail(at: 31),
+        excludedTop: 0, excludedRight: 0, direction: horizontalRight) == 31,
+        "A fixed side rail and bottom bar must not obscure horizontal movement")
+
+    guard let horizontalJoined = ScrollCaptureController.mergedHorizontalImage(
+        existing: horizontalFirst, currentFrame: horizontalSecond, offsetPx: 31),
+          let horizontalExpected = horizontalPage.cropping(to: CGRect(
+            x: 0, y: 0, width: 151, height: horizontalHeight)) else {
+        preconditionFailure("Overlapping horizontal frames should stitch")
+    }
+    let horizontalActualPixels = NSBitmapImageRep(cgImage: horizontalJoined)
+    let horizontalExpectedPixels = NSBitmapImageRep(cgImage: horizontalExpected)
+    precondition(horizontalJoined.width == 151 && horizontalJoined.height == horizontalHeight)
+    for y in 0..<horizontalHeight {
+        for x in 0..<151 {
+            precondition(horizontalActualPixels.colorAt(x: x, y: y)
+                == horizontalExpectedPixels.colorAt(x: x, y: y),
+                "Horizontal stitch changed a page pixel at (\(x), \(y))")
+        }
+    }
+    guard let horizontalThird = ScrollCaptureController.mergedHorizontalImage(
+        existing: horizontalJoined, currentFrame: horizontalFrame(at: 59), offsetPx: 28),
+          let horizontalThirdExpected = horizontalPage.cropping(to: CGRect(
+            x: 0, y: 0, width: 179, height: horizontalHeight)),
+          let horizontalCapped = ScrollCaptureController.mergedHorizontalImage(
+        existing: horizontalFirst, currentFrame: horizontalSecond,
+        offsetPx: 31, columnsToAppend: 10),
+          let horizontalCappedExpected = horizontalPage.cropping(to: CGRect(
+            x: 0, y: 0, width: 130, height: horizontalHeight)) else {
+        preconditionFailure("Multiple or capped horizontal strips should stitch")
+    }
+    for (image, expectedImage) in [(horizontalThird, horizontalThirdExpected),
+                                    (horizontalCapped, horizontalCappedExpected)] {
+        let actualPixels = NSBitmapImageRep(cgImage: image)
+        let expectedPixels = NSBitmapImageRep(cgImage: expectedImage)
+        for y in 0..<horizontalHeight {
+            for x in 0..<image.width {
+                precondition(actualPixels.colorAt(x: x, y: y)
+                    == expectedPixels.colorAt(x: x, y: y),
+                    "A horizontal strip skipped or duplicated a column at (\(x), \(y))")
+            }
+        }
+    }
+
+    let horizontalReverseFirst = horizontalFrame(at: 64)
+    let horizontalReverseSecond = horizontalFrame(at: 31)
+    precondition(ScrollCaptureController.matchedScrollOffset(previous: horizontalReverseFirst,
+        current: horizontalReverseSecond, excludedTop: 0, excludedRight: 0,
+        direction: horizontalLeft) == -33,
+        "A capture starting on the right must match leftward scrolling")
+    guard let horizontalReverseJoined = ScrollCaptureController.mergedHorizontalImage(
+        existing: horizontalReverseFirst, currentFrame: horizontalReverseSecond, offsetPx: -33),
+          let horizontalReverseExpected = horizontalPage.cropping(to: CGRect(
+            x: 31, y: 0, width: 153, height: horizontalHeight)) else {
+        preconditionFailure("Leftward horizontal frames should stitch")
+    }
+    let horizontalReverseActualPixels = NSBitmapImageRep(cgImage: horizontalReverseJoined)
+    let horizontalReverseExpectedPixels = NSBitmapImageRep(cgImage: horizontalReverseExpected)
+    precondition(horizontalReverseJoined.width == 153)
+    for y in 0..<horizontalHeight {
+        for x in 0..<153 {
+            precondition(horizontalReverseActualPixels.colorAt(x: x, y: y)
+                == horizontalReverseExpectedPixels.colorAt(x: x, y: y),
+                "Leftward stitch changed a page pixel at (\(x), \(y))")
+        }
+    }
+    guard let horizontalReverseCapped = ScrollCaptureController.mergedHorizontalImage(
+        existing: horizontalReverseFirst, currentFrame: horizontalReverseSecond,
+        offsetPx: -33, columnsToAppend: 10),
+          let horizontalReverseCappedExpected = horizontalPage.cropping(to: CGRect(
+            x: 54, y: 0, width: 130, height: horizontalHeight)) else {
+        preconditionFailure("A capped leftward strip should retain adjacent content")
+    }
+    let reverseCappedPixels = NSBitmapImageRep(cgImage: horizontalReverseCapped)
+    let reverseCappedExpectedPixels = NSBitmapImageRep(cgImage: horizontalReverseCappedExpected)
+    for y in 0..<horizontalHeight {
+        for x in 0..<130 {
+            precondition(reverseCappedPixels.colorAt(x: x, y: y)
+                == reverseCappedExpectedPixels.colorAt(x: x, y: y),
+                "A capped leftward strip skipped adjacent content at (\(x), \(y))")
+        }
+    }
 
     guard let joined = ScrollCaptureController.mergedImage(existing: first,
         currentFrame: second, offsetPx: 23),

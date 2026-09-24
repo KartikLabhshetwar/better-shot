@@ -28,7 +28,9 @@ final class ScrollCaptureSessionPresenter {
             guard self?.continuation != nil, let controller else { return }
             model.isStarting = false
             model.stripCount = count
-            model.pixelHeight = Int(controller.stitchedPixelSize.height)
+            model.isHorizontal = controller.isHorizontalCapture
+            model.pixelLength = Int(model.isHorizontal
+                ? controller.stitchedPixelSize.width : controller.stitchedPixelSize.height)
         }
         controller.onSessionDone = { [weak self, weak controller] image in
             guard let self else { return }
@@ -91,8 +93,9 @@ final class ScrollCaptureSessionPresenter {
 @Observable
 final class ScrollCaptureSessionModel {
     var isStarting = true
+    var isHorizontal = false
     var stripCount = 0
-    var pixelHeight = 0
+    var pixelLength = 0
 }
 
 struct ScrollCaptureSessionView: View {
@@ -103,7 +106,7 @@ struct ScrollCaptureSessionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 8) {
-                Image(systemName: "arrow.down.to.line")
+                Image(systemName: model.isHorizontal ? "arrow.right.to.line" : "arrow.down.to.line")
                     .foregroundStyle(BarMetrics.activeTint.opacity(0.75))
                 Text("Scrolling Capture")
                     .font(.system(size: 13, weight: .semibold))
@@ -117,11 +120,11 @@ struct ScrollCaptureSessionView: View {
                 .lineLimit(1)
 
             HStack(spacing: 8) {
-                Text("\(model.stripCount) strips · \(model.pixelHeight) px")
+                Text("\(model.stripCount) strips · \(model.pixelLength) px")
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(BarMetrics.activeTint.opacity(0.75))
                     .lineLimit(1)
-                    .accessibilityLabel("\(model.stripCount) captured frames, \(model.pixelHeight) pixels high")
+                    .accessibilityLabel("\(model.stripCount) captured frames, \(model.pixelLength) pixels \(model.isHorizontal ? "wide" : "high")")
                 Spacer(minLength: 0)
                 Button("Cancel", action: cancel)
                     .accessibilityLabel("Cancel Scrolling Capture")

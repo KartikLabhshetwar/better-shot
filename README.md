@@ -100,8 +100,9 @@ Set the background, padding, corner radius, and shadow for new captures in
 ### Scrolling capture
 
 Choose **Scrolling Capture** in the menu bar popover, then drag over the
-scrollable content you want to capture. Scroll through it as usual. The panel
-reports the stitched capture's strip count and height. Choose **Stop Scrolling
+scrollable content you want to capture. Scroll down or horizontally through it
+as usual; keep one direction for each capture. The panel reports the stitched
+capture's strip count and height or width. Choose **Stop Scrolling
 Capture** to send the finished image to the capture preview, or **Cancel
 Scrolling Capture** to discard it.
 Keep the selected area over the same content as it scrolls; the result is
