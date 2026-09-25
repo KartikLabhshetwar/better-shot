@@ -2598,7 +2598,7 @@ final class RecordingStudioModel {
     // MARK: - Share to cloud
 
     var canShareToCloud: Bool {
-        CloudUploader.shared.isConfigured
+        CloudUploader.shared.canShare
     }
 
     /// The Loom loop: render the current edits, cache the result as the

@@ -355,7 +355,7 @@ struct AnnotationEditorWindow: View {
             if model.isCropping {
                 CropResolutionBadge(size: model.cropPixelSize)
             } else {
-                if CloudUploader.shared.isConfigured {
+                if CloudUploader.shared.canShare {
                     CloudUploadButton(
                         suggestedTitle: model.sourceURL?.deletingPathExtension().lastPathComponent ?? "",
                         onUpload: uploadAnnotation, shortcutAction: .imageShare

@@ -193,7 +193,7 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     overlay.remove(movieURL)
     precondition(recentVideos.first(where: { $0.previewURL == movieURL })!.open(cloud: false) == nil)
     precondition(overlay.items.contains(movieURL), "Recent saved media must reopen the existing preview/actions")
-    precondition(!CloudUploader.shared.isConfigured, "Tests must not access R2 credentials")
+    precondition(!R2CredentialStore.shared.isConfigured, "Tests must not access R2 credentials")
     overlay.remove(movieURL)
     overlay.share(movieURL)
     precondition(overlay.items.contains(movieURL) && overlay.transferStatus(for: movieURL) != nil,

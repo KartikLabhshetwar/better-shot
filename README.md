@@ -158,6 +158,8 @@ Sharing is optional and uses a Cloudflare R2 bucket you own.
    [API token](https://developers.cloudflare.com/r2/api/tokens/) with
    Object Read & Write access to that bucket.
 2. Enter your credentials in **Settings > Sharing** and click **Test Connection**.
+   A successful test turns on **Upload when I share**; while it is off, Share
+   uploads nothing.
 3. Click **Share** on any capture to upload it and copy the link.
 
 Credentials are stored in your login Keychain. Links open a viewer on
