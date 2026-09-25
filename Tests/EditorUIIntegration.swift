@@ -1099,6 +1099,13 @@ private func checkScrollCaptureStitching() throws {
             color: CGColor(gray: 0.5, alpha: 1)),
         excludedTop: headerHeight, excludedRight: 0) == nil,
         "The matcher must reject unrelated frames")
+    let revealContext = bitmap(viewportHeight)
+    revealContext.draw(second, in: CGRect(x: 0, y: 0, width: width, height: viewportHeight))
+    revealContext.setFillColor(CGColor(gray: 1, alpha: 0.6))
+    revealContext.fill(CGRect(x: 0, y: 24, width: width, height: 20))
+    precondition(ScrollCaptureController.matchedScrollOffset(previous: first,
+        current: revealContext.makeImage()!, excludedTop: headerHeight, excludedRight: 0) == 23,
+        "Content fading in during a scroll must not hide the page movement")
 
     // Sparse text on a dark page resembles a conversation capture: most of
     // the viewport is unchanged background, with a stationary top bar.
