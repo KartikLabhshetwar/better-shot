@@ -6,13 +6,17 @@ enum R2UploadToggleCheck {
     static func main() async {
         precondition(ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] == "1",
                      "Run through scripts/run-checks.sh to keep the real Keychain isolated")
-        let defaultsKeys = ["bs_r2_accountID", "bs_r2_bucket", "bs_r2_publicBaseURL", "bs_r2_enabled"]
+        let defaultsKeys = ["bs_r2_accountID", "bs_r2_bucket", "bs_r2_publicBaseURL", "bs_r2_enabled", "bs_r2_enabledMigrated"]
         defaultsKeys.forEach(UserDefaults.standard.removeObject(forKey:))
         defer { defaultsKeys.forEach(UserDefaults.standard.removeObject(forKey:)) }
 
         // Keys stay in memory: the Keychain is blocked under BETTERSHOT_TESTING.
         // An http:// URL makes any upload that gets past the toggle fail locally, never on the network.
         let store = R2CredentialStore.shared
+        precondition(UserDefaults.standard.object(forKey: "bs_r2_enabled") as? Bool == false,
+                     "the Keychain is blocked here, so this process's own first launch has no keys and must migrate to a persisted, explicit OFF")
+        precondition(UserDefaults.standard.bool(forKey: "bs_r2_enabledMigrated"),
+                     "the first launch must record that the migration ran")
         store.accountID = "test-account"
         store.bucket = "test-bucket"
         store.publicBaseURL = "http://share.example.com"
@@ -35,13 +39,20 @@ enum R2UploadToggleCheck {
         precondition(onMessage != store.snapshot().shareBlocker && !onMessage.contains("Uploads are off"),
                      "uploads on must get past the toggle, got: \(onMessage)")
 
-        precondition(R2CredentialStore.resolvedEnabled(stored: nil, hasKeys: true),
-                     "0.4.3-0.5.6 saved keys without writing the toggle; those installs keep sharing")
-        precondition(!R2CredentialStore.resolvedEnabled(stored: nil, hasKeys: false), "no keys, nothing to upload to")
-        precondition(!R2CredentialStore.resolvedEnabled(stored: false, hasKeys: true), "an explicit off stays off")
-        precondition(R2CredentialStore.resolvedEnabled(stored: true, hasKeys: true), "an explicit on stays on")
+        precondition(R2CredentialStore.resolvedEnabled(stored: nil, hasKeys: true, hasMigrated: false),
+                     "an upgrader's first launch (no stored value, no migration yet) turns sharing on once")
+        precondition(!R2CredentialStore.resolvedEnabled(stored: nil, hasKeys: false, hasMigrated: false),
+                     "a fresh install's first launch has no keys, so migration resolves to off")
+        precondition(!R2CredentialStore.resolvedEnabled(stored: nil, hasKeys: true, hasMigrated: true),
+                     "once migrated, a missing value must never re-infer on from keys added afterward")
+        precondition(!R2CredentialStore.resolvedEnabled(stored: false, hasKeys: true, hasMigrated: true),
+                     "a new user who adds keys later without touching the toggle stays off across relaunches")
+        precondition(!R2CredentialStore.resolvedEnabled(stored: false, hasKeys: true, hasMigrated: false),
+                     "an explicit off is never overwritten, even mid-migration")
+        precondition(R2CredentialStore.resolvedEnabled(stored: true, hasKeys: false, hasMigrated: true),
+                     "an explicit on is never overwritten, even with keys since removed")
 
-        print("upload toggle: off refuses to upload, on proceeds, legacy installs keep sharing")
+        print("upload toggle: off refuses to upload, on proceeds, upgraders turn on once, new users stay off")
     }
 
     @MainActor

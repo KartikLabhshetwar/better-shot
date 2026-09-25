@@ -39,6 +39,7 @@ final class R2CredentialStore {
         static let publicBaseURL = "bs_r2_publicBaseURL"
         static let useDirectLinks = "bs_r2_useDirectLinks"
         static let enabled = "bs_r2_enabled"
+        static let enabledMigrated = "bs_r2_enabledMigrated"
         static let accessKeyID = "accessKeyID"
         static let secretAccessKey = "secretAccessKey"
     }
@@ -124,9 +125,9 @@ final class R2CredentialStore {
 
     var canShare: Bool { snapshot().shareBlocker == nil }
 
-    /// 0.4.3 to 0.5.6 saved keys without writing the toggle and uploaded anyway; a missing value keeps those installs sharing.
-    nonisolated static func resolvedEnabled(stored: Bool?, hasKeys: Bool) -> Bool {
-        stored ?? hasKeys
+    /// 0.4.3-0.5.6 installs saved keys without writing the toggle; the first launch of this build turns those on once, and any later missing value means OFF.
+    nonisolated static func resolvedEnabled(stored: Bool?, hasKeys: Bool, hasMigrated: Bool = false) -> Bool {
+        stored ?? (hasMigrated ? false : hasKeys)
     }
 
     func snapshot() -> R2Credentials {
@@ -152,7 +153,14 @@ final class R2CredentialStore {
         _accessKeyID = accessKey.value ?? ""
         _secretAccessKey = secret.value ?? ""
         keychainAccess = Self.access(of: [accessKey.status, secret.status])
-        _enabled = Self.resolvedEnabled(stored: defaults.object(forKey: Keys.enabled) as? Bool, hasKeys: isConfigured)
+
+        let storedEnabled = defaults.object(forKey: Keys.enabled) as? Bool
+        let hasMigrated = defaults.bool(forKey: Keys.enabledMigrated)
+        _enabled = Self.resolvedEnabled(stored: storedEnabled, hasKeys: isConfigured, hasMigrated: hasMigrated)
+        if !hasMigrated {
+            defaults.set(_enabled, forKey: Keys.enabled)
+            defaults.set(true, forKey: Keys.enabledMigrated)
+        }
     }
 
     /// Wipes the stored keys so the next save writes a fresh item owned by this build, which is the only way past an access list a re-signed app no longer matches.
