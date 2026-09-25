@@ -690,6 +690,7 @@ final class ScrollCaptureController {
                       let other = match.score(distance * direction.sign, direction: direction, sampleLimit: 16),
                       other.isConfident else { return false }
                 return other.error <= score.error + max(2, score.error * 0.5)
+                    && other.relativeError <= score.relativeError * 1.5 + 0.05
             }
             if !ambiguous { return (candidate, score) }
         }
@@ -712,43 +713,69 @@ final class ScrollCaptureController {
             coarse.append((candidate, score))
         }
         let likely = coarse.sorted { $0.score.error < $1.score.error }.prefix(24)
+        let seeds = Set(likely.map(\.offset) + coarse.filter(\.score.isConfident).map(\.offset))
         var candidates: [Int: ScrollMatch.Score] = [:]
-        for entry in coarse where entry.score.isConfident {
-            candidates[entry.offset] = entry.score
-        }
-        for entry in likely {
-            for distance in max(minimum, abs(entry.offset) - step)...min(maximum, abs(entry.offset) + step) {
+        var refined = Set<Int>()
+        for seed in seeds {
+            for distance in max(minimum, abs(seed) - step)...min(maximum, abs(seed) + step)
+            where refined.insert(distance).inserted {
                 let offset = distance * direction.sign
                 guard let score = match.score(offset, direction: direction),
                       score.isConfident else { continue }
                 candidates[offset] = score
             }
         }
-        let ranked = candidates.sorted { $0.value.error < $1.value.error }
-        guard let best = ranked.first else { return nil }
-        let offsets = candidates.keys.sorted()
-        var lower = offsets.firstIndex(of: best.key)!
-        var upper = lower
-        while lower > 0, offsets[lower] - offsets[lower - 1] <= step { lower -= 1 }
-        while upper < offsets.count - 1, offsets[upper + 1] - offsets[upper] <= step { upper += 1 }
-        let bestBasin = offsets[lower]...offsets[upper]
+        var basins: [(offset: Int, score: ScrollMatch.Score)] = []
+        var previousOffset: Int?
+        for offset in candidates.keys.sorted() {
+            let score = candidates[offset]!
+            if let previousOffset, offset - previousOffset <= step, let last = basins.last {
+                if score.error < last.score.error { basins[basins.count - 1] = (offset, score) }
+            } else {
+                basins.append((offset, score))
+            }
+            previousOffset = offset
+        }
+        guard let best = basins.min(by: { $0.score.error < $1.score.error }) else { return nil }
+        let rivals = basins
+            .filter { $0.score.error - best.score.error <= max(2, best.score.error * 0.5)
+                && $0.score.relativeError <= best.score.relativeError * 1.5 + 0.05 }
+            .sorted { $0.score.evidence > $1.score.evidence }
         // Repeated content can match at several offsets. Wait for another frame
         // rather than permanently joining at an arbitrary row or column.
-        if let runnerUp = ranked.first(where: { !bestBasin.contains($0.key) }),
-           runnerUp.value.error - best.value.error <= max(2, best.value.error * 0.5) {
-            return nil
-        }
-        return (best.key, best.value)
+        guard rivals.count == 1 || rivals[0].score.evidence >= rivals[1].score.evidence * 2 else { return nil }
+        return rivals[0]
     }
 
     private nonisolated struct ScrollMatch {
         struct Score {
             let error: Double
+            let trimmedError: Double
             let relativeError: Double
-            let support: Int
+            let evidence: Int
+
+            /// Scores aligned differences, ignoring the worst half so fading or animated content cannot hide a true match.
+            init?(alignedHistogram histogram: [Int], unchangedPositionError: Int, stride: Int) {
+                let changed = histogram.reduce(0, +)
+                guard changed >= 20 else { return nil }
+                let kept = changed - changed / 2
+                var remaining = kept
+                var trimmedSum = 0
+                var alignedSum = 0
+                for (value, count) in histogram.enumerated() {
+                    let taken = min(count, remaining)
+                    trimmedSum += value * taken
+                    remaining -= taken
+                    alignedSum += value * count
+                }
+                error = Double(alignedSum) / Double(changed * 3)
+                trimmedError = Double(trimmedSum) / Double(kept * 3)
+                relativeError = Double(alignedSum) / Double(unchangedPositionError)
+                evidence = histogram[..<36].reduce(0, +) * stride
+            }
 
             var isConfident: Bool {
-                support >= 20 && error <= 8 && relativeError <= 0.12
+                trimmedError <= 1.5 && error <= 32 && relativeError <= 0.35
             }
         }
 
@@ -818,9 +845,8 @@ final class ScrollCaptureController {
                 current.withUnsafeBytes { currentRaw in
                     let old = previousRaw.bindMemory(to: UInt8.self)
                     let new = currentRaw.bindMemory(to: UInt8.self)
-                    var changed = 0
+                    var histogram = [Int](repeating: 0, count: 766)
                     var unchangedPositionError = 0
-                    var alignedError = 0
                     for y in stride(from: top, to: overlapEnd, by: yStep) {
                         for x in stride(from: 0, to: sampledWidth, by: xStep) {
                             let currentIndex = y * rowBytes + x * 4
@@ -833,15 +859,12 @@ final class ScrollCaptureController {
                             let aligned = abs(Int(old[shiftedIndex]) - Int(new[currentIndex]))
                                 + abs(Int(old[shiftedIndex + 1]) - Int(new[currentIndex + 1]))
                                 + abs(Int(old[shiftedIndex + 2]) - Int(new[currentIndex + 2]))
-                            changed += 1
+                            histogram[aligned] += 1
                             unchangedPositionError += same
-                            alignedError += aligned
                         }
                     }
-                    guard changed >= 20, unchangedPositionError > 0 else { return nil }
-                    return Score(error: Double(alignedError) / Double(changed * 3),
-                                 relativeError: Double(alignedError) / Double(unchangedPositionError),
-                                 support: changed)
+                    return Score(alignedHistogram: histogram,
+                                 unchangedPositionError: unchangedPositionError, stride: yStep)
                 }
             }
         }
@@ -859,9 +882,8 @@ final class ScrollCaptureController {
                 current.withUnsafeBytes { currentRaw in
                     let old = previousRaw.bindMemory(to: UInt8.self)
                     let new = currentRaw.bindMemory(to: UInt8.self)
-                    var changed = 0
+                    var histogram = [Int](repeating: 0, count: 766)
                     var unchangedPositionError = 0
-                    var alignedError = 0
                     for y in stride(from: top, to: height, by: yStep) {
                         for x in stride(from: overlapStart, to: overlapEnd, by: xStep) {
                             let currentIndex = y * rowBytes + x * 4
@@ -873,15 +895,12 @@ final class ScrollCaptureController {
                             let aligned = abs(Int(old[shiftedIndex]) - Int(new[currentIndex]))
                                 + abs(Int(old[shiftedIndex + 1]) - Int(new[currentIndex + 1]))
                                 + abs(Int(old[shiftedIndex + 2]) - Int(new[currentIndex + 2]))
-                            changed += 1
+                            histogram[aligned] += 1
                             unchangedPositionError += same
-                            alignedError += aligned
                         }
                     }
-                    guard changed >= 20, unchangedPositionError > 0 else { return nil }
-                    return Score(error: Double(alignedError) / Double(changed * 3),
-                                 relativeError: Double(alignedError) / Double(unchangedPositionError),
-                                 support: changed)
+                    return Score(alignedHistogram: histogram,
+                                 unchangedPositionError: unchangedPositionError, stride: xStep)
                 }
             }
         }
