@@ -11,6 +11,14 @@ objects=()
 for object in "$derived"/Build/Intermediates.noindex/BetterShot.build/"$configuration"/BetterShot.build/Objects-normal/"$arch"/*.o; do
     [[ "$object" == */BetterShotApp.o ]] || objects+=("$object")
 done
+if [[ "${BETTERSHOT_CHECK_SCROLL_CAPTURE:-0}" == "1" ]]; then
+    swiftc -parse-as-library -module-cache-path .build/ExportCheckModules \
+        -I "$derived/Build/Products/$configuration" Tests/ScrollCaptureIntegration.swift \
+        "${objects[@]}" "$derived/Build/Products/$configuration/DockProgress.o" "$derived/Build/Products/$configuration/TourKit.o" "$derived/Build/Products/$configuration/DynamicNotchKit.o" \
+        -o "$out/ScrollCaptureIntegration"
+    BETTERSHOT_TESTING=1 "$out/ScrollCaptureIntegration"
+    exit 0
+fi
 if [[ "${BETTERSHOT_CHECK_WINDOW_CAPTURE:-0}" == "1" ]]; then
     swiftc -parse-as-library -module-cache-path .build/ExportCheckModules \
         -I "$derived/Build/Products/$configuration" Tests/WindowCaptureIntegration.swift \

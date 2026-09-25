@@ -147,7 +147,14 @@ Scrolling Capture is the `.scrollCapture` action: the menu bar, capture bar,
 shortcut, and `bettershot://capture/scroll` all reach it through
 `CaptureOrchestrator.performCapture`. It selects an area with
 `RegionSelectionOverlay` and uses `ScrollCaptureSessionPresenter` to Stop into
-that same private preview flow or Cancel without staging a file. Run
+that same private preview flow or Cancel/Escape without staging a file. MacShot's
+Vision registration, automatic scroll cycle, and live preview use the same
+controller and preserve ScreenCaptureKit exclusion/coordinate conversion.
+`ScrollFrameAnalyzer` compares native pixel strides and channel layouts; never
+assume captured rows are packed. Keep matching off the main actor, serialize
+manual/auto/final captures, and retain the last successfully stitched reference
+when a match fails. Auto Scroll pauses on tracking loss or app changes and stops
+at page end or the size limit. Run
 `BETTERSHOT_CHECK_CAPTURE_UI=1 bash Tests/run-exports.sh` after a test build to
 check stitching and the compact capture controls in both appearances.
 Region screenshots use `RegionSelectionOverlay` with the previous area
@@ -381,6 +388,7 @@ with `make test` when production code changes.
 | Area | Command |
 | --- | --- |
 | Notch hover, preview actions, and compact/expanded snapshots | `BETTERSHOT_CHECK_NOTCH=1 bash Tests/run-exports.sh` |
+| Live scroll capture, automatic page-end detection, and ordered pixels (requires existing Screen Recording and Accessibility permissions) | `BETTERSHOT_CHECK_SCROLL_CAPTURE=1 bash Tests/run-exports.sh` |
 | ScreenCaptureKit window pixels, native resolution, staging, and preview in both modes (requires existing Screen Recording permission) | `BETTERSHOT_CHECK_WINDOW_CAPTURE=1 bash Tests/run-exports.sh` |
 | Screenshot Copy/Save and private storage | `BETTERSHOT_CHECK_SCREENSHOT_SAVING=1 bash Tests/run-exports.sh` |
 | Video compositing and encoded exports | `BETTERSHOT_CHECK_VIDEO_EXPORTS=1 bash Tests/run-exports.sh` |
