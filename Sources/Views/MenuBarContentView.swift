@@ -123,12 +123,8 @@ struct MenuBarContentView: View {
                 }
             }
 
-            TrayFullWidthButton(title: "Scrolling Capture", icon: "arrow.down.to.line") {
-                let screen = ActiveDisplayResolver.screenForScreenshotCapture() ?? originScreen
-                dismissPopover()
-                Task { @MainActor in
-                    await CaptureOrchestrator.shared.performScrollCapture(on: screen)
-                }
+            TrayGridButton(title: "Scrolling Capture", icon: "rectangle.expand.vertical", action: .scrollCapture) {
+                dismissAndRun(.scrollCapture)
             }
             .accessibilityIdentifier("scrollCaptureStart")
         }

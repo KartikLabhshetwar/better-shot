@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.7] - 2026-09-25
 
+### Added
+
+- **Scrolling capture is now available.** The 0.5.5 stitching engine shipped without a way to start it. Choose Scrolling Capture in the menu bar or Scroll in the capture bar, select an area, then scroll down or sideways through the content. A floating panel counts stitched frames and the image's length; Stop sends the result to the normal capture preview and Cancel discards it. Stitching now handles horizontal scrolling, fixed headers, and moving scrollbars, and a capture finishes on its own at 30,000 pixels ([#169](https://github.com/KartikLabhshetwar/better-shot/pull/169), thanks [@ItisPratham](https://github.com/ItisPratham))
+- Scrolling Capture can be assigned a shortcut in Settings > Shortcuts (unassigned by default); triggering it again during a capture stops the capture. It is also available as `bettershot://capture/scroll` for automation.
+
 ### Fixed
 
 - Image and video editors open in a normal window after a screenshot or recording instead of entering full screen automatically. Use the window's green full-screen button to enter full screen, or turn on Settings > General > Editor > Open editors in full screen to restore automatic full screen.

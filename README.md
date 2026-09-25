@@ -99,15 +99,17 @@ Set the background, padding, corner radius, and shadow for new captures in
 
 ### Scrolling capture
 
-Choose **Scrolling Capture** in the menu bar popover, then drag over the
-scrollable content you want to capture. Scroll down or horizontally through it
-as usual; keep one direction for each capture. The panel reports the stitched
-capture's strip count and height or width. Choose **Stop Scrolling
-Capture** to send the finished image to the capture preview, or **Cancel
-Scrolling Capture** to discard it.
-Keep the selected area over the same content as it scrolls; the result is
-assembled from overlapping screen frames, so fixed headers are handled
-automatically when detected.
+Capture a page or list that is taller or wider than the screen. Choose
+**Scrolling Capture** in the menu bar popover or **Scroll** in the capture bar
+(`⌘⇧2`), or assign a shortcut in **Settings > Shortcuts**. Drag over the
+scrollable content, then scroll through it as usual in one direction: down, or
+horizontally. The floating panel counts the stitched frames and the image's
+length. Click **Stop**, or trigger Scrolling Capture again, to send the image to
+the capture preview. **Cancel** discards it.
+
+Scroll at a steady pace so consecutive frames overlap. Fixed headers and
+scrollbars are detected and left out of the joins. A capture finishes on its own at
+30,000 pixels.
 
 ### Where files go
 
@@ -169,8 +171,8 @@ Trigger captures from Shortcuts, Raycast, Alfred, or the terminal:
 open 'bettershot://capture/region'
 ```
 
-Routes: `capture/region`, `capture/fullscreen`, `capture/window`, `ocr`,
-`color-picker`, `record`, `settings`.
+Routes: `capture/region`, `capture/fullscreen`, `capture/window`,
+`capture/scroll`, `ocr`, `color-picker`, `record`, `settings`.
 
 ## Build from source
 

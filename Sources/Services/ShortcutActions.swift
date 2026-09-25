@@ -8,7 +8,7 @@ extension ShortcutService {
         let manager = ScreenRecordingManager.shared
         switch action {
         case .region, .fullscreen, .window, .ocr, .ocrSingleLine, .colorPicker,
-             .timedRegion, .regionCopy, .regionSave, .regionEdit, .regionPin:
+             .timedRegion, .regionCopy, .regionSave, .regionEdit, .regionPin, .scrollCapture:
             await CaptureOrchestrator.shared.performCapture(action, on: screen)
         case .previousRegion:
             if AppPreferences.lastRegionRect != nil {

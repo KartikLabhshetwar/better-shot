@@ -16,6 +16,10 @@ final class CaptureOrchestrator {
 
     func performCapture(_ action: ShortcutService.Action, on screen: NSScreen? = nil) async {
         guard !NotchVoiceCapture.shared.isPreparing, !NotchQuickEditor.shared.listening else { return }
+        if action == .scrollCapture, ScrollCaptureSessionPresenter.shared.isActive {
+            ScrollCaptureSessionPresenter.shared.stop()
+            return
+        }
         if captureInProgress {
             pendingCaptures.append((action, screen))
             return
@@ -48,43 +52,31 @@ final class CaptureOrchestrator {
         await finishCaptures()
     }
 
-    func performScrollCapture(on screen: NSScreen? = nil) async {
-        guard !captureInProgress, !NotchVoiceCapture.shared.isPreparing,
-              !NotchQuickEditor.shared.listening else { return }
-        NotchPresenter.shared.suspendForCapture()
-        captureInProgress = true
-        captureScreen = screen
-        await RecordingBarPresenter.shared.hidePickerForCapture()
-
+    private func performScrollCapture() async {
         let outcome = await RegionSelectionOverlay().selectRegion(allowsWindowSelection: false)
-        if case .region(let selection) = outcome,
-           let selectedScreen = ActiveDisplayResolver.screen(for: selection.displayID) {
-            captureScreen = selectedScreen
-            // The selector returns Quartz top-left coordinates; the scroll
-            // controller accepts global AppKit bottom-left coordinates.
-            let rect = RegionGeometry.pointsRect(global: selection.pointsRect,
-                primaryHeight: CGDisplayBounds(CGMainDisplayID()).height)
-            let result = await ScrollCaptureSessionPresenter.shared.capture(rect: rect, on: selectedScreen)
-            switch result {
-            case .completed(let image):
-                do {
-                    let url = try await Self.writeScrollImage(image)
-                    ScreenCapture.shared.playShutterSound()
-                    await processCapturedImage(url)
-                } catch {
-                    ToastWindow.shared.show(isError: true, title: "Couldn’t finish scrolling capture",
-                        message: "The image could not be prepared. Select the area and try again. \(error.localizedDescription)",
-                        systemIcon: "exclamationmark.triangle", duration: 10, on: selectedScreen)
-                }
-            case .failed:
-                ToastWindow.shared.show(isError: true, title: "Couldn’t capture scrolling area",
-                    message: "Check Screen & System Audio Recording permission, then select the area and try again.",
+        guard case .region(let selection) = outcome,
+              let selectedScreen = ActiveDisplayResolver.screen(for: selection.displayID) else { return }
+        captureScreen = selectedScreen
+        let rect = RegionGeometry.pointsRect(global: selection.pointsRect,
+            primaryHeight: CGDisplayBounds(CGMainDisplayID()).height)
+        switch await ScrollCaptureSessionPresenter.shared.capture(rect: rect, on: selectedScreen) {
+        case .completed(let image):
+            do {
+                let url = try await Self.writeScrollImage(image)
+                ScreenCapture.shared.playShutterSound()
+                await processCapturedImage(url, action: .scrollCapture)
+            } catch {
+                ToastWindow.shared.show(isError: true, title: "Couldn’t finish scrolling capture",
+                    message: "The image could not be prepared. Select the area and try again. \(error.localizedDescription)",
                     systemIcon: "exclamationmark.triangle", duration: 10, on: selectedScreen)
-            case .cancelled:
-                break
             }
+        case .failed:
+            ToastWindow.shared.show(isError: true, title: "Couldn’t capture scrolling area",
+                message: "Check Screen & System Audio Recording permission, then select the area and try again.",
+                systemIcon: "exclamationmark.triangle", duration: 10, on: selectedScreen)
+        case .cancelled:
+            break
         }
-        await finishCaptures()
     }
 
     private nonisolated static func writeScrollImage(_ image: CGImage) async throws -> URL {
@@ -110,6 +102,8 @@ final class CaptureOrchestrator {
             await captureAndProcess(action: action) { try await ScreenCapture.shared.captureFullscreen(on: captureScreen) }
         case .window:
             await captureAndProcess(action: action) { try await ScreenCapture.shared.captureWindow() }
+        case .scrollCapture:
+            await performScrollCapture()
         case .ocr, .ocrSingleLine:
             await performOCR(singleLine: action == .ocrSingleLine)
         case .colorPicker:
@@ -198,7 +192,7 @@ final class CaptureOrchestrator {
         var displayURL = AppPreferences.keepInDeckUntilSaved ? stagedURL : DeckStaging.retain(stagedURL)
         if displayURL != stagedURL { DeckStaging.discard(stagedURL) }
         let allowsAutomaticSave: Bool = switch action {
-        case .region, .fullscreen, .window, .previousRegion, .timedRegion: true
+        case .region, .fullscreen, .window, .previousRegion, .timedRegion, .scrollCapture: true
         default: false
         }
         var saveFailed = false

@@ -18,6 +18,12 @@ final class ScrollCaptureSessionPresenter {
 
     private init() {}
 
+    var isActive: Bool { continuation != nil }
+
+    func stop() {
+        controller?.stopSession()
+    }
+
     func capture(rect: CGRect, on screen: NSScreen) async -> Result {
         guard continuation == nil else { return .cancelled }
 
@@ -52,7 +58,7 @@ final class ScrollCaptureSessionPresenter {
 
     private func present(model: ScrollCaptureSessionModel, on screen: NSScreen) {
         let view = ScrollCaptureSessionView(model: model,
-            stop: { [weak self] in self?.controller?.stopSession() },
+            stop: { [weak self] in self?.stop() },
             cancel: { [weak self] in
                 self?.controller?.cancelSession()
                 self?.finish(.cancelled)

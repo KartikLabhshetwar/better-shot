@@ -1855,7 +1855,11 @@ private func checkPreviewOverlay(imageURL: URL) async throws {
     precondition(overlay.items.isEmpty && overlay.transferStatus(for: imageURL) == nil)
     precondition(overlay.toastURL == nil, "Removing a preview clears its transfer toast")
     overlay.share(imageURL)
-    precondition(overlay.transferStatus(for: imageURL) == nil, "Removed cards cannot start uploads")
+    precondition(overlay.items.contains(imageURL), "Sharing a removed capture presents its card again")
+    guard case .failed(_, _, true) = overlay.transferStatus(for: imageURL) else {
+        preconditionFailure("A re-presented unconfigured share must offer recovery")
+    }
+    overlay.remove(imageURL)
 
     let id = UUID()
     let cancelledUpload = Task {
