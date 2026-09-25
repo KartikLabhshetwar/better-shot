@@ -188,6 +188,8 @@ final class ScreenRecordingManager {
                 // Own the session as soon as it exists. Any failure after this
                 // point must be able to remove or recover the directory.
                 self.session = session
+                // The recording is named now, once; every Save and Export reuses it.
+                _ = RecordingDeliverable.fileName(for: session, extension: VideoExportContainer.default.fileExtension)
                 let content = try await ScreenRecordingCapture.availableContent()
                 guard isStarting(session: session) else { return }
                 let target = try Self.captureTarget(for: source, content: content, options: options)

@@ -167,10 +167,10 @@ final class ScreenshotHistoryStore {
     }
 
     @discardableResult
-    func importScreenshot(from sourceURL: URL, sourceCapturePath: String? = nil) -> URL {
+    func importScreenshot(from sourceURL: URL, named fileName: String? = nil, sourceCapturePath: String? = nil) -> URL {
         do {
             try FileManager.default.createDirectory(at: Self.historyDirectory, withIntermediateDirectories: true)
-            let destinationURL = uniqueHistoryURL(for: sourceURL)
+            let destinationURL = uniqueHistoryURL(for: sourceURL, named: fileName)
 
             if sourceURL != destinationURL {
                 if FileManager.default.fileExists(atPath: destinationURL.path) {
@@ -199,10 +199,10 @@ final class ScreenshotHistoryStore {
     }
 
     @discardableResult
-    func importVideo(from sourceURL: URL) async -> URL {
+    func importVideo(from sourceURL: URL, named fileName: String? = nil) async -> URL {
         do {
             try FileManager.default.createDirectory(at: Self.historyDirectory, withIntermediateDirectories: true)
-            let destinationURL = uniqueHistoryURL(for: sourceURL)
+            let destinationURL = uniqueHistoryURL(for: sourceURL, named: fileName)
 
             if sourceURL != destinationURL {
                 if FileManager.default.fileExists(atPath: destinationURL.path) {
@@ -299,7 +299,10 @@ final class ScreenshotHistoryStore {
     ) -> URL {
         let displayURL = isHistoryURL(displayURL)
             ? displayURL
-            : importScreenshot(from: renderedURL, sourceCapturePath: displayURL.standardizedFileURL.path)
+            : importScreenshot(
+                from: renderedURL,
+                named: ScreenshotFileActions.captureFileName(for: displayURL, extension: renderedURL.pathExtension),
+                sourceCapturePath: displayURL.standardizedFileURL.path)
         guard isHistoryURL(displayURL) else { return displayURL }
 
         do {
@@ -474,10 +477,11 @@ final class ScreenshotHistoryStore {
         var standardized = fileURL.standardizedFileURL
         if !items.contains(where: { $0.url.standardizedFileURL == standardized }) {
             // Untouched images and imported videos can be shared without an editor save.
+            let name = ScreenshotFileActions.captureFileName(for: fileURL, extension: fileURL.pathExtension)
             if ShareBundle.mimeType(for: fileURL).hasPrefix("video/") {
-                standardized = await importVideo(from: fileURL).standardizedFileURL
+                standardized = await importVideo(from: fileURL, named: name).standardizedFileURL
             } else {
-                standardized = importScreenshot(from: fileURL,
+                standardized = importScreenshot(from: fileURL, named: name,
                     sourceCapturePath: standardized.path).standardizedFileURL
             }
         }
@@ -596,32 +600,16 @@ final class ScreenshotHistoryStore {
         }
     }
 
-    private func uniqueHistoryURL(for sourceURL: URL) -> URL {
+    /// `fileName` is the name of the capture being stored. Without one, the
+    /// file is a new capture and takes its name from the template.
+    private func uniqueHistoryURL(for sourceURL: URL, named fileName: String?) -> URL {
         let pathExtension = sourceURL.pathExtension.isEmpty ? "png" : sourceURL.pathExtension
         let isVideo = VideoExportContainer(fileExtension: pathExtension) != nil
-        let fileName = ScreenshotFileNaming.currentFileName(
+        let fileName = fileName ?? ScreenshotFileNaming.currentFileName(
             extension: pathExtension,
             kind: isVideo ? .recording : .screenshot
         )
-        let initialURL = Self.historyDirectory.appendingPathComponent(fileName)
-
-        guard FileManager.default.fileExists(atPath: initialURL.path) else {
-            return initialURL
-        }
-
-        let baseName = initialURL.deletingPathExtension().lastPathComponent
-        for index in 1...10_000 {
-            let candidateURL = Self.historyDirectory
-                .appendingPathComponent("\(baseName)-\(index)")
-                .appendingPathExtension(pathExtension)
-            if !FileManager.default.fileExists(atPath: candidateURL.path) {
-                return candidateURL
-            }
-        }
-
-        return Self.historyDirectory
-            .appendingPathComponent("BetterShot_\(UUID().uuidString)")
-            .appendingPathExtension(pathExtension)
+        return ScreenshotFileNaming.uniqueURL(for: fileName, in: Self.historyDirectory, separator: "-")
     }
 
     private func videoMetadata(at url: URL) async -> (width: Int, height: Int, duration: Double?) {

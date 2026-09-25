@@ -258,7 +258,8 @@ enum ScreenshotExportFormat: String, CaseIterable, Identifiable {
 }
 
 enum ScreenshotFileActions {
-    static func copyImageToClipboard(from url: URL) throws {
+    /// `captureURL` names the pasted file when `url` is a rendering of it.
+    static func copyImageToClipboard(from url: URL, of captureURL: URL? = nil) throws {
         let contentType = UTType(filenameExtension: url.pathExtension)
         let dataType: NSPasteboard.PasteboardType
         if contentType?.conforms(to: .jpeg) == true {
@@ -269,20 +270,26 @@ enum ScreenshotFileActions {
             dataType = .png
         }
 
-        try copyImageToClipboard(from: url, dataType: dataType)
+        try copyImageToClipboard(from: url, of: captureURL ?? url, dataType: dataType)
     }
 
-    static func copyPNGToClipboard(from url: URL, text: String? = nil, to pasteboard: NSPasteboard = .general) throws {
-        try copyImageToClipboard(from: url, dataType: .png, text: text, pasteboard: pasteboard)
+    static func copyPNGToClipboard(from url: URL, of captureURL: URL? = nil, text: String? = nil,
+                                   to pasteboard: NSPasteboard = .general) throws {
+        try copyImageToClipboard(from: url, of: captureURL ?? url, dataType: .png, text: text, pasteboard: pasteboard)
     }
 
-    private static func copyImageToClipboard(from url: URL, dataType: NSPasteboard.PasteboardType,
+    private static func copyImageToClipboard(from url: URL, of captureURL: URL, dataType: NSPasteboard.PasteboardType,
                                               text: String? = nil, pasteboard: NSPasteboard = .general) throws {
         let imageData = try Data(contentsOf: url, options: .mappedIfSafe)
         // Keep a clipboard snapshot independent of later dismissal, edits, or Save.
-        let clipboardURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("BetterShot-Clipboard-\(UUID().uuidString)")
-            .appendingPathExtension(url.pathExtension)
+        // Paste targets show the file name, so it carries the capture's name;
+        // a per-copy folder keeps two copies of one capture apart.
+        let clipboardDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BetterShot-Clipboard", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: clipboardDirectory, withIntermediateDirectories: true)
+        let clipboardURL = clipboardDirectory
+            .appendingPathComponent(captureFileName(for: captureURL, extension: url.pathExtension))
         try imageData.write(to: clipboardURL, options: .atomic)
         pasteboard.clearContents()
 
@@ -312,19 +319,18 @@ enum ScreenshotFileActions {
     }
     
     @discardableResult
-    static func saveToDefaultLocation(from url: URL) throws -> URL {
-        let destinationDirectory = BetterShotPreferences.exportDirectory
-        try FileManager.default.createDirectory(
-            at: destinationDirectory,
-            withIntermediateDirectories: true
-        )
-        
-        let destinationURL = uniqueDestinationURL(
-            for: ScreenshotFileNaming.currentFileName(extension: BetterShotPreferences.exportFormat.fileExtension),
-            in: destinationDirectory
-        )
+    static func saveToDefaultLocation(from url: URL, suggestedFileName: String? = nil) throws -> URL {
+        let destinationURL = try exportDestination(named: suggestedFileName ?? exportFileName(for: url))
         try save(from: url, to: destinationURL)
         return destinationURL
+    }
+
+    /// A free path for `fileName` in the save folder, creating the folder if
+    /// needed. Image and video saves both resolve their destination here.
+    static func exportDestination(named fileName: String) throws -> URL {
+        let directory = BetterShotPreferences.exportDirectory
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return ScreenshotFileNaming.uniqueURL(for: fileName, in: directory)
     }
     
     static func save(from sourceURL: URL, to destinationURL: URL) throws {
@@ -349,7 +355,7 @@ enum ScreenshotFileActions {
                                       compressionQuality: BetterShotPreferences.compressionQuality)
             destination = existing
         } else {
-            destination = try saveToDefaultLocation(from: renderedURL)
+            destination = try saveToDefaultLocation(from: renderedURL, suggestedFileName: exportFileName(for: captureURL))
         }
         if let record { HistoryStore.shared.setBeautifiedPath(destination.path, for: record.id) }
         return destination
@@ -382,11 +388,24 @@ enum ScreenshotFileActions {
         }
     }
     
-    static func exportFileName(for sourceURL: URL) -> String {
-        return sourceURL
-            .deletingPathExtension()
-            .appendingPathExtension(BetterShotPreferences.exportFormat.fileExtension)
-            .lastPathComponent
+    /// The name a capture was given when it was taken, carrying `pathExtension`.
+    /// Derived files (the raw source, the deck preview, edited copies) resolve
+    /// to it through the capture's record; any other file keeps its own name.
+    static func captureFileName(for url: URL, extension pathExtension: String) -> String {
+        ScreenshotFileNaming.fileName(of: URL(fileURLWithPath: captureName(for: url)), extension: pathExtension)
+    }
+
+    /// The capture's name without an extension.
+    static func captureName(for url: URL) -> String {
+        if let session = RecordingDeliverable.session(for: url) {
+            return RecordingDeliverable.name(for: session)
+        }
+        let fileName = HistoryStore.shared.record(matching: url)?.displayName ?? url.lastPathComponent
+        return URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent
+    }
+
+    static func exportFileName(for captureURL: URL) -> String {
+        captureFileName(for: captureURL, extension: BetterShotPreferences.exportFormat.fileExtension)
     }
     
     static var exportContentType: UTType {
@@ -446,31 +465,5 @@ enum ScreenshotFileActions {
         if type.conforms(to: .jpeg) { return .jpeg }
         if type.conforms(to: .heic) { return .heic }
         return type
-    }
-    
-    private static func uniqueDestinationURL(for fileName: String, in directory: URL) -> URL {
-        let originalURL = directory.appendingPathComponent(fileName)
-        
-        guard FileManager.default.fileExists(atPath: originalURL.path) else {
-            return originalURL
-        }
-        
-        let baseName = originalURL.deletingPathExtension().lastPathComponent
-        let pathExtension = originalURL.pathExtension
-        
-        for index in 1...10_000 {
-            let numberedName = "\(baseName) \(index)"
-            let candidateURL = directory
-                .appendingPathComponent(numberedName)
-                .appendingPathExtension(pathExtension)
-            
-            if !FileManager.default.fileExists(atPath: candidateURL.path) {
-                return candidateURL
-            }
-        }
-        
-        return directory
-            .appendingPathComponent("\(baseName) \(UUID().uuidString)")
-            .appendingPathExtension(pathExtension)
     }
 }

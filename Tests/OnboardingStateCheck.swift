@@ -3,8 +3,10 @@ import Foundation
 @main
 struct OnboardingStateCheck {
     static func main() {
-        let suite = "BetterShot-onboarding-\(UUID().uuidString)"
+        // A fixed suite, cleared first: a UUID name left one plist per run behind.
+        let suite = "BetterShotTests-onboarding"
         let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
         defer { defaults.removePersistentDomain(forName: suite) }
         OnboardingState.prepareForLaunch(defaults: defaults)
         precondition(OnboardingState.shouldPresent(defaults: defaults), "Fresh installs see setup")

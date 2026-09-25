@@ -21,17 +21,35 @@ enum RecordingDeliverable {
         if let task = saveTasks[key] { return try await task.value }
         let task = Task {
             let deliverable = try await resolve(for: mediaURL)
-            return try await VideoFileActions.saveToDefaultLocation(
-                from: deliverable,
-                suggestedFileName: ScreenshotFileNaming.currentFileName(
-                    extension: deliverable.pathExtension,
-                    kind: .recording
-                )
-            )
+            let suggestedFileName = session(for: mediaURL).map { fileName(for: $0, extension: deliverable.pathExtension) }
+                ?? ScreenshotFileNaming.currentFileName(extension: deliverable.pathExtension, kind: .recording)
+            return try await VideoFileActions.saveToDefaultLocation(from: deliverable, suggestedFileName: suggestedFileName)
         }
         saveTasks[key] = task
         defer { saveTasks.removeValue(forKey: key) }
         return try await task.value
+    }
+
+    /// The recording's name, carrying `pathExtension`. It is rendered from the
+    /// template once, when the recording is made, and kept in the package, so
+    /// every Save and Export reuses it. Packages from older builds are named on
+    /// their first save and keep that name. The package folder is not renamed.
+    static func fileName(for session: RecordingSession, extension pathExtension: String) -> String {
+        let name: String
+        if let stored = session.loadProjectMetadata()?.fileName {
+            name = stored
+        } else {
+            name = ScreenshotFileNaming.currentFileName(extension: pathExtension, kind: .recording)
+            session.updateProjectMetadata { $0.fileName = name }
+        }
+        return ScreenshotFileNaming.fileName(of: URL(fileURLWithPath: name), extension: pathExtension)
+    }
+
+    /// The recording's name without an extension, for Share, drag-out, and
+    /// tooltips. Only the stored name's own extension is dropped.
+    static func name(for session: RecordingSession) -> String {
+        // Any extension works here: it is appended, then dropped again.
+        URL(fileURLWithPath: fileName(for: session, extension: "mp4")).deletingPathExtension().lastPathComponent
     }
 
     /// The session a recording media URL belongs to, if any. Bare movies

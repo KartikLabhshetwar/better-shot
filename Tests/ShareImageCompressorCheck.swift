@@ -40,6 +40,21 @@ enum ShareImageCompressorCheck {
         let staged = try! FileManager.default.contentsOfDirectory(atPath: dir.path).sorted()
         assert(staged == ["alpha.png", "flat.png", "photo.jpg"], "only the winning encodes should survive, got \(staged)")
 
+        // MARK: - A compressed copy that loses to the original is deleted
+
+        let original = dir.appendingPathComponent("original.png")
+        try! Data(count: 100).write(to: original)
+        let bigger = dir.appendingPathComponent("capture.png")
+        try! Data(count: 500).write(to: bigger)
+        assert(ShareImageCompressor.smaller(bigger, orOriginal: original) == original, "the smaller original must win")
+        assert(!FileManager.default.fileExists(atPath: bigger.path),
+               "a losing copy must not stay behind to shadow the capture's name")
+        let smallerCopy = dir.appendingPathComponent("capture.jpg")
+        try! Data(count: 10).write(to: smallerCopy)
+        assert(ShareImageCompressor.smaller(smallerCopy, orOriginal: original) == smallerCopy, "a smaller copy wins")
+        try! FileManager.default.removeItem(at: original)
+        try! FileManager.default.removeItem(at: smallerCopy)
+
         // MARK: - Compression sheds an order of magnitude off the raw render
 
         let uncompressed = 5120 * 2880 * 4

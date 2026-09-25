@@ -25,11 +25,20 @@ final class HistoryStore {
 
     // MARK: - Import
 
-    func importCapture(from tempURL: URL, deleteSource: Bool = true, kind: CaptureKind = .screenshot) -> CaptureRecord? {
+    /// Copies a capture into the library as `fileName`, the name the capture
+    /// was given when it was taken; defaults to the source file's own name.
+    /// The stored copy keeps the source's extension, since that is its format.
+    /// `companion` maps a storage URL to a file that will be written beside it;
+    /// the chosen name leaves that path free too.
+    func importCapture(from tempURL: URL, named fileName: String? = nil, deleteSource: Bool = true,
+                       kind: CaptureKind = .screenshot, companion: ((URL) -> URL)? = nil) -> CaptureRecord? {
         let kind = CaptureKind.resolved(for: tempURL, fallback: kind)
-        let ext = tempURL.pathExtension.isEmpty ? "png" : tempURL.pathExtension
-        let filename = "bettershot_\(UUID().uuidString).\(ext)"
-        let destURL = storageDir.appendingPathComponent(filename)
+        let name = fileName ?? tempURL.lastPathComponent
+        let storedName = ScreenshotFileNaming.fileName(of: URL(fileURLWithPath: name), extension: tempURL.pathExtension)
+        let exists = { (url: URL) in FileManager.default.fileExists(atPath: url.path) }
+        let destURL = ScreenshotFileNaming.uniqueURL(for: storedName, in: storageDir, separator: "-") { url in
+            exists(url) || companion.map { exists($0(url)) } == true
+        }
 
         do {
             try FileManager.default.copyItem(at: tempURL, to: destURL)
@@ -40,7 +49,8 @@ final class HistoryStore {
 
         let size = Self.pixelSize(of: destURL, kind: kind)
         let record = CaptureRecord(
-            filename: filename,
+            filename: destURL.lastPathComponent,
+            name: name,
             pixelWidth: size.width,
             pixelHeight: size.height,
             kind: kind
@@ -113,8 +123,7 @@ final class HistoryStore {
     @discardableResult
     func setBeautifiedPath(_ path: String, for recordID: UUID) -> Bool {
         guard let index = records.firstIndex(where: { $0.id == recordID }) else { return false }
-        if let superseded = records[index].beautifiedPath, superseded != path,
-           URL(fileURLWithPath: superseded).standardizedFileURL.path.hasPrefix(storageDir.standardizedFileURL.path + "/") {
+        if let superseded = records[index].beautifiedPath, superseded != path, isInLibrary(superseded) {
             try? FileManager.default.removeItem(atPath: superseded)
         }
         records[index].beautifiedPath = path
@@ -128,8 +137,7 @@ final class HistoryStore {
         guard let record = record(matching: url), record.kind == .screenshot,
               let path = record.beautifiedPath else { return nil }
         let exportURL = URL(fileURLWithPath: path).standardizedFileURL
-        guard !exportURL.path.hasPrefix(storageDir.standardizedFileURL.path + "/"),
-              exportURL != urlForRecord(record).standardizedFileURL else { return nil }
+        guard !isInLibrary(path), exportURL != urlForRecord(record).standardizedFileURL else { return nil }
         return exportURL
     }
 
@@ -318,9 +326,22 @@ final class HistoryStore {
 
         for record in records[limit...] where record.isManaged {
             try? FileManager.default.removeItem(at: urlForRecord(record))
+            // The deck preview companion is library-owned too; leaving it behind
+            // would block the next capture that reuses this name.
+            if let companion = record.beautifiedPath,
+               URL(fileURLWithPath: companion).deletingLastPathComponent().standardizedFileURL
+                   == storageDir.standardizedFileURL {
+                try? FileManager.default.removeItem(atPath: companion)
+            }
         }
         records.removeSubrange(limit...)
         saveRecords()
+    }
+
+    /// Whether `path` is a file BetterShot owns inside the library folder,
+    /// as opposed to an export the user keeps elsewhere.
+    private func isInLibrary(_ path: String) -> Bool {
+        URL(fileURLWithPath: path).standardizedFileURL.path.hasPrefix(storageDir.standardizedFileURL.path + "/")
     }
 
     private func saveRecords() {

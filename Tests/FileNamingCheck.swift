@@ -18,19 +18,41 @@ enum FileNamingCheck {
         checkCounter(context: context)
         checkKind(date: date)
         checkCounterSpending()
+        checkUniqueURL()
 
-        print("file naming: 9 groups checked")
+        print("file naming: 10 groups checked")
+    }
+
+    /// Two captures can render the same name; the second must not overwrite the first.
+    private static func checkUniqueURL() {
+        let directory = FileManager.default.temporaryDirectory
+        let taken = directory.appendingPathComponent("FileNamingCheck-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: taken, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: taken) }
+        FileManager.default.createFile(atPath: taken.appendingPathComponent("a.png").path, contents: Data())
+        assert(ScreenshotFileNaming.uniqueURL(for: "b.png", in: taken).lastPathComponent == "b.png")
+        assert(ScreenshotFileNaming.uniqueURL(for: "a.png", in: taken).lastPathComponent == "a 1.png")
+        assert(ScreenshotFileNaming.uniqueURL(for: "a.png", in: taken, separator: "-").lastPathComponent == "a-1.png")
+        // A leftover companion (`c.preview.png`) reserves its name too.
+        FileManager.default.createFile(atPath: taken.appendingPathComponent("c.preview.png").path, contents: Data())
+        let companionFree = ScreenshotFileNaming.uniqueURL(for: "c.png", in: taken, separator: "-") { url in
+            [url, url.deletingPathExtension().appendingPathExtension("preview.png")]
+                .contains { FileManager.default.fileExists(atPath: $0.path) }
+        }
+        assert(companionFree.lastPathComponent == "c-1.png", "a name whose companion exists is taken, got \(companionFree.lastPathComponent)")
     }
 
     /// `currentFileName` has a side effect, which is why it is a function and
     /// not a property. Pin the contract: one call spends exactly one number,
     /// and a template without `{counter}` spends none.
     private static func checkCounterSpending() {
-        let suite = "FileNamingCheck-\(UUID().uuidString)"
+        // A fixed suite, cleared first: a UUID name left one plist per run behind.
+        let suite = "BetterShotTests-file-naming"
         guard let defaults = UserDefaults(suiteName: suite) else {
             fatalError("could not open a scratch defaults suite")
         }
-        defer { UserDefaults.standard.removePersistentDomain(forName: suite) }
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
 
         assert(ScreenshotFileNaming.counter(in: defaults) == 1, "an untouched counter starts at 1")
         assert(

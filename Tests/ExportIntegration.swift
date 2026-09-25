@@ -27,6 +27,11 @@ struct ExportIntegration {
         setbuf(stdout, nil)
         precondition(ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] == "1",
                      "Run through Tests/run-exports.sh to keep the real Keychain isolated")
+        // Start from empty settings: a run that crashed mid-check must not hand
+        // its template, counter, or deleted save folder to the next run.
+        UserDefaults.standard.removePersistentDomain(forName: ProcessInfo.processInfo.processName)
+        precondition(!AppPreferences.saveDirectory.hasPrefix(NSHomeDirectory() + "/Desktop"),
+                     "Tests must never default to the real Desktop")
         precondition(R2CredentialStore.shared.keychainAccess == .empty)
         if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_CAPTURE_UI"] == "1" {
             try checkCaptureControlsUI()
@@ -843,7 +848,7 @@ private func checkAnnotationExport(image: CGImage, source: URL, directory: URL) 
     precondition(history.annotationExportURL(for: output) == output)
     precondition(history.annotationExportURL(for: source) == nil)
     let edited = CaptureOrchestrator.saveImage(
-        image.cropping(to: CGRect(x: 0, y: 0, width: 32, height: 32))!, in: directory.path)!
+        image.cropping(to: CGRect(x: 0, y: 0, width: 32, height: 32))!, named: "edited.png", in: directory.path)!
     try ScreenshotFileActions.replaceExistingExport(from: edited, at: history.annotationExportURL(for: raw)!, compressionQuality: 0.9)
     let savedData = try Data(contentsOf: output)
     precondition(savedData != rawData)
@@ -866,6 +871,105 @@ private func checkAnnotationExport(image: CGImage, source: URL, directory: URL) 
     }
     precondition(history.records.count == 1)
     print("PASS annotation saves update the associated export and preserve the source and previous export on failure")
+}
+
+/// A capture is named from the template once, when it is taken. Copy, Save,
+/// and the editor keep that name even after the template changes, and the
+/// capture spends exactly one `{counter}` number.
+@MainActor
+private func checkCapturesKeepTheirName(
+    capture: (ShortcutService.Action) async throws -> URL,
+    savedFiles: () -> [URL]
+) async throws {
+    let templateKey = ScreenshotFileNaming.templateKey
+    let storedTemplate = UserDefaults.standard.string(forKey: templateKey)
+    let storedKeep = AppPreferences.keepInDeckUntilSaved
+    defer {
+        UserDefaults.standard.set(storedTemplate, forKey: templateKey)
+        AppPreferences.keepInDeckUntilSaved = storedKeep
+    }
+    func clipboardFileName() -> String? {
+        NSPasteboard.general.string(forType: .fileURL).flatMap(URL.init(string:))?.lastPathComponent
+    }
+
+    for keep in [false, true] {
+        AppPreferences.keepInDeckUntilSaved = keep
+        let born = "born-\(keep)-{counter:3}"
+        UserDefaults.standard.set(born, forKey: templateKey)
+        let counterBefore = ScreenshotFileNaming.counter()
+        let copied = try await capture(.region)
+        let toSave = try await capture(.region)
+        let edited = try await capture(.region)
+        precondition(ScreenshotFileNaming.counter() == counterBefore + 3,
+                     "Each capture spends one number when it is taken (keep: \(keep))")
+        let name = { (offset: Int) in
+            ScreenshotFileNaming.fileName(template: born, extension: "png",
+                                          context: .init(counter: counterBefore + offset))
+        }
+        UserDefaults.standard.set("later-{kind}", forKey: templateKey)
+
+        // Drag-out and the notch tooltip name the card, which may be a `.preview` companion.
+        precondition(ScreenshotFileActions.captureFileName(for: copied, extension: copied.pathExtension) == name(0),
+                     "A card resolves to its capture's name (keep: \(keep)), got \(copied.lastPathComponent)")
+        PreviewOverlay.shared.copy(copied)
+        precondition(clipboardFileName() == name(0),
+                     "Copy pastes the capture's own name (keep: \(keep)), got \(clipboardFileName() ?? "nil")")
+
+        PreviewOverlay.shared.save(toSave)
+        precondition(savedFiles().contains { $0.lastPathComponent == name(1) },
+                     "Save keeps the capture's name (keep: \(keep)), got \(savedFiles().map(\.lastPathComponent))")
+
+        let editorSource = ScreenshotHistoryStore.shared.annotationEditorURL(for: DeckStaging.retain(edited))
+        precondition(ScreenshotFileActions.exportFileName(for: editorSource) == name(2),
+                     "The editor names Save, Export, and Copy after the capture (keep: \(keep)), got \(ScreenshotFileActions.exportFileName(for: editorSource))")
+        precondition(ScreenshotFileNaming.counter() == counterBefore + 3, "Copy, Save, and editing spend no numbers")
+        PreviewOverlay.shared.clearAll()
+        await Task.yield()
+    }
+
+    // A template without tokens names every capture the same. Library storage
+    // numbers the files, but the capture's name stays the name it was given.
+    AppPreferences.keepInDeckUntilSaved = false
+    UserDefaults.standard.set("static", forKey: templateKey)
+    let storedLimit = AppPreferences.historyRetentionLimit
+    defer { AppPreferences.historyRetentionLimit = storedLimit }
+    let first = try await capture(.region)
+    let second = try await capture(.region)
+    precondition(!DeckStaging.isStaged(first) && !DeckStaging.isStaged(second), "Both captures reach the library")
+    PreviewOverlay.shared.copy(second)
+    precondition(clipboardFileName() == "static.png",
+                 "Storage numbering must not rename a capture, got \(clipboardFileName() ?? "nil")")
+    // Retention frees the first capture's name. Its preview companion goes with
+    // it, or the next capture that reuses the name can never be retained.
+    AppPreferences.historyRetentionLimit = 1
+    HistoryStore.shared.trimToRetentionLimit()
+    let afterTrim = try await capture(.region)
+    precondition(!DeckStaging.isStaged(afterTrim), "A capture reusing a trimmed name must still be retained")
+    PreviewOverlay.shared.clearAll()
+    await Task.yield()
+
+    // A capture whose staging fails still carries its name.
+    UserDefaults.standard.set("unrenderable", forKey: templateKey)
+    let broken = FileManager.default.temporaryDirectory.appendingPathComponent("broken-\(UUID().uuidString).png")
+    try Data("not an image".utf8).write(to: broken)
+    await CaptureOrchestrator.shared.processCapturedImage(broken, action: .region)
+    let unstaged = CaptureOrchestrator.shared.lastCaptureURL
+    precondition(unstaged?.lastPathComponent == "unrenderable.png",
+                 "A failed staging keeps the capture's name, got \(unstaged?.lastPathComponent ?? "nil")")
+    PreviewOverlay.shared.clearAll()
+    await Task.yield()
+
+    // Share uploads the file under the capture's name, whether or not it compresses.
+    let shareDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("share-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: shareDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: shareDirectory) }
+    let preview = DeckStaging.retain(try await capture(.region))
+    let upload = await CloudUploader.prepareUpload(of: preview, named: "shared", into: shareDirectory)
+    precondition(upload.deletingPathExtension().lastPathComponent == "shared",
+                 "Share uploads under the capture's name, got \(upload.lastPathComponent)")
+    PreviewOverlay.shared.clearAll()
+    await Task.yield()
+    print("PASS captures keep the name they were given when taken, across Copy, Save, Share, retention, and the editor")
 }
 
 /// Exercises production persistence in an isolated directory; never alters the user's captures.
@@ -928,7 +1032,8 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
             for action in [ShortcutService.Action.region, .timedRegion, .fullscreen, .window, .previousRegion, .regionCopy, .regionEdit] {
                 editorURL = nil
                 let staged = try await capture(action)
-                precondition(savedFiles().isEmpty, "Capture and opening the editor must never export automatically")
+                precondition(savedFiles().isEmpty,
+                             "Capture and opening the editor must never export automatically, found \(savedFiles().map(\.lastPathComponent)) after \(action)")
                 if let editorURL {
                     precondition((try? Data(contentsOf: editorURL)) == originalData, "The editor opens untouched source pixels")
                     precondition(HistoryStore.shared.annotationExportURL(for: editorURL) == nil)
@@ -944,7 +1049,7 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
                     await Task.yield()
                     precondition(FileManager.default.fileExists(atPath: staged.path) != keep,
                                  "Normal captures stay available for Restore Last Capture; staged cards are discarded")
-                    try FileManager.default.removeItem(at: clipboardURL)
+                    try FileManager.default.removeItem(at: clipboardURL.deletingLastPathComponent())
                 }
                 PreviewOverlay.shared.clearAll()
                 precondition(savedFiles().isEmpty, "Deck Copy is clipboard-only")
@@ -986,8 +1091,10 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
     let toSave = try await capture()
     PreviewOverlay.shared.save(toSave)
     precondition(savedFiles().count == 2 && !PreviewOverlay.shared.items.contains(toSave))
+    try await checkCapturesKeepTheirName(capture: capture, savedFiles: savedFiles)
+    let exportsBeforeCaptureAndSave = savedFiles().count
     _ = try await capture(.regionSave)
-    precondition(savedFiles().count == 3, "Capture-and-save remains an explicit Save action")
+    precondition(savedFiles().count == exportsBeforeCaptureAndSave + 1, "Capture-and-save remains an explicit Save action")
     let retry = try await capture()
     let blockedFolder = directory.appendingPathComponent("not-a-directory")
     try Data("block".utf8).write(to: blockedFolder)
@@ -997,7 +1104,7 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
                  && FileManager.default.fileExists(atPath: retry.path), "Failed Save preserves the card for retry")
     AppPreferences.saveDirectory = saveFolder.path
     PreviewOverlay.shared.save(retry)
-    precondition(savedFiles().count == 4 && !PreviewOverlay.shared.items.contains(retry))
+    precondition(savedFiles().count == exportsBeforeCaptureAndSave + 2 && !PreviewOverlay.shared.items.contains(retry))
     print("PASS all screenshot capture modes, clipboard-only deck/editor Copy, private retention, explicit Save, and retry")
 
     UserDefaults.standard.set(true, forKey: autoSaveKey)
@@ -1093,6 +1200,12 @@ private func checkCaptureStorage(image: CGImage, source: URL, directory: URL) as
     precondition(first.filename != second.filename)
     precondition(history.importCapture(from: directory.appendingPathComponent("missing.png")) == nil)
     precondition(history.records.count == 2, "A failed import must not insert a capture")
+    for format in ["jpg", "heic"] {
+        let named = history.importCapture(from: source, named: "Capture.\(format)", deleteSource: false)!
+        precondition(named.displayName == "Capture.\(format)" && named.filename == "Capture.\(source.pathExtension)",
+                     "A \(format) capture keeps its name, while its source is stored in its own format; got \(named.displayName), \(named.filename)")
+        history.deleteRecord(named)
+    }
     let childDirectory = directory.appendingPathComponent("project")
     let siblingDirectory = directory.appendingPathComponent("project-copy")
     for folder in [childDirectory, siblingDirectory] {
@@ -1120,7 +1233,8 @@ private func checkCaptureStorage(image: CGImage, source: URL, directory: URL) as
     let outputs = try await withThrowingTaskGroup(of: URL.self) { group in
         for _ in 0..<24 {
             group.addTask {
-                guard let output = CaptureOrchestrator.saveImage(smallImage, in: directory.path) else {
+                // Every capture in the same second renders the same name.
+                guard let output = CaptureOrchestrator.saveImage(smallImage, named: "same-second.png", in: directory.path) else {
                     throw CocoaError(.fileWriteUnknown)
                 }
                 return output
@@ -1131,12 +1245,15 @@ private func checkCaptureStorage(image: CGImage, source: URL, directory: URL) as
         return urls
     }
     precondition(Set(outputs).count == 24, "Concurrent saves need unique destinations")
+    precondition(outputs.allSatisfy { $0.lastPathComponent.hasPrefix("same-second") },
+                 "Colliding captures keep their name and gain a number")
     for output in outputs {
         let imageSource = CGImageSourceCreateWithURL(output as CFURL, nil)!
         precondition(CGImageSourceCreateImageAtIndex(imageSource, 0, nil)?.width == 32)
     }
-    precondition(CaptureOrchestrator.saveImage(smallImage, in: directory.appendingPathComponent("missing").path) == nil)
+    precondition(CaptureOrchestrator.saveImage(smallImage, named: "missing.png",
+                                               in: directory.appendingPathComponent("missing").path) == nil)
     let leftovers = try FileManager.default.contentsOfDirectory(atPath: directory.path)
-    precondition(!leftovers.contains { $0.hasPrefix(".bettershot_") }, "Staging files must be cleaned up")
+    precondition(!leftovers.contains { $0.hasPrefix(".") }, "Staging files must be cleaned up")
     print("PASS capture collisions, failed saves/imports, deleted capture guard, path identity, and history persistence")
 }

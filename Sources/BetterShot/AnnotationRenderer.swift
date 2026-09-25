@@ -78,8 +78,7 @@ enum AnnotationRenderer {
         shapes: [AnnoShape],
         backgroundSettings: AnnotationBackgroundSettings = AnnotationBackgroundSettings()
     ) throws -> URL {
-        let destinationURL = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("BetterShot_Annotated_\(UUID().uuidString).png")
+        let destinationURL = ScreenshotFileNaming.scratchURL("Annotated", extension: "png")
         try render(
             sourceURL: sourceURL,
             shapes: shapes,

@@ -39,8 +39,10 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
                          "Editor chrome must remain neutral in both appearances")
         }
     }
-    let suiteName = "BetterShot-shortcuts-" + UUID().uuidString
+    // A fixed suite, cleared first: a UUID name left one plist per run behind.
+    let suiteName = "BetterShotTests-shortcuts"
     let shortcutDefaults = UserDefaults(suiteName: suiteName)!
+    shortcutDefaults.removePersistentDomain(forName: suiteName)
     defer { shortcutDefaults.removePersistentDomain(forName: suiteName) }
     let shortcuts = ShortcutService.Shortcut.self
     precondition(shortcuts.defaultRegion.keyCode == UInt32(kVK_ANSI_4))
@@ -2012,7 +2014,7 @@ private func checkPreviewOverlay(imageURL: URL) async throws {
 
     let id = UUID()
     let cancelledUpload = Task {
-        try await CloudUploader.shared.upload(itemID: id, fileURL: imageURL)
+        try await CloudUploader.shared.upload(itemID: id, fileURL: imageURL, named: "cancelled")
     }
     cancelledUpload.cancel()
     do {

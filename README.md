@@ -122,14 +122,19 @@ bundled in [Resources/Licenses/MacShot.txt](Resources/Licenses/MacShot.txt).
 
 ### Where files go
 
-Captures stay in BetterShot's private storage until you save them.
+Captures stay in BetterShot's private storage until you save them. A screenshot
+or recording is named once, when it is taken, and Copy, Save, Export, Share, and
+drag-out all reuse that name.
 
 - **Copy** puts the image on the clipboard. No file lands in your save folder.
 - **Save** writes to your configured folder. In the editor, later saves update the same file.
 - **Export** asks for a new destination.
 
-Automatic saving is off by default. Turn it on in **Settings > General > Saving**,
-where you can also set file name templates such as `standup-{date}-{counter:3}`.
+Automatic screenshot saving is **off by default**. Enable it under
+**Settings > General > Saving** to save normal captures while keeping the preview
+or editor available. Explicit Capture & Copy, Edit, and Pin shortcuts bypass it.
+The same settings section lets you customize file names with templates such as
+`standup-{date}-{counter:3}`.
 
 ### Permissions
 

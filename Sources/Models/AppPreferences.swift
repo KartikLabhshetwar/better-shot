@@ -57,9 +57,19 @@ enum AppPreferences {
 
     // MARK: - General
     static var saveDirectory: String {
-        get { UserDefaults.standard.string(forKey: saveDirKey) ?? NSHomeDirectory() + "/Desktop" }
+        get { UserDefaults.standard.string(forKey: saveDirKey) ?? defaultSaveDirectory }
         set { UserDefaults.standard.set(newValue, forKey: saveDirKey) }
     }
+
+    /// The Desktop, except under tests: a check that forgets to choose a folder
+    /// must never write into the real Desktop.
+    private static let defaultSaveDirectory: String = {
+        if ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] == "1" {
+            return FileManager.default.temporaryDirectory
+                .appendingPathComponent("BetterShotSaveTests-\(UUID().uuidString)", isDirectory: true).path
+        }
+        return NSHomeDirectory() + "/Desktop"
+    }()
 
     static var copyAfterSave: Bool {
         get { UserDefaults.standard.object(forKey: copyAfterSaveKey) as? Bool ?? true }

@@ -202,8 +202,7 @@ final class ScreenCapture {
     // MARK: - Helpers
 
     private func makeTempPath() -> String {
-        let dir = NSTemporaryDirectory()
-        return "\(dir)bettershot_\(UUID().uuidString).png"
+        ScreenshotFileNaming.scratchURL("Capture", extension: "png").path
     }
 
     private func runScreencapture(_ arguments: [String], output: String) async throws -> Bool {

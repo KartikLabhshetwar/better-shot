@@ -1,2 +1,3 @@
 Sources/BetterShot/RecordingDeliverable.swift
 Sources/BetterShot/ScreenshotFileNaming.swift
+Sources/BetterShot/RecordingProject.swift

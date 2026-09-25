@@ -275,7 +275,8 @@ final class PreviewOverlay {
             do {
                 let uploadURL = try await RecordingDeliverable.resolve(for: savedURL)
                 try Task.checkCancellation()
-                let result = try await CloudUploader.shared.upload(itemID: id, fileURL: uploadURL)
+                let result = try await CloudUploader.shared.upload(
+                    itemID: id, fileURL: uploadURL, named: ScreenshotFileActions.captureName(for: url))
                 if let session = RecordingDeliverable.session(for: savedURL) {
                     await ScreenshotHistoryStore.shared.importRecordingSession(session)
                     ScreenshotHistoryStore.shared.setCloudURL(forSession: session, cloudURL: result.url)
@@ -577,7 +578,8 @@ struct PreviewCardView: View {
                         .onDrag {
                             let retainedURL = DeckStaging.retain(url)
                             if !DeckStaging.isStaged(retainedURL), let provider = NSItemProvider(contentsOf: retainedURL) {
-                                provider.suggestedName = url.lastPathComponent
+                                provider.suggestedName = ScreenshotFileActions.captureFileName(
+                                    for: url, extension: retainedURL.pathExtension)
                                 return provider
                             }
                             return NSItemProvider(object: image)

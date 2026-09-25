@@ -25,15 +25,24 @@ enum DeckStaging {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 
+    /// A folder for one capture, so its staged file carries exactly the
+    /// capture's name even when another card in the deck has the same one.
+    nonisolated static func makeCaptureDirectory() throws -> URL {
+        let folder = directory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder
+    }
+
     static func savedURL(for url: URL) -> URL? { savedCopies[url] }
 
     /// Keep the editable source and preview inside BetterShot for Edit, Pin, Share, or drag-out.
     static func retain(_ url: URL) -> URL {
         guard isStaged(url) else { return url }
         if let retained = retainedCopies[url] { return retained }
-        guard let record = HistoryStore.shared.importCapture(from: rawURL(for: url), deleteSource: false) else { return url }
-        let raw = HistoryStore.shared.urlForRecord(record)
-        let preview = raw.deletingPathExtension().appendingPathExtension("preview." + url.pathExtension)
+        let previewURL = { (raw: URL) in raw.deletingPathExtension().appendingPathExtension("preview." + url.pathExtension) }
+        guard let record = HistoryStore.shared.importCapture(
+            from: rawURL(for: url), named: url.lastPathComponent, deleteSource: false, companion: previewURL) else { return url }
+        let preview = previewURL(HistoryStore.shared.urlForRecord(record))
         do {
             try FileManager.default.copyItem(at: url, to: preview)
         } catch {
@@ -73,6 +82,10 @@ enum DeckStaging {
         retainedCopies.removeValue(forKey: url)
         try? FileManager.default.removeItem(at: url)
         try? FileManager.default.removeItem(at: rawURL(for: url))
+        let folder = url.deletingLastPathComponent()
+        if folder.standardizedFileURL != directory.standardizedFileURL {
+            try? FileManager.default.removeItem(at: folder)
+        }
     }
 
     static func purge() {

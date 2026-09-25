@@ -223,7 +223,7 @@ struct MenuBarContentView: View {
             screenshotItems.append(TrayMenuItem(title: "No screenshots yet", icon: "photo", action: {}, isDisabled: true))
         } else {
             for record in recentScreenshots.prefix(8) {
-                screenshotItems.append(TrayMenuItem(title: record.filename, icon: "photo") { [record] in
+                screenshotItems.append(TrayMenuItem(title: record.displayName, icon: "photo") { [record] in
                     openRecentCapture(record)
                 })
             }
@@ -235,7 +235,7 @@ struct MenuBarContentView: View {
             recordingItems.append(TrayMenuItem(title: "No recordings yet", icon: "video", action: {}, isDisabled: true))
         } else {
             for record in recentRecordings.prefix(8) {
-                recordingItems.append(TrayMenuItem(title: record.filename, icon: "video") { [record] in
+                recordingItems.append(TrayMenuItem(title: record.displayName, icon: "video") { [record] in
                     openRecentCapture(record)
                 })
             }

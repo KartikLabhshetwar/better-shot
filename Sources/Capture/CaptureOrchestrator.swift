@@ -237,34 +237,61 @@ final class CaptureOrchestrator {
 
     private func stageCapture(_ url: URL) async -> URL {
         let config = AppPreferences.defaultBeautifierConfig
+        // The capture is named once, here. Its raw source, library copy, and
+        // every later Copy or Save keep this name.
+        let fileName = ScreenshotFileNaming.currentFileName(extension: AppPreferences.exportFormat.fileExtension)
         let stagedURL = await Task.detached { () -> URL? in
-            guard (try? DeckStaging.prepareDirectory()) != nil,
-                  let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+            guard let folder = try? DeckStaging.makeCaptureDirectory() else { return nil }
+            guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
                   let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil),
-                  let rendered = BeautifierRenderer.render(image: cgImage, config: config) else { return nil }
-            return Self.saveImage(rendered, in: DeckStaging.directory.path)
+                  let rendered = BeautifierRenderer.render(image: cgImage, config: config),
+                  let staged = Self.saveImage(rendered, named: fileName, in: folder.path) else {
+                try? FileManager.default.removeItem(at: folder)
+                return nil
+            }
+            return staged
         }.value
 
         guard let stagedURL else {
             ToastWindow.shared.show(isError: true, title: "Couldn’t prepare capture",
                 message: "The original screenshot is still available in the preview.",
                 systemIcon: "exclamationmark.triangle", on: captureScreen)
-            return url
+            return Self.unstagedCapture(url, named: fileName)
         }
         do {
             try FileManager.default.moveItem(at: url, to: DeckStaging.rawURL(for: stagedURL))
             return stagedURL
         } catch {
-            try? FileManager.default.removeItem(at: stagedURL)
+            DeckStaging.discard(stagedURL)
+            return Self.unstagedCapture(url, named: fileName)
+        }
+    }
+
+    /// When staging fails the original is shown as-is; it still carries the
+    /// capture's name, in a private folder of its own.
+    private static func unstagedCapture(_ url: URL, named fileName: String) -> URL {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BetterShot-Unstaged", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let named = folder.appendingPathComponent(
+            ScreenshotFileNaming.fileName(of: URL(fileURLWithPath: fileName), extension: url.pathExtension))
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try FileManager.default.moveItem(at: url, to: named)
+            return named
+        } catch {
             return url
         }
     }
 
-    nonisolated static func saveImage(_ cgImage: CGImage, in dir: String) -> URL? {
+    /// Writes `cgImage` as `fileName` (numbered if taken) in `dir`. Captures
+    /// taken in the same second render the same name, so the hidden staging
+    /// file is unique per call and the final rename retries on a taken name.
+    nonisolated static func saveImage(_ cgImage: CGImage, named fileName: String, in dir: String) -> URL? {
         let format = AppPreferences.exportFormat
         let directory = URL(fileURLWithPath: dir, isDirectory: true)
-        let url = directory.appendingPathComponent("bettershot_\(UUID().uuidString).\(format.fileExtension)")
-        let stagingURL = directory.appendingPathComponent(".\(url.lastPathComponent)")
+        let fileName = ScreenshotFileNaming.fileName(of: URL(fileURLWithPath: fileName), extension: format.fileExtension)
+        let stagingURL = directory.appendingPathComponent(".\(UUID().uuidString).\(format.fileExtension)")
         defer { try? FileManager.default.removeItem(at: stagingURL) }
 
         guard let destination = CGImageDestinationCreateWithURL(
@@ -281,13 +308,15 @@ final class CaptureOrchestrator {
         CGImageDestinationAddImage(destination, cgImage, options as CFDictionary)
 
         guard CGImageDestinationFinalize(destination) else { return nil }
-        do {
-            // Rename only a complete image; moveItem refuses to overwrite an existing file.
-            try FileManager.default.moveItem(at: stagingURL, to: url)
-            return url
-        } catch {
-            return nil
+        // Rename only a complete image. `RENAME_EXCL` fails atomically when the
+        // name exists (moveItem checks, then overwrites), so a name taken since
+        // `uniqueURL` looked is retried with the next number.
+        for _ in 0..<100 {
+            let url = ScreenshotFileNaming.uniqueURL(for: fileName, in: directory, separator: "-")
+            if renamex_np(stagingURL.path, url.path, UInt32(RENAME_EXCL)) == 0 { return url }
+            guard errno == EEXIST else { return nil }
         }
+        return nil
     }
 
     /// Legacy home of duplicated raw copies. Nothing writes here any more; kept so old captures still resolve.

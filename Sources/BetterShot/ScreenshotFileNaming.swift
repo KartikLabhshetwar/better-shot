@@ -9,8 +9,8 @@
 //
 //  The renderer is pure. It never reads preferences and never advances the
 //  counter, so Settings can preview a template as often as it likes without
-//  taking a number out of the sequence. `AppPreferences.captureFileName` is
-//  the one path that spends one.
+//  taking a number out of the sequence. `currentFileName` is the one path that
+//  spends one, and it runs once per capture, when the capture is taken.
 //
 
 import Foundation
@@ -56,12 +56,12 @@ nonisolated enum ScreenshotFileNaming {
         max(defaults.object(forKey: counterKey) as? Int ?? 1, 1)
     }
 
-    /// Names one deliverable from the stored template.
+    /// Names one new capture or recording from the stored template.
     ///
     /// Calling this SPENDS one `{counter}` number. It is the only path that
     /// does, which is what lets Settings preview a template as often as it
-    /// likes. Call it once per file, and hold the result in a local rather
-    /// than calling it again for the same save.
+    /// likes. Call it once, when the capture is taken; Copy and Save reuse
+    /// the capture's name instead of calling it again.
     @MainActor static func currentFileName(
         extension pathExtension: String,
         kind: Kind = .screenshot,
@@ -77,6 +77,51 @@ nonisolated enum ScreenshotFileNaming {
         )
         if usesCounter(template) { defaults.set(counter + 1, forKey: counterKey) }
         return name
+    }
+
+    // MARK: - Paths
+
+    /// `fileName` in `directory`, or the first free "name 1.png", "name 2.png".
+    /// Every export and library write resolves collisions through here.
+    /// `isTaken` lets a caller also reserve files that travel with the name.
+    static func uniqueURL(
+        for fileName: String,
+        in directory: URL,
+        separator: String = " ",
+        isTaken: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }
+    ) -> URL {
+        let originalURL = directory.appendingPathComponent(fileName)
+        guard isTaken(originalURL) else { return originalURL }
+
+        let baseName = originalURL.deletingPathExtension().lastPathComponent
+        let pathExtension = originalURL.pathExtension
+        for index in 1...10_000 {
+            let candidateURL = directory
+                .appendingPathComponent("\(baseName)\(separator)\(index)")
+                .appendingPathExtension(pathExtension)
+            if !isTaken(candidateURL) { return candidateURL }
+        }
+        return directory
+            .appendingPathComponent("\(baseName)\(separator)\(UUID().uuidString)")
+            .appendingPathExtension(pathExtension)
+    }
+
+    /// `sourceURL`'s file name carrying `pathExtension` instead of its own.
+    static func fileName(of sourceURL: URL, extension pathExtension: String) -> String {
+        sourceURL.deletingPathExtension().appendingPathExtension(pathExtension).lastPathComponent
+    }
+
+    /// A private working file nobody sees by name: `BetterShot-<purpose>-<UUID>.<ext>`.
+    /// Captures are named from the template when taken; deliverables and
+    /// clipboard files carry that capture name, never a scratch name.
+    static func scratchURL(
+        _ purpose: String,
+        extension pathExtension: String,
+        in directory: URL = FileManager.default.temporaryDirectory
+    ) -> URL {
+        directory
+            .appendingPathComponent("BetterShot-\(purpose)-\(UUID().uuidString)")
+            .appendingPathExtension(pathExtension.isEmpty ? "png" : pathExtension)
     }
 
     // MARK: - Rendering

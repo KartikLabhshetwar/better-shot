@@ -38,7 +38,9 @@ extension ShortcutService {
         case .restoreLastCapture, .pinLastCapture, .editClipboard:
             if action == .editClipboard {
                 do {
-                    if let url = try ClipboardImage.fileURL() {
+                    if let url = try ClipboardImage.fileURL(fileName: {
+                        ScreenshotFileNaming.currentFileName(extension: $0)
+                    }) {
                         PreviewPanelPresenter.shared.openEditor(for: url)
                         return
                     }
