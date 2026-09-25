@@ -53,15 +53,26 @@ final class ScreenCapture {
 
     // MARK: - Region
 
-    func captureRegion() async throws -> URL? {
+    /// Opens BetterShot's selector with the previous area preselected; OCR keeps the native selector.
+    func captureRegion(nativeSelector: Bool = false) async throws -> URL? {
         guard !isCapturing else { return nil }
         isCapturing = true
         defer { isCapturing = false }
 
-        let tempPath = makeTempPath()
-        let success = try await runScreencapture(["-i", "-o", "-x", "-t", "png", tempPath], output: tempPath)
-        guard success, FileManager.default.fileExists(atPath: tempPath) else { return nil }
-        return URL(fileURLWithPath: tempPath)
+        if nativeSelector {
+            let tempPath = makeTempPath()
+            let success = try await runScreencapture(["-i", "-o", "-x", "-t", "png", tempPath], output: tempPath)
+            guard success, FileManager.default.fileExists(atPath: tempPath) else { return nil }
+            return URL(fileURLWithPath: tempPath)
+        }
+        switch await RegionSelectionOverlay().selectRegion() {
+        case .cancelled:
+            return nil
+        case .window:
+            return try await pickWindowShot(includeShadow: false)
+        case .region(let selection):
+            return try await regionShot(selection.pointsRect)
+        }
     }
 
     /// Captures the remembered rectangle straight away, no selection overlay.
@@ -88,6 +99,10 @@ final class ScreenCapture {
         guard !isCapturing else { return nil }
         isCapturing = true
         defer { isCapturing = false }
+        return try await pickWindowShot(includeShadow: includeShadow)
+    }
+
+    private func pickWindowShot(includeShadow: Bool) async throws -> URL? {
         let selection = WindowScreenshotPicker()
         let picker = SCContentSharingPicker.shared
         let previousConfiguration = picker.defaultConfiguration
@@ -122,7 +137,7 @@ final class ScreenCapture {
     // MARK: - OCR Region
 
     func captureAndOCR() async throws -> String? {
-        guard let url = try await captureRegion() else { return nil }
+        guard let url = try await captureRegion(nativeSelector: true) else { return nil }
         defer { try? FileManager.default.removeItem(at: url) }
 
         guard let image = NSImage(contentsOf: url),

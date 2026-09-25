@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Thumbnail geometry adapts Cap's three-d.ts, Copyright (c) 2023-present Cap Software, Inc.
-// Swift adaptation Copyright (c) 2026 Kartik Labhshetwar. See Resources/Licenses/NOTICE.md.
+// Swift adaptation Copyright (c) 2026 Kartik Labhshetwar. See Resources/Licenses/Cap.txt.
 import SwiftUI
 import simd
 

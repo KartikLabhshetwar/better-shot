@@ -204,7 +204,7 @@ struct GeneralSettingsTab: View {
     /// on every unrelated redraw and read as a glitch.
     @State private var fileNamePreview = ""
 
-    @AppStorage(AppPreferences.editorOpensFullScreenKey) private var editorFullScreen = true
+    @AppStorage(AppPreferences.editorOpensFullScreenKey) private var editorFullScreen = false
     @State private var defaultConfig = AppPreferences.defaultBeautifierConfig
     @State private var isConfirmingReset = false
 
@@ -420,8 +420,6 @@ struct GeneralSettingsTab: View {
                 switch ExportFormat(rawValue: exportFormatRaw) ?? .png {
                 case .jpeg:
                     Text("JPEG files are much smaller, and a little detail is lost every time one is saved.")
-                case .webp:
-                    Text("WebP produces smaller files than JPEG at similar quality, with broad browser and editor support.")
                 case .png:
                     Text("PNG keeps every pixel exactly as captured, which is the safer default for screenshots of text.")
                 }
@@ -555,7 +553,7 @@ struct GeneralSettingsTab: View {
         fileNameCounter = 1
         refreshFileNamePreview()
         historyRetentionLimit = 100
-        editorFullScreen = true
+        editorFullScreen = false
         defaultConfig = .default
         AppPreferences.defaultBeautifierConfig = .default
     }
@@ -962,7 +960,7 @@ struct CaptureSettingsTab: View {
             } header: {
                 Text("Region")
             } footer: {
-                Text("Space still switches to window selection, and Escape still cancels. Your last region stays a click away either way.")
+                Text("Your last area opens already selected: press Return to capture it again, drag its handles to adjust it, or draw a new one. Space switches to window selection, and Escape cancels.")
             }
 
             Section {

@@ -143,7 +143,17 @@ all affected callers meet. Keep unrelated cleanup out of the diff.
 
 The screenshot path runs through `ShortcutService`, `CaptureOrchestrator`,
 `ScreenCapture`, private staging/history, and the preview or image editor.
-Region screenshots use macOS's native `/usr/sbin/screencapture -i` selector.
+Scrolling Capture is the `.scrollCapture` action: the menu bar, capture bar,
+shortcut, and `bettershot://capture/scroll` all reach it through
+`CaptureOrchestrator.performCapture`. It selects an area with
+`RegionSelectionOverlay` and uses `ScrollCaptureSessionPresenter` to Stop into
+that same private preview flow or Cancel without staging a file. Run
+`BETTERSHOT_CHECK_CAPTURE_UI=1 bash Tests/run-exports.sh` after a test build to
+check stitching and the compact capture controls in both appearances.
+Region screenshots use `RegionSelectionOverlay` with the previous area
+(`AppPreferences.lastRegionRect`) preselected, so Return captures it again, then
+reactivate the previously frontmost app before `screencapture -R` takes the shot.
+OCR keeps macOS's native `/usr/sbin/screencapture -i` selector.
 Window screenshots use `SCContentSharingPicker` and `SCScreenshotManager.captureImage`
 in the app process; preserve picker cancellation, native pixel dimensions, and private PNG staging.
 OCR and color results share `CaptureOrchestrator.completeTextCapture`: copy the exact
@@ -208,6 +218,14 @@ cache invalidation must agree on camera layouts, crop, masks, cursor styling,
 and effects. Camera frame ratio is independent of canvas ratio. Older projects
 must retain compatible defaults and saved artwork, including legacy Hand cursors
 and the `macOS` storage key for Arrow.
+
+`ViewportTimeline.build` adapts Cap's `zoom_spring.rs`: magnification and a
+travel-space center (0 is flush left/top, 1 flush right/bottom) use separate
+springs, so every frame stays inside the source. The center pre-aims while
+unzoomed, holds its last framing while zooming out, and Auto cues follow
+fixed pointer regions (50% by 70% of the zoomed view) instead of raw samples.
+Instant cues snap within 0.1 seconds of their boundaries. `checkZoomCamera`
+in the export integration run covers these rules against production code.
 
 `GradientPreset.presets` in [BackgroundStyle.swift](Sources/Models/BackgroundStyle.swift)
 is the palette source. General > Default Look initializes new media; editing a
@@ -313,8 +331,8 @@ transparent padding, shadow suppression, and whole-card zoom.
 
 Adapted rendering code carries Cap's AGPLv3 attribution and license in
 `Resources/Licenses/`, bundled with the application. Keep those notices and the
-corresponding-source/build instructions with distributions; see that folder's
-`NOTICE.md` and the repository `LICENSE`.
+corresponding-source/build instructions with distributions; see the repository
+`LICENSE`.
 
 `make test` includes projection/normalization checks, model persistence/undo,
 compact light/dark snapshots, production compositor checks, and encoded 30/60 fps
@@ -507,8 +525,8 @@ both appearances. The opt-in window-capture check drives selection and Escape;
 live recording and multi-display hardware still need manual checks.
 
 Boring Notch's copied shape and adapted hover button/interaction code retain their
-source credits and GPLv3 notices. See `Resources/Licenses/NOTICE.md` for the pinned
-revision and exact file mapping; bundle `BoringNotch.txt` with distributions.
+source credits and GPLv3 notices. Bundle `Resources/Licenses/BoringNotch.txt`
+with distributions.
 
 For window screenshot changes, also select a window and cancel with Escape in the
 signed dev app. Standalone test executables use their terminal’s capture identity

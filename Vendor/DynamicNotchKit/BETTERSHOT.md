@@ -8,7 +8,7 @@ The local NotchShape.swift is copied from TheBoredTeam/boring.notch revision
 99c26e418323d10e48886469fc9bd83900194bec, retaining its original author headers.
 The interruptible presentation updates were adapted from that project's ContentView.
 Those portions retain GPLv3, documented in BetterShot's
-Resources/Licenses/NOTICE.md and BoringNotch.txt; the original package's MIT
+Resources/Licenses/BoringNotch.txt; the original package's MIT
 notice does not replace their terms.
 
 Local integration applies capture exclusion before showing a panel, supports

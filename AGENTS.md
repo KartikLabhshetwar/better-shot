@@ -91,12 +91,15 @@ a PR unless explicitly requested.
 ## Capture, image quality, and recording
 
 - Shortcut defaults: `⌘⇧4` region screenshot, `⌘⇧3` fullscreen screenshot,
-  `⌘⇧2` shared capture bar, `⌘⇧5` Recording options, `⌘⇧O` OCR, `⌘⇧C` color picker.
+  `⌘⇧2` shared capture bar, `⌘⇧5` Recording options, `⌘⇧O` OCR, `⌘⇧C` color picker,
+  `⌘⇧1` Capture Previous Region. `⌘⇧2` always opens the capture bar.
   Use `ShortcutService` as the source for UI labels and settings. Migrations must
   preserve customized bindings and disabled states.
-- Region screenshots use macOS's native `screencapture` selector. Recording areas
-  use BetterShot's adjustable AppKit selector and system crosshair. Do not describe
-  the recording selector as Apple's system recording picker.
+- Region screenshots and recording areas use BetterShot's adjustable AppKit selector
+  and system crosshair. It opens with the previous area selected, so Return captures
+  it again; its edges resize it, and a drag anywhere, even inside it, draws a new
+  area. OCR keeps macOS's native `screencapture` selector. Do not describe the
+  recording selector as Apple's system recording picker.
 - Preserve capture-window exclusion, correct display/coordinate conversion,
   cancellation, and focus restoration. Never start a recording after cancellation.
 - Keep untouched capture pixels and editable project sources. Full-resolution
