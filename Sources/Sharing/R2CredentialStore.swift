@@ -14,6 +14,12 @@ struct R2Credentials: Sendable {
     var isConfigured: Bool {
         !accountID.isEmpty && !bucket.isEmpty && !publicBaseURL.isEmpty && !accessKeyID.isEmpty && !secretAccessKey.isEmpty
     }
+
+    /// Why Share must not upload; nil when it may. "Upload when I share" is the consent to publish.
+    var shareBlocker: String? {
+        if !isConfigured { return "R2 sharing is not configured. Add your credentials in Settings > Sharing." }
+        return enabled ? nil : "Uploads are off. Turn on Upload when I share in Settings > Sharing."
+    }
 }
 
 /// Keychain-backed R2 config: secrets go to the Keychain, non-secret settings to UserDefaults.
@@ -33,6 +39,7 @@ final class R2CredentialStore {
         static let publicBaseURL = "bs_r2_publicBaseURL"
         static let useDirectLinks = "bs_r2_useDirectLinks"
         static let enabled = "bs_r2_enabled"
+        static let enabledMigrated = "bs_r2_enabledMigrated"
         static let accessKeyID = "accessKeyID"
         static let secretAccessKey = "secretAccessKey"
     }
@@ -116,6 +123,13 @@ final class R2CredentialStore {
         !_accountID.isEmpty && !_bucket.isEmpty && !_publicBaseURL.isEmpty && !_accessKeyID.isEmpty && !_secretAccessKey.isEmpty
     }
 
+    var canShare: Bool { snapshot().shareBlocker == nil }
+
+    /// 0.4.3-0.5.6 installs saved keys without writing the toggle; the first launch of this build turns those on once, and any later missing value means OFF.
+    nonisolated static func resolvedEnabled(stored: Bool?, hasKeys: Bool, hasMigrated: Bool = false) -> Bool {
+        stored ?? (hasMigrated ? false : hasKeys)
+    }
+
     func snapshot() -> R2Credentials {
         R2Credentials(
             accountID: _accountID,
@@ -133,13 +147,20 @@ final class R2CredentialStore {
         _bucket = defaults.string(forKey: Keys.bucket) ?? ""
         _publicBaseURL = defaults.string(forKey: Keys.publicBaseURL) ?? ""
         _useDirectLinks = defaults.bool(forKey: Keys.useDirectLinks)
-        _enabled = defaults.bool(forKey: Keys.enabled)
 
         let accessKey = Self.getKeychainItem(key: Keys.accessKeyID)
         let secret = Self.getKeychainItem(key: Keys.secretAccessKey)
         _accessKeyID = accessKey.value ?? ""
         _secretAccessKey = secret.value ?? ""
         keychainAccess = Self.access(of: [accessKey.status, secret.status])
+
+        let storedEnabled = defaults.object(forKey: Keys.enabled) as? Bool
+        let hasMigrated = defaults.bool(forKey: Keys.enabledMigrated)
+        _enabled = Self.resolvedEnabled(stored: storedEnabled, hasKeys: isConfigured, hasMigrated: hasMigrated)
+        if !hasMigrated {
+            defaults.set(_enabled, forKey: Keys.enabled)
+            defaults.set(true, forKey: Keys.enabledMigrated)
+        }
     }
 
     /// Wipes the stored keys so the next save writes a fresh item owned by this build, which is the only way past an access list a re-signed app no longer matches.
