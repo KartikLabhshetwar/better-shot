@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Region screenshots remember your last area again.** `⌘⇧4` and Area in the capture bar open BetterShot's selector with the previous area already selected, as in 0.4: press Return (or double-click inside it) to capture the same area again, drag its handles to adjust it, or drag anywhere else to draw a new area. Space still switches to window selection and Escape cancels. The app you were using regains focus before the shot, so its windows are captured as active. OCR keeps the native macOS selector.
+- The capture bar no longer shows a dashed "A to capture again" rectangle that could not be moved, resized, or triggered. The previous area is now part of the selector itself, and Capture Previous Region in Settings > Shortcuts still captures it without opening the selector.
 - Image and video editors open in a normal window after a screenshot or recording instead of entering full screen automatically. Use the window's green full-screen button to enter full screen, or turn on Settings > General > Editor > Open editors in full screen to restore automatic full screen.
 - Automatically saved screenshots and new explicit Saves use the configured file name template instead of the internal `.preview.png` name. Saving over an existing export keeps its current name ([#167](https://github.com/KartikLabhshetwar/better-shot/pull/167), thanks [@zergzorg](https://github.com/zergzorg))
 

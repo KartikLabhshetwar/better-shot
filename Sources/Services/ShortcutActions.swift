@@ -14,7 +14,7 @@ extension ShortcutService {
             if AppPreferences.lastRegionRect != nil {
                 await CaptureOrchestrator.shared.captureLastRegion(on: screen)
             } else {
-                ToastWindow.shared.show(isError: true, title: "No previous region", message: "Choose a region in the capture bar first.", systemIcon: "rectangle.dashed", on: screen)
+                ToastWindow.shared.show(isError: true, title: "No previous region", message: "Select an area with the region shortcut first.", systemIcon: "rectangle.dashed", on: screen)
             }
         case .recording, .recordingOptions:
             RecordingBarPresenter.shared.showPicker(recordingOptions: action == .recordingOptions)

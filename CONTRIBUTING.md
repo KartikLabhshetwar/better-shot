@@ -150,7 +150,10 @@ shortcut, and `bettershot://capture/scroll` all reach it through
 that same private preview flow or Cancel without staging a file. Run
 `BETTERSHOT_CHECK_CAPTURE_UI=1 bash Tests/run-exports.sh` after a test build to
 check stitching and the compact capture controls in both appearances.
-Region screenshots use macOS's native `/usr/sbin/screencapture -i` selector.
+Region screenshots use `RegionSelectionOverlay` with the previous area
+(`AppPreferences.lastRegionRect`) preselected, so Return captures it again, then
+reactivate the previously frontmost app before `screencapture -R` takes the shot.
+OCR keeps macOS's native `/usr/sbin/screencapture -i` selector.
 Window screenshots use `SCContentSharingPicker` and `SCScreenshotManager.captureImage`
 in the app process; preserve picker cancellation, native pixel dimensions, and private PNG staging.
 OCR and color results share `CaptureOrchestrator.completeTextCapture`: copy the exact

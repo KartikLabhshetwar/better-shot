@@ -960,7 +960,7 @@ struct CaptureSettingsTab: View {
             } header: {
                 Text("Region")
             } footer: {
-                Text("Space still switches to window selection, and Escape still cancels. Your last region stays a click away either way.")
+                Text("Your last area opens already selected: press Return to capture it again, drag its handles to adjust it, or draw a new one. Space switches to window selection, and Escape cancels.")
             }
 
             Section {

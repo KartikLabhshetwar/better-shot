@@ -80,6 +80,7 @@ undo, redo, and native full screen.
 
 1. Open BetterShot and allow screen capture. Enable Accessibility for global shortcuts.
 2. Press `⌘⇧4` to capture a region, or `⌘⇧2` to open the capture and recording bar.
+   Your last area opens already selected: press Return to capture it again, or draw a new one.
 3. Use the floating preview to Copy, Save, Pin, or Edit.
 
 | Action | Shortcut |

@@ -265,8 +265,28 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
         selector.beginControlDrag(at: origin) { outcome = $0 }
         selector.cancelControlDrag()
         guard case .cancelled = outcome else { preconditionFailure("Releasing Control early must cancel") }
+
+        let previous = CGRect(x: screen.frame.minX + 40, y: screen.frame.minY + 50, width: 160, height: 90)
+        AppPreferences.lastRegionRect = previous
+        let reselector = RegionSelectionOverlay()
+        let reuse = Task { await reselector.selectRegion(allowsWindowSelection: false) }
+        var overlay: NSWindow?
+        for _ in 0..<50 where overlay == nil {
+            try await Task.sleep(for: .milliseconds(10))
+            overlay = NSApp.windows.first {
+                $0.isVisible && $0.frame == screen.frame && $0.level.rawValue == Int(CGWindowLevelForKey(.maximumWindow))
+            }
+        }
+        guard let overlay, let returnKey = NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: overlay.windowNumber,
+            context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36
+        ) else { preconditionFailure("The region selector must open over the screen holding the previous area") }
+        overlay.contentView?.keyDown(with: returnKey)
+        precondition(!overlay.isVisible, "Return must capture the preselected previous area")
+        guard case .region(let reused) = await reuse.value else { preconditionFailure("Return must capture the preselected previous area") }
+        precondition(reused.pointsRect.size == previous.size && AppPreferences.lastRegionRect == previous)
     }
-    print("PASS Control-drag rectangle geometry and cancellation")
+    print("PASS Control-drag rectangle geometry and cancellation, Return reuses the previous area")
     // Exercise the kit's non-notched fallback on the same screen without changing display settings.
     if let screen = window.screen {
         let floating = DynamicNotch(hoverBehavior: [], style: .floating) { NotchContent() }

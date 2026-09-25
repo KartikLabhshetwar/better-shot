@@ -42,13 +42,24 @@ final class RegionSelectionOverlay {
     private var overlayWindows: [NSWindow] = []
     private var selectionViews: [SelectionView] = []
     private var continuation: CheckedContinuation<RegionSelectionOutcome, Never>?
+    private var previousApp: NSRunningApplication?
 
+    /// Returns once the app that was frontmost is active again, so captures show its windows as focused.
     func selectRegion(allowsWindowSelection: Bool = true) async -> RegionSelectionOutcome {
         self.allowsWindowSelection = allowsWindowSelection
-        return await withCheckedContinuation { cont in
+        previousApp = NSWorkspace.shared.frontmostApplication.flatMap {
+            $0.processIdentifier == ProcessInfo.processInfo.processIdentifier ? nil : $0
+        }
+        let outcome = await withCheckedContinuation { cont in
             self.continuation = cont
             showOverlays()
         }
+        if let app = previousApp {
+            previousApp = nil
+            app.activate()
+            for _ in 0..<25 where !app.isActive { try? await Task.sleep(for: .milliseconds(20)) }
+        }
+        return outcome
     }
 
     private func showOverlays() {
@@ -70,12 +81,12 @@ final class RegionSelectionOverlay {
             window.acceptsMouseMovedEvents = true
             window.collectionBehavior = [.canJoinAllSpaces, .fullScreenPrimary]
 
-            let ghost = (controlScreen == nil ? AppPreferences.lastRegionRect : nil)
+            let previousRegion = (controlScreen == nil ? AppPreferences.lastRegionRect : nil)
                 .flatMap { screen.frame.contains($0) ? RegionGeometry.localRect(global: $0, screenFrame: screen.frame) : nil }
             let overlayView = SelectionView(
                 screen: screen,
                 cursor: crosshair,
-                ghost: ghost,
+                selection: previousRegion,
                 capturesOnRelease: capturesOnRelease
             ) { [weak self] rect in
                 self?.finishSelection(rect: rect, screen: screen)
@@ -95,7 +106,10 @@ final class RegionSelectionOverlay {
             selectionViews.append(overlayView)
         }
 
-        if controlScreen == nil { NSApp.activate(ignoringOtherApps: true) }
+        if controlScreen == nil {
+            NSApp.activate(ignoringOtherApps: true)
+            selectionViews.first(where: \.hasSelection)?.window?.makeKeyAndOrderFront(nil)
+        }
         crosshair.push()
         crosshair.set()
     }
@@ -150,6 +164,7 @@ private final class SelectionView: NSView {
     private var dragCurrent: NSPoint?
     private var mouseLocation: NSPoint?
     private var selection: CGRect?
+    var hasSelection: Bool { selection != nil }
     private var activeHandle: RegionHandle?
     private var handleDragOrigin: NSPoint?
     private var handleDragRect: CGRect?
@@ -157,7 +172,6 @@ private final class SelectionView: NSView {
     private var trackingArea: NSTrackingArea?
     private let screen: NSScreen
     private let crosshairCursor: NSCursor
-    private let ghost: CGRect?
     private let capturesOnRelease: Bool
     private let onSelect: (CGRect) -> Void
     private let onCancel: () -> Void
@@ -166,7 +180,7 @@ private final class SelectionView: NSView {
     init(
         screen: NSScreen,
         cursor: NSCursor,
-        ghost: CGRect?,
+        selection: CGRect?,
         capturesOnRelease: Bool,
         onSelect: @escaping (CGRect) -> Void,
         onCancel: @escaping () -> Void,
@@ -174,7 +188,7 @@ private final class SelectionView: NSView {
     ) {
         self.screen = screen
         self.crosshairCursor = cursor
-        self.ghost = ghost
+        self.selection = selection
         self.capturesOnRelease = capturesOnRelease
         self.onSelect = onSelect
         self.onCancel = onCancel
@@ -186,6 +200,8 @@ private final class SelectionView: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     override var acceptsFirstResponder: Bool { true }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -227,28 +243,9 @@ private final class SelectionView: NSView {
             drawSelection(start: start, current: current)
         } else if let selection {
             drawAdjustableSelection(selection)
-        } else {
-            if let ghost {
-                drawGhost(ghost)
-            }
-            if let mouse = mouseLocation {
-                drawGuideLines(at: mouse)
-            }
+        } else if let mouse = mouseLocation {
+            drawGuideLines(at: mouse)
         }
-    }
-
-    private func drawGhost(_ rect: CGRect) {
-        let hovered = mouseLocation.map(rect.contains) ?? false
-        NSColor.white.withAlphaComponent(hovered ? 0.16 : 0.08).setFill()
-        rect.fill()
-
-        NSColor.white.withAlphaComponent(hovered ? 1 : 0.8).setStroke()
-        let path = NSBezierPath(rect: rect)
-        path.lineWidth = 1
-        path.setLineDash([6, 4], count: 2, phase: 0)
-        path.stroke()
-
-        drawLabel("\(pixelSize(rect))  ·  ↩ / A / click to reuse", below: rect)
     }
 
     private func drawGuideLines(at point: NSPoint) {
@@ -303,7 +300,7 @@ private final class SelectionView: NSView {
             dot.stroke()
         }
 
-        drawLabel("\(pixelSize(rect))  ·  drag to adjust  ·  ↩ to confirm  ·  esc", below: rect)
+        drawLabel("\(pixelSize(rect))  ·  ↩ to capture  ·  drag to adjust or draw a new area  ·  esc", below: rect)
     }
 
     private func pixelSize(_ rect: CGRect) -> String {
@@ -433,8 +430,6 @@ private final class SelectionView: NSView {
             onBeginSelection()
             selection = rect
             updateCursor(at: end)
-        } else if selection == nil, let ghost, ghost.contains(end) {
-            onSelect(ghost)
         } else if selection == nil {
             onCancel()
         }
@@ -448,17 +443,10 @@ private final class SelectionView: NSView {
         case 49:
             onWindow()
         case 36, 76:
-            if let selection { onSelect(selection) } else { reuseGhost() }
+            if let selection { onSelect(selection) }
         default:
-            if selection == nil, event.charactersIgnoringModifiers?.lowercased() == "a" {
-                reuseGhost()
-            }
+            break
         }
-    }
-
-    private func reuseGhost() {
-        guard let ghost else { return }
-        onSelect(ghost)
     }
 
     private func rectFromPoints(_ a: NSPoint, _ b: NSPoint) -> CGRect {
