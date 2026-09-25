@@ -525,6 +525,13 @@
 			path = Sharing;
 			sourceTree = "<group>";
 		};
+		299E86DC313097FC40D543B7 /* Presets */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Presets;
+			sourceTree = "<group>";
+		};
 		39D4566D88515C653CF4F4DB /* Models */ = {
 			isa = PBXGroup;
 			children = (
@@ -802,6 +809,7 @@
 				749E9D00F818F70E06F34BB9 /* History */,
 				39D4566D88515C653CF4F4DB /* Models */,
 				BDA590964BECE51622E85075 /* Notch */,
+				299E86DC313097FC40D543B7 /* Presets */,
 				99E8726305BC9AF4B98FA73B /* Preview */,
 				02E0E07267FD5201B631F82C /* Services */,
 				E4007FFA622C92BA5142F86A /* Settings */,
