@@ -71,7 +71,7 @@ struct AnnotationEditorWindow: View {
             .scrollIndicators(.hidden)
             .tint(EditorChrome.accent)
             .accentColor(EditorChrome.accent)
-            .editorFullScreenByDefault()
+            .editorFullScreenSupport()
             .navigationTitle(url?.deletingPathExtension().lastPathComponent ?? "Image Editor")
             .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
             .toolbar {

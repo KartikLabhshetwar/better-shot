@@ -208,6 +208,7 @@ struct ExportIntegration {
         let defaults = UserDefaults.standard
         let preferenceKeys = [
             "bs_openEditorAfterCapture", AppPreferences.openEditorAfterRecordingKey, "bs_playSound",
+            AppPreferences.editorOpensFullScreenKey,
         ]
         let previousPreferences = preferenceKeys.map { defaults.object(forKey: $0) }
         defer {
@@ -224,7 +225,9 @@ struct ExportIntegration {
             AppPreferences.openEditorAfterRecording && !AppPreferences.openEditorAfterCapture)
         defaults.set(false, forKey: "bs_playSound")
         precondition(!BetterShotPreferences.playSounds)
-        print("PASS preference migration, independent editors, shared sound setting")
+        defaults.removeObject(forKey: AppPreferences.editorOpensFullScreenKey)
+        precondition(!AppPreferences.editorOpensFullScreen, "Editors open windowed unless full screen is opted in")
+        print("PASS preference migration, independent editors, shared sound setting, windowed editors by default")
 
         let movie = directory.appendingPathComponent("source.mov")
         try await makeMovie(at: movie, image: image)
@@ -247,7 +250,79 @@ struct ExportIntegration {
         try await checkVideoExports(movie: movie, directory: directory)
     }
 
+    static func checkZoomCamera() {
+        let clips = RecordingClipTimeline.full(sourceDuration: 8)
+        func travelCenter(_ frame: ViewportFrame) -> CGPoint {
+            let halfExtent = 1 / (2 * frame.magnification)
+            return CGPoint(x: (frame.anchor.x - halfExtent) / (1 - 2 * halfExtent),
+                           y: (frame.anchor.y - halfExtent) / (1 - 2 * halfExtent))
+        }
+        func samples(_ timeline: ViewportTimeline) -> [ViewportFrame] {
+            stride(from: 0.0, through: 8, by: 1.0 / 120).map { timeline.frame(at: $0) }
+        }
+        let empty = ViewportTimeline.build(cues: [], capture: PointerCaptureFile(), clipTimeline: clips)
+        precondition(samples(empty).allSatisfy { $0 == .identity }, "No cues must never zoom")
+
+        let pinned = ViewportTimeline.build(cues: [
+            ZoomCue(start: 1, end: 3, zoom: 2, anchorMode: .pinnedAnchor, pinnedPoint: CGPoint(x: 0.7, y: 0.35))
+        ], capture: PointerCaptureFile(), clipTimeline: clips)
+        let aimed = samples(pinned).filter { $0.magnification > 1.05 }
+        precondition(aimed.allSatisfy {
+            abs(travelCenter($0).x - 0.9) < 0.000_1 && abs(travelCenter($0).y - 0.2) < 0.000_1
+        }, "Zoom-in must launch pre-aimed and zoom-out must hold the last framing")
+        let settled = pinned.frame(at: 2.9)
+        precondition(abs(settled.magnification - 2) < 0.02
+            && abs(settled.anchor.x - 0.7) < 0.01 && abs(settled.anchor.y - 0.35) < 0.01)
+        precondition(abs(pinned.frame(at: 6).magnification - 1) < 0.01, "Zoom-out must return to identity")
+
+        let jitter = (0..<100).map { index in
+            PointerTravelSample(time: 0.5 + Double(index) * 0.02,
+                                x: 0.3 + (index.isMultiple(of: 2) ? 0.04 : -0.04), y: 0.6)
+        }
+        let corner = (0..<100).map { index in
+            PointerTravelSample(time: 2.6 + Double(index) * 0.02,
+                                x: 0.85 + (index.isMultiple(of: 2) ? 0.02 : -0.02), y: 0.2)
+        }
+        let capture = PointerCaptureFile(travel: jitter + corner,
+            presses: [PointerPressEvent(time: 1, x: 0.3, y: 0.6, button: 0, phase: .down)])
+        let followCues = [ZoomCue(start: 0.5, end: 5, zoom: 2)]
+        let follow = ViewportTimeline.build(cues: followCues, capture: capture, clipTimeline: clips)
+        let steady = stride(from: 2.0, through: 2.5, by: 1.0 / 120).map { follow.frame(at: $0).anchor }
+        precondition(zip(steady, steady.dropFirst()).allSatisfy {
+            abs($0.x - $1.x) < 0.000_1 && abs($0.y - $1.y) < 0.000_1
+        }, "Pointer jitter inside the dead zone must not move the Auto camera")
+        precondition(follow.frame(at: 4.8).anchor.x > 0.65, "Hovering into a corner must re-aim without a click")
+
+        let instant = ViewportTimeline.build(cues: [
+            ZoomCue(start: 1, end: 2, zoom: 2, anchorMode: .pinnedAnchor, skipsEasing: true)
+        ], capture: PointerCaptureFile(), clipTimeline: clips)
+        precondition(instant.frame(at: 1).magnification == 2 && instant.frame(at: 2.05).magnification == 1,
+                     "Instant zooms must snap in and out")
+
+        let mixed = followCues + [
+            ZoomCue(start: 5.2, end: 6, zoom: 4, anchorMode: .pinnedAnchor, pinnedPoint: CGPoint(x: 0, y: 1)),
+            ZoomCue(start: 6.1, end: 7.5, zoom: 3, anchorMode: .smartAnchor)
+        ]
+        let frames = samples(ViewportTimeline.build(cues: mixed, capture: capture, clipTimeline: clips))
+        precondition(frames.allSatisfy { frame in
+            let halfExtent = 1 / (2 * frame.magnification)
+            return frame.magnification >= 1
+                && frame.anchor.x - halfExtent >= -1e-9 && frame.anchor.x + halfExtent <= 1 + 1e-9
+                && frame.anchor.y - halfExtent >= -1e-9 && frame.anchor.y + halfExtent <= 1 + 1e-9
+        }, "Every sprung frame must stay inside the source")
+        precondition(frames == samples(ViewportTimeline.build(cues: mixed, capture: capture, clipTimeline: clips)))
+
+        let generated = ZoomCueSynthesizer.cues(from: PointerCaptureFile(presses: [
+            PointerPressEvent(time: 1, x: 0.4, y: 0.4, button: 0, phase: .down),
+            PointerPressEvent(time: 4, x: 0.6, y: 0.6, button: 0, phase: .down)
+        ]), duration: 10)
+        precondition(generated.count == 1 && generated[0].zoom == 2
+            && abs(generated[0].start - 0.7) < 1e-9 && abs(generated[0].end - 6.5) < 1e-9)
+        print("PASS Cap-style zoom: pre-aim, held zoom-out, stable Auto focus, instant snap, bounds, auto zoom")
+    }
+
     @MainActor static func checkVideoExports(movie: URL, directory: URL) async throws {
+        checkZoomCamera()
         let clips = RecordingClipTimeline.full(sourceDuration: 2)
         let viewport = ViewportTimeline.build(
             cues: [
@@ -911,12 +986,14 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
     let autoSaveKey = AfterCaptureAction.save.storageKey(for: .screenshot)
     let oldAutoSave = UserDefaults.standard.object(forKey: autoSaveKey)
     let oldLegacyAutoSave = UserDefaults.standard.object(forKey: BetterShotPreferences.autoSaveKey)
+    let oldFileNameTemplate = UserDefaults.standard.object(forKey: ScreenshotFileNaming.templateKey)
     let oldHandler = PreviewPanelPresenter.shared.onAnnotate
     let oldRecords = Set(HistoryStore.shared.records.map(\.id))
     var editorURL: URL?
     PreviewPanelPresenter.shared.onAnnotate = { editorURL = ScreenshotHistoryStore.shared.annotationEditorURL(for: $0) }
     AppPreferences.saveDirectory = saveFolder.path
     AppPreferences.copyAfterSave = true
+    UserDefaults.standard.set("Saved-{kind}", forKey: ScreenshotFileNaming.templateKey)
     defer {
         PreviewOverlay.shared.clearAll()
         DeckStaging.purge()
@@ -930,6 +1007,7 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
         AppPreferences.overlayDismissDelay = oldDismissDelay
         UserDefaults.standard.set(oldAutoSave, forKey: autoSaveKey)
         UserDefaults.standard.set(oldLegacyAutoSave, forKey: BetterShotPreferences.autoSaveKey)
+        UserDefaults.standard.set(oldFileNameTemplate, forKey: ScreenshotFileNaming.templateKey)
         PinnedScreenshotController.shared.unpinAll()
         PreviewPanelPresenter.shared.onAnnotate = oldHandler
     }
@@ -968,7 +1046,6 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
                     precondition(!DeckStaging.isStaged(clipboardURL)
                         && (try? Data(contentsOf: clipboardURL)) == previewData,
                         "Clipboard file pastes must survive dismissing the card")
-                    // Removing a card discards its staged file after the view update.
                     await Task.yield()
                     precondition(FileManager.default.fileExists(atPath: staged.path) != keep,
                                  "Normal captures stay available for Restore Last Capture; staged cards are discarded")
@@ -994,6 +1071,7 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
     precondition(saved.deletingLastPathComponent().resolvingSymlinksInPath().path == saveFolder.resolvingSymlinksInPath().path
                  && savedFiles().count == 1,
                  "Explicit editor Save expected \(saveFolder.path), got \(saved.path); files: \(savedFiles().map(\.lastPathComponent))")
+    precondition(saved.lastPathComponent == "Saved-Screenshot.png", "Explicit Save must use the file name template")
     let savedData = try Data(contentsOf: saved)
     let rendered = directory.appendingPathComponent("editor-render.png")
     var background = AnnotationBackgroundSettings()
@@ -1041,6 +1119,9 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
                 precondition(savedFiles().count == before + 1
                     && saved.deletingLastPathComponent().standardizedFileURL == saveFolder.standardizedFileURL,
                     "Automatic saving creates exactly one export in the configured folder")
+                precondition(saved.lastPathComponent.hasPrefix("Saved-Screenshot")
+                    && !saved.lastPathComponent.contains(".preview."),
+                    "Automatic saving must use the file name template instead of the internal preview name")
                 let raw = ScreenshotHistoryStore.shared.annotationEditorURL(for: saved)
                 precondition((try? Data(contentsOf: raw)) == originalData && raw != saved)
                 precondition(HistoryStore.shared.annotationExportURL(for: raw) == saved,

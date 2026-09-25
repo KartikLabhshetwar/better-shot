@@ -235,9 +235,9 @@ enum AppPreferences {
         set { UserDefaults.standard.set(newValue, forKey: recordingMicrophoneDeviceIDKey) }
     }
 
-    static let editorOpensFullScreenKey = "bs_editorOpensFullScreen"
+    static let editorOpensFullScreenKey = "bs_editorOpensFullScreenOptIn"
     static var editorOpensFullScreen: Bool {
-        UserDefaults.standard.object(forKey: editorOpensFullScreenKey) as? Bool ?? true
+        UserDefaults.standard.bool(forKey: editorOpensFullScreenKey)
     }
 
     static let openEditorAfterRecordingKey = "bs_openEditorAfterRecording"
@@ -367,14 +367,14 @@ enum OverlayCardSize: String, CaseIterable, Identifiable {
     }
 }
 
+/// Formats ImageIO can encode. macOS decodes WebP but cannot write it.
 enum ExportFormat: String, CaseIterable {
-    case png, jpeg, webp
+    case png, jpeg
 
     var utType: String {
         switch self {
         case .png: return "public.png"
         case .jpeg: return "public.jpeg"
-        case .webp: return "public.webp"
         }
     }
 
@@ -382,7 +382,6 @@ enum ExportFormat: String, CaseIterable {
         switch self {
         case .png: return "png"
         case .jpeg: return "jpg"
-        case .webp: return "webp"
         }
     }
 

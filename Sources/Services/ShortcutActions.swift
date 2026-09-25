@@ -8,13 +8,13 @@ extension ShortcutService {
         let manager = ScreenRecordingManager.shared
         switch action {
         case .region, .fullscreen, .window, .ocr, .ocrSingleLine, .colorPicker,
-             .timedRegion, .regionCopy, .regionSave, .regionEdit, .regionPin:
+             .timedRegion, .regionCopy, .regionSave, .regionEdit, .regionPin, .scrollCapture:
             await CaptureOrchestrator.shared.performCapture(action, on: screen)
         case .previousRegion:
             if AppPreferences.lastRegionRect != nil {
                 await CaptureOrchestrator.shared.captureLastRegion(on: screen)
             } else {
-                ToastWindow.shared.show(isError: true, title: "No previous region", message: "Choose a region in the capture bar first.", systemIcon: "rectangle.dashed", on: screen)
+                ToastWindow.shared.show(isError: true, title: "No previous region", message: "Select an area with the region shortcut first.", systemIcon: "rectangle.dashed", on: screen)
             }
         case .recording, .recordingOptions:
             RecordingBarPresenter.shared.showPicker(recordingOptions: action == .recordingOptions)

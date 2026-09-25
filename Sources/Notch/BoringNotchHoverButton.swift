@@ -6,7 +6,7 @@
 //
 
 // Adapted from TheBoredTeam/boring.notch at 99c26e418323d10e48886469fc9bd83900194bec.
-// GPL-3.0; see Resources/Licenses/BoringNotch.txt and NOTICE.md.
+// GPL-3.0; see Resources/Licenses/BoringNotch.txt.
 // BetterShot: accessible names and reduced-motion-aware, shorter hover feedback.
 
 import SwiftUI

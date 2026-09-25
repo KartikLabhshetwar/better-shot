@@ -38,6 +38,7 @@ final class ShortcutService {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         Self.migrateCaptureShortcuts(defaults: defaults)
+        Self.migratePreviousRegionDefault(defaults: defaults)
     }
 
     func registerScope(_ scope: Scope, for window: NSWindow) {
@@ -61,6 +62,7 @@ final class ShortcutService {
         static let defaultColorPicker = Shortcut(keyCode: UInt32(kVK_ANSI_C), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultRecordingOptions = Shortcut(keyCode: UInt32(kVK_ANSI_5), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
         static let defaultRecording = Shortcut(keyCode: UInt32(kVK_ANSI_2), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
+        static let defaultPreviousRegion = Shortcut(keyCode: UInt32(kVK_ANSI_1), modifiers: UInt32(cmdKey | shiftKey), enabled: true)
     }
 
     // MARK: - Registration (CGEvent tap — intercepts system shortcuts)
@@ -156,6 +158,24 @@ final class ShortcutService {
             if let data = try? JSONEncoder().encode(saved) { defaults.set(data, forKey: key) }
         }
         defaults.set(true, forKey: migrationKey)
+    }
+
+    /// Leaves Capture Previous Region unassigned when another action already uses its new ⌘⇧1 default.
+    static func migratePreviousRegionDefault(defaults: UserDefaults = .standard) {
+        let migrationKey = "bs_previousRegionDefault057"
+        guard !defaults.bool(forKey: migrationKey) else { return }
+        defaults.set(true, forKey: migrationKey)
+        let key = "bs_hotkey_\(Action.previousRegion.rawValue)"
+        let fallback = Shortcut.defaultPreviousRegion
+        let taken = Action.allCases.contains { action in
+            guard action != .previousRegion, action.scope == .global,
+                  let data = defaults.data(forKey: "bs_hotkey_\(action.rawValue)"),
+                  let saved = try? JSONDecoder().decode(Shortcut.self, from: data) else { return false }
+            return saved.keyCode == fallback.keyCode && saved.modifiers == fallback.modifiers
+        }
+        guard taken, defaults.data(forKey: key) == nil,
+              let cleared = try? JSONEncoder().encode(Shortcut(keyCode: .max, modifiers: 0, enabled: false)) else { return }
+        defaults.set(cleared, forKey: key)
     }
 
     // MARK: - Accessibility Permission

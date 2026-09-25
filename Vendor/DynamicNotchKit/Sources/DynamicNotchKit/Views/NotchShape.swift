@@ -7,7 +7,7 @@
 // Modified by Alexander on 2025-05-18.
 
 // Copied from TheBoredTeam/boring.notch at 99c26e418323d10e48886469fc9bd83900194bec.
-// GPL-3.0; see Resources/Licenses/BoringNotch.txt and NOTICE.md in BetterShot.
+// GPL-3.0; see Resources/Licenses/BoringNotch.txt in BetterShot.
 
 import SwiftUI
 
