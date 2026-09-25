@@ -2963,6 +2963,7 @@ struct StudioInspector: View {
                         } else if let selectedClip = model.selectedClip {
                             InspectorSection("Selected Clip") {
                                 selectedClipControls(for: selectedClip)
+                                    .id(selectedClip.id)
                             }
                             .studioEffectCard()
                         }
@@ -3458,19 +3459,25 @@ struct StudioInspector: View {
     // MARK: Selected clip
 
     private func selectedClipControls(for clip: RecordingClipSegment) -> some View {
-        VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
+        let speed = model.clipSpeedDraft.speed(forClipID: clip.id) ?? clip.speed
+        return VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
             InspectorSlider(
                 "Speed",
                 value: Binding(
-                    get: { CGFloat(clip.speed) },
+                    get: { CGFloat(speed) },
                     set: { model.setClipSpeed(Double($0), forClipID: clip.id) }
                 ),
                 range: CGFloat(RecordingClipSegment.minimumSpeed)...CGFloat(RecordingClipSegment.maximumSpeed),
-                format: .magnification(fractionDigits: 2)
+                format: .magnification(fractionDigits: 2),
+                onEditingChanged: { editing in
+                    if editing { model.beginClipSpeedEdit() } else { model.endClipSpeedEdit() }
+                }
             )
+            // A drag cut short by the clip leaving the inspector still ends its edit.
+            .onDisappear { model.endClipSpeedEdit() }
 
-            if clip.speed != 1 {
-                Text("Video and recorded audio play at \(clip.speed.formatted(.number.precision(.fractionLength(0...2))))× speed.")
+            if speed != 1 {
+                Text("Video and recorded audio play at \(speed.formatted(.number.precision(.fractionLength(0...2))))× speed.")
                     .font(.inspectorLabel)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
