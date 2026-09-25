@@ -1013,9 +1013,43 @@ private func checkCapturesKeepTheirName(
     print("PASS captures keep the name they were given when taken, across Copy, Save, Share, retention, and the editor")
 }
 
+@MainActor
+private func checkScreenshotSavingDefaults() {
+    let suite = "BetterShotTests-screenshot-saving-defaults"
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let key = AfterCaptureAction.save.storageKey(for: .screenshot)
+    func check(_ stored: [String: Any], isNewInstall: Bool, enabled: Bool) {
+        defaults.removePersistentDomain(forName: suite)
+        for (key, value) in stored { defaults.set(value, forKey: key) }
+        let fresh = OnboardingState.prepareForLaunch(defaults: defaults)
+        precondition(fresh == isNewInstall)
+        AfterCaptureActions.prepareForLaunch(isNewInstall: fresh, defaults: defaults)
+        precondition(AfterCaptureActions.isEnabled(.save, for: .screenshot, defaults: defaults) == enabled)
+        precondition(!AfterCaptureActions.isEnabled(.save, for: .recording, defaults: defaults),
+                     "Screenshot defaults must not enable recording exports")
+        AfterCaptureActions.prepareForLaunch(
+            isNewInstall: OnboardingState.prepareForLaunch(defaults: defaults), defaults: defaults)
+        precondition(defaults.bool(forKey: key) == enabled, "Relaunch must preserve the initialized choice")
+        defaults.set(!enabled, forKey: key)
+        AfterCaptureActions.prepareForLaunch(isNewInstall: false, defaults: defaults)
+        precondition(defaults.bool(forKey: key) == !enabled, "Later user choices must survive upgrades")
+    }
+    check([:], isNewInstall: true, enabled: true)
+    check([OnboardingState.seenVersionKey: 0], isNewInstall: false, enabled: false)
+    check([OnboardingState.seenVersionKey: 2], isNewInstall: false, enabled: false)
+    check(["bs_keepInDeckUntilSaved": true, BetterShotPreferences.autoSaveKey: true], isNewInstall: false, enabled: false)
+    for enabled in [false, true] {
+        check([OnboardingState.seenVersionKey: 2, key: enabled], isNewInstall: false, enabled: enabled)
+    }
+    precondition(AfterCaptureAction.save.defaultValue(for: .screenshot), "Restore Defaults enables screenshot saving")
+    print("PASS screenshot saving defaults: new installs, upgrades, unfinished setup, legacy keys, explicit choices, and relaunch")
+}
+
 /// Exercises production persistence in an isolated directory; never alters the user's captures.
 @MainActor
 private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throws {
+    checkScreenshotSavingDefaults()
     let originalData = try Data(contentsOf: source)
     let saveFolder = directory.appendingPathComponent("explicit-saves")
     try FileManager.default.createDirectory(at: saveFolder, withIntermediateDirectories: true)
@@ -1054,8 +1088,9 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
     }
     UserDefaults.standard.removeObject(forKey: autoSaveKey)
     UserDefaults.standard.set(true, forKey: BetterShotPreferences.autoSaveKey)
+    AfterCaptureActions.prepareForLaunch(isNewInstall: false)
     precondition(!AfterCaptureActions.isEnabled(.save, for: .screenshot),
-                 "Fresh installs and dormant legacy auto-save values must not enable automatic exports")
+                 "Upgrades must keep automatic exports off even with a dormant legacy auto-save value")
     UserDefaults.standard.set(false, forKey: autoSaveKey)
     func capture(_ action: ShortcutService.Action = .region) async throws -> URL {
         let temporary = directory.appendingPathComponent("capture-\(UUID().uuidString).png")
@@ -1070,7 +1105,7 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
         AppPreferences.keepInDeckUntilSaved = keep
         for opensEditor in [false, true] {
             AppPreferences.openEditorAfterCapture = opensEditor
-            for action in [ShortcutService.Action.region, .timedRegion, .fullscreen, .window, .previousRegion, .regionCopy, .regionEdit] {
+            for action in [ShortcutService.Action.region, .timedRegion, .fullscreen, .window, .previousRegion, .scrollCapture, .regionCopy, .regionEdit] {
                 editorURL = nil
                 let staged = try await capture(action)
                 precondition(savedFiles().isEmpty,
@@ -1148,12 +1183,27 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
     precondition(savedFiles().count == exportsBeforeCaptureAndSave + 2 && !PreviewOverlay.shared.items.contains(retry))
     print("PASS all screenshot capture modes, clipboard-only deck/editor Copy, private retention, explicit Save, and retry")
 
-    UserDefaults.standard.set(true, forKey: autoSaveKey)
+    UserDefaults.standard.removeObject(forKey: autoSaveKey)
+    AfterCaptureActions.prepareForLaunch(isNewInstall: true)
     for keep in [false, true] {
         AppPreferences.keepInDeckUntilSaved = keep
+        AppPreferences.openEditorAfterCapture = false
+        AppPreferences.overlayDismissDelay = 0.05
+        let automaticallySaved = try await capture()
+        // Hide the native panel so desktop hover/focus cannot cancel the timer.
+        PreviewOverlay.shared.hide()
+        try await Task.sleep(for: .milliseconds(100))
+        PreviewOverlay.shared.scheduleDismiss(for: automaticallySaved)
+        try await Task.sleep(for: .milliseconds(200))
+        precondition(PreviewOverlay.shared.items.contains(automaticallySaved) == keep,
+                     "Keep previews open must also apply to automatically saved screenshots (keep: \(keep))")
+        precondition(FileManager.default.fileExists(atPath: automaticallySaved.path),
+                     "Dismissing an automatically saved preview must keep the exported file")
+        PreviewOverlay.shared.clearAll()
+        AppPreferences.overlayDismissDelay = oldDismissDelay
         for opensEditor in [false, true] {
             AppPreferences.openEditorAfterCapture = opensEditor
-            for action in [ShortcutService.Action.region, .fullscreen, .window, .previousRegion, .timedRegion] {
+            for action in [ShortcutService.Action.region, .fullscreen, .window, .previousRegion, .timedRegion, .scrollCapture] {
                 let before = savedFiles().count
                 editorURL = nil
                 let saved = try await capture(action)
@@ -1213,6 +1263,24 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
         PreviewOverlay.shared.save(failed)
         precondition(savedFiles().count == before + 1 && !PreviewOverlay.shared.items.contains(failed))
     }
+    do {
+        let oldMode = UserDefaults.standard.object(forKey: AppPreferences.presentationModeKey)
+        defer {
+            UserDefaults.standard.set(oldMode, forKey: AppPreferences.presentationModeKey)
+            NotchPresenter.shared.refreshMode()
+        }
+        UserDefaults.standard.set(CapturePresentationMode.notch.rawValue, forKey: AppPreferences.presentationModeKey)
+        NotchPresenter.shared.refreshMode()
+        AppPreferences.openEditorAfterCapture = false
+        let before = savedFiles().count
+        let saved = try await capture()
+        precondition(savedFiles().count == before + 1 && PreviewOverlay.shared.items.contains(saved),
+                     "Notch captures must use the same automatic saving path and retain the preview")
+        PreviewOverlay.shared.copy(saved)
+        precondition(savedFiles().count == before + 1 && FileManager.default.fileExists(atPath: saved.path),
+                     "Notch Copy must keep the automatic save without creating another export")
+    }
+    AppPreferences.openEditorAfterCapture = true
     PreviewOverlay.shared.clearAll()
     DeckStaging.purge()
     try Data("block staging".utf8).write(to: DeckStaging.directory)
@@ -1230,7 +1298,7 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
     let beforeDisable = savedFiles().count
     _ = try await capture()
     precondition(savedFiles().count == beforeDisable, "Turning auto-save off restores private capture behavior")
-    print("PASS opt-in screenshot auto-save, legacy preference isolation, all normal modes, shortcut overrides, source/export associations, and failure retry")
+    print("PASS screenshot auto-save default, private opt-out, persistent previews, Normal/Notch modes, shortcut overrides, source/export associations, and failure retry")
 }
 
 @MainActor

@@ -124,20 +124,27 @@ bundled in [Resources/Licenses/MacShot.txt](Resources/Licenses/MacShot.txt).
 
 ### Where files go
 
-Captures stay in BetterShot's private storage until you save them. A screenshot
-or recording is named once, when it is taken, and Copy, Save, Export, Share, and
+New installs save normal screenshots to the configured folder immediately
+(Desktop by default). Change **Automatically save screenshots to this folder**
+under **Settings > General > Saving** to keep captures private until you choose
+Save or Export. Upgrades keep your previous saving behavior, including leaving
+automatic saving off if you had never enabled it.
+
+A screenshot or recording is named once, when it is taken, and Copy, Save, Export, Share, and
 drag-out all reuse that name, including any dots in a custom template.
 Video saves finish copying or converting before replacing an existing file;
 simultaneous saves with the same name get separate numbered files.
 
-- **Copy** puts the image on the clipboard. No file lands in your save folder.
+- **Copy** puts the image on the clipboard without creating another export. If the capture was already saved automatically, that file remains.
 - **Save** writes to your configured folder. In the editor, later saves update the same file.
 - **Export** asks for a new destination.
 
-Automatic screenshot saving is **off by default**. Enable it under
-**Settings > General > Saving** to save normal captures while keeping the preview
-or editor available. Explicit Capture & Copy, Edit, and Pin shortcuts bypass it.
-The same settings section lets you customize file names with templates such as
+Explicit Capture & Copy, Edit, and Pin shortcuts bypass automatic saving.
+The preview and editor remain available after an automatic save; dismissing or
+copying the preview does not delete the saved file. **Keep screenshot previews
+open** works whether automatic saving is on or off. Failed saves keep the
+capture available for retry.
+General > Saving also lets you customize file names with templates such as
 `standup-{date}-{counter:3}`.
 
 ### Permissions

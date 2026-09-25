@@ -8,15 +8,15 @@ struct OnboardingStateCheck {
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
         defer { defaults.removePersistentDomain(forName: suite) }
-        OnboardingState.prepareForLaunch(defaults: defaults)
+        precondition(OnboardingState.prepareForLaunch(defaults: defaults), "Only a fresh install initializes new defaults")
         precondition(OnboardingState.shouldPresent(defaults: defaults), "Fresh installs see setup")
         defaults.set("custom shortcut", forKey: "bs_hotkey_1")
         defaults.set("existing look", forKey: "bs_defaultBeautifierConfig")
-        OnboardingState.prepareForLaunch(defaults: defaults)
+        precondition(!OnboardingState.prepareForLaunch(defaults: defaults), "Pending setup on restart is not a new install")
         precondition(OnboardingState.shouldPresent(defaults: defaults), "Launch migrations must not skip pending first-time setup")
         defaults.removePersistentDomain(forName: suite)
         defaults.set(false, forKey: "bs_openEditorAfterRecording")
-        OnboardingState.prepareForLaunch(defaults: defaults)
+        precondition(!OnboardingState.prepareForLaunch(defaults: defaults), "Legacy preferences identify an upgrade")
         precondition(!OnboardingState.shouldPresent(defaults: defaults), "Existing users without an onboarding marker skip setup, including stored false values")
         defaults.set("custom shortcut", forKey: "bs_hotkey_1")
         defaults.set("existing look", forKey: "bs_defaultBeautifierConfig")

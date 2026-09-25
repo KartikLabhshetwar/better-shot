@@ -6,13 +6,16 @@ enum OnboardingState {
     static let seenVersionKey = "bs_onboardingSeenVersion"
     static let resumePermissionsKey = "bs_onboardingResumePermissions"
 
-    /// Run before launch migrations create preferences. Zero means first-time setup is pending.
-    static func prepareForLaunch(defaults: UserDefaults = .standard) {
-        guard defaults.object(forKey: seenVersionKey) == nil else { return }
+    /// Run before launch migrations create preferences. Returns true only for a new install,
+    /// not a permission restart or an upgrade with unfinished setup.
+    @discardableResult
+    static func prepareForLaunch(defaults: UserDefaults = .standard) -> Bool {
+        guard defaults.object(forKey: seenVersionKey) == nil else { return false }
         let existingUser = defaults.dictionaryRepresentation().keys.contains {
             $0.hasPrefix("bs_") || $0.hasPrefix("recordingStudio.")
         }
         defaults.set(existingUser ? currentVersion : 0, forKey: seenVersionKey)
+        return !existingUser
     }
 
     static func shouldPresent(defaults: UserDefaults = .standard) -> Bool {

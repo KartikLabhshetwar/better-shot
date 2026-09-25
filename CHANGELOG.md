@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Normal screenshots save automatically on new installs.** The default save folder is Desktop; change it or turn automatic saving off in Settings > General > Saving. Upgrades keep their existing behavior, including automatic saving staying off when it was never enabled. Capture & Copy, Edit, and Pin shortcuts still bypass automatic saving. Copying or dismissing an already-saved preview keeps the file. Settings now explains the active saving behavior ([#149](https://github.com/KartikLabhshetwar/better-shot/issues/149)).
 - **Recording zooms now follow Cap's camera model for smoother, steadier zoom in and zoom out.** Zoom level and framing move on separate springs, so every frame stays inside the recording. A zoom now aims at its target before it begins, so it scales straight toward the subject instead of zooming into the middle and panning across. When a zoom ends, the view zooms out in place without drifting back to the center first. Auto focus groups pointer movement into regions, so small cursor jitter no longer shakes the camera and the view only re-aims when the pointer moves into a new area (hovering is enough, no click needed). The pan-widening and click-snap corrections that caused wobble are gone. Instant zooms snap cleanly on both sides of the segment. Adapted from [Cap](https://github.com/CapSoftware/Cap) under AGPLv3.
 - Auto Zoom creates zooms at 2x, matching Cap's default. Existing zooms keep their saved level and focus.
 - The floating capture preview cards are larger at every size (Small, Medium, and Large), with larger hover actions to match. The preview also appears faster: the deck window is reused between captures and a new card shows the already-rendered image instead of reading it back from disk.
@@ -35,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WebP is no longer offered as an export format because macOS cannot encode it. A saved WebP choice falls back to PNG ([#162](https://github.com/KartikLabhshetwar/better-shot/pull/162), thanks [@icanhasjonas](https://github.com/icanhasjonas))
 - Custom capture names containing dots keep their full name through Copy, Save, Export, and drag-out instead of losing the last dotted suffix.
 - Video saves preserve the previous file if copying or conversion fails. Simultaneous video saves with the same name now create separate numbered files.
+- Keep screenshot previews open now also keeps automatically saved previews open; saving to a folder no longer overrides that setting.
 
 ## [0.5.6] - 2026-09-21
 

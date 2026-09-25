@@ -4,7 +4,8 @@
 //
 //  Configurable "what happens after a capture" pipeline, per capture type
 //  (screenshot vs recording), mirroring CleanShot's General > After capture
-//  matrix. Screenshot auto-save is an explicit opt-in starting in 0.5.4.
+//  matrix. New installs save normal screenshots automatically; upgrades keep
+//  their previous saving behavior.
 //
 
 import Foundation
@@ -72,19 +73,24 @@ enum AfterCaptureAction: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Default when the user hasn't chosen yet. The overlay defaults on, and
-    /// recordings open in the studio so zooms/backgrounds are discoverable.
-    var defaultValue: Bool {
-        self == .showOverlay || self == .openVideoEditor
+    /// New-install defaults. Screenshot saving does not enable recording exports.
+    func defaultValue(for type: AfterCaptureType) -> Bool {
+        self == .showOverlay || self == .openVideoEditor || (self == .save && type == .screenshot)
     }
 }
 
 enum AfterCaptureActions {
-    static func isEnabled(_ action: AfterCaptureAction, for type: AfterCaptureType) -> Bool {
+    /// Pin the previous default off on upgrades, including installs that never
+    /// touched the toggle. Explicit choices always win; dormant legacy keys do not.
+    static func prepareForLaunch(isNewInstall: Bool, defaults: UserDefaults = .standard) {
+        let key = AfterCaptureAction.save.storageKey(for: .screenshot)
+        guard defaults.object(forKey: key) == nil else { return }
+        defaults.set(isNewInstall && AfterCaptureAction.save.defaultValue(for: .screenshot), forKey: key)
+    }
+
+    static func isEnabled(_ action: AfterCaptureAction, for type: AfterCaptureType,
+                          defaults: UserDefaults = .standard) -> Bool {
         let key = action.storageKey(for: type)
-        if UserDefaults.standard.object(forKey: key) == nil {
-            return action.defaultValue
-        }
-        return UserDefaults.standard.bool(forKey: key)
+        return defaults.object(forKey: key) as? Bool ?? action.defaultValue(for: type)
     }
 }

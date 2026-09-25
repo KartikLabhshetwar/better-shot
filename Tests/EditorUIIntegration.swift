@@ -462,6 +462,16 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         let name = scheme == .light ? "light" : "dark"
         try snapshot(PreferencesView(selection: .general), scheme: scheme, width: 780,
             to: output.appendingPathComponent("general-background-\(name).png"), height: 2600)
+        do {
+            let key = AfterCaptureAction.save.storageKey(for: .screenshot)
+            let stored = UserDefaults.standard.object(forKey: key)
+            defer { UserDefaults.standard.set(stored, forKey: key) }
+            for enabled in [false, true] {
+                UserDefaults.standard.set(enabled, forKey: key)
+                try snapshot(GeneralSettingsTab(), scheme: scheme, width: 580,
+                    to: output.appendingPathComponent("general-saving-\(enabled)-\(name).png"), height: 2600)
+            }
+        }
         try snapshot(PreferencesView(selection: .sharing), scheme: scheme, width: 780,
                      to: output.appendingPathComponent("sharing-buttons-\(name).png"), height: 720)
         try snapshot(VStack(alignment: .leading, spacing: 16) {

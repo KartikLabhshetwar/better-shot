@@ -193,7 +193,7 @@ struct GeneralSettingsTab: View {
     @AppStorage("bs_appAppearance") private var appAppearanceRaw: String = AppAppearance.system.rawValue
     @AppStorage("bs_saveDirectory") private var saveDir = NSHomeDirectory() + "/Desktop"
     @AppStorage("bs_copyAfterSave") private var copyAfterSave = true
-    @AppStorage(AfterCaptureAction.save.storageKey(for: .screenshot)) private var automaticallySaveScreenshots = false
+    @AppStorage(AfterCaptureAction.save.storageKey(for: .screenshot)) private var automaticallySaveScreenshots = AfterCaptureAction.save.defaultValue(for: .screenshot)
     @AppStorage("bs_playSound") private var playSound = true
     @AppStorage("bs_exportFormat") private var exportFormatRaw: String = ExportFormat.png.rawValue
     @AppStorage("bs_exportQuality") private var exportQuality: Double = 0.9
@@ -322,7 +322,7 @@ struct GeneralSettingsTab: View {
             }
 
             Section {
-                LabeledContent("Save to") {
+                LabeledContent("Save folder") {
                     HStack(spacing: 8) {
                         Text(saveDirDisplayPath)
                             .foregroundStyle(.secondary)
@@ -391,7 +391,10 @@ struct GeneralSettingsTab: View {
             } header: {
                 Text("Saving")
             } footer: {
-                Text("Save and Export use this folder. Enable automatic saving to save normal screenshots immediately. Capture & Copy, Edit, and Pin shortcuts do not automatically save. The + button adds a date, a random string, or a counter to file names.")
+                Text(automaticallySaveScreenshots
+                    ? "Normal screenshots are saved to this folder immediately. Copying or dismissing the preview keeps the saved file."
+                    : "Screenshots are not automatically saved to this folder. Choose Save or Export when you want a file.")
+                Text("Capture & Copy, Edit, and Pin shortcuts bypass automatic saving. The + button adds a date, a random string, or a counter to file names.")
             }
             .onAppear(perform: refreshFileNamePreview)
             .onChange(of: fileNameTemplate) { _, _ in refreshFileNamePreview() }
@@ -545,7 +548,7 @@ struct GeneralSettingsTab: View {
         AppPreferences.applyAppearance()
         saveDir = NSHomeDirectory() + "/Desktop"
         copyAfterSave = true
-        automaticallySaveScreenshots = false
+        automaticallySaveScreenshots = AfterCaptureAction.save.defaultValue(for: .screenshot)
         playSound = true
         exportFormatRaw = ExportFormat.png.rawValue
         exportQuality = 0.9
@@ -986,11 +989,11 @@ struct CaptureSettingsTab: View {
             Section {
                 Toggle(isOn: $openEditorAfterCapture) {
                     Text("Open the editor straight away")
-                    Text("Off, show a preview card. To save normal screenshots immediately, enable automatic saving in General.")
+                    Text("Off, show a preview card. Automatic saving follows General > Saving.")
                 }
                 Toggle(isOn: $keepInDeckUntilSaved) {
                     Text("Keep screenshot previews open")
-                    Text("Turn off automatic dismissal. Copy never saves to your save folder.")
+                    Text("Turn off automatic dismissal, including for screenshots already saved to your folder.")
                 }
                 .disabled(openEditorAfterCapture)
             } header: {

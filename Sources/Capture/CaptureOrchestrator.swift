@@ -186,7 +186,7 @@ final class CaptureOrchestrator {
         return pasteboard.setString(text, forType: .string)
     }
 
-    /// Every screenshot starts privately; normal captures can opt into automatic saving.
+    /// Every screenshot starts privately; normal captures follow the automatic saving setting.
     func processCapturedImage(_ url: URL, action: ShortcutService.Action = .region) async {
         let (stagedURL, thumbnail) = await stageCapture(url)
         var displayURL = AppPreferences.keepInDeckUntilSaved ? stagedURL : DeckStaging.retain(stagedURL)

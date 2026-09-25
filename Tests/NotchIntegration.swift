@@ -332,7 +332,8 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
     }
     defaults.set("normal", forKey: AppPreferences.presentationModeKey)
     notch.refreshMode()
-    precondition(!notch.isVisible && overlay.items.count == 2 && bar.isVisible)
+    precondition(!notch.isVisible && overlay.items.count == 2 && bar.isVisible,
+                 "Mode switch must preserve the deck and bar: notchVisible=\(notch.isVisible), cards=\(overlay.items.count), barVisible=\(bar.isVisible)")
     precondition(NSApp.windows.contains { $0.identifier?.rawValue == "BetterShot.CaptureOverlay" && $0.isVisible })
     precondition(NSApp.windows.contains { $0.identifier?.rawValue == "BetterShot.RecordingBar" && $0.isVisible })
     ToastWindow.shared.show(message: "Normal mode toast", duration: 30)

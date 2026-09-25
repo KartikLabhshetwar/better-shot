@@ -108,9 +108,11 @@ a PR unless explicitly requested.
   to integer pixels and preserve lossless PNG behavior.
 - All screenshot modes stage privately. Copy never exports to the configured
   folder; Edit, Pin, Share, and drag-out retain working files internally. Only
-  explicit Save/Export, capture-and-save, or opt-in automatic saving of normal
-  captures writes a deliverable. Automatic saving defaults off; explicit Copy,
-  Edit, and Pin shortcuts bypass it. Preserve preview/editor behavior and retain
+  explicit Save/Export, capture-and-save, or enabled automatic saving of normal
+  captures writes a deliverable. Automatic screenshot saving defaults on for new
+  installs; upgrades preserve both explicit choices and the previous unset/off
+  behavior. Explicit Copy, Edit, and Pin shortcuts bypass it. Keeping previews
+  open is independent of automatic saving. Preserve preview/editor behavior and retain
   failed automatic saves for retry. Editor Save
   must work for untouched screenshots, and clipboard file references must
   survive dismissing the capture card.

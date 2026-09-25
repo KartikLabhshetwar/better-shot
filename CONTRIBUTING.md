@@ -201,9 +201,15 @@ for camera/microphone, and keep screenshot and recording delays distinct.
 Every screenshot starts in `DeckStaging`. Copy only updates the clipboard and
 retains a private file for file-based paste targets. Edit, Pin, Share, and drag-out
 retain working files internally. Only explicit Save/Export, capture-and-save,
-or opt-in automatic saving writes a deliverable to the configured folder.
-Automatic saving defaults off, bypasses explicit Copy/Edit/Pin actions, and
-retains failed captures for retry. Preserve this distinction across all callers.
+or enabled automatic saving writes a deliverable to the configured folder.
+Automatic screenshot saving defaults on for new installs. At launch, use
+`OnboardingState.prepareForLaunch` before other preference migrations to identify
+a new install, then `AfterCaptureActions.prepareForLaunch` to preserve upgrades'
+explicit choices and previous unset/off behavior. Unfinished onboarding is not a
+new install. Restore General defaults uses the new-install saving default.
+Explicit Copy/Edit/Pin actions bypass automatic saving, and failed saves keep
+the capture for retry. Keeping screenshot previews open applies to saved files
+as well as private staged files. Preserve this distinction across all callers.
 
 Image-editor Save commits to history and creates or atomically replaces the
 associated export, even for an untouched image. Copy and Share do not update

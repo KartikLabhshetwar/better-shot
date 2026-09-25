@@ -460,7 +460,7 @@ final class PreviewOverlay {
         cancelScheduledDismiss(for: url)
         guard AppPreferences.presentationMode == .normal, items.contains(url), !failedSaves.contains(url) else { return }
         guard AppPreferences.overlayDismisses(after: AppPreferences.overlayDismissDelay),
-              (!DeckStaging.isStaged(url) || !AppPreferences.keepInDeckUntilSaved),
+              (Self.isVideo(url) || !AppPreferences.keepInDeckUntilSaved),
               shareStatuses[url] == nil else { return }
         dismissTasks[url] = Task {
             try? await Task.sleep(for: .seconds(AppPreferences.overlayDismissDelay))
