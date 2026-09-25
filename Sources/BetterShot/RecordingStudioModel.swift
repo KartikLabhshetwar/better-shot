@@ -167,6 +167,7 @@ final class RecordingStudioModel {
     private(set) var keystrokeTimeline = KeystrokeCaptionTimeline.empty
     var selectedCueID: UUID?
     private(set) var clipTimeline = RecordingClipTimeline(segments: [])
+    private(set) var clipSpeedDraft = RecordingClipSpeedDraft()
     var selectedClipID: UUID?
     var timelineHoverTime: TimeInterval?
     /// Storyboard tiles for the clip lane, sampled on demand at whatever
@@ -688,7 +689,8 @@ final class RecordingStudioModel {
     func setClipSpeed(_ speed: Double, forClipID id: UUID) {
         guard let segment = clipTimeline.segments.first(where: { $0.id == id }) else { return }
         let clamped = min(max(speed, RecordingClipSegment.minimumSpeed), RecordingClipSegment.maximumSpeed)
-        guard abs(segment.speed - clamped) > 0.000_001 else { return }
+        guard clipSpeedDraft.propose(clamped, forClipID: id),
+              abs(segment.speed - clamped) > 0.000_001 else { return }
         var replacement = segment
         replacement.speed = clamped
         let next = clipTimeline.replacing(replacement)
@@ -698,6 +700,13 @@ final class RecordingStudioModel {
             playheadTime: min(currentTime, next.duration),
             actionName: "Change Clip Speed"
         )
+    }
+
+    func beginClipSpeedEdit() { clipSpeedDraft.begin() }
+
+    func endClipSpeedEdit() {
+        guard let change = clipSpeedDraft.end() else { return }
+        setClipSpeed(change.speed, forClipID: change.clipID)
     }
 
     func resetClips() {

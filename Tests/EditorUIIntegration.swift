@@ -247,6 +247,30 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     }
     videoModel.setClipSpeed(1, forClipID: speedClipID)
     print("PASS custom fractional clip speeds update the editor timeline")
+
+    let dragModel = RecordingStudioModel(url: movieURL)
+    await dragModel.load()
+    defer { dragModel.teardown() }
+    let dragClipID = dragModel.clipTimeline.segments[0].id
+    precondition(!dragModel.canUndo, "A freshly loaded recording starts with no undo history")
+    dragModel.beginClipSpeedEdit()
+    for tick in [1.2, 1.4, 1.6] {
+        dragModel.setClipSpeed(tick, forClipID: dragClipID)
+        precondition(dragModel.clipTimeline.segments[0].speed == 1, "A drag tick must not rebuild the timeline")
+    }
+    dragModel.endClipSpeedEdit()
+    precondition(dragModel.clipTimeline.segments[0].speed == 1.6, "Release commits the last dragged speed once")
+    precondition(dragModel.canUndo, "A completed drag registers exactly one undo step")
+    dragModel.undo()
+    precondition(dragModel.clipTimeline.segments[0].speed == 1, "One undo restores the pre-drag speed")
+    precondition(!dragModel.canUndo, "A single undo fully reverts the one-step drag")
+    dragModel.beginClipSpeedEdit()
+    dragModel.setClipSpeed(1.3, forClipID: dragClipID)
+    dragModel.setClipSpeed(1, forClipID: dragClipID)
+    dragModel.endClipSpeedEdit()
+    precondition(dragModel.clipTimeline.segments[0].speed == 1, "Dragging back to the start settles on the original speed")
+    precondition(!dragModel.canUndo, "Returning to the original value during a drag adds no undo step")
+    print("PASS a speed slider drag registers exactly one undo step and a round trip adds none")
     let originalCues = videoModel.zoomCues
     videoModel.addZoomCue(fromEditorTime: 0.25, toEditorTime: 1.25)
     precondition(videoModel.zoomEnabled, "Adding a zoom must enable playback of zooms")
