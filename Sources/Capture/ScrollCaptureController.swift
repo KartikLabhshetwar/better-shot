@@ -28,6 +28,7 @@ final class ScrollCaptureController {
     var onStripAdded: ((Int) -> Void)?
     var onSessionDone: ((NSImage?) -> Void)?
     var onPreviewUpdated: ((NSImage) -> Void)?
+    var onTrackingChanged: ((Bool) -> Void)?
 
     var excludedWindowIDs: [CGWindowID] = []
 
@@ -57,6 +58,9 @@ final class ScrollCaptureController {
 
     private let manualCaptureInterval: TimeInterval = 0.15
     private var lastCaptureTime: TimeInterval = 0
+    private var scrolledSinceCapture: CGFloat = 0
+    private var scrolledSinceMatch: CGFloat = 0
+    private var isTracking = true
     private var settlementTimer: Timer?
     private let settlementInterval: TimeInterval = 0.25
 
@@ -239,11 +243,6 @@ final class ScrollCaptureController {
         return previousCG
     }
 
-    private func captureAndCompare() async -> Bool {
-        guard let currentFrame = await captureSettledFrame(), isActive else { return false }
-        return processFrame(currentFrame, allowAxisFallback: true)
-    }
-
     @discardableResult
     private func processFrame(_ currentFrame: CGImage,
                               allowAxisFallback: Bool = false) -> Bool {
@@ -294,6 +293,8 @@ final class ScrollCaptureController {
         scrollDirection = direction
         shotA = currentFrame
         stripCount += 1
+        scrolledSinceMatch = 0
+        setTracking(true)
 
         emitPreview()
         onStripAdded?(stripCount)
@@ -434,6 +435,11 @@ final class ScrollCaptureController {
             prefersHorizontal = false
         }
 
+        let delta = prefersHorizontal ? event.scrollingDeltaX : event.scrollingDeltaY
+        let distance = event.hasPreciseScrollingDeltas ? delta : delta * 10
+        scrolledSinceCapture += abs(distance)
+        scrolledSinceMatch += distance
+
         settlementTimer?.invalidate()
         settlementTimer = Timer.scheduledTimer(withTimeInterval: settlementInterval, repeats: false) { [weak self] _ in
             guard let self = self else { return }
@@ -441,8 +447,10 @@ final class ScrollCaptureController {
         }
 
         let now = ProcessInfo.processInfo.systemUptime
-        guard now - lastCaptureTime >= manualCaptureInterval else { return }
+        guard !isCapturing, now - lastCaptureTime >= manualCaptureInterval
+                || scrolledSinceCapture >= scrollLength / 3 else { return }
         lastCaptureTime = now
+        scrolledSinceCapture = 0
 
         Task { @MainActor in await self.grabAndProcess() }
     }
@@ -465,7 +473,22 @@ final class ScrollCaptureController {
         isCapturing = true
         defer { isCapturing = false }
 
-        _ = await captureAndCompare()
+        guard let frame = await captureSettledFrame(), isActive else { return }
+        let matched = processFrame(frame, allowAxisFallback: true)
+        if !final, !matched, abs(scrolledSinceMatch) >= scrollLength / 20,
+           frame.dataProvider?.data as Data? != shotA?.dataProvider?.data as Data? {
+            setTracking(false)
+        }
+    }
+
+    private var scrollLength: CGFloat {
+        (scrollDirection?.isHorizontal ?? prefersHorizontal) ? captureRect.width : captureRect.height
+    }
+
+    private func setTracking(_ tracking: Bool) {
+        guard tracking != isTracking else { return }
+        isTracking = tracking
+        onTrackingChanged?(tracking)
     }
 
     /// Compare only pixels that changed at the same screen location, so fixed

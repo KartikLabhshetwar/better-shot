@@ -38,6 +38,13 @@ final class ScrollCaptureSessionPresenter {
             model.pixelLength = Int(model.isHorizontal
                 ? controller.stitchedPixelSize.width : controller.stitchedPixelSize.height)
         }
+        controller.onTrackingChanged = { [weak self] isTracking in
+            guard self?.continuation != nil else { return }
+            model.isLost = !isTracking
+            if !isTracking {
+                AccessibilityNotification.Announcement(ScrollCaptureSessionView.lostMessage).post()
+            }
+        }
         controller.onSessionDone = { [weak self, weak controller] image in
             guard let self else { return }
             if image != nil, let pixels = controller?.stitchedImage {
@@ -88,6 +95,7 @@ final class ScrollCaptureSessionPresenter {
         self.continuation = nil
         controller?.onStripAdded = nil
         controller?.onSessionDone = nil
+        controller?.onTrackingChanged = nil
         panel?.orderOut(nil)
         panel = nil
         controller = nil
@@ -100,11 +108,14 @@ final class ScrollCaptureSessionPresenter {
 final class ScrollCaptureSessionModel {
     var isStarting = true
     var isHorizontal = false
+    var isLost = false
     var stripCount = 0
     var pixelLength = 0
 }
 
 struct ScrollCaptureSessionView: View {
+    static let lostMessage = "Lost track. Scroll back a little, then slower."
+
     @State var model: ScrollCaptureSessionModel
     let stop: () -> Void
     let cancel: () -> Void
@@ -112,17 +123,19 @@ struct ScrollCaptureSessionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 8) {
-                Image(systemName: model.isHorizontal ? "arrow.right.to.line" : "arrow.down.to.line")
-                    .foregroundStyle(BarMetrics.activeTint.opacity(0.75))
+                Image(systemName: model.isLost ? "exclamationmark.triangle.fill"
+                      : model.isHorizontal ? "arrow.right.to.line" : "arrow.down.to.line")
+                    .foregroundStyle(model.isLost ? Color.orange : BarMetrics.activeTint.opacity(0.75))
                 Text("Scrolling Capture")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(BarMetrics.activeTint)
                 Spacer()
             }
 
-            Text(model.isStarting ? "Preparing area…" : "Scroll the area, then Stop.")
+            Text(model.isStarting ? "Preparing area…"
+                 : model.isLost ? Self.lostMessage : "Scroll the area, then Stop.")
                 .font(.system(size: 11))
-                .foregroundStyle(BarMetrics.activeTint.opacity(0.75))
+                .foregroundStyle(BarMetrics.activeTint.opacity(model.isLost ? 1 : 0.75))
                 .lineLimit(1)
 
             HStack(spacing: 8) {

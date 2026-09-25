@@ -895,6 +895,10 @@ func checkCaptureControlsUI() throws {
             try snapshot(ScrollCaptureSessionView(model: capturingModel,
                 stop: {}, cancel: {}), scheme: scheme, width: 312,
                 to: output.appendingPathComponent("scroll-session-horizontal-\(name).png"), height: 116)
+            capturingModel.isLost = true
+            try snapshot(ScrollCaptureSessionView(model: capturingModel,
+                stop: {}, cancel: {}), scheme: scheme, width: 312,
+                to: output.appendingPathComponent("scroll-session-lost-\(name).png"), height: 116)
         }
         try snapshot(RecordingSessionControls().studioGlass(cornerRadius: BarMetrics.cornerRadius, opacity: 0.78),
                      scheme: scheme, width: 360,
