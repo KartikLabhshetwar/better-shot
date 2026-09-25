@@ -1060,6 +1060,38 @@ private func checkScrollCaptureStitching() throws {
         excludedRight: 0) == nil,
         "A wrong shift on a sparse dark page must be rejected")
 
+    func composerFrame(at row: Int, height: Int) -> CGImage {
+        let context = darkBitmap(height)
+        context.draw(darkPage.cropping(to: CGRect(x: 0, y: row,
+            width: darkWidth, height: height))!,
+            in: CGRect(x: 0, y: 0, width: darkWidth, height: height))
+        context.setFillColor(CGColor(gray: 0.17, alpha: 1))
+        context.fill(CGRect(x: 0, y: height - darkHeader, width: darkWidth, height: darkHeader))
+        context.setFillColor(CGColor(gray: 0.24, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: darkWidth, height: 20))
+        context.setFillColor(CGColor(gray: 0.55, alpha: 1))
+        context.fill(CGRect(x: 14, y: 7, width: 90, height: 6))
+        return context.makeImage()!
+    }
+    let composerFirst = composerFrame(at: 0, height: darkHeight)
+    let composerSecond = composerFrame(at: 42, height: darkHeight)
+    precondition(ScrollCaptureController.matchedScrollOffset(previous: composerFirst,
+        current: composerSecond, excludedTop: darkHeader, excludedRight: 0) == 42,
+        "A pinned composer must not hide the page movement above it")
+    guard let composerJoined = ScrollCaptureController.mergedImage(existing: composerFirst,
+        currentFrame: composerSecond, offsetPx: 42, refreshedRows: 80) else {
+        preconditionFailure("Frames with a pinned composer should stitch")
+    }
+    let composerActual = NSBitmapImageRep(cgImage: composerJoined)
+    let composerExpected = NSBitmapImageRep(cgImage: composerFrame(at: 0, height: darkHeight + 42))
+    precondition(composerJoined.height == darkHeight + 42)
+    for y in 0..<composerJoined.height {
+        for x in 0..<darkWidth {
+            precondition(composerActual.colorAt(x: x, y: y) == composerExpected.colorAt(x: x, y: y),
+                "A pinned composer must appear once, at the end of the stitch (\(x), \(y))")
+        }
+    }
+
     // A repeated list can align perfectly at several offsets. There is no
     // safe seam until a distinctive row comes into view.
     let repeatingContext = darkBitmap(400)

@@ -320,13 +320,19 @@ final class ScrollCaptureController {
             ? min(abs(offsetPx), max(0, maxScrollHeight - existingLength))
             : abs(offsetPx)
         guard newPixels > 0 else { return false }
+        let frameLength = direction.isHorizontal ? currentFrame.width : currentFrame.height
+        let leadingFixedLength = max(frameLength / 5, direction.isHorizontal ? 0 : headerHeight)
+        let refreshedPixels = max(0, min(frameLength / 2,
+                                         frameLength - abs(offsetPx) - leadingFixedLength))
         let merged: CGImage?
         if direction.isHorizontal {
             merged = Self.mergedHorizontalImage(existing: existing, currentFrame: currentFrame,
-                                                offsetPx: offsetPx, columnsToAppend: newPixels)
+                                                offsetPx: offsetPx, columnsToAppend: newPixels,
+                                                refreshedColumns: refreshedPixels)
         } else {
             merged = Self.mergedImage(existing: existing, currentFrame: currentFrame,
-                                      offsetPx: offsetPx, rowsToAppend: newPixels)
+                                      offsetPx: offsetPx, rowsToAppend: newPixels,
+                                      refreshedRows: refreshedPixels)
         }
         guard let merged else { return false }
         mergedImage = merged
@@ -335,15 +341,18 @@ final class ScrollCaptureController {
         return true
     }
 
+    /// Appends new rows and redraws the trailing `refreshedRows` so pinned overlays appear once.
     static func mergedImage(
         existing: CGImage,
         currentFrame: CGImage,
         offsetPx: Int,
-        rowsToAppend: Int? = nil
+        rowsToAppend: Int? = nil,
+        refreshedRows: Int = 0
     ) -> CGImage? {
         let newRows = rowsToAppend ?? offsetPx
         guard existing.width == currentFrame.width,
-              offsetPx > 0, offsetPx <= currentFrame.height,
+              offsetPx > 0, refreshedRows >= 0, refreshedRows <= existing.height,
+              offsetPx + refreshedRows <= currentFrame.height,
               newRows > 0, newRows <= offsetPx else { return nil }
 
         let width = currentFrame.width
@@ -355,21 +364,25 @@ final class ScrollCaptureController {
                                       space: colorSpace, bitmapInfo: bitmapInfo) else { return nil }
 
         context.draw(existing, in: CGRect(x: 0, y: newRows, width: width, height: existing.height))
-        let stripY = currentFrame.height - offsetPx
+        let stripY = currentFrame.height - offsetPx - refreshedRows
+        let stripHeight = refreshedRows + newRows
         guard let strip = currentFrame.cropping(to: CGRect(
-            x: 0, y: stripY, width: width, height: newRows
+            x: 0, y: stripY, width: width, height: stripHeight
         )) else { return nil }
-        context.draw(strip, in: CGRect(x: 0, y: 0, width: width, height: newRows))
+        context.setBlendMode(.copy)
+        context.draw(strip, in: CGRect(x: 0, y: 0, width: width, height: stripHeight))
         return context.makeImage()
     }
 
     static func mergedHorizontalImage(
         existing: CGImage, currentFrame: CGImage,
-        offsetPx: Int, columnsToAppend: Int? = nil
+        offsetPx: Int, columnsToAppend: Int? = nil,
+        refreshedColumns: Int = 0
     ) -> CGImage? {
         let newColumns = columnsToAppend ?? abs(offsetPx)
         guard existing.height == currentFrame.height,
-              offsetPx != 0, abs(offsetPx) <= currentFrame.width,
+              offsetPx != 0, refreshedColumns >= 0, refreshedColumns <= existing.width,
+              abs(offsetPx) + refreshedColumns <= currentFrame.width,
               newColumns > 0, newColumns <= abs(offsetPx) else { return nil }
 
         let height = currentFrame.height
@@ -381,20 +394,23 @@ final class ScrollCaptureController {
                                       bytesPerRow: (existing.width + newColumns) * 4,
                                       space: colorSpace, bitmapInfo: bitmapInfo) else { return nil }
 
-        let stripX = offsetPx > 0 ? currentFrame.width - offsetPx : -offsetPx - newColumns
+        let stripWidth = newColumns + refreshedColumns
+        let stripX = offsetPx > 0 ? currentFrame.width - offsetPx - refreshedColumns : -offsetPx - newColumns
         guard let strip = currentFrame.cropping(to: CGRect(
-            x: stripX, y: 0, width: newColumns, height: height
+            x: stripX, y: 0, width: stripWidth, height: height
         )) else { return nil }
         if offsetPx > 0 {
             context.draw(existing, in: CGRect(x: 0, y: 0,
                                                width: existing.width, height: height))
-            context.draw(strip, in: CGRect(x: existing.width, y: 0,
-                                            width: newColumns, height: height))
+            context.setBlendMode(.copy)
+            context.draw(strip, in: CGRect(x: existing.width - refreshedColumns, y: 0,
+                                            width: stripWidth, height: height))
         } else {
-            context.draw(strip, in: CGRect(x: 0, y: 0,
-                                            width: newColumns, height: height))
             context.draw(existing, in: CGRect(x: newColumns, y: 0,
                                                width: existing.width, height: height))
+            context.setBlendMode(.copy)
+            context.draw(strip, in: CGRect(x: 0, y: 0,
+                                            width: stripWidth, height: height))
         }
         return context.makeImage()
     }
@@ -514,9 +530,15 @@ final class ScrollCaptureController {
         }
         let ranked = candidates.sorted { $0.value.error < $1.value.error }
         guard let best = ranked.first else { return nil }
+        let offsets = candidates.keys.sorted()
+        var lower = offsets.firstIndex(of: best.key)!
+        var upper = lower
+        while lower > 0, offsets[lower] - offsets[lower - 1] <= step { lower -= 1 }
+        while upper < offsets.count - 1, offsets[upper + 1] - offsets[upper] <= step { upper += 1 }
+        let bestBasin = offsets[lower]...offsets[upper]
         // Repeated content can match at several offsets. Wait for another frame
         // rather than permanently joining at an arbitrary row or column.
-        if let runnerUp = ranked.first(where: { abs($0.key - best.key) > max(1, step) }),
+        if let runnerUp = ranked.first(where: { !bestBasin.contains($0.key) }),
            runnerUp.value.error - best.value.error <= max(2, best.value.error * 0.5) {
             return nil
         }
@@ -540,6 +562,7 @@ final class ScrollCaptureController {
         let height: Int
         let top: Int
         let right: Int
+        let bottom: Int
 
         init?(previous: CGImage, current: CGImage, excludedTop: Int, excludedRight: Int) {
             guard previous.width == current.width, previous.height == current.height,
@@ -552,11 +575,44 @@ final class ScrollCaptureController {
             height = current.height
             top = min(max(0, excludedTop), height / 5)
             right = min(max(0, excludedRight), width / 5)
+            bottom = Self.pinnedBottomRows(previous: previousPixels, current: currentPixels,
+                                           width: width, height: height, sampledWidth: width - right)
+        }
+
+        /// Counts trailing rows that stay unchanged between frames, such as a pinned footer or composer.
+        private static func pinnedBottomRows(previous: Data, current: Data,
+                                             width: Int, height: Int, sampledWidth: Int) -> Int {
+            let xStep = max(1, sampledWidth / 96)
+            let rowBytes = width * 4
+            return previous.withUnsafeBytes { previousRaw in
+                current.withUnsafeBytes { currentRaw in
+                    let old = previousRaw.bindMemory(to: UInt8.self)
+                    let new = currentRaw.bindMemory(to: UInt8.self)
+                    var rows = 0
+                    while rows < height / 3 {
+                        let rowStart = (height - 1 - rows) * rowBytes
+                        var samples = 0
+                        var moved = 0
+                        for x in stride(from: 0, to: sampledWidth, by: xStep) {
+                            let index = rowStart + x * 4
+                            samples += 1
+                            if abs(Int(old[index]) - Int(new[index]))
+                                + abs(Int(old[index + 1]) - Int(new[index + 1]))
+                                + abs(Int(old[index + 2]) - Int(new[index + 2])) >= 36 {
+                                moved += 1
+                            }
+                        }
+                        guard moved * 10 <= samples else { break }
+                        rows += 1
+                    }
+                    return rows >= 10 && rows < height / 3 ? rows : 0
+                }
+            }
         }
 
         func score(_ offset: Int, direction: ScrollDirection) -> Score? {
             if direction.isHorizontal { return scoreHorizontal(offset) }
-            let overlapEnd = height - offset
+            let overlapEnd = height - offset - bottom
             guard offset > 0, overlapEnd - top >= max(12, height / 5) else { return nil }
             let sampledWidth = width - right
             let xStep = max(1, sampledWidth / 96)
