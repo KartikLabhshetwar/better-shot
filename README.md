@@ -106,12 +106,19 @@ Capture a page or list that is taller or wider than the screen. Choose
 (`⌘⇧2`), or assign a shortcut in **Settings > Shortcuts**. Drag over the
 scrollable content, then scroll through it as usual in one direction: down, or
 horizontally. The floating panel counts the stitched frames and the image's
-length. Click **Stop**, or trigger Scrolling Capture again, to send the image to
-the capture preview. **Cancel** discards it.
+length, with a live stitched preview beside the area when there is room.
+Choose **Auto Scroll** to scroll down automatically and **Pause Scroll** to resume
+manual scrolling. Click **Stop**, or trigger Scrolling Capture again, to send the
+image to the capture preview. **Cancel** or Escape discards it.
 
 Scroll at a steady pace so consecutive frames overlap. Fixed headers and
-scrollbars are detected and left out of the joins. A capture finishes on its own at
-30,000 pixels.
+scrollbars are detected and left out of the joins. Auto Scroll finishes at the
+bottom of the page; either mode finishes at 30,000 pixels. If tracking is lost,
+auto-scroll pauses so you can scroll back slightly and recover.
+
+Vision alignment, automatic scrolling, frame analysis, and the live preview are
+adapted from [MacShot](https://github.com/sw33tLie/macshot); its GPLv3 notice is
+bundled in [Resources/Licenses/MacShot.txt](Resources/Licenses/MacShot.txt).
 
 ### Where files go
 

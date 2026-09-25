@@ -14,6 +14,10 @@ final class ScrollCaptureSessionPresenter {
 
     private var controller: ScrollCaptureController?
     private var panel: NSPanel?
+    private var previewPanel: ScrollCapturePreviewPanel?
+    private var selectionPanel: NSPanel?
+    private var keyMonitorGlobal: Any?
+    private var keyMonitorLocal: Any?
     private var continuation: CheckedContinuation<Result, Never>?
 
     private init() {}
@@ -54,8 +58,38 @@ final class ScrollCaptureSessionPresenter {
             }
         }
 
-        present(model: model, on: screen)
-        controller.excludedWindowIDs = panel.map { [CGWindowID($0.windowNumber)] } ?? []
+        let outline = NSPanel(contentRect: rect.insetBy(dx: -1, dy: -1),
+            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        outline.isOpaque = false
+        outline.backgroundColor = .clear
+        outline.hasShadow = false
+        outline.level = .floating
+        outline.sharingType = .none
+        outline.hidesOnDeactivate = false
+        outline.ignoresMouseEvents = true
+        outline.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        outline.contentView = NSHostingView(rootView: Rectangle()
+            .strokeBorder(Color.accentColor, lineWidth: 2).accessibilityHidden(true))
+        outline.orderFrontRegardless()
+        selectionPanel = outline
+        controller.onAutoScrollChanged = { active in model.isAutoScrolling = active }
+        controller.onStatusMessage = { message in model.statusMessage = message }
+        let preview = ScrollCapturePreviewPanel(captureRect: rect, screen: screen)
+        previewPanel = preview
+        controller.onPreviewUpdated = { [weak preview] image in
+            preview?.updatePreview(image: image)
+        }
+        preview?.orderFrontRegardless()
+        present(model: model, rect: rect, on: screen)
+        controller.excludedWindowIDs = [panel, previewPanel, selectionPanel].compactMap { $0.map { CGWindowID($0.windowNumber) } }
+        keyMonitorGlobal = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if event.keyCode == 53 { self?.cancel() }
+        }
+        keyMonitorLocal = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.keyCode == 53 else { return event }
+            self?.cancel()
+            return nil
+        }
 
         return await withCheckedContinuation { continuation in
             self.continuation = continuation
@@ -63,15 +97,30 @@ final class ScrollCaptureSessionPresenter {
         }
     }
 
-    private func present(model: ScrollCaptureSessionModel, on screen: NSScreen) {
+    private func cancel() {
+        controller?.cancelSession()
+        finish(.cancelled)
+    }
+
+    // MacShot's selection-relative HUD placement, including the notch-safe fallback.
+    static func panelFrame(size: NSSize, selection: NSRect, screenFrame: NSRect,
+                           visibleFrame: NSRect, topInset: CGFloat) -> NSRect {
+        var y = selection.minY - size.height - 6
+        if y < visibleFrame.minY + 4 { y = selection.maxY + 6 }
+        let topLimit = min(visibleFrame.maxY, screenFrame.maxY - topInset) - 4
+        y = max(visibleFrame.minY + 4, min(y, topLimit - size.height))
+        let x = max(visibleFrame.minX + 4,
+            min(selection.midX - size.width / 2, visibleFrame.maxX - size.width - 4))
+        return NSRect(x: x, y: y, width: size.width, height: size.height)
+    }
+
+    private func present(model: ScrollCaptureSessionModel, rect: NSRect, on screen: NSScreen) {
         let view = ScrollCaptureSessionView(model: model,
             stop: { [weak self] in self?.stop() },
-            cancel: { [weak self] in
-                self?.controller?.cancelSession()
-                self?.finish(.cancelled)
-            })
+            cancel: { [weak self] in self?.cancel() },
+            toggleAutoScroll: { [weak self] in self?.controller?.toggleAutoScroll() })
         let hostingView = NSHostingView(rootView: view)
-        let size = NSSize(width: 312, height: 116)
+        let size = NSSize(width: 312, height: 148)
         let panel = NSPanel(contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.identifier = NSUserInterfaceItemIdentifier("BetterShot.ScrollCaptureControls")
@@ -84,8 +133,9 @@ final class ScrollCaptureSessionPresenter {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isMovableByWindowBackground = true
         panel.contentView = hostingView
-        panel.setFrameOrigin(CGPoint(x: screen.visibleFrame.maxX - size.width - 16,
-                                   y: screen.visibleFrame.maxY - size.height - 16))
+        panel.setFrame(Self.panelFrame(size: size, selection: rect,
+            screenFrame: screen.frame, visibleFrame: screen.visibleFrame,
+            topInset: screen.safeAreaInsets.top), display: true)
         panel.orderFrontRegardless()
         self.panel = panel
     }
@@ -96,6 +146,17 @@ final class ScrollCaptureSessionPresenter {
         controller?.onStripAdded = nil
         controller?.onSessionDone = nil
         controller?.onTrackingChanged = nil
+        controller?.onAutoScrollChanged = nil
+        controller?.onStatusMessage = nil
+        controller?.onPreviewUpdated = nil
+        if let keyMonitorGlobal { NSEvent.removeMonitor(keyMonitorGlobal) }
+        if let keyMonitorLocal { NSEvent.removeMonitor(keyMonitorLocal) }
+        keyMonitorGlobal = nil
+        keyMonitorLocal = nil
+        previewPanel?.orderOut(nil)
+        previewPanel = nil
+        selectionPanel?.orderOut(nil)
+        selectionPanel = nil
         panel?.orderOut(nil)
         panel = nil
         controller = nil
@@ -106,7 +167,9 @@ final class ScrollCaptureSessionPresenter {
 @MainActor
 @Observable
 final class ScrollCaptureSessionModel {
+    var statusMessage: String?
     var isStarting = true
+    var isAutoScrolling = false
     var isHorizontal = false
     var isLost = false
     var stripCount = 0
@@ -119,6 +182,7 @@ struct ScrollCaptureSessionView: View {
     @State var model: ScrollCaptureSessionModel
     let stop: () -> Void
     let cancel: () -> Void
+    var toggleAutoScroll: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -132,11 +196,11 @@ struct ScrollCaptureSessionView: View {
                 Spacer()
             }
 
-            Text(model.isStarting ? "Preparing area…"
-                 : model.isLost ? Self.lostMessage : "Scroll the area, then Stop.")
+            Text(model.statusMessage ?? (model.isStarting ? "Preparing area…"
+                 : model.isLost ? Self.lostMessage : model.isAutoScrolling ? "Scrolling automatically…" : "Scroll the area, then Stop."))
                 .font(.system(size: 11))
                 .foregroundStyle(BarMetrics.activeTint.opacity(model.isLost ? 1 : 0.75))
-                .lineLimit(1)
+                .lineLimit(2)
 
             HStack(spacing: 8) {
                 Text("\(model.stripCount) strips · \(model.pixelLength) px")
@@ -144,6 +208,13 @@ struct ScrollCaptureSessionView: View {
                     .foregroundStyle(BarMetrics.activeTint.opacity(0.75))
                     .lineLimit(1)
                     .accessibilityLabel("\(model.stripCount) captured frames, \(model.pixelLength) pixels \(model.isHorizontal ? "wide" : "high")")
+                Spacer(minLength: 0)
+            }
+            HStack(spacing: 8) {
+                Button(model.isAutoScrolling ? "Pause Scroll" : "Auto Scroll", action: toggleAutoScroll)
+                    .disabled(model.isStarting || model.isHorizontal)
+                    .accessibilityLabel(model.isAutoScrolling ? "Pause Automatic Scrolling" : "Start Automatic Scrolling")
+                    .accessibilityIdentifier("scrollCaptureAutoScroll")
                 Spacer(minLength: 0)
                 Button("Cancel", action: cancel)
                     .accessibilityLabel("Cancel Scrolling Capture")
@@ -157,7 +228,7 @@ struct ScrollCaptureSessionView: View {
             .controlSize(.small)
         }
         .padding(12)
-        .frame(width: 312, height: 116)
+        .frame(width: 312, height: 148)
         .glassSurface(cornerRadius: 12, depth: .raised)
     }
 

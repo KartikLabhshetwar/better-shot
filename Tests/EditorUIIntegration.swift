@@ -908,7 +908,7 @@ func checkCaptureControlsUI() throws {
             let startingModel = ScrollCaptureSessionModel()
             try snapshot(ScrollCaptureSessionView(model: startingModel,
                 stop: {}, cancel: {}), scheme: scheme, width: 312,
-                to: output.appendingPathComponent("scroll-session-starting-\(name).png"), height: 116)
+                to: output.appendingPathComponent("scroll-session-starting-\(name).png"), height: 148)
 
             let capturingModel = ScrollCaptureSessionModel()
             capturingModel.isStarting = false
@@ -916,15 +916,25 @@ func checkCaptureControlsUI() throws {
             capturingModel.pixelLength = 2_160
             try snapshot(ScrollCaptureSessionView(model: capturingModel,
                 stop: {}, cancel: {}), scheme: scheme, width: 312,
-                to: output.appendingPathComponent("scroll-session-capturing-\(name).png"), height: 116)
+                to: output.appendingPathComponent("scroll-session-capturing-\(name).png"), height: 148)
+            capturingModel.isAutoScrolling = true
+            try snapshot(ScrollCaptureSessionView(model: capturingModel,
+                stop: {}, cancel: {}), scheme: scheme, width: 312,
+                to: output.appendingPathComponent("scroll-session-auto-\(name).png"), height: 148)
+            capturingModel.isAutoScrolling = false
+            capturingModel.statusMessage = "Allow Accessibility in Settings, then retry Auto Scroll."
+            try snapshot(ScrollCaptureSessionView(model: capturingModel,
+                stop: {}, cancel: {}), scheme: scheme, width: 312,
+                to: output.appendingPathComponent("scroll-session-permission-\(name).png"), height: 148)
+            capturingModel.statusMessage = nil
             capturingModel.isHorizontal = true
             try snapshot(ScrollCaptureSessionView(model: capturingModel,
                 stop: {}, cancel: {}), scheme: scheme, width: 312,
-                to: output.appendingPathComponent("scroll-session-horizontal-\(name).png"), height: 116)
+                to: output.appendingPathComponent("scroll-session-horizontal-\(name).png"), height: 148)
             capturingModel.isLost = true
             try snapshot(ScrollCaptureSessionView(model: capturingModel,
                 stop: {}, cancel: {}), scheme: scheme, width: 312,
-                to: output.appendingPathComponent("scroll-session-lost-\(name).png"), height: 116)
+                to: output.appendingPathComponent("scroll-session-lost-\(name).png"), height: 148)
         }
         try snapshot(RecordingSessionControls().studioGlass(cornerRadius: BarMetrics.cornerRadius, opacity: 0.78),
                      scheme: scheme, width: 360,
@@ -942,6 +952,49 @@ func checkCaptureControlsUI() throws {
 /// Exercises the production strip merger with synthetic frames, without live screen capture.
 @MainActor
 private func checkScrollCaptureStitching() throws {
+    // MacShot's analyzer must respect row padding and RGB channel order.
+    func paddedFrame(changed: Bool, littleEndian: Bool, scrollbarOnly: Bool = false, padding: UInt8 = 17) -> CGImage {
+        let width = 80, height = 60, rowBytes = width * 4 + 28
+        var bytes = [UInt8](repeating: padding, count: rowBytes * height)
+        for y in 0..<height {
+            for x in 0..<width {
+                let offset = y * rowBytes + x * 4
+                let rgb: [UInt8] = changed && ((!scrollbarOnly && y >= 18) || x >= 74) ? [140, 180, 220] : [40, 80, 120]
+                let pixel = littleEndian ? [rgb[2], rgb[1], rgb[0], 255] : [255, rgb[0], rgb[1], rgb[2]]
+                bytes.replaceSubrange(offset..<offset + 4, with: pixel)
+            }
+        }
+        let order: CGBitmapInfo = littleEndian ? .byteOrder32Little : .byteOrder32Big
+        return CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
+            bytesPerRow: rowBytes, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue | order.rawValue),
+            provider: CGDataProvider(data: Data(bytes) as CFData)!, decode: nil,
+            shouldInterpolate: false, intent: .defaultIntent)!
+    }
+    let padded = paddedFrame(changed: false, littleEndian: true)
+    precondition(ScrollCaptureController.framesEqual(padded,
+        paddedFrame(changed: false, littleEndian: true, padding: 91)),
+        "Changing unused row padding must not look like new content")
+    precondition(ScrollCaptureController.framesEqual(padded,
+        paddedFrame(changed: false, littleEndian: false)), "Padding/channel order must not prevent page-end detection")
+    precondition(!ScrollCaptureController.framesEqual(padded,
+        paddedFrame(changed: true, littleEndian: false)))
+    precondition(ScrollFrameAnalyzer.frozenTopRows(current: paddedFrame(changed: false, littleEndian: false),
+        previous: padded, rightMarginPx: 0) == 60)
+    precondition(ScrollFrameAnalyzer.frozenTopRows(current: paddedFrame(changed: true, littleEndian: false),
+        previous: padded, rightMarginPx: 6) == 18)
+    precondition(ScrollFrameAnalyzer.scrollbarWidth(current: paddedFrame(changed: true,
+        littleEndian: false, scrollbarOnly: true), previous: padded) == 6)
+    for shift: CGFloat in [.nan, .infinity, -.infinity, 60, -60] {
+        precondition(ScrollFrameAnalyzer.validatedVerticalShift(shift, frameHeight: 60) == nil)
+    }
+    let screenFrame = CGRect(x: -1512, y: -200, width: 1512, height: 982)
+    let visibleFrame = screenFrame.insetBy(dx: 0, dy: 40)
+    let panel = ScrollCaptureSessionPresenter.panelFrame(size: CGSize(width: 312, height: 148),
+        selection: screenFrame, screenFrame: screenFrame, visibleFrame: visibleFrame, topInset: 38)
+    precondition(visibleFrame.contains(panel) && panel.maxY <= screenFrame.maxY - 38,
+        "Full-height selections must keep Stop/Auto Scroll visible, including on secondary displays")
+
     func solidFrame(width: Int, height: Int, color: CGColor) -> CGImage {
         let context = CGContext(data: nil, width: width, height: height,
             bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
@@ -1082,6 +1135,20 @@ private func checkScrollCaptureStitching() throws {
     }
     let darkFirst = darkFrame(at: 0)
     let darkSecond = darkFrame(at: 42)
+    precondition(ScrollCaptureController.visionScrollOffset(previous: darkFirst,
+        current: darkSecond, excludedTop: darkHeader, excludedRight: 0) == 42,
+        "MacShot's Vision registration must align sparse dark content")
+    func lowContrast(_ image: CGImage) -> CGImage {
+        let context = darkBitmap(image.height)
+        context.setFillColor(CGColor(gray: 0.08, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        context.setAlpha(0.035)
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return context.makeImage()!
+    }
+    precondition(ScrollCaptureController.matchedScrollOffset(previous: lowContrast(darkFirst),
+        current: lowContrast(darkSecond), excludedTop: darkHeader, excludedRight: 0) == 42,
+        "Low-contrast pages must stitch even when RGB changes fall below the old 36 threshold")
     precondition(ScrollCaptureController.matchedScrollOffset(previous: darkFirst,
         current: darkSecond, excludedTop: darkHeader, excludedRight: 0) == 42,
         "The matcher must align sparse text on a dark page")
@@ -1172,6 +1239,9 @@ private func checkScrollCaptureStitching() throws {
     let horizontalSecond = horizontalFrame(at: 31)
     let horizontalRight = ScrollCaptureController.ScrollDirection.right
     let horizontalLeft = ScrollCaptureController.ScrollDirection.left
+    precondition(ScrollCaptureController.visionScrollOffset(previous: horizontalFirst,
+        current: horizontalSecond, excludedTop: 0, excludedRight: 0,
+        direction: horizontalRight) == 31, "Vision must preserve the horizontal scroll direction")
     precondition(ScrollCaptureController.matchedScrollOffset(previous: horizontalFirst,
         current: horizontalSecond, excludedTop: 0, excludedRight: 0,
         direction: horizontalRight) == 31,

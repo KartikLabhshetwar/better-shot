@@ -1,10 +1,14 @@
 import Cocoa
 import ScreenCaptureKit
+import Vision
+
+// Scroll registration, settlement and auto-scroll adapted from MacShot (GPLv3).
+// See Resources/Licenses/MacShot.txt.
 
 @MainActor
 final class ScrollCaptureController {
 
-    enum ScrollDirection {
+    nonisolated enum ScrollDirection: Sendable {
         case down, right, left
 
         var isHorizontal: Bool { self != .down }
@@ -32,6 +36,12 @@ final class ScrollCaptureController {
 
     var excludedWindowIDs: [CGWindowID] = []
 
+    private(set) var autoScrollActive = false
+    var onAutoScrollChanged: ((Bool) -> Void)?
+    var onStatusMessage: ((String?) -> Void)?
+    private var autoScrollTask: Task<Void, Never>?
+    private var autoScrollSpeed = 3
+    private var targetAppPID: pid_t = 0
     private var maxScrollHeight: Int = 30000
     private var frozenDetectionEnabled: Bool = true
 
@@ -48,7 +58,6 @@ final class ScrollCaptureController {
     var isHorizontalCapture: Bool { scrollDirection?.isHorizontal == true }
     private var headerHeight: Int = 0
     private var headerDetectionDone: Bool = false
-    private var headerDetectionSamples: Int = 0
 
     private var rightMarginPx: Int = 0
     private var rightMarginDetected: Bool = false
@@ -81,11 +90,15 @@ final class ScrollCaptureController {
         maxScrollHeight = ud.object(forKey: "scrollMaxHeight") as? Int ?? 30000
         frozenDetectionEnabled = ud.object(forKey: "scrollFrozenDetection") as? Bool ?? true
 
+        autoScrollSpeed = min(4, max(1, ud.object(forKey: "scrollAutoScrollSpeed") as? Int ?? 3))
+        resolveTargetApp()
         cachedContentFilter = nil
 
         // Mark the session active before the first awaited frame so Stop can
         // cancel a capture that is still settling.
         isActive = true
+        isCapturing = true
+        defer { isCapturing = false }
 
         guard let firstFrame = await captureSettledFrame() else {
             if !isCancelled { finishSession(with: nil) }
@@ -98,7 +111,6 @@ final class ScrollCaptureController {
         prefersHorizontal = false
         headerHeight = 0
         headerDetectionDone = false
-        headerDetectionSamples = 0
         rightMarginPx = 0
         rightMarginDetected = false
         frozenTopHeight = 0
@@ -109,12 +121,15 @@ final class ScrollCaptureController {
         emitPreview()
         onStripAdded?(stripCount)
 
+        guard !isStopping else { return }
         startManualScrollMonitors()
+        if ud.bool(forKey: "scrollAutoScrollEnabled") { toggleAutoScroll() }
     }
 
     func stopSession() {
         guard isActive, !isStopping else { return }
         isStopping = true
+        stopAutoScroll()
         settlementTimer?.invalidate(); settlementTimer = nil
         if let monitor = scrollMonitorGlobal { NSEvent.removeMonitor(monitor); scrollMonitorGlobal = nil }
         if let monitor = scrollMonitorLocal { NSEvent.removeMonitor(monitor); scrollMonitorLocal = nil }
@@ -144,6 +159,7 @@ final class ScrollCaptureController {
 
     private func endSession() {
         isActive = false
+        stopAutoScroll()
         settlementTimer?.invalidate(); settlementTimer = nil
         if let monitor = scrollMonitorGlobal { NSEvent.removeMonitor(monitor); scrollMonitorGlobal = nil }
         if let monitor = scrollMonitorLocal { NSEvent.removeMonitor(monitor); scrollMonitorLocal = nil }
@@ -211,7 +227,7 @@ final class ScrollCaptureController {
         var waitNs: UInt64 = 10_000_000
 
         for _ in 0..<30 {
-            guard !isCancelled else { return nil }
+            guard !isCancelled, !Task.isCancelled else { return nil }
             guard let cg = await captureFrame() else {
                 try? await Task.sleep(nanoseconds: 30_000_000)
                 continue
@@ -223,7 +239,7 @@ final class ScrollCaptureController {
                     cont.resume(returning: bitmapRep.tiffRepresentation)
                 }
             }
-            guard !isCancelled else { return nil }
+            guard !isCancelled, !Task.isCancelled else { return nil }
             guard let currentTIFF = tiffData else {
                 try? await Task.sleep(nanoseconds: waitNs)
                 waitNs = min(waitNs * 3 / 2, 80_000_000)
@@ -245,7 +261,7 @@ final class ScrollCaptureController {
 
     @discardableResult
     private func processFrame(_ currentFrame: CGImage,
-                              allowAxisFallback: Bool = false) -> Bool {
+                              allowAxisFallback: Bool = false) async -> Bool {
         guard let previousFrame = shotA else { return false }
 
         if !rightMarginDetected {
@@ -260,24 +276,29 @@ final class ScrollCaptureController {
         } else {
             directionGroups = allowAxisFallback ? [[.down], [.right, .left]] : [[.down]]
         }
-        var chosen: (ScrollDirection, Int)?
-        for directions in directionGroups {
-            let matches = directions.compactMap { direction -> (ScrollDirection, Int, ScrollMatch.Score)? in
-                guard let match = Self.matchedScroll(
-                    previous: previousFrame, current: currentFrame,
-                    excludedTop: headerDetectionDone ? headerHeight : 0,
-                    excludedRight: rightMarginPx, direction: direction
-                ) else { return nil }
-                return (direction, match.offset, match.score)
-            }.sorted { $0.2.error < $1.2.error }
-            guard let best = matches.first else { continue }
-            if matches.count > 1,
-               matches[1].2.error - best.2.error <= max(2, best.2.error * 0.5) {
-                return false
+        let excludedTop = headerDetectionDone ? headerHeight : 0
+        let excludedRight = rightMarginPx
+        let chosen: (ScrollDirection, Int)? = await withCheckedContinuation { continuation in
+            captureQueue.async {
+                for directions in directionGroups {
+                    let matches = directions.compactMap { direction -> (ScrollDirection, Int, ScrollMatch.Score)? in
+                        guard let match = Self.matchedScroll(previous: previousFrame, current: currentFrame,
+                            excludedTop: excludedTop, excludedRight: excludedRight, direction: direction) else { return nil }
+                        return (direction, match.offset, match.score)
+                    }.sorted { $0.2.error < $1.2.error }
+                    guard let best = matches.first else { continue }
+                    if matches.count > 1,
+                       matches[1].2.error - best.2.error <= max(2, best.2.error * 0.5) {
+                        continuation.resume(returning: nil)
+                        return
+                    }
+                    continuation.resume(returning: (best.0, best.1))
+                    return
+                }
+                continuation.resume(returning: nil)
             }
-            chosen = (best.0, best.1)
-            break
         }
+        guard isActive, !isCancelled, !Task.isCancelled else { return false }
         guard let (direction, offsetPx) = chosen else { return false }
 
         if direction == .down && frozenDetectionEnabled && !headerDetectionDone {
@@ -298,6 +319,7 @@ final class ScrollCaptureController {
 
         emitPreview()
         onStripAdded?(stripCount)
+        if hasReachedMaximumDimension(for: direction) { stopSession() }
 
         return true
     }
@@ -416,6 +438,109 @@ final class ScrollCaptureController {
         return context.makeImage()
     }
 
+    private func resolveTargetApp() {
+        let primaryHeight = CGDisplayBounds(CGMainDisplayID()).height
+        let point = CGPoint(x: captureRect.midX, y: primaryHeight - captureRect.midY)
+        guard let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
+            kCGNullWindowID) as? [[String: Any]] else { return }
+        for info in windows {
+            guard let layer = info[kCGWindowLayer as String] as? Int, layer == 0,
+                  let bounds = info[kCGWindowBounds as String] as? [String: Any],
+                  let rect = CGRect(dictionaryRepresentation: bounds as CFDictionary), rect.contains(point),
+                  let pid = info[kCGWindowOwnerPID as String] as? pid_t,
+                  pid != ProcessInfo.processInfo.processIdentifier else { continue }
+            targetAppPID = pid
+            NSRunningApplication(processIdentifier: pid)?.activate(options: [])
+            return
+        }
+    }
+
+    func toggleAutoScroll() {
+        guard isActive, !isStopping, stitchedImage != nil else { return }
+        if autoScrollActive {
+            stopAutoScroll()
+            return
+        }
+        guard !isHorizontalCapture else { return }
+        guard ShortcutService.hasAccessibilityPermission else {
+            onStatusMessage?("Allow Accessibility in Settings, then retry Auto Scroll.")
+            ShortcutService.requestAccessibilityPermission()
+            return
+        }
+        guard targetAppPID != 0 else {
+            onStatusMessage?("No target app found. Cancel and reselect the area.")
+            return
+        }
+        onStatusMessage?(nil)
+        settlementTimer?.invalidate()
+        settlementTimer = nil
+        autoScrollActive = true
+        onAutoScrollChanged?(true)
+        let point = CGPoint(x: captureRect.midX,
+            y: CGDisplayBounds(CGMainDisplayID()).height - captureRect.midY)
+        CGWarpMouseCursorPosition(point)
+        NSRunningApplication(processIdentifier: targetAppPID)?.activate(options: [])
+        let lines: Int32 = autoScrollSpeed == 4 ? 2 : 1
+        let bursts = autoScrollSpeed
+        autoScrollTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard let self else { return }
+            var failures = 0
+            var unchanged = 0
+            while self.isActive && self.autoScrollActive && !Task.isCancelled {
+                if self.isCapturing {
+                    try? await Task.sleep(nanoseconds: 20_000_000)
+                    continue
+                }
+                // Pause if the user switches apps; never scroll an unrelated window.
+                guard NSWorkspace.shared.frontmostApplication?.processIdentifier == self.targetAppPID else {
+                    self.stopAutoScroll()
+                    return
+                }
+                self.isCapturing = true
+                for _ in 0..<bursts {
+                    let event = CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1,
+                        wheel1: -lines, wheel2: 0, wheel3: 0)
+                    event?.location = point
+                    event?.post(tap: .cghidEventTap)
+                }
+                try? await Task.sleep(nanoseconds: 50_000_000)
+                let frame = await self.captureSettledFrame()
+                guard self.isActive, self.autoScrollActive, !Task.isCancelled else {
+                    self.isCapturing = false
+                    return
+                }
+                let previousFrame = self.shotA
+                let matched = if let frame { await self.processFrame(frame) } else { false }
+                self.isCapturing = false
+                if matched {
+                    failures = 0
+                    unchanged = 0
+                } else if let frame, let previousFrame,
+                          Self.framesEqual(frame, previousFrame) {
+                    unchanged += 1
+                    if unchanged >= 6 { self.stopSession(); return }
+                } else {
+                    failures += 1
+                    if failures >= 8 {
+                        self.stopAutoScroll()
+                        self.setTracking(false)
+                        return
+                    }
+                }
+                try? await Task.sleep(nanoseconds: 10_000_000)
+            }
+        }
+    }
+
+    private func stopAutoScroll() {
+        autoScrollTask?.cancel()
+        autoScrollTask = nil
+        guard autoScrollActive else { return }
+        autoScrollActive = false
+        onAutoScrollChanged?(false)
+    }
+
     private func startManualScrollMonitors() {
         scrollMonitorGlobal = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
             self?.onManualScrollEvent(event)
@@ -427,7 +552,7 @@ final class ScrollCaptureController {
     }
 
     private func onManualScrollEvent(_ event: NSEvent) {
-        guard isActive, !isStopping else { return }
+        guard isActive, !isStopping, !autoScrollActive, captureRect.contains(NSEvent.mouseLocation) else { return }
         if event.modifierFlags.contains(.shift)
             || abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) {
             prefersHorizontal = true
@@ -462,21 +587,21 @@ final class ScrollCaptureController {
 
         guard let currentFrame = await captureFrame() else { return }
         guard isActive else { return }
-        processFrame(currentFrame)
+        await processFrame(currentFrame)
     }
 
     private func settledCapture(final: Bool = false) async {
         while isActive && isCapturing {
             try? await Task.sleep(nanoseconds: 25_000_000)
         }
-        guard isActive, (final || !isStopping) else { return }
+        guard isActive, (final || (!isStopping && !autoScrollActive)) else { return }
         isCapturing = true
         defer { isCapturing = false }
 
         guard let frame = await captureSettledFrame(), isActive else { return }
-        let matched = processFrame(frame, allowAxisFallback: true)
+        let matched = await processFrame(frame, allowAxisFallback: true)
         if !final, !matched, abs(scrolledSinceMatch) >= scrollLength / 20,
-           frame.dataProvider?.data as Data? != shotA?.dataProvider?.data as Data? {
+           let previous = shotA, !Self.framesEqual(frame, previous) {
             setTracking(false)
         }
     }
@@ -491,9 +616,36 @@ final class ScrollCaptureController {
         onTrackingChanged?(tracking)
     }
 
+    /// MacShot's Vision registration, cropped to moving content. Keep exact pixel
+    /// offsets: subtracting a row on every strip progressively shortens the page.
+    nonisolated static func visionScrollOffset(
+        previous: CGImage, current: CGImage, excludedTop: Int, excludedRight: Int,
+        excludedBottom: Int = 0, direction: ScrollDirection = .down
+    ) -> Int? {
+        guard previous.width == current.width, previous.height == current.height else { return nil }
+        let crop = CGRect(x: 0, y: max(0, excludedTop),
+            width: current.width - max(0, excludedRight),
+            height: current.height - max(0, excludedTop) - max(0, excludedBottom))
+        guard crop.width > 20, crop.height > 20,
+              let old = previous.cropping(to: crop), let new = current.cropping(to: crop) else { return nil }
+        let request = VNTranslationalImageRegistrationRequest(targetedCGImage: old)
+        let handler = VNImageRequestHandler(cgImage: new, options: [:])
+        guard (try? handler.perform([request])) != nil,
+              let result = request.results?.first as? VNImageTranslationAlignmentObservation else { return nil }
+        let transform = result.alignmentTransform
+        // Vision's image Y axis points up; horizontal translation has the opposite sign.
+        let shift = direction.isHorizontal ? -transform.tx : transform.ty
+        let crossAxis = direction.isHorizontal ? transform.ty : transform.tx
+        let length = direction.isHorizontal ? old.width : old.height
+        guard crossAxis.isFinite,
+              let valid = ScrollFrameAnalyzer.validatedVerticalShift(shift, frameHeight: length) else { return nil }
+        let offset = Int(valid.rounded())
+        return offset * direction.sign > 0 ? offset : nil
+    }
+
     /// Compare only pixels that changed at the same screen location, so fixed
     /// toolbars and empty backgrounds cannot vote for a false shift.
-    static func validatedScrollOffset(
+    nonisolated static func validatedScrollOffset(
         previous: CGImage, current: CGImage, candidate: Int,
         excludedTop: Int, excludedRight: Int,
         direction: ScrollDirection = .down
@@ -506,7 +658,7 @@ final class ScrollCaptureController {
         return candidate
     }
 
-    static func matchedScrollOffset(
+    nonisolated static func matchedScrollOffset(
         previous: CGImage, current: CGImage,
         excludedTop: Int, excludedRight: Int,
         direction: ScrollDirection = .down
@@ -516,14 +668,31 @@ final class ScrollCaptureController {
                       direction: direction)?.offset
     }
 
-    private static func matchedScroll(
+    private nonisolated static func matchedScroll(
         previous: CGImage, current: CGImage,
         excludedTop: Int, excludedRight: Int,
         direction: ScrollDirection
     ) -> (offset: Int, score: ScrollMatch.Score)? {
         guard let match = ScrollMatch(previous: previous, current: current,
                                       excludedTop: excludedTop, excludedRight: excludedRight) else { return nil }
+        guard match.previous != match.current else { return nil }
         let length = direction.isHorizontal ? current.width : current.height
+        let visionCandidate = visionScrollOffset(previous: previous, current: current,
+            excludedTop: max(match.top, ScrollFrameAnalyzer.frozenTopRows(current: current,
+                previous: previous, rightMarginPx: match.right).flatMap { $0 < current.height / 2 ? $0 : nil } ?? 0),
+            excludedRight: match.right, excludedBottom: match.bottom, direction: direction)
+        if let candidate = visionCandidate,
+           let score = match.score(candidate, direction: direction), score.isConfident {
+            // A sparse ambiguity scan keeps repeated rows safe without running the
+            // full pixel search after every successful Vision registration.
+            let ambiguous = (2...max(2, length * 4 / 5)).contains { distance in
+                guard abs(distance - abs(candidate)) > 2,
+                      let other = match.score(distance * direction.sign, direction: direction, sampleLimit: 16),
+                      other.isConfident else { return false }
+                return other.error <= score.error + max(2, score.error * 0.5)
+            }
+            if !ambiguous { return (candidate, score) }
+        }
         let minimum = max(2, length / 50)
         let maximum = min(length * 4 / 5,
                           length - (direction.isHorizontal ? 0 : match.top)
@@ -537,6 +706,10 @@ final class ScrollCaptureController {
             if let score = match.score(offset, direction: direction) {
                 coarse.append((offset, score))
             }
+        }
+        if let candidate = visionCandidate, (minimum...maximum).contains(abs(candidate)),
+           let score = match.score(candidate, direction: direction) {
+            coarse.append((candidate, score))
         }
         let likely = coarse.sorted { $0.score.error < $1.score.error }.prefix(24)
         var candidates: [Int: ScrollMatch.Score] = [:]
@@ -568,7 +741,7 @@ final class ScrollCaptureController {
         return (best.key, best.value)
     }
 
-    private struct ScrollMatch {
+    private nonisolated struct ScrollMatch {
         struct Score {
             let error: Double
             let relativeError: Double
@@ -633,13 +806,13 @@ final class ScrollCaptureController {
             }
         }
 
-        func score(_ offset: Int, direction: ScrollDirection) -> Score? {
-            if direction.isHorizontal { return scoreHorizontal(offset) }
+        func score(_ offset: Int, direction: ScrollDirection, sampleLimit: Int = 96) -> Score? {
+            if direction.isHorizontal { return scoreHorizontal(offset, sampleLimit: sampleLimit) }
             let overlapEnd = height - offset - bottom
             guard offset > 0, overlapEnd - top >= max(12, height / 5) else { return nil }
             let sampledWidth = width - right
-            let xStep = max(1, sampledWidth / 96)
-            let yStep = max(1, (overlapEnd - top) / 64)
+            let xStep = max(1, sampledWidth / sampleLimit)
+            let yStep = max(1, (overlapEnd - top) / min(64, sampleLimit))
             let rowBytes = width * 4
             return previous.withUnsafeBytes { previousRaw in
                 current.withUnsafeBytes { currentRaw in
@@ -656,7 +829,7 @@ final class ScrollCaptureController {
                             let same = abs(Int(old[sameIndex]) - Int(new[currentIndex]))
                                 + abs(Int(old[sameIndex + 1]) - Int(new[currentIndex + 1]))
                                 + abs(Int(old[sameIndex + 2]) - Int(new[currentIndex + 2]))
-                            guard same >= 36 else { continue }
+                            guard same >= 8 else { continue }
                             let aligned = abs(Int(old[shiftedIndex]) - Int(new[currentIndex]))
                                 + abs(Int(old[shiftedIndex + 1]) - Int(new[currentIndex + 1]))
                                 + abs(Int(old[shiftedIndex + 2]) - Int(new[currentIndex + 2]))
@@ -673,14 +846,14 @@ final class ScrollCaptureController {
             }
         }
 
-        private func scoreHorizontal(_ offset: Int) -> Score? {
+        private func scoreHorizontal(_ offset: Int, sampleLimit: Int) -> Score? {
             let overlapStart = max(0, -offset)
             // Keep the right margin out of both frames after alignment.
             let overlapEnd = min(width - right, width - right - offset)
             guard offset != 0,
                   overlapEnd - overlapStart >= max(12, width / 5) else { return nil }
-            let xStep = max(1, (overlapEnd - overlapStart) / 64)
-            let yStep = max(1, (height - top) / 96)
+            let xStep = max(1, (overlapEnd - overlapStart) / min(64, sampleLimit))
+            let yStep = max(1, (height - top) / sampleLimit)
             let rowBytes = width * 4
             return previous.withUnsafeBytes { previousRaw in
                 current.withUnsafeBytes { currentRaw in
@@ -696,7 +869,7 @@ final class ScrollCaptureController {
                             let same = abs(Int(old[currentIndex]) - Int(new[currentIndex]))
                                 + abs(Int(old[currentIndex + 1]) - Int(new[currentIndex + 1]))
                                 + abs(Int(old[currentIndex + 2]) - Int(new[currentIndex + 2]))
-                            guard same >= 36 else { continue }
+                            guard same >= 8 else { continue }
                             let aligned = abs(Int(old[shiftedIndex]) - Int(new[currentIndex]))
                                 + abs(Int(old[shiftedIndex + 1]) - Int(new[currentIndex + 1]))
                                 + abs(Int(old[shiftedIndex + 2]) - Int(new[currentIndex + 2]))
@@ -714,7 +887,16 @@ final class ScrollCaptureController {
         }
     }
 
-    private static func normalizedPixelData(for image: CGImage) -> Data? {
+    // ScreenCaptureKit can pad pixel rows with changing unused bytes. Compare
+    // rendered pixels, not the provider buffer, when deciding that scrolling ended.
+    nonisolated static func framesEqual(_ first: CGImage, _ second: CGImage) -> Bool {
+        guard first.width == second.width, first.height == second.height,
+              let firstPixels = normalizedPixelData(for: first),
+              let secondPixels = normalizedPixelData(for: second) else { return false }
+        return firstPixels == secondPixels
+    }
+
+    private nonisolated static func normalizedPixelData(for image: CGImage) -> Data? {
         let bytesPerRow = image.width * 4
         let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
         let bitmapInfo = CGImageAlphaInfo.premultipliedFirst.rawValue
@@ -734,105 +916,35 @@ final class ScrollCaptureController {
     }
 
     private func detectRightMargin(current: CGImage, previous: CGImage) {
-        guard current.width == previous.width, current.height == previous.height else { return }
-        guard let curData = Self.normalizedPixelData(for: current),
-              let prevData = Self.normalizedPixelData(for: previous) else { return }
+        // Only mark detection as done once a comparable pair actually arrived.
+        // Setting it up front let one odd pair (a resize mid-session, say)
+        // disable scrollbar exclusion for the rest of the capture.
+        guard let scrollbarWidth = ScrollFrameAnalyzer.scrollbarWidth(current: current, previous: previous) else { return }
         rightMarginDetected = true
-
-        let w = current.width
-        let h = current.height
-        let bytesPerRow = w * 4
-
-        let rowStart = h * 2 / 10
-        let rowEnd = h * 8 / 10
-        let rowStep = max(1, (rowEnd - rowStart) / 40)
-
-        var scrollbarWidth = 0
-        let maxScanCols = min(50, w / 8)
-
-        for colOffset in 0..<maxScanCols {
-            let col = w - 1 - colOffset
-            var sad: UInt64 = 0
-            var samples: Int = 0
-
-            for row in stride(from: rowStart, to: rowEnd, by: rowStep) {
-                let idx = row * bytesPerRow + col * 4
-                guard idx + 2 < h * bytesPerRow else { continue }
-                sad += UInt64(abs(Int(curData[idx]) - Int(prevData[idx]))
-                            + abs(Int(curData[idx + 1]) - Int(prevData[idx + 1]))
-                            + abs(Int(curData[idx + 2]) - Int(prevData[idx + 2])))
-                samples += 1
-            }
-            guard samples > 0 else { continue }
-            let avgSAD = sad / UInt64(samples)
-
-            if avgSAD > 8 {
-                scrollbarWidth = colOffset + 1
-            } else if scrollbarWidth > 0 {
-                break
-            }
-        }
 
         if scrollbarWidth >= 3 && scrollbarWidth <= 40 {
             rightMarginPx = scrollbarWidth + 4
         }
     }
 
+    // MARK: - Header (frozen region) detection
+
     private func detectHeader(current: CGImage, previous: CGImage, shiftPx: Int) {
-        guard current.width == previous.width, current.height == previous.height else { return }
         guard shiftPx > 5 else { return }
+        guard let frozenRows = ScrollFrameAnalyzer.frozenTopRows(
+            current: current, previous: previous, rightMarginPx: rightMarginPx) else { return }
 
-        let w = current.width
         let h = current.height
-
-        guard let curData = Self.normalizedPixelData(for: current),
-              let prevData = Self.normalizedPixelData(for: previous) else { return }
-
-        let bytesPerRow = w * 4
-        let compareBytes = max(4, (w - rightMarginPx)) * 4
-        let colStep = 4
-
-        var frozenRows = 0
-        for row in 0..<h {
-            var rowSAD: UInt64 = 0
-            var samples: Int = 0
-            let offset = row * bytesPerRow
-            for col in stride(from: 0, to: compareBytes, by: colStep * 4) {
-                let cR = Int(curData[offset + col])
-                let cG = Int(curData[offset + col + 1])
-                let cB = Int(curData[offset + col + 2])
-                let pR = Int(prevData[offset + col])
-                let pG = Int(prevData[offset + col + 1])
-                let pB = Int(prevData[offset + col + 2])
-                rowSAD += UInt64(abs(cR - pR) + abs(cG - pG) + abs(cB - pB))
-                samples += 1
-            }
-            let avg = samples > 0 ? rowSAD / UInt64(samples) : 999
-            if avg > 8 {
-                frozenRows = row
-                break
-            }
-            if row == h - 1 { return }
-        }
+        // Nothing changed anywhere: this pair says nothing about a header, so
+        // leave detection open for the next frame instead of freezing the
+        // whole capture area.
+        guard frozenRows < h else { return }
 
         if frozenRows >= 10 && frozenRows < (h * 6 / 10) {
-            headerDetectionSamples += 1
-
-            if headerDetectionSamples == 1 {
-                headerHeight = frozenRows
-            } else {
-                if abs(frozenRows - headerHeight) <= 5 {
-                    headerHeight = min(headerHeight, frozenRows)
-                    frozenTopHeight = CGFloat(headerHeight) / backingScale
-                } else {
-                    headerHeight = 0
-                    frozenTopHeight = 0
-                }
-                headerDetectionDone = true
-            }
+            headerHeight = frozenRows
+            frozenTopHeight = CGFloat(headerHeight) / backingScale
+            headerDetectionDone = true
         } else if frozenRows < 10 {
-            headerHeight = 0
-            frozenTopHeight = 0
             headerDetectionDone = true
         }
     }
