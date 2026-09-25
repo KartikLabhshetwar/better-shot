@@ -223,6 +223,7 @@ extension ShortcutService {
         var defaultShortcut: Shortcut? {
             switch self {
             case .region: .defaultRegion
+            case .previousRegion: .defaultPreviousRegion
             case .fullscreen: .defaultFullscreen
             case .ocr: .defaultOCR
             case .colorPicker: .defaultColorPicker

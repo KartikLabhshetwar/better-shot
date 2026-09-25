@@ -164,6 +164,7 @@ private final class SelectionView: NSView {
     private var dragCurrent: NSPoint?
     private var mouseLocation: NSPoint?
     private var selection: CGRect?
+    private var movesSelection: Bool
     var hasSelection: Bool { selection != nil }
     private var activeHandle: RegionHandle?
     private var handleDragOrigin: NSPoint?
@@ -189,6 +190,7 @@ private final class SelectionView: NSView {
         self.screen = screen
         self.crosshairCursor = cursor
         self.selection = selection
+        self.movesSelection = selection == nil
         self.capturesOnRelease = capturesOnRelease
         self.onSelect = onSelect
         self.onCancel = onCancel
@@ -300,7 +302,8 @@ private final class SelectionView: NSView {
             dot.stroke()
         }
 
-        drawLabel("\(pixelSize(rect))  ·  ↩ to capture  ·  drag to adjust or draw a new area  ·  esc", below: rect)
+        let hint = movesSelection ? "drag to adjust" : "drag the edges to resize, or draw a new area"
+        drawLabel("\(pixelSize(rect))  ·  ↩ to capture  ·  \(hint)  ·  esc", below: rect)
     }
 
     private func pixelSize(_ rect: CGRect) -> String {
@@ -314,11 +317,13 @@ private final class SelectionView: NSView {
             .foregroundColor: NSColor.white,
         ]
         let labelSize = label.size(withAttributes: attrs)
+        let width = labelSize.width + 12
+        let height = labelSize.height + 4
         let labelRect = CGRect(
-            x: rect.midX - labelSize.width / 2 - 6,
-            y: rect.minY - labelSize.height - 8,
-            width: labelSize.width + 12,
-            height: labelSize.height + 4
+            x: min(max(rect.midX - width / 2, bounds.minX + 8), bounds.maxX - width - 8),
+            y: max(rect.minY - height - 4, bounds.minY + 8),
+            width: width,
+            height: height
         )
         NSColor.black.withAlphaComponent(0.7).setFill()
         NSBezierPath(roundedRect: labelRect, xRadius: 4, yRadius: 4).fill()
@@ -332,8 +337,14 @@ private final class SelectionView: NSView {
         needsDisplay = true
     }
 
+    /// The previous area only resizes from its edges, so a drag inside it can draw a new area.
+    private func adjustmentHandle(at point: NSPoint) -> RegionHandle? {
+        guard let selection, let handle = RegionAdjustment.handle(at: point, in: selection) else { return nil }
+        return handle == .move && !movesSelection ? nil : handle
+    }
+
     private func updateCursor(at point: NSPoint) {
-        guard let selection, let handle = RegionAdjustment.handle(at: point, in: selection) else {
+        guard let handle = adjustmentHandle(at: point) else {
             crosshairCursor.set()
             return
         }
@@ -373,11 +384,11 @@ private final class SelectionView: NSView {
 
     func beginDrag(at loc: CGPoint, clickCount: Int = 1) {
         mouseLocation = nil
-        if let selection, let handle = RegionAdjustment.handle(at: loc, in: selection) {
-            if handle == .move, clickCount == 2 {
-                onSelect(selection)
-                return
-            }
+        if clickCount == 2, let selection, selection.contains(loc) {
+            onSelect(selection)
+            return
+        }
+        if let selection, let handle = adjustmentHandle(at: loc) {
             activeHandle = handle
             handleDragOrigin = loc
             handleDragRect = selection
@@ -429,6 +440,7 @@ private final class SelectionView: NSView {
             }
             onBeginSelection()
             selection = rect
+            movesSelection = true
             updateCursor(at: end)
         } else if selection == nil {
             onCancel()

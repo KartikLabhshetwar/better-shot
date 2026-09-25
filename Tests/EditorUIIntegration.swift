@@ -1776,6 +1776,18 @@ private func checkShortcutCustomization(defaults: UserDefaults) {
         let keys = bindings.map { "\($0.keyCode):\($0.modifiers)" }
         precondition(Set(keys).count == keys.count, "Defaults must not conflict within a scope")
     }
+    precondition(service.effectiveShortcut(for: .previousRegion) == .defaultPreviousRegion)
+    for taken in [false, true] {
+        let suiteName = "BetterShot-previous-region-" + UUID().uuidString
+        let migrationDefaults = UserDefaults(suiteName: suiteName)!
+        defer { migrationDefaults.removePersistentDomain(forName: suiteName) }
+        if taken, let data = try? JSONEncoder().encode(ShortcutService.Shortcut.defaultPreviousRegion) {
+            migrationDefaults.set(data, forKey: "bs_hotkey_\(ShortcutService.Action.window.rawValue)")
+        }
+        let migrated = ShortcutService(defaults: migrationDefaults)
+        precondition(migrated.effectiveShortcut(for: .previousRegion) == (taken ? nil : .defaultPreviousRegion),
+                     "A custom ⌘⇧1 binding on another action must keep working")
+    }
     let custom = ShortcutService.Shortcut(keyCode: UInt32(kVK_ANSI_9), modifiers: UInt32(cmdKey | optionKey), enabled: true)
     precondition(service.validationError(for: custom, action: .window) == nil)
     service.saveShortcut(custom, for: .window)

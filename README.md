@@ -86,6 +86,7 @@ undo, redo, and native full screen.
 | Action | Shortcut |
 | --- | --- |
 | Region screenshot | `⌘⇧4` |
+| Capture previous region again | `⌘⇧1` |
 | Fullscreen screenshot | `⌘⇧3` |
 | Capture and recording bar | `⌘⇧2` |
 | Recording options | `⌘⇧5` |
