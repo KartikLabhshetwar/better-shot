@@ -156,8 +156,9 @@ final class ScrollCaptureController {
         }
 
         let excluded = Set(excludedWindowIDs)
-        let excludedWindows = content.windows.filter { excluded.contains($0.windowID) }
-        let filter = SCContentFilter(display: display, excludingWindows: excludedWindows)
+        let filter = PreviewWindowCaptureExclusion.includesAppWindowsInCaptures
+            ? SCContentFilter(display: display, excludingWindows: content.windows.filter { excluded.contains($0.windowID) })
+            : ScreenRecordingCapture.displayFilter(display: display, content: content, includesAppWindows: false)
         cachedContentFilter = filter
         return filter
     }
