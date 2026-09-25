@@ -41,6 +41,17 @@ struct RecordingClipSpeedCheck {
         precondition(change?.clipID == clipID && change?.speed == 2, "Release applies the last speed once")
         precondition(draft.speed(forClipID: clipID) == nil && draft.end() == nil, "Release clears the draft")
         precondition(draft.propose(3, forClipID: clipID), "Outside a drag, a change applies immediately")
+
+        let otherClipID = UUID()
+        var retargetDraft = RecordingClipSpeedDraft()
+        retargetDraft.begin()
+        precondition(!retargetDraft.propose(1.5, forClipID: clipID), "The first tick starts the drag")
+        precondition(!retargetDraft.propose(1.75, forClipID: otherClipID), "A different clip id must not retarget the draft")
+        precondition(retargetDraft.speed(forClipID: otherClipID) == nil, "The other clip must not see a held value")
+        precondition(retargetDraft.speed(forClipID: clipID) == 1.5, "The originally dragged clip keeps its held value")
+        let retargetChange = retargetDraft.end()
+        precondition(retargetChange?.clipID == clipID && retargetChange?.speed == 1.5,
+                     "Release commits to the clip the drag started on")
         print("RecordingClipSpeedCheck: fractional timing, split, persistence, legacy decoding, and one-step speed drags passed")
     }
 }

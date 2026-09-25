@@ -2963,6 +2963,7 @@ struct StudioInspector: View {
                         } else if let selectedClip = model.selectedClip {
                             InspectorSection("Selected Clip") {
                                 selectedClipControls(for: selectedClip)
+                                    .id(selectedClip.id)
                             }
                             .studioEffectCard()
                         }

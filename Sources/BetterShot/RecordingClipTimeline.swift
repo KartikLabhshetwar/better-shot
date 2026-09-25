@@ -410,6 +410,7 @@ nonisolated struct RecordingClipSpeedDraft: Equatable, Sendable {
     /// Returns true when the change should apply now rather than on `end()`.
     mutating func propose(_ speed: Double, forClipID id: UUID) -> Bool {
         guard isEditing else { return true }
+        guard clipID == nil || clipID == id else { return false }
         clipID = id
         self.speed = speed
         return false
