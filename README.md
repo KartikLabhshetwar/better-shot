@@ -9,7 +9,8 @@
 </p>
 
 <p align="center">
-  <a href="https://formulae.brew.sh/cask/bettershot"><img src="https://img.shields.io/badge/macOS-26.0+-black.svg" alt="macOS 26 or later"></a>
+  <a href="https://github.com/KartikLabhshetwar/better-shot/releases/latest"><img src="https://img.shields.io/github/v/release/KartikLabhshetwar/better-shot?label=release" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/macOS-26.0+-black.svg" alt="macOS 26 or later">
   <a href="https://github.com/KartikLabhshetwar/better-shot/actions/workflows/build.yml"><img src="https://github.com/KartikLabhshetwar/better-shot/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-BSD%203--Clause-green.svg" alt="BSD 3-Clause license"></a>
 </p>
@@ -22,8 +23,9 @@
   <a href="https://github.com/KartikLabhshetwar/better-shot/issues">Report a bug</a>
 </p>
 
-BetterShot is an open-source Mac app for screenshots, screen recordings, and
-image and video editing. No account or subscription required.
+BetterShot is a free, open-source Mac app for screenshots, scrolling captures,
+screen recordings, and image and video editing. No account, subscription, or
+cloud service required.
 
 ![BetterShot image editor with editable annotations and background controls](bettershot-landing/public/features/screenshot-editor-dark.webp)
 
@@ -43,10 +45,11 @@ permissions and your first capture.
 ## Features
 
 **Screenshots**
-- Region, window, and fullscreen capture. Extract text with OCR or pick a color as hex.
+- Region, window, fullscreen, and [scrolling](#scrolling-capture) capture.
+- Extract text with OCR or pick any on-screen color as hex.
 - Annotate with arrows, shapes, text, numbered markers, highlights, blur, and pixelate.
 - Crop, rotate, and flip without losing editable annotations.
-- Frame captures on a wallpaper, soft gradient, or any solid color with padding, rounded corners, and shadow.
+- Frame captures on a wallpaper, soft gradient, or any custom color with padding, rounded corners, and shadow.
 - Save as PNG or JPEG.
 
 **Recordings**
@@ -63,8 +66,9 @@ permissions and your first capture.
 **Everything else**
 - Copy, save, pin, edit, share, or drag captures from the floating preview.
 - Browse screenshots, recordings, and share links in the Media Gallery.
-- Share to your own Cloudflare R2 bucket with one click.
+- Share to [your own Cloudflare R2 bucket](#cloud-sharing) with one click.
 - Optional [Notch Mode](#notch-mode) keeps previews and a capture shelf at the top of the screen.
+- Trigger any capture from Shortcuts, Raycast, or the terminal with [URL actions](#automation).
 
 Original captures and source movies are never modified. Both editors support
 undo, redo, and native full screen.
@@ -78,10 +82,11 @@ undo, redo, and native full screen.
 
 ## Getting started
 
-1. Open BetterShot and allow screen capture. Enable Accessibility for global shortcuts.
+1. Open BetterShot and allow Screen Recording. Enable Accessibility for global shortcuts.
 2. Press `⌘⇧4` to capture a region, or `⌘⇧2` to open the capture and recording bar.
-   Your last area opens already selected: press Return to capture it again, or draw a new one.
-3. Use the floating preview to Copy, Save, Pin, or Edit.
+   Your last area opens already selected: press Return to capture it again, drag
+   its edges to resize it, or drag anywhere to draw a new one.
+3. Use the floating preview to Copy, Save, Pin, Edit, or Share.
 
 | Action | Shortcut |
 | --- | --- |
@@ -101,50 +106,35 @@ Set the background, padding, corner radius, and shadow for new captures in
 
 ### Scrolling capture
 
-Capture a page or list that is taller than the screen. Choose
-**Scrolling Capture** in the menu bar popover or **Scroll** in the capture bar
-(`⌘⇧2`), or assign a shortcut in **Settings > Shortcuts**. Drag over the
-scrollable content, then scroll down through it as usual. A compact bar beside
-the area shows the stitched size, with a live preview next to the area when
-there is room. Choose **Auto Scroll** to scroll down automatically, and click it
-again (it reads **Scrolling…**) to go back to scrolling by hand. Click **Stop**, or
-trigger Scrolling Capture again, to send the image to the capture preview. The
-**×** button or Escape discards it.
+Capture a page or list taller than the screen:
 
-Fixed headers and scrollbars are detected and left out of the joins. Each join
-redraws the overlap from the newest frame, and Stop takes one last frame at the
-end of the page, so content that fades in as it scrolls into view is captured
-fully drawn. Auto Scroll
-needs Accessibility and finishes at the bottom of the page; either mode finishes
-at 30,000 pixels. If a join is missed, scroll back up a little and continue.
+1. Choose **Scrolling Capture** in the menu bar, **Scroll** in the capture bar
+   (`⌘⇧2`), or assign a shortcut in **Settings > Shortcuts**.
+2. Drag over the scrollable content, then scroll down through it. Or click
+   **Auto Scroll** to let BetterShot scroll for you (requires Accessibility).
+3. Click **Stop** to send the stitched image to the capture preview. **×** or
+   Escape discards it.
 
-Vision alignment, automatic scrolling, frame analysis, and the live preview are
-adapted from [MacShot](https://github.com/sw33tLie/macshot); its GPLv3 notice is
-bundled in [Resources/Licenses/MacShot.txt](Resources/Licenses/MacShot.txt).
+Fixed headers and scrollbars are left out of the joins, and content that fades
+in while scrolling is captured fully drawn. Captures finish at 30,000 pixels.
+If a join is missed, scroll back up a little and continue.
 
 ### Where files go
 
-New installs save normal screenshots to the configured folder immediately
-(Desktop by default). Change **Automatically save screenshots to this folder**
-under **Settings > General > Saving** to keep captures private until you choose
-Save or Export. Upgrades keep your previous saving behavior, including leaving
-automatic saving off if you had never enabled it.
+| Action | Result |
+| --- | --- |
+| **Copy** | Puts the image on the clipboard. No extra file is exported. |
+| **Save** | Writes to your configured folder. Later saves from the editor update the same file. |
+| **Export** | Asks for a new destination. |
 
-A screenshot or recording is named once, when it is taken, and Copy, Save, Export, Share, and
-drag-out all reuse that name, including any dots in a custom template.
-Video saves finish copying or converting before replacing an existing file;
-simultaneous saves with the same name get separate numbered files.
+New installs also save every normal screenshot to the configured folder
+(Desktop by default). Turn this off under **Settings > General > Saving** to
+keep captures private until you choose Save or Export. Upgrades keep your
+previous behavior. Capture & Copy, Edit, and Pin shortcuts always skip
+automatic saving, and a failed save keeps the capture available for retry.
 
-- **Copy** puts the image on the clipboard without creating another export. If the capture was already saved automatically, that file remains.
-- **Save** writes to your configured folder. In the editor, later saves update the same file.
-- **Export** asks for a new destination.
-
-Explicit Capture & Copy, Edit, and Pin shortcuts bypass automatic saving.
-The preview and editor remain available after an automatic save; dismissing or
-copying the preview does not delete the saved file. **Keep screenshot previews
-open** works whether automatic saving is on or off. Failed saves keep the
-capture available for retry.
-General > Saving also lets you customize file names with templates such as
+Each capture is named once, when it is taken, and every action reuses that
+name. Customize it in **Settings > General > Saving** with templates such as
 `standup-{date}-{counter:3}`.
 
 ### Permissions
@@ -198,8 +188,16 @@ Trigger captures from Shortcuts, Raycast, Alfred, or the terminal:
 open 'bettershot://capture/region'
 ```
 
-Routes: `capture/region`, `capture/fullscreen`, `capture/window`,
-`capture/scroll`, `ocr`, `color-picker`, `record`, `settings`.
+| Route | Action |
+| --- | --- |
+| `capture/region` | Region screenshot |
+| `capture/fullscreen` | Fullscreen screenshot |
+| `capture/window` | Window screenshot |
+| `capture/scroll` | Scrolling capture |
+| `ocr` | OCR text scan |
+| `color-picker` | Color picker |
+| `record` | Start a recording |
+| `settings` | Open Settings |
 
 ## Build from source
 
