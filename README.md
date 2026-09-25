@@ -46,7 +46,7 @@ permissions and your first capture.
 - Region, window, and fullscreen capture. Extract text with OCR or pick a color as hex.
 - Annotate with arrows, shapes, text, numbered markers, highlights, blur, and pixelate.
 - Crop, rotate, and flip without losing editable annotations.
-- Frame captures on a wallpaper or soft gradient with padding, rounded corners, and shadow.
+- Frame captures on a wallpaper, soft gradient, or any solid color with padding, rounded corners, and shadow.
 - Save as PNG, JPEG, or WebP.
 
 **Recordings**

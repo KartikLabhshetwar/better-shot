@@ -461,7 +461,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
         try snapshot(PreferencesView(selection: .general), scheme: scheme, width: 780,
-            to: output.appendingPathComponent("general-background-\(name).png"), height: 1700)
+            to: output.appendingPathComponent("general-background-\(name).png"), height: 2600)
         try snapshot(PreferencesView(selection: .sharing), scheme: scheme, width: 780,
                      to: output.appendingPathComponent("sharing-buttons-\(name).png"), height: 720)
         try snapshot(VStack(alignment: .leading, spacing: 16) {
@@ -826,6 +826,22 @@ private func checkCameraAspectRatios(movieURL: URL) async throws {
                 to: output.appendingPathComponent("video-ratios-\(scheme)-\(Int(width)).png"), height: 800)
         }
     }
+    let customColor = AnnotationBackgroundColor.custom(from: Color(.sRGB, red: 0.2, green: 0.45, blue: 0.4))
+    var customColorSettings = AnnotationBackgroundSettings()
+    customColorSettings.style = .solid(customColor)
+    let savedBackground = model.style.background
+    model.style.background = .solid(customColor)
+    for scheme in [ColorScheme.light, .dark] {
+        for width: CGFloat in [260, 340] {
+            try snapshot(AnnotationBackgroundInspector(settings: .constant(customColorSettings),
+                wallpaperStore: .shared, onEditorAction: {}, onPickWallpaper: {}).padding(12),
+                scheme: scheme, width: width,
+                to: output.appendingPathComponent("image-custom-color-\(scheme)-\(Int(width)).png"), height: 520)
+            try snapshot(StudioInspector(model: model), scheme: scheme, width: width,
+                to: output.appendingPathComponent("video-custom-color-\(scheme)-\(Int(width)).png"), height: 800)
+        }
+    }
+    model.style.background = savedBackground
     for preset in RecordingLayoutPreset.allCases {
         model.setLayoutPreset(preset)
         for scheme in [ColorScheme.light, .dark] {

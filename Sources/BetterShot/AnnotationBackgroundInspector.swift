@@ -142,15 +142,22 @@ struct AnnotationBackgroundInspector: View {
     private var selectedFillPicker: some View {
         switch selectedFillLibrary {
         case .color:
-            LazyVGrid(columns: swatchColumns, spacing: 6) {
-                ForEach(AnnotationBackgroundColor.plainPresets) { color in
-                    InspectorTile(isSelected: settings.style == .solid(color)) {
-                        onEditorAction()
-                        settings.style = .solid(color)
-                    } content: {
-                        Rectangle().fill(color.color)
+            VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
+                LazyVGrid(columns: swatchColumns, spacing: 6) {
+                    ForEach(AnnotationBackgroundColor.plainPresets) { color in
+                        InspectorTile(isSelected: settings.style == .solid(color)) {
+                            onEditorAction()
+                            settings.style = .solid(color)
+                        } content: {
+                            Rectangle().fill(color.color)
+                        }
+                        .help(color.title)
                     }
-                    .help(color.title)
+                }
+
+                AnnotationBackgroundCustomColorRow(style: settings.style) { color in
+                    onEditorAction()
+                    settings.style = .solid(color)
                 }
             }
 
@@ -204,6 +211,31 @@ struct AnnotationBackgroundInspector: View {
         }
     }
 
+}
+
+struct AnnotationBackgroundCustomColorRow: View {
+    let style: AnnotationBackgroundStyle
+    let onSelect: (AnnotationBackgroundColor) -> Void
+
+    private var selection: Binding<Color> {
+        Binding(
+            get: {
+                guard case .solid(let color) = style else { return AnnotationBackgroundColor.white.color }
+                return color.color
+            },
+            set: { onSelect(.custom(from: $0)) }
+        )
+    }
+
+    var body: some View {
+        InspectorRow("Custom") {
+            ColorPicker("Custom background color", selection: selection, supportsOpacity: false)
+                .labelsHidden()
+                .controlSize(.small)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .help("Choose any background color")
+        }
+    }
 }
 
 struct AnnotationWallpaperLibraryPicker: View {

@@ -3257,6 +3257,10 @@ struct StudioInspector: View {
                         }
                     }
                 }
+
+                AnnotationBackgroundCustomColorRow(style: model.style.background) { color in
+                    model.style.background = .solid(color)
+                }
             }
 
             if backgroundKind == .gradient {

@@ -593,6 +593,16 @@ private struct DefaultBackgroundPicker: View {
                 }
             }
 
+            HStack(spacing: 6) {
+                ColorPicker("Custom Color", selection: customColor, supportsOpacity: false)
+                    .labelsHidden()
+                    .controlSize(.small)
+                Text("Custom Color")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+            }
+
             LazyVGrid(columns: swatchColumns, spacing: 5) {
                 ForEach(GradientPreset.presets) { preset in
                     gradientButton(preset)
@@ -618,6 +628,16 @@ private struct DefaultBackgroundPicker: View {
         .buttonStyle(.bordered)
         .controlSize(.small)
         .accessibilityAddTraits(selectedStyle == .none ? .isSelected : [])
+    }
+
+    private var customColor: Binding<Color> {
+        Binding(
+            get: {
+                guard case .solid(let color) = selectedStyle else { return AnnotationBackgroundColor.white.color }
+                return color.color
+            },
+            set: { selectedStyle = AnnotationBackgroundStyle.solid(.custom(from: $0)).captureBackgroundStyle }
+        )
     }
 
     private func solidButton(_ color: SolidColor) -> some View {

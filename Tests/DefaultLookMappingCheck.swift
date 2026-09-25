@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 @main
 enum DefaultLookMappingCheck {
@@ -19,6 +20,15 @@ enum DefaultLookMappingCheck {
         assert(settings.aspectRatio == .sixteenNine, "aspect ratio must carry over")
         guard case .solid(let color) = settings.style else { fatalError("expected solid style") }
         assert(color.id == "cobalt" && abs(color.red - 0.16) < 0.0001, "solid color must carry over")
+
+        let custom = AnnotationBackgroundColor.custom(from: Color(.sRGB, red: 0.2, green: 0.4, blue: 0.6))
+        assert(custom.id == "custom" && abs(custom.green - 0.4) < 0.0001 && custom.alpha == 1, "custom color must keep its sRGB components")
+        var customConfig = BeautifierConfig()
+        customConfig.style = AnnotationBackgroundStyle.solid(custom).captureBackgroundStyle
+        guard case .solid(let restoredCustom) = customConfig.annotationBackgroundSettings.style else {
+            fatalError("expected custom solid style")
+        }
+        assert(restoredCustom == custom, "custom color must survive the Default Look round trip")
 
         let preset = GradientPreset.presets[0]
         var gradientConfig = BeautifierConfig()

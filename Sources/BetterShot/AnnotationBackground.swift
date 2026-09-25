@@ -235,6 +235,18 @@ struct AnnotationBackgroundColor: Identifiable, Equatable, Hashable {
         .green, .blue, .purple, .blush, .mint, .sky,
         .lavender, .peach, .sage, .sand
     ]
+
+    static func custom(from color: Color) -> AnnotationBackgroundColor {
+        let nsColor = NSColor(color)
+        let converted = nsColor.usingColorSpace(.sRGB) ?? nsColor
+        return AnnotationBackgroundColor(
+            "custom",
+            title: "Custom",
+            red: converted.redComponent,
+            green: converted.greenComponent,
+            blue: converted.blueComponent
+        )
+    }
 }
 
 struct AnnotationBackgroundGradient: Identifiable, Equatable, Hashable {
