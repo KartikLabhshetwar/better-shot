@@ -7,6 +7,8 @@ import UniformTypeIdentifiers
 @main
 enum ScreencaptureRunnerCheck {
     static func main() async throws {
+        armWatchdog(seconds: 20)
+
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("ScreencaptureRunnerCheck-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -42,7 +44,27 @@ enum ScreencaptureRunnerCheck {
             executable: script("echo 'no permission' >&2; exit 2", in: dir))
         precondition(outcome == .exited(status: 2, diagnostic: "no permission\n"), "failure keeps its diagnostic, got \(outcome)")
 
+        output = dir.appendingPathComponent("chatty.png").path
+        outcome = try await ScreencaptureRunner.run([output], output: output,
+            executable: script("yes 'this line pads the diagnostic well past one pipe buffer' | head -c 200000 >&2; exit 3", in: dir))
+        switch outcome {
+        case let .exited(status, diagnostic):
+            precondition(status == 3, "expected the child's exit status, got \(status)")
+            precondition(diagnostic.utf8.count >= 200_000, "expected the full overflow to be drained, got \(diagnostic.utf8.count) bytes")
+        case .saved:
+            preconditionFailure("a chatty child that never writes a PNG must not report saved")
+        }
+
         print("ScreencaptureRunnerCheck passed")
+    }
+
+    /// Hard-exits the process if it runs longer than `seconds`, so a deadlocked runner fails the check instead of hanging the suite.
+    private static func armWatchdog(seconds: TimeInterval) {
+        Thread.detachNewThread {
+            Thread.sleep(forTimeInterval: seconds)
+            FileHandle.standardError.write(Data("ScreencaptureRunnerCheck timed out after \(Int(seconds))s\n".utf8))
+            exit(1)
+        }
     }
 
     private static func script(_ body: String, in dir: URL) throws -> URL {

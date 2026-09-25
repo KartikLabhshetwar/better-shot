@@ -25,6 +25,13 @@ nonisolated enum ScreencaptureRunner {
                     continuation.resume(throwing: error)
                     return
                 }
+                let diagnostic = DiagnosticBuffer()
+                let drained = DispatchGroup()
+                drained.enter()
+                DispatchQueue.global(qos: .utility).async {
+                    diagnostic.set(errors.fileHandleForReading.readDataToEndOfFile())
+                    drained.leave()
+                }
                 var saved = false
                 while process.isRunning {
                     if !saved, isCompletePNG(atPath: output) {
@@ -33,12 +40,26 @@ nonisolated enum ScreencaptureRunner {
                     }
                     Thread.sleep(forTimeInterval: 0.05)
                 }
-                let data = errors.fileHandleForReading.readDataToEndOfFile()
                 process.waitUntilExit()
                 guard !saved else { return }
+                drained.wait()
                 continuation.resume(returning: .exited(
-                    status: process.terminationStatus, diagnostic: String(decoding: data, as: UTF8.self)))
+                    status: process.terminationStatus, diagnostic: diagnostic.string))
             }
+        }
+    }
+
+    /// Holds stderr bytes drained on a background thread while the polling loop above runs.
+    private final class DiagnosticBuffer: @unchecked Sendable {
+        private let lock = NSLock()
+        private var data = Data()
+
+        func set(_ newData: Data) {
+            lock.withLock { data = newData }
+        }
+
+        var string: String {
+            lock.withLock { String(decoding: data, as: UTF8.self) }
         }
     }
 
