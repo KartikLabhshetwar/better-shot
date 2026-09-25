@@ -4,6 +4,7 @@ nonisolated enum CaptureURLAction: String, CaseIterable {
     case region = "capture/region"
     case fullscreen = "capture/fullscreen"
     case window = "capture/window"
+    case scrollCapture = "capture/scroll"
     case recording = "record"
     case ocr
     case colorPicker = "color-picker"

@@ -121,7 +121,7 @@ final class NotchPresenter {
         // Adapted from ContentView.handleHover in TheBoredTeam/boring.notch
         // (99c26e418323d10e48886469fc9bd83900194bec), GPL-3.0.
         // Keep BetterShot's native menu/sheet and capture-suspension guards.
-        // See Resources/Licenses/NOTICE.md and BoringNotch.txt.
+        // See Resources/Licenses/BoringNotch.txt.
         // Measure from the pointer event, not from when SwiftUI layout lets the task start.
         let deadline = ContinuousClock.now.advanced(by: .milliseconds(100))
         hoverTask = Task { [weak self] in

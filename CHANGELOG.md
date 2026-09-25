@@ -5,6 +5,28 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.7] - 2026-09-25
+
+### Added
+
+- **Scrolling capture is now available.** The 0.5.5 stitching engine shipped without a way to start it. Choose Scrolling Capture in the menu bar or Scroll in the capture bar, select an area, then scroll down or sideways through the content. A floating panel counts stitched frames and the image's length; Stop sends the result to the normal capture preview and Cancel discards it. Stitching now handles horizontal scrolling, fixed headers, and moving scrollbars, and a capture finishes on its own at 30,000 pixels ([#169](https://github.com/KartikLabhshetwar/better-shot/pull/169), thanks [@ItisPratham](https://github.com/ItisPratham))
+- Scrolling Capture can be assigned a shortcut in Settings > Shortcuts (unassigned by default); triggering it again during a capture stops the capture. It is also available as `bettershot://capture/scroll` for automation.
+
+### Changed
+
+- **Recording zooms now follow Cap's camera model for smoother, steadier zoom in and zoom out.** Zoom level and framing move on separate springs, so every frame stays inside the recording. A zoom now aims at its target before it begins, so it scales straight toward the subject instead of zooming into the middle and panning across. When a zoom ends, the view zooms out in place without drifting back to the center first. Auto focus groups pointer movement into regions, so small cursor jitter no longer shakes the camera and the view only re-aims when the pointer moves into a new area (hovering is enough, no click needed). The pan-widening and click-snap corrections that caused wobble are gone. Instant zooms snap cleanly on both sides of the segment. Adapted from [Cap](https://github.com/CapSoftware/Cap) under AGPLv3.
+- Auto Zoom creates zooms at 2x, matching Cap's default. Existing zooms keep their saved level and focus.
+- Capture Previous Region now defaults to `⌘⇧1`, so the last area can be shot again without opening the selector. `⌘⇧2` stays the capture bar. A custom binding for it is kept, and it stays unassigned if another action already uses `⌘⇧1`.
+
+### Fixed
+
+- **Region screenshots remember your last area again.** `⌘⇧4` and Area in the capture bar open BetterShot's selector with the previous area already selected, as in 0.4: press Return (or double-click inside it) to capture the same area again, drag its edges to resize it, or drag anywhere, even inside it, to draw a new area (so a full-screen previous area never blocks a new selection). Space still switches to window selection and Escape cancels. The app you were using regains focus before the shot, so its windows are captured as active. OCR keeps the native macOS selector.
+- **Scrolling capture stitches more reliably.** Pages with a pinned bottom bar (chat composer, cookie banner, tab bar) no longer stop after the first frame, and that bar appears once at the end instead of repeating between strips. Near-identical matches a pixel apart no longer make it skip frames.
+- Scrolling capture takes a new frame after every third of the area you scroll, so fast scrolling keeps enough overlap to stitch. If it still loses its place, the panel shows "Lost track. Scroll back a little, then slower." with a warning symbol and VoiceOver announces it; the message clears as soon as stitching resumes.
+- The capture bar no longer shows a dashed "A to capture again" rectangle that could not be moved, resized, or triggered. The previous area is now part of the selector itself, and Capture Previous Region (`⌘⇧1`) captures it without opening the selector.
+- Image and video editors open in a normal window after a screenshot or recording instead of entering full screen automatically. Use the window's green full-screen button to enter full screen, or turn on Settings > General > Editor > Open editors in full screen to restore automatic full screen.
+- Automatically saved screenshots and new explicit Saves use the configured file name template instead of the internal `.preview.png` name. Saving over an existing export keeps its current name ([#167](https://github.com/KartikLabhshetwar/better-shot/pull/167), thanks [@zergzorg](https://github.com/zergzorg))
+
 ## [0.5.6] - 2026-09-21
 
 ### Changed

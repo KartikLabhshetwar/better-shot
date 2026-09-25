@@ -92,6 +92,7 @@ enum BarTooltipID: String {
     case screenshotRegion
     case screenshotWindow
     case screenshotFullscreen
+    case screenshotScroll
     case ocr
     case colorPicker
 

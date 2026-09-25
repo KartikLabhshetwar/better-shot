@@ -131,7 +131,7 @@ struct RecordingStudioContent: View {
                 if let id = model.selected3DShotID { model.remove3DShot(id: id) }
             }
         }
-        .editorFullScreenByDefault()
+        .editorFullScreenSupport()
         .navigationTitle(windowTitle)
         .onWindowChange { window in
             configureCloseGuard()
