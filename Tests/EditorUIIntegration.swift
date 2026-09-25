@@ -1911,7 +1911,7 @@ private func checkPreviewOverlay(imageURL: URL) async throws {
     AppPreferences.overlayCardSize = .large
     overlay.refreshSettings()
     precondition(panel.frame.width > originalWidth, "Changing Overlay settings must resize an existing overlay")
-    precondition(!CloudUploader.shared.isConfigured, "Tests must not access R2 credentials")
+    precondition(!R2CredentialStore.shared.isConfigured, "Tests must not access R2 credentials")
     overlay.share(imageURL)
     guard case .failed(_, _, true) = overlay.transferStatus(for: imageURL) else {
         preconditionFailure("An unconfigured share must offer recovery")
