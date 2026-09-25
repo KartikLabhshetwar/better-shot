@@ -188,7 +188,7 @@ final class CaptureOrchestrator {
 
     /// Every screenshot starts privately; normal captures can opt into automatic saving.
     func processCapturedImage(_ url: URL, action: ShortcutService.Action = .region) async {
-        let stagedURL = await stageCapture(url)
+        let (stagedURL, thumbnail) = await stageCapture(url)
         var displayURL = AppPreferences.keepInDeckUntilSaved ? stagedURL : DeckStaging.retain(stagedURL)
         if displayURL != stagedURL { DeckStaging.discard(stagedURL) }
         let allowsAutomaticSave: Bool = switch action {
@@ -218,7 +218,7 @@ final class CaptureOrchestrator {
             }
         }
 
-        PreviewOverlay.shared.show(url: displayURL, on: captureScreen)
+        PreviewOverlay.shared.show(url: displayURL, on: captureScreen, thumbnail: thumbnail)
         if saveFailed {
             PreviewOverlay.shared.showSaveFailure(for: displayURL)
             return
@@ -235,12 +235,13 @@ final class CaptureOrchestrator {
         }
     }
 
-    private func stageCapture(_ url: URL) async -> URL {
+    private func stageCapture(_ url: URL) async -> (URL, NSImage?) {
         let config = AppPreferences.defaultBeautifierConfig
+        let thumbnailEdge = OverlayCardSize.large.thumbnailSize.width * 2
         // The capture is named once, here. Its raw source, library copy, and
         // every later Copy or Save keep this name.
         let fileName = ScreenshotFileNaming.currentFileName(extension: AppPreferences.exportFormat.fileExtension)
-        let stagedURL = await Task.detached { () -> URL? in
+        let staging = await Task.detached { () -> (URL, CGImage)? in
             guard let folder = try? DeckStaging.makeCaptureDirectory() else { return nil }
             guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
                   let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil),
@@ -249,21 +250,24 @@ final class CaptureOrchestrator {
                 try? FileManager.default.removeItem(at: folder)
                 return nil
             }
-            return staged
+            let scale = min(1, thumbnailEdge / CGFloat(max(rendered.width, rendered.height)))
+            let colorSpace = rendered.colorSpace ?? CGColorSpaceCreateDeviceRGB()
+            let thumbnail = (try? AnnotationScenePreviewRenderer.downscaled(rendered, scale: scale, colorSpace: colorSpace)) ?? rendered
+            return (staged, thumbnail)
         }.value
 
-        guard let stagedURL else {
+        guard let (stagedURL, thumbnail) = staging else {
             ToastWindow.shared.show(isError: true, title: "Couldn’t prepare capture",
                 message: "The original screenshot is still available in the preview.",
                 systemIcon: "exclamationmark.triangle", on: captureScreen)
-            return Self.unstagedCapture(url, named: fileName)
+            return (Self.unstagedCapture(url, named: fileName), nil)
         }
         do {
             try FileManager.default.moveItem(at: url, to: DeckStaging.rawURL(for: stagedURL))
-            return stagedURL
+            return (stagedURL, NSImage(cgImage: thumbnail, size: .zero))
         } catch {
             DeckStaging.discard(stagedURL)
-            return Self.unstagedCapture(url, named: fileName)
+            return (Self.unstagedCapture(url, named: fileName), nil)
         }
     }
 

@@ -154,6 +154,10 @@ outline, so BetterShot's panels never appear in them. Vision registration and
 merging run off the main actor, and manual, automatic, and final captures are
 serialized. The reference frame only advances when a strip is appended or the
 page is unchanged, so scrolling back after a missed join recovers.
+Every join redraws the overlap below the pinned header from the newer frame, and
+Stop's final frame refreshes the page end even without further scrolling, so
+content that fades in on scroll is captured settled. The live preview is
+downscaled off the main actor.
 `ScrollFrameAnalyzer` compares native pixel strides and channel layouts; never
 assume captured rows are packed. Auto Scroll posts continuous pixel-unit scroll
 events sized to the area, which mouse utilities such as Mac Mouse Fix pass

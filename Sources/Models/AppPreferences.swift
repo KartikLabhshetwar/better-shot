@@ -351,18 +351,18 @@ enum OverlayCardSize: String, CaseIterable, Identifiable {
     /// Hover control scale, deliberately sub-linear to the thumbnail ratio.
     var controlScale: CGFloat {
         switch self {
-        case .small: return 1.0
-        case .medium: return 1.25
-        case .large: return 1.5
+        case .small: return 1.15
+        case .medium: return 1.35
+        case .large: return 1.6
         }
     }
 
     /// The visible thumbnail drawn inside the panel.
     var thumbnailSize: CGSize {
         switch self {
-        case .small: return CGSize(width: 130, height: 98)
-        case .medium: return CGSize(width: 190, height: 140)
-        case .large: return CGSize(width: 250, height: 180)
+        case .small: return CGSize(width: 180, height: 130)
+        case .medium: return CGSize(width: 240, height: 172)
+        case .large: return CGSize(width: 300, height: 216)
         }
     }
 }

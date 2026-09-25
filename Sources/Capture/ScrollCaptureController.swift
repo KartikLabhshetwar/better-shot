@@ -96,7 +96,7 @@ final class ScrollCaptureController {
         shotA = firstFrame
         stitchedImage = firstFrame
         stripCount = 1
-        emitPreview()
+        await emitPreview()
         onStripAdded?(stripCount)
 
         guard !isStopping else { return }
@@ -203,12 +203,11 @@ final class ScrollCaptureController {
             Self.visionScrollOffset(previous: previous, current: frame,
                                     excludedTop: excludedTop, excludedRight: excludedRight)
         }
-        guard isActive, !isCancelled, !Task.isCancelled, let offset else { return .unmatched }
-        guard offset != 0 else {
+        guard isActive, !isCancelled, !Task.isCancelled, let offset, offset >= 0 else { return .unmatched }
+        guard offset > 0 || final else {
             shotA = frame
             return .unchanged
         }
-        guard offset > 0 else { return .unmatched }
         guard final || offset >= frame.height / 10 else { return .tooSmall }
 
         if frozenDetectionEnabled && !headerDetectionDone {
@@ -224,7 +223,7 @@ final class ScrollCaptureController {
         stitchedImage = merged
         shotA = frame
         stripCount += 1
-        emitPreview()
+        await emitPreview()
         onStripAdded?(stripCount)
         if maxScrollHeight > 0 && merged.height >= maxScrollHeight { stopSession() }
         return .appended
@@ -246,11 +245,14 @@ final class ScrollCaptureController {
         return Int(shift.rounded())
     }
 
-    /// Appends `offsetPx` new rows; without a pinned header the whole newer frame overwrites the overlap so pinned footers appear once, at the end.
+    /// Appends `offsetPx` rows and redraws everything below the pinned header from the newer frame, so content that faded or loaded in late is kept settled.
     nonisolated static func mergedImage(existing: CGImage, currentFrame: CGImage,
                                         offsetPx: Int, headerHeight: Int = 0) -> CGImage? {
-        guard existing.width == currentFrame.width, offsetPx > 0, offsetPx <= currentFrame.height,
-              currentFrame.height <= existing.height + offsetPx else { return nil }
+        let header = max(0, headerHeight)
+        guard existing.width == currentFrame.width, offsetPx >= 0, header < currentFrame.height,
+              currentFrame.height <= existing.height + offsetPx,
+              let body = currentFrame.cropping(to: CGRect(x: 0, y: header, width: currentFrame.width,
+                                                          height: currentFrame.height - header)) else { return nil }
         let width = currentFrame.width
         let totalHeight = existing.height + offsetPx
         let colorSpace = existing.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)!
@@ -259,13 +261,7 @@ final class ScrollCaptureController {
                                       bitsPerComponent: 8, bytesPerRow: width * 4,
                                       space: colorSpace, bitmapInfo: bitmapInfo) else { return nil }
         context.draw(existing, in: CGRect(x: 0, y: offsetPx, width: width, height: existing.height))
-        if headerHeight > 0 {
-            guard let strip = currentFrame.cropping(to: CGRect(x: 0, y: currentFrame.height - offsetPx,
-                                                               width: width, height: offsetPx)) else { return nil }
-            context.draw(strip, in: CGRect(x: 0, y: 0, width: width, height: offsetPx))
-        } else {
-            context.draw(currentFrame, in: CGRect(x: 0, y: 0, width: width, height: currentFrame.height))
-        }
+        context.draw(body, in: CGRect(x: 0, y: 0, width: width, height: body.height))
         return context.makeImage()
     }
 
@@ -418,8 +414,14 @@ final class ScrollCaptureController {
         }
     }
 
-    private func emitPreview() {
-        guard let image = stitchedImage, let onPreviewUpdated else { return }
-        onPreviewUpdated(NSImage(cgImage: image, size: pointSize(of: image)))
+    private func emitPreview() async {
+        guard let image = stitchedImage, onPreviewUpdated != nil else { return }
+        let scale = min(1, ScrollCapturePreviewPanel.previewWidth * backingScale / CGFloat(image.width))
+        let colorSpace = image.colorSpace ?? CGColorSpaceCreateDeviceRGB()
+        let preview = await onCaptureQueue {
+            (try? AnnotationScenePreviewRenderer.downscaled(image, scale: scale, colorSpace: colorSpace)) ?? image
+        }
+        guard isActive, !isCancelled, image === stitchedImage else { return }
+        onPreviewUpdated?(NSImage(cgImage: preview, size: pointSize(of: preview)))
     }
 }

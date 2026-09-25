@@ -94,6 +94,21 @@ struct LowResolutionPreviewNotice: View {
 struct AnnotationEditorWorkspaceBackground: View {
     var body: some View {
         EditorChrome.workspace
+            .overlay {
+                Canvas { context, size in
+                    let spacing: CGFloat = 16
+                    let diameter: CGFloat = 1.6
+                    var dots = Path()
+                    for x in stride(from: spacing / 2, to: size.width, by: spacing) {
+                        for y in stride(from: spacing / 2, to: size.height, by: spacing) {
+                            dots.addEllipse(in: CGRect(x: x - diameter / 2, y: y - diameter / 2,
+                                                       width: diameter, height: diameter))
+                        }
+                    }
+                    context.fill(dots, with: .color(Color(nsColor: .tertiaryLabelColor)))
+                }
+                .accessibilityHidden(true)
+            }
             .ignoresSafeArea()
     }
 }

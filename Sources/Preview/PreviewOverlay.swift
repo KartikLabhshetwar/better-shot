@@ -14,6 +14,7 @@ final class PreviewOverlay {
     private(set) var isPresented = false
     private(set) var items: [URL] = []
     private(set) var savingItems: Set<URL> = []
+    private(set) var thumbnails: [URL: NSImage] = [:]
     private var failedSaves: Set<URL> = []
     private var panel: NSPanel?
     private var dismissTasks: [URL: Task<Void, Never>] = [:]
@@ -43,9 +44,10 @@ final class PreviewOverlay {
 
     private init() {}
 
-    func show(url: URL, on screen: NSScreen? = nil, automaticallyDismiss: Bool = true) {
+    func show(url: URL, on screen: NSScreen? = nil, automaticallyDismiss: Bool = true, thumbnail: NSImage? = nil) {
         refreshSettings()
         cancelScheduledDismiss(for: url)
+        if let thumbnail { thumbnails[url] = thumbnail }
         items.removeAll { $0 == url }
         items.append(url)
         while items.count > Self.maxItems {
@@ -69,6 +71,7 @@ final class PreviewOverlay {
         if toastURL == url { toastURL = nil }
         cancelScheduledDismiss(for: url)
         items.removeAll { $0 == url }
+        thumbnails.removeValue(forKey: url)
         if items.isEmpty {
             dismiss()
         } else {
@@ -90,6 +93,7 @@ final class PreviewOverlay {
         let dismissedPanel = panel
         panel = nil
         items.removeAll()
+        thumbnails.removeAll()
         Task { @MainActor in
             dismissedPanel?.orderOut(nil)
             NotchPresenter.shared.refresh()
@@ -112,14 +116,17 @@ final class PreviewOverlay {
     }
 
     func refreshPresentation() {
-        teardownPanel()
+        let isNormal = isPresented && !items.isEmpty && AppPreferences.presentationMode != .notch
+        if !isNormal || panel?.screen != (targetScreen ?? ActiveDisplayResolver.screenForScreenshotCapture()) {
+            teardownPanel()
+        }
         guard isPresented, !items.isEmpty else { return }
         if AppPreferences.presentationMode == .notch {
             NotchPresenter.shared.show(on: targetScreen ?? ActiveDisplayResolver.screenForScreenshotCapture())
             startMouseTrackingIfNeeded()
         } else {
             // Create on the final display to preserve hit testing across mixed DPI screens.
-            createPanel()
+            if panel == nil { createPanel() }
             positionPanel()
             panel?.orderFrontRegardless()
             startMouseTrackingIfNeeded()
@@ -486,7 +493,7 @@ struct PreviewDeckView: View {
                 }
             }
             ForEach(overlay.items, id: \.self) { url in
-                PreviewCardView(overlay: overlay, url: url)
+                PreviewCardView(overlay: overlay, url: url, thumbnail: overlay.thumbnails[url])
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: pinnedLeft ? .bottomLeading : .bottomTrailing)
@@ -675,6 +682,10 @@ struct PreviewCardView: View {
     }
 
     private func loadThumbnail() async {
+        guard thumbnail == nil else {
+            isLoadingThumbnail = false
+            return
+        }
         // Both kinds go through the history store's decoder: it samples a bounded
         // thumbnail rather than the full bitmap, and it is nonisolated, so the
         // decode runs off the main actor instead of on the tick that just

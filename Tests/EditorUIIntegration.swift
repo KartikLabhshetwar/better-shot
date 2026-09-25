@@ -1027,16 +1027,18 @@ private func checkScrollCaptureStitching() throws {
         return (redPixels, bluePixels)
     }
     let counts = pixelCounts(merged)
-    precondition(counts.red == 12 * 6 && counts.blue == 12 * 3,
-                 "Below a pinned header the merger should keep prior pixels and append only the new strip")
+    precondition(counts.red == 12 * 3 && counts.blue == 12 * 6,
+                 "Below a pinned header the newer frame should replace the overlap so faded-in content is kept settled")
     let overwrittenCounts = pixelCounts(overwritten)
     precondition(overwrittenCounts.red == 12 * 1 && overwrittenCounts.blue == 12 * 8,
                  "Without a header the newest frame replaces the overlap so pinned footers appear once")
-    if case .some = ScrollCaptureController.mergedImage(
-        existing: existing, currentFrame: current, offsetPx: 0
-    ) {
-        preconditionFailure("A zero-height strip must not create a duplicate capture")
-    }
+    guard let refreshed = ScrollCaptureController.mergedImage(
+        existing: overwritten, currentFrame: solidFrame(width: 12, height: 8,
+            color: CGColor(red: 1, green: 0, blue: 0, alpha: 1)), offsetPx: 0, headerHeight: 2
+    ), refreshed.height == 9 else { preconditionFailure("The final frame should refresh the page end in place") }
+    let refreshedCounts = pixelCounts(refreshed)
+    precondition(refreshedCounts.red == 12 * 7 && refreshedCounts.blue == 12 * 2,
+                 "A zero-offset final frame should redraw only the rows below the pinned header")
 
     // Each row has a distinct color and text-like bars, so repeated or omitted
     // rows at a seam cannot hide inside a solid-color fixture.

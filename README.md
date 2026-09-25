@@ -111,7 +111,10 @@ again (it reads **Scrolling…**) to go back to scrolling by hand. Click **Stop*
 trigger Scrolling Capture again, to send the image to the capture preview. The
 **×** button or Escape discards it.
 
-Fixed headers and scrollbars are detected and left out of the joins. Auto Scroll
+Fixed headers and scrollbars are detected and left out of the joins. Each join
+redraws the overlap from the newest frame, and Stop takes one last frame at the
+end of the page, so content that fades in as it scrolls into view is captured
+fully drawn. Auto Scroll
 needs Accessibility and finishes at the bottom of the page; either mode finishes
 at 30,000 pixels. If a join is missed, scroll back up a little and continue.
 
