@@ -48,6 +48,57 @@ final class CaptureOrchestrator {
         await finishCaptures()
     }
 
+    func performScrollCapture(on screen: NSScreen? = nil) async {
+        guard !captureInProgress, !NotchVoiceCapture.shared.isPreparing,
+              !NotchQuickEditor.shared.listening else { return }
+        NotchPresenter.shared.suspendForCapture()
+        captureInProgress = true
+        captureScreen = screen
+        await RecordingBarPresenter.shared.hidePickerForCapture()
+
+        let outcome = await RegionSelectionOverlay().selectRegion(allowsWindowSelection: false)
+        if case .region(let selection) = outcome,
+           let selectedScreen = ActiveDisplayResolver.screen(for: selection.displayID) {
+            captureScreen = selectedScreen
+            // The selector returns Quartz top-left coordinates; the scroll
+            // controller accepts global AppKit bottom-left coordinates.
+            let rect = RegionGeometry.pointsRect(global: selection.pointsRect,
+                primaryHeight: CGDisplayBounds(CGMainDisplayID()).height)
+            let result = await ScrollCaptureSessionPresenter.shared.capture(rect: rect, on: selectedScreen)
+            switch result {
+            case .completed(let image):
+                do {
+                    let url = try await Self.writeScrollImage(image)
+                    ScreenCapture.shared.playShutterSound()
+                    await processCapturedImage(url)
+                } catch {
+                    ToastWindow.shared.show(isError: true, title: "Couldn’t finish scrolling capture",
+                        message: "The image could not be prepared. Select the area and try again. \(error.localizedDescription)",
+                        systemIcon: "exclamationmark.triangle", duration: 10, on: selectedScreen)
+                }
+            case .failed:
+                ToastWindow.shared.show(isError: true, title: "Couldn’t capture scrolling area",
+                    message: "Check Screen & System Audio Recording permission, then select the area and try again.",
+                    systemIcon: "exclamationmark.triangle", duration: 10, on: selectedScreen)
+            case .cancelled:
+                break
+            }
+        }
+        await finishCaptures()
+    }
+
+    private nonisolated static func writeScrollImage(_ image: CGImage) async throws -> URL {
+        try await Task.detached(priority: .userInitiated) {
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("bettershot_scroll_\(UUID().uuidString).png")
+            guard let data = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else {
+                throw CocoaError(.fileWriteUnknown)
+            }
+            try data.write(to: url, options: .atomic)
+            return url
+        }.value
+    }
+
     private func executeCapture(_ action: ShortcutService.Action) async {
         if action != .recording {
             await RecordingBarPresenter.shared.hidePickerForCapture()

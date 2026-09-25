@@ -143,6 +143,11 @@ all affected callers meet. Keep unrelated cleanup out of the diff.
 
 The screenshot path runs through `ShortcutService`, `CaptureOrchestrator`,
 `ScreenCapture`, private staging/history, and the preview or image editor.
+Scrolling Capture starts from the menu bar, selects an area with
+`RegionSelectionOverlay`, and uses `ScrollCaptureSessionPresenter` to Stop into
+that same private preview flow or Cancel without staging a file. Run
+`BETTERSHOT_CHECK_CAPTURE_UI=1 bash Tests/run-exports.sh` after a test build to
+check stitching and the compact capture controls in both appearances.
 Region screenshots use macOS's native `/usr/sbin/screencapture -i` selector.
 Window screenshots use `SCContentSharingPicker` and `SCScreenshotManager.captureImage`
 in the app process; preserve picker cancellation, native pixel dimensions, and private PNG staging.
