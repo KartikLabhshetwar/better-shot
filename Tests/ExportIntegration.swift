@@ -810,12 +810,14 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
     let autoSaveKey = AfterCaptureAction.save.storageKey(for: .screenshot)
     let oldAutoSave = UserDefaults.standard.object(forKey: autoSaveKey)
     let oldLegacyAutoSave = UserDefaults.standard.object(forKey: BetterShotPreferences.autoSaveKey)
+    let oldFileNameTemplate = UserDefaults.standard.object(forKey: ScreenshotFileNaming.templateKey)
     let oldHandler = PreviewPanelPresenter.shared.onAnnotate
     let oldRecords = Set(HistoryStore.shared.records.map(\.id))
     var editorURL: URL?
     PreviewPanelPresenter.shared.onAnnotate = { editorURL = ScreenshotHistoryStore.shared.annotationEditorURL(for: $0) }
     AppPreferences.saveDirectory = saveFolder.path
     AppPreferences.copyAfterSave = true
+    UserDefaults.standard.set("Saved-{kind}", forKey: ScreenshotFileNaming.templateKey)
     defer {
         PreviewOverlay.shared.clearAll()
         DeckStaging.purge()
@@ -829,6 +831,7 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
         AppPreferences.overlayDismissDelay = oldDismissDelay
         UserDefaults.standard.set(oldAutoSave, forKey: autoSaveKey)
         UserDefaults.standard.set(oldLegacyAutoSave, forKey: BetterShotPreferences.autoSaveKey)
+        UserDefaults.standard.set(oldFileNameTemplate, forKey: ScreenshotFileNaming.templateKey)
         PinnedScreenshotController.shared.unpinAll()
         PreviewPanelPresenter.shared.onAnnotate = oldHandler
     }
@@ -891,6 +894,7 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
     precondition(saved.deletingLastPathComponent().resolvingSymlinksInPath().path == saveFolder.resolvingSymlinksInPath().path
                  && savedFiles().count == 1,
                  "Explicit editor Save expected \(saveFolder.path), got \(saved.path); files: \(savedFiles().map(\.lastPathComponent))")
+    precondition(saved.lastPathComponent == "Saved-Screenshot.png", "Explicit Save must use the file name template")
     let savedData = try Data(contentsOf: saved)
     let rendered = directory.appendingPathComponent("editor-render.png")
     var background = AnnotationBackgroundSettings()
@@ -936,6 +940,9 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
                 precondition(savedFiles().count == before + 1
                     && saved.deletingLastPathComponent().standardizedFileURL == saveFolder.standardizedFileURL,
                     "Automatic saving creates exactly one export in the configured folder")
+                precondition(saved.lastPathComponent.hasPrefix("Saved-Screenshot")
+                    && !saved.lastPathComponent.contains(".preview."),
+                    "Automatic saving must use the file name template instead of the internal preview name")
                 let raw = ScreenshotHistoryStore.shared.annotationEditorURL(for: saved)
                 precondition((try? Data(contentsOf: raw)) == originalData && raw != saved)
                 precondition(HistoryStore.shared.annotationExportURL(for: raw) == saved,

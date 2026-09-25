@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Image and video editors open in a normal window after a screenshot or recording instead of entering full screen automatically. Use the window's green full-screen button to enter full screen, or turn on Settings > General > Editor > Open editors in full screen to restore automatic full screen.
+- Automatically saved screenshots and new explicit Saves use the configured file name template instead of the internal `.preview.png` name. Saving over an existing export keeps its current name ([#167](https://github.com/KartikLabhshetwar/better-shot/pull/167), thanks [@zergzorg](https://github.com/zergzorg))
 
 ## [0.5.6] - 2026-09-21
 
