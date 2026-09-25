@@ -216,6 +216,14 @@ and effects. Camera frame ratio is independent of canvas ratio. Older projects
 must retain compatible defaults and saved artwork, including legacy Hand cursors
 and the `macOS` storage key for Arrow.
 
+`ViewportTimeline.build` adapts Cap's `zoom_spring.rs`: magnification and a
+travel-space center (0 is flush left/top, 1 flush right/bottom) use separate
+springs, so every frame stays inside the source. The center pre-aims while
+unzoomed, holds its last framing while zooming out, and Auto cues follow
+fixed pointer regions (50% by 70% of the zoomed view) instead of raw samples.
+Instant cues snap within 0.1 seconds of their boundaries. `checkZoomCamera`
+in the export integration run covers these rules against production code.
+
 `GradientPreset.presets` in [BackgroundStyle.swift](Sources/Models/BackgroundStyle.swift)
 is the palette source. General > Default Look initializes new media; editing a
 saved project must not overwrite those defaults. No Background retains framing
