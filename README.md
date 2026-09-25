@@ -47,7 +47,7 @@ permissions and your first capture.
 - Annotate with arrows, shapes, text, numbered markers, highlights, blur, and pixelate.
 - Crop, rotate, and flip without losing editable annotations.
 - Frame captures on a wallpaper, soft gradient, or any solid color with padding, rounded corners, and shadow.
-- Save as PNG, JPEG, or WebP.
+- Save as PNG or JPEG.
 
 **Recordings**
 - Record a display, window, or adjustable area with optional system audio, microphone, camera, and teleprompter.
@@ -126,7 +126,9 @@ bundled in [Resources/Licenses/MacShot.txt](Resources/Licenses/MacShot.txt).
 
 Captures stay in BetterShot's private storage until you save them. A screenshot
 or recording is named once, when it is taken, and Copy, Save, Export, Share, and
-drag-out all reuse that name.
+drag-out all reuse that name, including any dots in a custom template.
+Video saves finish copying or converting before replacing an existing file;
+simultaneous saves with the same name get separate numbered files.
 
 - **Copy** puts the image on the clipboard. No file lands in your save folder.
 - **Save** writes to your configured folder. In the editor, later saves update the same file.

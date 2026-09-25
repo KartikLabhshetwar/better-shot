@@ -392,7 +392,7 @@ enum ScreenshotFileActions {
     /// Derived files (the raw source, the deck preview, edited copies) resolve
     /// to it through the capture's record; any other file keeps its own name.
     static func captureFileName(for url: URL, extension pathExtension: String) -> String {
-        ScreenshotFileNaming.fileName(of: URL(fileURLWithPath: captureName(for: url)), extension: pathExtension)
+        URL(fileURLWithPath: captureName(for: url)).appendingPathExtension(pathExtension).lastPathComponent
     }
 
     /// The capture's name without an extension.

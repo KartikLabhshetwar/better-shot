@@ -98,10 +98,16 @@ enum VideoFileActions {
 
     @discardableResult
     static func saveToDefaultLocation(from url: URL, suggestedFileName: String? = nil) async throws -> URL {
-        let destinationURL = try ScreenshotFileActions.exportDestination(
-            named: suggestedFileName ?? exportFileName(for: url)
-        )
-        try await save(from: url, to: destinationURL)
+        let fileName = suggestedFileName ?? exportFileName(for: url)
+        let stagingURL = try ScreenshotFileActions.exportDestination(
+            named: ".BetterShot-\(UUID().uuidString).\(URL(fileURLWithPath: fileName).pathExtension)")
+        defer { try? FileManager.default.removeItem(at: stagingURL) }
+        try await save(from: url, to: stagingURL)
+        // Remuxing suspends. Choose the free name afterward, so concurrent
+        // saves with the same template cannot overwrite each other's output.
+        let destinationURL = ScreenshotFileNaming.uniqueURL(
+            for: fileName, in: stagingURL.deletingLastPathComponent())
+        try FileManager.default.moveItem(at: stagingURL, to: destinationURL)
         return destinationURL
     }
 
@@ -111,16 +117,22 @@ enum VideoFileActions {
     /// reject - the remux is what makes the rename honest. Matching containers
     /// take the copy path, which on APFS is a clone rather than a byte copy.
     static func save(from sourceURL: URL, to destinationURL: URL) async throws {
+        let stagingURL = destinationURL.deletingLastPathComponent()
+            .appendingPathComponent(".BetterShot-\(UUID().uuidString)")
+            .appendingPathExtension(destinationURL.pathExtension)
+        defer { try? FileManager.default.removeItem(at: stagingURL) }
+
+        if let target = remuxTarget(from: sourceURL, to: destinationURL) {
+            try await VideoContainerRemuxer.remux(from: sourceURL, to: stagingURL, as: target)
+        } else {
+            try FileManager.default.copyItem(at: sourceURL, to: stagingURL)
+        }
+        try Task.checkCancellation()
         if FileManager.default.fileExists(atPath: destinationURL.path) {
-            try FileManager.default.removeItem(at: destinationURL)
+            _ = try FileManager.default.replaceItemAt(destinationURL, withItemAt: stagingURL)
+        } else {
+            try FileManager.default.moveItem(at: stagingURL, to: destinationURL)
         }
-
-        guard let target = remuxTarget(from: sourceURL, to: destinationURL) else {
-            try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
-            return
-        }
-
-        try await VideoContainerRemuxer.remux(from: sourceURL, to: destinationURL, as: target)
     }
 
     /// The container to rewrite into, or nil when a plain copy is correct.

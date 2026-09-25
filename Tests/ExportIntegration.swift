@@ -322,6 +322,7 @@ struct ExportIntegration {
     }
 
     @MainActor static func checkVideoExports(movie: URL, directory: URL) async throws {
+        try await checkVideoFileSaving(movie: movie, directory: directory)
         checkZoomCamera()
         let clips = RecordingClipTimeline.full(sourceDuration: 2)
         let viewport = ViewportTimeline.build(
@@ -835,6 +836,46 @@ struct ExportIntegration {
 }
 
 @MainActor
+private func checkVideoFileSaving(movie: URL, directory: URL) async throws {
+    let destination = directory.appendingPathComponent("saved-video.mov")
+    let original = try Data(contentsOf: movie)
+    try original.write(to: destination)
+    for source in [directory.appendingPathComponent("missing.mov"), directory.appendingPathComponent("invalid.mp4")] {
+        if source.pathExtension == "mp4" { try Data("invalid movie".utf8).write(to: source) }
+        do {
+            try await VideoFileActions.save(from: source, to: destination)
+            preconditionFailure("Invalid video input must fail")
+        } catch {}
+        precondition((try? Data(contentsOf: destination)) == original,
+                     "Failed video copy/remux must preserve the previous export")
+    }
+    try await VideoFileActions.save(from: destination, to: destination)
+    precondition((try? Data(contentsOf: destination)) == original, "Saving onto the source must preserve it")
+
+    let oldDirectory = AppPreferences.saveDirectory
+    AppPreferences.saveDirectory = directory.path
+    defer { AppPreferences.saveDirectory = oldDirectory }
+    let first = Task { @MainActor in
+        try await VideoFileActions.saveToDefaultLocation(from: movie, suggestedFileName: "same-name.mp4")
+    }
+    let second = Task { @MainActor in
+        try await VideoFileActions.saveToDefaultLocation(from: movie, suggestedFileName: "same-name.mp4")
+    }
+    let outputs = try await [first.value, second.value]
+    precondition(outputs[0] != outputs[1], "Concurrent remuxes must not share a destination")
+    for output in outputs {
+        let duration = try await AVURLAsset(url: output).load(.duration).seconds
+        precondition(abs(duration - 2) < 0.04, "Each saved video must be complete")
+    }
+    let longName = String(repeating: "x", count: 200) + ".mov"
+    let longOutput = try await VideoFileActions.saveToDefaultLocation(from: movie, suggestedFileName: longName)
+    precondition(longOutput.lastPathComponent == longName, "Staging must allow full-length template names")
+    let leftovers = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+    precondition(!leftovers.contains { $0.hasPrefix(".BetterShot-") }, "Video saves must clean up staging files")
+    print("PASS video save failure preserves exports, same-file save, and concurrent remux naming")
+}
+
+@MainActor
 private func checkAnnotationExport(image: CGImage, source: URL, directory: URL) async throws {
     let history = HistoryStore(storageDirectory: directory.appendingPathComponent("annotation-history"))
     let record = history.importCapture(from: source, deleteSource: false)!
@@ -894,7 +935,7 @@ private func checkCapturesKeepTheirName(
 
     for keep in [false, true] {
         AppPreferences.keepInDeckUntilSaved = keep
-        let born = "born-\(keep)-{counter:3}"
+        let born = "born-\(keep)-{counter:3}.release.0.5.7"
         UserDefaults.standard.set(born, forKey: templateKey)
         let counterBefore = ScreenshotFileNaming.counter()
         let copied = try await capture(.region)

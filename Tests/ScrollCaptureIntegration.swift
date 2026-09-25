@@ -82,7 +82,7 @@ struct ScrollCaptureIntegration {
         for _ in 0..<600 {
             if finished { break }
             if !controller.autoScrollActive && NSWorkspace.shared.frontmostApplication?.processIdentifier != fixture.processIdentifier {
-                throw failure("Live check interrupted by an app switch; rerun with the fixture in front")
+                throw failure("Live check interrupted by an app switch to \(NSWorkspace.shared.frontmostApplication?.localizedName ?? "unknown"); rerun with the fixture in front")
             }
             if !checkedPause && controller.stripCount >= 3 {
                 checkedPause = true
@@ -102,7 +102,7 @@ struct ScrollCaptureIntegration {
                     try await Task.sleep(for: .milliseconds(100))
                 }
                 guard controller.stripCount > pausedCount else {
-                    throw failure("Manual scrolling after Pause did not capture the next strip")
+                    throw failure("Manual scrolling after Pause did not capture the next strip; strips=\(pausedCount), pixels=\(controller.stitchedPixelSize), pointerInSelection=\(selection.contains(NSEvent.mouseLocation)), fixtureInFront=\(NSWorkspace.shared.frontmostApplication?.processIdentifier == fixture.processIdentifier)")
                 }
                 controller.toggleAutoScroll()
             }

@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Share only uploads when Upload when I share is on. Setups from 0.4.3 to 0.5.6 that already saved cloud keys have it turned on once during this update; new setups stay off until you turn it on, and Share explains how instead of uploading ([#163](https://github.com/KartikLabhshetwar/better-shot/pull/163), thanks [@icanhasjonas](https://github.com/icanhasjonas))
 - Dragging a clip's Speed slider applies the speed once when you let go: one undo step, no preview stutter, and the speed stays on the clip where the drag started ([#164](https://github.com/KartikLabhshetwar/better-shot/pull/164), thanks [@icanhasjonas](https://github.com/icanhasjonas))
 - WebP is no longer offered as an export format because macOS cannot encode it. A saved WebP choice falls back to PNG ([#162](https://github.com/KartikLabhshetwar/better-shot/pull/162), thanks [@icanhasjonas](https://github.com/icanhasjonas))
+- Custom capture names containing dots keep their full name through Copy, Save, Export, and drag-out instead of losing the last dotted suffix.
+- Video saves preserve the previous file if copying or conversion fails. Simultaneous video saves with the same name now create separate numbered files.
 
 ## [0.5.6] - 2026-09-21
 

@@ -213,6 +213,11 @@ that export. Export opens a save panel for a new destination.
 Foundation-only deliverable name renderer. Preserve sanitization and keep
 previews from advancing counters. Recording package directory names identify
 projects and must not change with the deliverable template.
+`captureName` already removes the format extension; append the requested
+extension without stripping another dotted suffix. Video saves stage the complete
+copy/remux before replacing an export, and choose collision-free default names
+after asynchronous conversion. Keep the naming and failed-save regressions in
+`Tests/ExportIntegration.swift` against these production paths.
 
 ### Editing, rendering, and persistence
 
