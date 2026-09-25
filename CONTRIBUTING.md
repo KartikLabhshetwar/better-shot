@@ -147,14 +147,18 @@ Scrolling Capture is the `.scrollCapture` action: the menu bar, capture bar,
 shortcut, and `bettershot://capture/scroll` all reach it through
 `CaptureOrchestrator.performCapture`. It selects an area with
 `RegionSelectionOverlay` and uses `ScrollCaptureSessionPresenter` to Stop into
-that same private preview flow or Cancel/Escape without staging a file. MacShot's
-Vision registration, automatic scroll cycle, and live preview use the same
-controller and preserve ScreenCaptureKit exclusion/coordinate conversion.
+that same private preview flow or Cancel/Escape without staging a file.
+`ScrollCaptureController` ports MacShot's engine: frames come from
+`CGWindowListCreateImage` (loaded at runtime) for windows below the selection
+outline, so BetterShot's panels never appear in them. Vision registration and
+merging run off the main actor, and manual, automatic, and final captures are
+serialized. The reference frame only advances when a strip is appended or the
+page is unchanged, so scrolling back after a missed join recovers.
 `ScrollFrameAnalyzer` compares native pixel strides and channel layouts; never
-assume captured rows are packed. Keep matching off the main actor, serialize
-manual/auto/final captures, and retain the last successfully stitched reference
-when a match fails. Auto Scroll pauses on tracking loss or app changes and stops
-at page end or the size limit. Run
+assume captured rows are packed. Auto Scroll posts continuous pixel-unit scroll
+events sized to the area, which mouse utilities such as Mac Mouse Fix pass
+through unchanged; line events get reversed or smoothed. It pauses on app
+changes and stops at page end, after repeated misses, or at the size limit. Run
 `BETTERSHOT_CHECK_CAPTURE_UI=1 bash Tests/run-exports.sh` after a test build to
 check stitching and the compact capture controls in both appearances.
 Region screenshots use `RegionSelectionOverlay` with the previous area

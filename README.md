@@ -101,20 +101,19 @@ Set the background, padding, corner radius, and shadow for new captures in
 
 ### Scrolling capture
 
-Capture a page or list that is taller or wider than the screen. Choose
+Capture a page or list that is taller than the screen. Choose
 **Scrolling Capture** in the menu bar popover or **Scroll** in the capture bar
 (`⌘⇧2`), or assign a shortcut in **Settings > Shortcuts**. Drag over the
-scrollable content, then scroll through it as usual in one direction: down, or
-horizontally. The floating panel counts the stitched frames and the image's
-length, with a live stitched preview beside the area when there is room.
-Choose **Auto Scroll** to scroll down automatically and **Pause Scroll** to resume
-manual scrolling. Click **Stop**, or trigger Scrolling Capture again, to send the
-image to the capture preview. **Cancel** or Escape discards it.
+scrollable content, then scroll down through it as usual. A compact bar beside
+the area shows the stitched size, with a live preview next to the area when
+there is room. Choose **Auto Scroll** to scroll down automatically, and click it
+again (it reads **Scrolling…**) to go back to scrolling by hand. Click **Stop**, or
+trigger Scrolling Capture again, to send the image to the capture preview. The
+**×** button or Escape discards it.
 
-Scroll at a steady pace so consecutive frames overlap. Fixed headers and
-scrollbars are detected and left out of the joins. Auto Scroll finishes at the
-bottom of the page; either mode finishes at 30,000 pixels. If tracking is lost,
-auto-scroll pauses so you can scroll back slightly and recover.
+Fixed headers and scrollbars are detected and left out of the joins. Auto Scroll
+needs Accessibility and finishes at the bottom of the page; either mode finishes
+at 30,000 pixels. If a join is missed, scroll back up a little and continue.
 
 Vision alignment, automatic scrolling, frame analysis, and the live preview are
 adapted from [MacShot](https://github.com/sw33tLie/macshot); its GPLv3 notice is

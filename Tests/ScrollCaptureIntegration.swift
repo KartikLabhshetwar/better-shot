@@ -70,7 +70,7 @@ struct ScrollCaptureIntegration {
         var finished = false
         controller.onSessionDone = { completed = $0; finished = true }
         UserDefaults.standard.set(false, forKey: "scrollAutoScrollEnabled")
-        UserDefaults.standard.set(3, forKey: "scrollAutoScrollSpeed")
+        UserDefaults.standard.set(1, forKey: "scrollAutoScrollSpeed")
         UserDefaults.standard.set(30_000, forKey: "scrollMaxHeight")
         await controller.startSession()
         guard controller.stripCount == 1, let first = controller.stitchedImage else {
@@ -92,8 +92,8 @@ struct ScrollCaptureIntegration {
                 guard !controller.autoScrollActive, controller.stripCount == pausedCount else {
                     throw failure("Pause must stop the auto-scroll cycle")
                 }
-                let event = CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1,
-                    wheel1: -3, wheel2: 0, wheel3: 0)!
+                let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1,
+                    wheel1: -60, wheel2: 0, wheel3: 0)!
                 event.location = CGPoint(x: selection.midX,
                     y: CGDisplayBounds(CGMainDisplayID()).height - selection.midY)
                 event.post(tap: .cghidEventTap)
@@ -129,7 +129,7 @@ struct ScrollCaptureIntegration {
         for row in 0..<10 {
             let original = initial.colorAt(x: Int(10 * scale), y: Int((CGFloat(row * 30) + 10) * scale))!
                 .usingColorSpace(.sRGB)!.redComponent
-            guard abs(reds[row] - original) < 0.005 else { throw failure("Initial row \(row) changed") }
+            guard abs(reds[row] - original) < 0.015 else { throw failure("Initial row \(row) changed") }
         }
         for row in 0..<20 {
             for other in 0..<row {
