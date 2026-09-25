@@ -287,7 +287,7 @@ private struct EditorFullScreenModifier: ViewModifier {
 }
 
 extension View {
-    func editorFullScreenByDefault() -> some View {
+    func editorFullScreenSupport() -> some View {
         modifier(EditorFullScreenModifier())
     }
 }

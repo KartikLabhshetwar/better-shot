@@ -100,7 +100,7 @@ public final class DynamicNotch<Expanded, CompactLeading, CompactTrailing>: Obse
         if state != target {
             let animation: Animation? = animated && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
                 // Adapted from boring.notch ContentView's interruptible spring.
-                // GPL-3.0; see BetterShot's Resources/Licenses/NOTICE.md.
+                // GPL-3.0; see BetterShot's Resources/Licenses/BoringNotch.txt.
                 // BetterShot uses a short ease-out with no bounce.
                 ? .easeOut(duration: 0.14) : nil
             withAnimation(animation) { state = target }

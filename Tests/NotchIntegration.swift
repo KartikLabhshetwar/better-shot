@@ -265,8 +265,46 @@ func checkNotchPresentation(imageURL: URL, movieURL: URL) async throws {
         selector.beginControlDrag(at: origin) { outcome = $0 }
         selector.cancelControlDrag()
         guard case .cancelled = outcome else { preconditionFailure("Releasing Control early must cancel") }
+
+        let releaseSetting = AppPreferences.captureRegionOnRelease
+        AppPreferences.captureRegionOnRelease = false
+        defer { AppPreferences.captureRegionOnRelease = releaseSetting }
+        let small = CGRect(x: screen.frame.minX + 40, y: screen.frame.minY + 50, width: 160, height: 90)
+        let cases: [(previous: CGRect, drawn: CGSize?)] = [(small, nil), (screen.frame, CGSize(width: 120, height: 70))]
+        for (previous, drawn) in cases {
+            AppPreferences.lastRegionRect = previous
+            let reselector = RegionSelectionOverlay()
+            let reuse = Task { await reselector.selectRegion(allowsWindowSelection: false) }
+            var overlay: NSWindow?
+            for _ in 0..<50 where overlay == nil {
+                try await Task.sleep(for: .milliseconds(10))
+                overlay = NSApp.windows.first {
+                    $0.isVisible && $0.frame == screen.frame && $0.level.rawValue == Int(CGWindowLevelForKey(.maximumWindow))
+                }
+            }
+            guard let overlay, let view = overlay.contentView, let returnKey = NSEvent.keyEvent(
+                with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: overlay.windowNumber,
+                context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36
+            ) else { preconditionFailure("The region selector must open over the screen holding the previous area") }
+            if let drawn {
+                func mouse(_ type: NSEvent.EventType, _ point: CGPoint) -> NSEvent {
+                    NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: 0, windowNumber: overlay.windowNumber,
+                                       context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+                }
+                let start = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
+                let end = CGPoint(x: start.x + drawn.width, y: start.y + drawn.height)
+                view.mouseDown(with: mouse(.leftMouseDown, start))
+                view.mouseDragged(with: mouse(.leftMouseDragged, end))
+                view.mouseUp(with: mouse(.leftMouseUp, end))
+            }
+            view.keyDown(with: returnKey)
+            precondition(!overlay.isVisible, "Return must capture the selected area")
+            guard case .region(let region) = await reuse.value else { preconditionFailure("Return must capture the selected area") }
+            precondition(region.pointsRect.size == (drawn ?? previous.size), "A drag inside the previous area must draw a new area")
+            precondition(AppPreferences.lastRegionRect?.size == region.pointsRect.size)
+        }
     }
-    print("PASS Control-drag rectangle geometry and cancellation")
+    print("PASS Control-drag rectangle geometry and cancellation, Return reuses the previous area, drags inside it draw a new one")
     // Exercise the kit's non-notched fallback on the same screen without changing display settings.
     if let screen = window.screen {
         let floating = DynamicNotch(hoverBehavior: [], style: .floating) { NotchContent() }

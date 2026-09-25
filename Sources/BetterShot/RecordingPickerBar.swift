@@ -40,6 +40,7 @@ struct RecordingPickerControls: View {
         (.screenshotRegion, .region, "Area", "viewfinder"),
         (.screenshotFullscreen, .fullscreen, "Screen", "desktopcomputer"),
         (.screenshotWindow, .window, "Window", "macwindow"),
+        (.screenshotScroll, .scrollCapture, "Scroll", "rectangle.expand.vertical"),
         (.ocr, .ocr, "Text", "doc.text.viewfinder"),
         (.colorPicker, .colorPicker, "Color", "eyedropper"),
     ]
@@ -53,9 +54,10 @@ struct RecordingPickerControls: View {
     var body: some View {
         HStack(spacing: 4) {
             ForEach(Array(Self.screenshotActions.enumerated()), id: \.element.0) { index, item in
-                if index == 3 { BarDivider() }
                 let (id, action, caption, icon) = item
-                let title = ShortcutService.shared.help(action == .ocr ? "Copy text from screen" : caption, for: action)
+                if action == .ocr { BarDivider() }
+                let title = ShortcutService.shared.help(action == .ocr ? "Copy text from screen"
+                    : action == .scrollCapture ? "Scrolling Capture" : caption, for: action)
                 BarActionButton(id: id, title: title, systemImage: icon, caption: caption) {
                     capture(action)
                 }

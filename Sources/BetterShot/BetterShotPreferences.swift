@@ -58,7 +58,6 @@ enum BetterShotPreferences {
     static var exportFormat: ScreenshotExportFormat {
         switch AppPreferences.exportFormat {
         case .jpeg: .jpeg
-        case .webp: .webp
         case .png: .png
         }
     }
@@ -217,7 +216,6 @@ enum ScreenshotExportFormat: String, CaseIterable, Identifiable {
     case png
     case jpeg
     case heic
-    case webp
 
     var id: String { rawValue }
 
@@ -229,8 +227,6 @@ enum ScreenshotExportFormat: String, CaseIterable, Identifiable {
             "JPEG"
         case .heic:
             "HEIC"
-        case .webp:
-            "WebP"
         }
     }
 
@@ -242,8 +238,6 @@ enum ScreenshotExportFormat: String, CaseIterable, Identifiable {
             "jpg"
         case .heic:
             "heic"
-        case .webp:
-            "webp"
         }
     }
 
@@ -255,8 +249,6 @@ enum ScreenshotExportFormat: String, CaseIterable, Identifiable {
             .jpeg
         case .heic:
             .heic
-        case .webp:
-            .webP
         }
     }
 
@@ -328,7 +320,7 @@ enum ScreenshotFileActions {
         )
         
         let destinationURL = uniqueDestinationURL(
-            for: exportFileName(for: url),
+            for: ScreenshotFileNaming.currentFileName(extension: BetterShotPreferences.exportFormat.fileExtension),
             in: destinationDirectory
         )
         try save(from: url, to: destinationURL)

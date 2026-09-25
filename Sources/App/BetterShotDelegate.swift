@@ -73,6 +73,8 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
                     await CaptureOrchestrator.shared.performCapture(.fullscreen, on: screen)
                 case .window:
                     await CaptureOrchestrator.shared.performCapture(.window, on: screen)
+                case .scrollCapture:
+                    await CaptureOrchestrator.shared.performCapture(.scrollCapture, on: screen)
                 case .ocr:
                     await CaptureOrchestrator.shared.performCapture(.ocr, on: screen)
                 case .colorPicker:
