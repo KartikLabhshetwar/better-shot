@@ -5,6 +5,12 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.7] - 2026-09-25
+
+### Fixed
+
+- Image and video editors open in a normal window after a screenshot or recording instead of entering full screen automatically. Use the window's green full-screen button to enter full screen, or turn on Settings > General > Editor > Open editors in full screen to restore automatic full screen.
+
 ## [0.5.6] - 2026-09-21
 
 ### Changed

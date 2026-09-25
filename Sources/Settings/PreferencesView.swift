@@ -204,7 +204,7 @@ struct GeneralSettingsTab: View {
     /// on every unrelated redraw and read as a glitch.
     @State private var fileNamePreview = ""
 
-    @AppStorage(AppPreferences.editorOpensFullScreenKey) private var editorFullScreen = true
+    @AppStorage(AppPreferences.editorOpensFullScreenKey) private var editorFullScreen = false
     @State private var defaultConfig = AppPreferences.defaultBeautifierConfig
     @State private var isConfirmingReset = false
 
@@ -555,7 +555,7 @@ struct GeneralSettingsTab: View {
         fileNameCounter = 1
         refreshFileNamePreview()
         historyRetentionLimit = 100
-        editorFullScreen = true
+        editorFullScreen = false
         defaultConfig = .default
         AppPreferences.defaultBeautifierConfig = .default
     }

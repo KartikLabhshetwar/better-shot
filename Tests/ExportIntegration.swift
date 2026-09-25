@@ -203,6 +203,7 @@ struct ExportIntegration {
         let defaults = UserDefaults.standard
         let preferenceKeys = [
             "bs_openEditorAfterCapture", AppPreferences.openEditorAfterRecordingKey, "bs_playSound",
+            AppPreferences.editorOpensFullScreenKey,
         ]
         let previousPreferences = preferenceKeys.map { defaults.object(forKey: $0) }
         defer {
@@ -219,7 +220,9 @@ struct ExportIntegration {
             AppPreferences.openEditorAfterRecording && !AppPreferences.openEditorAfterCapture)
         defaults.set(false, forKey: "bs_playSound")
         precondition(!BetterShotPreferences.playSounds)
-        print("PASS preference migration, independent editors, shared sound setting")
+        defaults.removeObject(forKey: AppPreferences.editorOpensFullScreenKey)
+        precondition(!AppPreferences.editorOpensFullScreen, "Editors open windowed unless full screen is opted in")
+        print("PASS preference migration, independent editors, shared sound setting, windowed editors by default")
 
         let movie = directory.appendingPathComponent("source.mov")
         try await makeMovie(at: movie, image: image)
@@ -863,6 +866,7 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
                     precondition(!DeckStaging.isStaged(clipboardURL)
                         && (try? Data(contentsOf: clipboardURL)) == previewData,
                         "Clipboard file pastes must survive dismissing the card")
+                    await Task.yield()
                     precondition(FileManager.default.fileExists(atPath: staged.path) != keep,
                                  "Normal captures stay available for Restore Last Capture; staged cards are discarded")
                     try FileManager.default.removeItem(at: clipboardURL)

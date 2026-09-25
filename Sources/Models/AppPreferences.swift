@@ -225,9 +225,9 @@ enum AppPreferences {
         set { UserDefaults.standard.set(newValue, forKey: recordingMicrophoneDeviceIDKey) }
     }
 
-    static let editorOpensFullScreenKey = "bs_editorOpensFullScreen"
+    static let editorOpensFullScreenKey = "bs_editorOpensFullScreenOptIn"
     static var editorOpensFullScreen: Bool {
-        UserDefaults.standard.object(forKey: editorOpensFullScreenKey) as? Bool ?? true
+        UserDefaults.standard.bool(forKey: editorOpensFullScreenKey)
     }
 
     static let openEditorAfterRecordingKey = "bs_openEditorAfterRecording"
