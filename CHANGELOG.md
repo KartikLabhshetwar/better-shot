@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Recording confirmations no longer show a black rectangle.** Discard and Start Over now use standalone native macOS alerts instead of SwiftUI alerts attached to the transparent recording bar. Buttons and keyboard shortcuts share the same confirmation; Cancel keeps the current recording.
 - Floating screenshot previews now dismiss after Overlay > Hide After. The timer pauses for the live pointer or a focused action, recovers from missed hover/focus events, and keeps saved files. Keep screenshot previews open now holds only unsaved staged captures; saved and retained captures follow Hide After.
 
 ### Changed

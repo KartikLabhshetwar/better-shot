@@ -14,6 +14,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         try await checkEditorWindowInteractions(imageURL: imageURL, movieURL: movieURL)
     }
     try checkCaptureControlsUI()
+    checkRecordingConfirmations()
     try checkImageTransforms(imageURL: imageURL)
     try await checkColorPickerAndToast()
     try await checkPreviewOverlay(imageURL: imageURL)
@@ -903,6 +904,55 @@ private func checkGeneralEditorDefaults(movieURL: URL) async throws {
         reopened.teardown()
     }
     print("PASS General defaults for new recordings/imports, image look parity, reset, and saved project preservation")
+}
+
+/// Exercises real native dialogs without starting a capture or accessing microphone/camera.
+@MainActor
+private func checkRecordingConfirmations() {
+    let manager = ScreenRecordingManager.shared
+    let presenter = RecordingBarPresenter.shared
+    let previousState = manager.state
+    let previousAppearance = NSApp.appearance
+    defer {
+        manager.state = previousState
+        NSApp.appearance = previousAppearance
+        presenter.hide()
+    }
+    for state in [ScreenRecordingState.idle, .starting, .finishing] {
+        manager.state = state
+        presenter.confirmRecordingAction(.discardRecording)
+        presenter.confirmRecordingAction(.restartRecording)
+        precondition(NSApp.modalWindow == nil, "Inactive/settling recordings must not open a destructive confirmation")
+    }
+    for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+        NSApp.appearance = NSAppearance(named: appearance)
+        for action in [ShortcutService.Action.discardRecording, .restartRecording] {
+            manager.state = action == .discardRecording ? .recording : .paused
+            let state = manager.state
+            presenter.showRecording(displayID: nil)
+            let bar = NSApp.windows.first { $0.identifier?.rawValue == "BetterShot.RecordingBar" }!
+            var observed = false
+            let timer = Timer(timeInterval: 0.1, repeats: false) { _ in
+                MainActor.assumeIsolated {
+                    guard let alertWindow = NSApp.modalWindow else { preconditionFailure("Missing native recording confirmation") }
+                    observed = true
+                    precondition(alertWindow !== bar && alertWindow.sheetParent == nil && bar.attachedSheet == nil,
+                                 "Recording confirmations must be standalone, not sheets on the transparent bar")
+                    precondition(!bar.isOpaque && bar.backgroundColor == .clear)
+                    precondition(alertWindow.sharingType == (PreviewWindowCaptureExclusion.includesAppWindowsInCaptures ? .readOnly : .none))
+                    presenter.confirmRecordingAction(action)
+                    precondition(NSApp.modalWindow === alertWindow, "Repeated shortcuts must not nest confirmations")
+                    NSApp.stopModal(withCode: .alertFirstButtonReturn) // Cancel is the safe default.
+                }
+            }
+            RunLoop.main.add(timer, forMode: .modalPanel)
+            presenter.confirmRecordingAction(action)
+            timer.invalidate()
+            precondition(observed && manager.state == state, "Cancel must preserve recording/paused state")
+            precondition(NSApp.modalWindow == nil && bar.attachedSheet == nil)
+        }
+    }
+    print("PASS standalone native recording confirmations, cancellation, duplicate protection, capture exclusion, and both appearances")
 }
 
 /// Static layout checks need no camera/microphone access or encoded video fixture.

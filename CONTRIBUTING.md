@@ -178,6 +178,10 @@ OCR and color results copy through `CaptureOrchestrator.completeTextCapture`;
 empty OCR must not erase the clipboard.
 Recording areas use BetterShot's adjustable AppKit selector.
 `RecordingPickerControls` owns the compact `RecordingOptionsView`. Keep the 0.5.4 Display/Window/Area and Camera/Mic/Audio/Script strip in the floating bar.
+Discard and Start Over, including their shortcuts, use
+`RecordingBarPresenter.confirmRecordingAction` and a standalone `NSAlert.runModal()`.
+Do not attach SwiftUI alerts or sheets to the transparent recording panel: its
+oversized hosting area becomes an opaque backdrop. Cancel preserves the recording.
 Run `BETTERSHOT_CHECK_CAPTURE_UI=1 bash Tests/run-exports.sh` after building for
 focused light/dark capture layout checks without generating a video fixture.
 Keep source selection separate from starting a recording, preserve permission checks

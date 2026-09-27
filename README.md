@@ -54,7 +54,7 @@ permissions and your first capture.
 
 **Recordings**
 - Record a display, window, or adjustable area with optional system audio, microphone, camera, and teleprompter.
-- Pause, restart, or discard from the compact recording bar.
+- Pause, restart, or discard from the compact recording bar. Restart and Discard ask for confirmation in a native macOS dialog; Cancel keeps the recording.
 
 **Video editor**
 - Cut clips, change speed from 0.25x to 8x, and add zooms, transitions, captions, and blur or pixelate masks.

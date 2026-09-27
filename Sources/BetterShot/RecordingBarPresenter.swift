@@ -34,7 +34,7 @@ final class RecordingBarPresenter {
     /// tells the hosting view which part of itself is real and satellite
     /// windows where to anchor.
     var showsRecordingOptions = false
-    var recordingConfirmation: ShortcutService.Action?
+    @ObservationIgnored private var isConfirmingRecordingAction = false
 
     var barFrameInPanel: CGRect = .zero
 
@@ -87,6 +87,33 @@ final class RecordingBarPresenter {
     }
 
     // MARK: Recording
+
+    func confirmRecordingAction(_ action: ShortcutService.Action) {
+        let manager = ScreenRecordingManager.shared
+        guard action == .restartRecording || action == .discardRecording,
+              manager.state == .recording || manager.state == .paused,
+              !isConfirmingRecordingAction else { return }
+        isConfirmingRecordingAction = true
+        defer { isConfirmingRecordingAction = false }
+
+        let restarting = action == .restartRecording
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = restarting ? "Start a new recording?" : "Discard this recording?"
+        alert.informativeText = restarting
+            ? "This recording will be discarded and recording will start again."
+            : "This recording will be deleted without saving."
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: restarting ? "Start Over" : "Discard").hasDestructiveAction = true
+        PreviewWindowCaptureExclusion.shared.register(window: alert.window)
+        NSApp.activate(ignoringOtherApps: true)
+        // A sheet makes the transparent recording panel's full hosting area visible.
+        // Present independently so the bar never becomes an alert backdrop.
+        guard alert.runModal() == .alertSecondButtonReturn,
+              manager.state == .recording || manager.state == .paused else { return }
+        if restarting { manager.restartRecording() }
+        else { manager.deleteRecording() }
+    }
 
     /// Called once capture is actually starting. If the bar is already up on
     /// the recording's display it morphs in place; otherwise it has to move,
