@@ -79,6 +79,20 @@ export function SiteFooter() {
                 Kartik Labhshetwar
               </a>
             </p>
+            <a
+              href="https://usefulshelf.co/?utm_source=bettershot.site&utm_medium=referral&utm_campaign=badge&utm_content=light"
+              target="_blank"
+              rel="noopener"
+              className="mt-6 inline-flex"
+            >
+              <img
+                src="https://usefulshelf.co/badge/usefulshelf.svg"
+                alt="Featured on UsefulShelf"
+                width={210}
+                height={56}
+                className="h-10 w-auto"
+              />
+            </a>
           </div>
 
           {columns.map((column) => (
