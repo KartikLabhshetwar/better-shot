@@ -103,10 +103,10 @@ Capture Region & Pin or Edit Clipboard Image, start unassigned.
 Set the background, padding, corner radius, and shadow for new captures in
 **Settings > General > Default Look**.
 
-Choose **Settings > Capture > Region > Use native macOS region selector**
-for the macOS crosshair instead of BetterShot’s adjustable selector. Window
-screenshots always use the native macOS window selector. The native selector
-does not update BetterShot’s remembered area.
+Region screenshots use BetterShot’s adjustable selector. Enable
+**Settings > Capture > Region > Capture as soon as I let go** to capture on mouse
+release, or leave it off to adjust the area before confirming. Window screenshots
+and OCR use the native macOS selectors.
 
 Saved previews dismiss after **Settings > Overlay > Hide After**, pausing while
 you use the card. **Keep screenshot previews open** holds only unsaved captures;

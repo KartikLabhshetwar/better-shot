@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Restored native macOS window screenshot selection.
-- Added Settings > Capture > Region > Use native macOS region selector. Off keeps BetterShot’s adjustable, remembered-area selector; on uses the native crosshair. OCR continues to use native selection.
+- Simplified region capture to BetterShot’s adjustable selector and removed the separate native region-selector option. Use Settings > Capture > Region > Capture as soon as I let go to capture on mouse release, or leave it off to adjust the area before confirming. Both keep the previous area for reuse. Window screenshots and OCR retain native macOS selection.
 - Removed Notch Mode, its shelf, quick editor, capture gestures, and bundled dependencies. Previews use the floating capture deck.
 
 ## [0.5.7] - 2026-09-25

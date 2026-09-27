@@ -52,15 +52,12 @@ final class ScreenCapture {
 
     // MARK: - Region
 
-    /// Region screenshots follow Settings; OCR explicitly uses the native selector.
-    func captureRegion(nativeSelector: Bool = AppPreferences.nativeRegionSelector) async throws -> URL? {
+    /// Opens BetterShot's adjustable selector, including the capture-on-release setting.
+    func captureRegion() async throws -> URL? {
         guard !isCapturing else { return nil }
         isCapturing = true
         defer { isCapturing = false }
 
-        if nativeSelector {
-            return try await interactiveShot(window: false, includeShadow: false)
-        }
         switch await RegionSelectionOverlay().selectRegion() {
         case .cancelled:
             return nil
@@ -112,7 +109,10 @@ final class ScreenCapture {
     // MARK: - OCR Region
 
     func captureAndOCR() async throws -> String? {
-        guard let url = try await captureRegion(nativeSelector: true) else { return nil }
+        guard !isCapturing else { return nil }
+        isCapturing = true
+        defer { isCapturing = false }
+        guard let url = try await interactiveShot(window: false, includeShadow: false) else { return nil }
         defer { try? FileManager.default.removeItem(at: url) }
 
         guard let image = NSImage(contentsOf: url),

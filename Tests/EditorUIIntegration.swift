@@ -958,15 +958,6 @@ private func checkRecordingConfirmations() {
 /// Static layout checks need no camera/microphone access or encoded video fixture.
 @MainActor
 func checkCaptureControlsUI() throws {
-    let defaults = UserDefaults.standard
-    let selectorKey = AppPreferences.nativeRegionSelectorKey
-    let storedSelector = defaults.object(forKey: selectorKey)
-    defer { defaults.set(storedSelector, forKey: selectorKey) }
-    defaults.removeObject(forKey: selectorKey)
-    precondition(!AppPreferences.nativeRegionSelector, "Existing installs keep the adjustable selector")
-    defaults.set(true, forKey: selectorKey)
-    precondition(AppPreferences.nativeRegionSelector, "Native selection must follow the persisted toggle")
-    defaults.set(false, forKey: selectorKey)
     try checkScrollCaptureStitching()
     let sources = RecordingSourceCatalog.shared
     precondition(!sources.containsSelection(.fullscreen, displayID: nil, windowID: nil))
@@ -977,11 +968,8 @@ func checkCaptureControlsUI() throws {
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
-        for native in [false, true] {
-            defaults.set(native, forKey: selectorKey)
-            try snapshot(PreferencesView(selection: .capture), scheme: scheme, width: 780,
-                         to: output.appendingPathComponent("capture-settings-\(native ? "native" : "adjustable")-\(name).png"), height: 740)
-        }
+        try snapshot(PreferencesView(selection: .capture), scheme: scheme, width: 780,
+                     to: output.appendingPathComponent("capture-settings-\(name).png"), height: 740)
         if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_CAPTURE_UI"] == "1" {
             try snapshot(MenuBarContentView(dismissPopover: {}), scheme: scheme, width: 296,
                          to: output.appendingPathComponent("capture-menu-\(name).png"), height: 540)

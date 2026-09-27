@@ -878,7 +878,6 @@ struct CaptureSettingsTab: View {
     @AppStorage("bs_overlayFollowsMouse") private var overlayFollowsMouse: Bool = true
     @AppStorage("bs_overlayPinnedDisplayID") private var overlayPinnedDisplayIDRaw: Int = 0
     @AppStorage("bs_openEditorAfterCapture") private var openEditorAfterCapture = false
-    @AppStorage(AppPreferences.nativeRegionSelectorKey) private var nativeRegionSelector = false
     @AppStorage("bs_keepInDeckUntilSaved") private var keepInDeckUntilSaved = false
     @AppStorage("bs_captureRegionOnRelease") private var captureRegionOnRelease = false
     @State private var isConfirmingReset = false
@@ -922,12 +921,10 @@ struct CaptureSettingsTab: View {
             }
 
             Section {
-                Toggle("Use native macOS region selector", isOn: $nativeRegionSelector)
                 Toggle(isOn: $captureRegionOnRelease) {
                     Text("Capture as soon as I let go")
                     Text("Off, the rectangle stays up with handles so you can nudge it, and Return or a double-click takes the shot.")
                 }
-                .disabled(nativeRegionSelector)
 
                 Picker("Show it on", selection: $overlayFollowsMouse) {
                     Text("Whatever screen my mouse is on").tag(true)
@@ -950,9 +947,7 @@ struct CaptureSettingsTab: View {
             } header: {
                 Text("Region")
             } footer: {
-                Text(nativeRegionSelector
-                    ? "Use the macOS crosshair to draw an area. Space switches to window selection, and Escape cancels. The native selector does not update BetterShot’s remembered area."
-                    : "Your last area opens already selected: press Return to capture it again, drag its handles to adjust it, or draw a new one. Space switches to native window selection, and Escape cancels.")
+                Text("Your last area opens already selected: press Return to capture it again, drag its handles to adjust it, or draw a new one. Space switches to native window selection, and Escape cancels.")
             }
 
             Section {
@@ -985,7 +980,6 @@ struct CaptureSettingsTab: View {
                 overlayFollowsMouse = true
                 overlayPinnedDisplayIDRaw = 0
                 openEditorAfterCapture = false
-                nativeRegionSelector = false
                 keepInDeckUntilSaved = false
                 captureRegionOnRelease = false
             }

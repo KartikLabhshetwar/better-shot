@@ -169,9 +169,10 @@ Region screenshots use `RegionSelectionOverlay` with the previous area
 (`AppPreferences.lastRegionRect`) preselected, so Return captures it again, then
 reactivate the previously frontmost app before `screencapture -R` takes the shot.
 OCR keeps macOS's native `/usr/sbin/screencapture -i` selector.
-Region screenshots can instead use the native selector via
-`AppPreferences.nativeRegionSelector`, exposed in Settings > Capture > Region.
-The native selector does not update BetterShot's remembered rectangle.
+Region screenshots always use BetterShot’s selector.
+`AppPreferences.captureRegionOnRelease`, exposed as Capture as soon as I let go
+in Settings > Capture > Region, chooses immediate capture on release or adjustment
+before confirmation. Both paths preserve the remembered rectangle.
 Window screenshots use `/usr/sbin/screencapture -i -w`, retaining cancellation,
 shadow options, native pixel dimensions, and private PNG staging.
 OCR and color results copy through `CaptureOrchestrator.completeTextCapture`;
