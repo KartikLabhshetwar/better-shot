@@ -63,27 +63,6 @@ struct ExportIntegration {
         context.setFillColor(CGColor(red: 0.1, green: 0.2, blue: 0.8, alpha: 1))
         context.fill(CGRect(x: 960, y: 0, width: 960, height: 1080))
         let image = context.makeImage()!
-        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_LOCAL_SHELF"] == "1" {
-            let png = directory.appendingPathComponent("shelf-fixture.png")
-            try NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])!.write(to: png)
-            try await checkLocalShelfFeatures(imageURL: png, directory: directory,
-                output: URL(fileURLWithPath: ".build/editor-snapshots"))
-            if let audio = ProcessInfo.processInfo.environment["BETTERSHOT_SPEECH_FIXTURE"] {
-                let transcript = try await RecordingTranscriptionService.transcribeAudio(at: URL(fileURLWithPath: audio))
-                let text = transcript.words.map(\.text).joined().lowercased()
-                precondition(text.contains("button") && text.contains("smaller"), "Unexpected local transcript: \(text)")
-                print("PASS on-device voice fixture transcription")
-            }
-            return
-        }
-        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_NOTCH"] == "1" {
-            let png = directory.appendingPathComponent("notch-fixture.png")
-            try NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])!.write(to: png)
-            let movie = directory.appendingPathComponent("notch-fixture.mov")
-            try await makeMovie(at: movie, image: image)
-            try await checkNotchPresentation(imageURL: png, movieURL: movie)
-            return
-        }
         if ProcessInfo.processInfo.environment["BETTERSHOT_BENCHMARK_IMAGES"] == "1" {
             try benchmarkImageExports(image: image, directory: directory)
             return
@@ -949,7 +928,7 @@ private func checkCapturesKeepTheirName(
         }
         UserDefaults.standard.set("later-{kind}", forKey: templateKey)
 
-        // Drag-out and the notch tooltip name the card, which may be a `.preview` companion.
+        // Drag-out and the preview tooltip name the card, which may be a `.preview` companion.
         precondition(ScreenshotFileActions.captureFileName(for: copied, extension: copied.pathExtension) == name(0),
                      "A card resolves to its capture's name (keep: \(keep)), got \(copied.lastPathComponent)")
         PreviewOverlay.shared.copy(copied)
@@ -1183,6 +1162,18 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
     precondition(savedFiles().count == exportsBeforeCaptureAndSave + 2 && !PreviewOverlay.shared.items.contains(retry))
     print("PASS all screenshot capture modes, clipboard-only deck/editor Copy, private retention, explicit Save, and retry")
 
+    for keep in [false, true] {
+        AppPreferences.keepInDeckUntilSaved = keep
+        AppPreferences.overlayDismissDelay = 0.05
+        let privateCapture = try await capture()
+        let panel = NSApp.windows.first { $0.identifier?.rawValue == "BetterShot.CaptureOverlay" && $0.isVisible }!
+        panel.setFrameOrigin(NSPoint(x: NSEvent.mouseLocation.x + 40, y: NSEvent.mouseLocation.y + 40))
+        try await Task.sleep(for: .milliseconds(250))
+        precondition(PreviewOverlay.shared.items.contains(privateCapture) == keep,
+                     "Only staged captures with Keep enabled bypass Hide After")
+        precondition(FileManager.default.fileExists(atPath: privateCapture.path))
+        PreviewOverlay.shared.clearAll()
+    }
     UserDefaults.standard.removeObject(forKey: autoSaveKey)
     AfterCaptureActions.prepareForLaunch(isNewInstall: true)
     for keep in [false, true] {
@@ -1190,13 +1181,12 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
         AppPreferences.openEditorAfterCapture = false
         AppPreferences.overlayDismissDelay = 0.05
         let automaticallySaved = try await capture()
-        // Hide the native panel so desktop hover/focus cannot cancel the timer.
-        PreviewOverlay.shared.hide()
-        try await Task.sleep(for: .milliseconds(100))
-        PreviewOverlay.shared.scheduleDismiss(for: automaticallySaved)
-        try await Task.sleep(for: .milliseconds(200))
-        precondition(PreviewOverlay.shared.items.contains(automaticallySaved) == keep,
-                     "Keep previews open must also apply to automatically saved screenshots (keep: \(keep))")
+        // Keep the native panel visible, with the live pointer outside it.
+        let panel = NSApp.windows.first { $0.identifier?.rawValue == "BetterShot.CaptureOverlay" && $0.isVisible }!
+        panel.setFrameOrigin(NSPoint(x: NSEvent.mouseLocation.x + 40, y: NSEvent.mouseLocation.y + 40))
+        try await Task.sleep(for: .milliseconds(250))
+        precondition(!PreviewOverlay.shared.items.contains(automaticallySaved),
+                     "Saved previews must follow Hide After even when Keep is enabled")
         precondition(FileManager.default.fileExists(atPath: automaticallySaved.path),
                      "Dismissing an automatically saved preview must keep the exported file")
         PreviewOverlay.shared.clearAll()
@@ -1263,23 +1253,6 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
         PreviewOverlay.shared.save(failed)
         precondition(savedFiles().count == before + 1 && !PreviewOverlay.shared.items.contains(failed))
     }
-    do {
-        let oldMode = UserDefaults.standard.object(forKey: AppPreferences.presentationModeKey)
-        defer {
-            UserDefaults.standard.set(oldMode, forKey: AppPreferences.presentationModeKey)
-            NotchPresenter.shared.refreshMode()
-        }
-        UserDefaults.standard.set(CapturePresentationMode.notch.rawValue, forKey: AppPreferences.presentationModeKey)
-        NotchPresenter.shared.refreshMode()
-        AppPreferences.openEditorAfterCapture = false
-        let before = savedFiles().count
-        let saved = try await capture()
-        precondition(savedFiles().count == before + 1 && PreviewOverlay.shared.items.contains(saved),
-                     "Notch captures must use the same automatic saving path and retain the preview")
-        PreviewOverlay.shared.copy(saved)
-        precondition(savedFiles().count == before + 1 && FileManager.default.fileExists(atPath: saved.path),
-                     "Notch Copy must keep the automatic save without creating another export")
-    }
     AppPreferences.openEditorAfterCapture = true
     PreviewOverlay.shared.clearAll()
     DeckStaging.purge()
@@ -1298,7 +1271,7 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
     let beforeDisable = savedFiles().count
     _ = try await capture()
     precondition(savedFiles().count == beforeDisable, "Turning auto-save off restores private capture behavior")
-    print("PASS screenshot auto-save default, private opt-out, persistent previews, Normal/Notch modes, shortcut overrides, source/export associations, and failure retry")
+    print("PASS screenshot auto-save default, private opt-out, persistent previews, shortcut overrides, source/export associations, and failure retry")
 }
 
 @MainActor

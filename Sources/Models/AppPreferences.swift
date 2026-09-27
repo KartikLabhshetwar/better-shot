@@ -91,9 +91,9 @@ enum AppPreferences {
         set { UserDefaults.standard.set(newValue.map(NSStringFromRect), forKey: lastRegionRectKey) }
     }
 
-    static let presentationModeKey = "bs_presentationMode"
-    static var presentationMode: CapturePresentationMode {
-        CapturePresentationMode(rawValue: UserDefaults.standard.string(forKey: presentationModeKey) ?? "") ?? .normal
+    static let nativeRegionSelectorKey = "bs_nativeRegionSelector"
+    static var nativeRegionSelector: Bool {
+        UserDefaults.standard.bool(forKey: nativeRegionSelectorKey)
     }
 
     // MARK: - Overlay

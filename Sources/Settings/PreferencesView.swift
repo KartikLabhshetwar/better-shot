@@ -180,13 +180,9 @@ private struct SettingsSearchField: NSViewRepresentable {
 // MARK: - General
 
 struct GeneralSettingsTab: View {
-    @AppStorage(AppPreferences.presentationModeKey) private var mode = CapturePresentationMode.normal
     @AppStorage(AppPreferences.showCaptureBarAtLaunchKey) private var showCaptureBarAtLaunch = true
     @AppStorage(AppPreferences.showInDockKey) private var showInDock = false
     @AppStorage(AppPreferences.showInMenuBarKey) private var showInMenuBar = true
-    @AppStorage(NotchShelfStore.colorsKey) private var clipboardColors = true
-    @AppStorage(NotchShelfStore.enabledKey) private var clipboardHistory = false
-    @State private var confirmClearShelf = false
     @State private var loginStatus: SMAppService.Status = .notRegistered
     @State private var loginError: String?
 
@@ -231,36 +227,6 @@ struct GeneralSettingsTab: View {
 
     var body: some View {
         Form {
-            Section {
-                Picker("Presentation", selection: $mode) {
-                    ForEach(CapturePresentationMode.allCases) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
-            } header: {
-                Text("Capture Mode")
-            } footer: {
-                Text("The capture and recording bars stay floating in both modes. Notch moves capture previews, quick editing, and saved shelf items to the top of your display. Displays without a notch use a floating preview panel at the top.")
-            }
-
-            Section("Notch Shelf") {
-                Toggle("Keep copied colors in Notch Mode", isOn: $clipboardColors)
-                    .onChange(of: clipboardColors) { NotchShelfStore.shared.refreshMonitoring() }
-                Text("Copied hex colors, such as #8B5CF6 or #F80, appear as swatches in the shelf. Only standalone color codes are collected.")
-                    .font(.caption).foregroundStyle(.secondary)
-                Toggle("Keep copied text in Notch Mode", isOn: $clipboardHistory)
-                    .onChange(of: clipboardHistory) { NotchShelfStore.shared.refreshMonitoring() }
-                Text("OCR text and colors are saved only in Notch Mode. Text and color history keeps up to 50 items locally. Copies marked private by their source app are skipped; unmarked sensitive text can still be saved. Turning history off stops new copies; Clear removes saved shelf text and transcripts.")
-                    .font(.caption).foregroundStyle(.secondary)
-                Button("Clear Shelf Text…", role: .destructive) { confirmClearShelf = true }
-                    .alert("Clear shelf text and transcripts?", isPresented: $confirmClearShelf) {
-                        Button("Cancel", role: .cancel) {}
-                        Button("Clear", role: .destructive) { NotchShelfStore.shared.clear() }
-                    } message: { Text("Screenshot files and recordings stay in your library.") }
-                if let error = NotchShelfStore.shared.error {
-                    Text(error).font(.caption).foregroundStyle(.red)
-                }
-            }
-
             Section("Startup") {
                 Toggle("Launch at Login", isOn: Binding(
                     get: { loginStatus == .enabled || loginStatus == .requiresApproval },
@@ -487,7 +453,6 @@ struct GeneralSettingsTab: View {
             }
         }
         .formStyle(.grouped)
-        .onChange(of: mode) { NotchPresenter.shared.refreshMode() }
         .onAppear(perform: refreshLoginStatus)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshLoginStatus()
@@ -539,7 +504,6 @@ struct GeneralSettingsTab: View {
     }
 
     private func restoreDefaults() {
-        mode = .normal
         showInMenuBar = true
         showInDock = false
         AppActivationPolicy.applyVisibility()
@@ -914,6 +878,7 @@ struct CaptureSettingsTab: View {
     @AppStorage("bs_overlayFollowsMouse") private var overlayFollowsMouse: Bool = true
     @AppStorage("bs_overlayPinnedDisplayID") private var overlayPinnedDisplayIDRaw: Int = 0
     @AppStorage("bs_openEditorAfterCapture") private var openEditorAfterCapture = false
+    @AppStorage(AppPreferences.nativeRegionSelectorKey) private var nativeRegionSelector = false
     @AppStorage("bs_keepInDeckUntilSaved") private var keepInDeckUntilSaved = false
     @AppStorage("bs_captureRegionOnRelease") private var captureRegionOnRelease = false
     @State private var isConfirmingReset = false
@@ -957,10 +922,12 @@ struct CaptureSettingsTab: View {
             }
 
             Section {
+                Toggle("Use native macOS region selector", isOn: $nativeRegionSelector)
                 Toggle(isOn: $captureRegionOnRelease) {
                     Text("Capture as soon as I let go")
                     Text("Off, the rectangle stays up with handles so you can nudge it, and Return or a double-click takes the shot.")
                 }
+                .disabled(nativeRegionSelector)
 
                 Picker("Show it on", selection: $overlayFollowsMouse) {
                     Text("Whatever screen my mouse is on").tag(true)
@@ -983,7 +950,9 @@ struct CaptureSettingsTab: View {
             } header: {
                 Text("Region")
             } footer: {
-                Text("Your last area opens already selected: press Return to capture it again, drag its handles to adjust it, or draw a new one. Space switches to window selection, and Escape cancels.")
+                Text(nativeRegionSelector
+                    ? "Use the macOS crosshair to draw an area. Space switches to window selection, and Escape cancels. The native selector does not update BetterShot’s remembered area."
+                    : "Your last area opens already selected: press Return to capture it again, drag its handles to adjust it, or draw a new one. Space switches to native window selection, and Escape cancels.")
             }
 
             Section {
@@ -993,9 +962,10 @@ struct CaptureSettingsTab: View {
                 }
                 Toggle(isOn: $keepInDeckUntilSaved) {
                     Text("Keep screenshot previews open")
-                    Text("Turn off automatic dismissal, including for screenshots already saved to your folder.")
+                    Text("Keep unsaved captures available until you act on them. Saved screenshots follow Overlay > Hide After.")
                 }
                 .disabled(openEditorAfterCapture)
+                .onChange(of: keepInDeckUntilSaved) { PreviewOverlay.shared.refreshSettings() }
             } header: {
                 Text("After Capture")
             }
@@ -1015,6 +985,7 @@ struct CaptureSettingsTab: View {
                 overlayFollowsMouse = true
                 overlayPinnedDisplayIDRaw = 0
                 openEditorAfterCapture = false
+                nativeRegionSelector = false
                 keepInDeckUntilSaved = false
                 captureRegionOnRelease = false
             }
@@ -1160,10 +1131,6 @@ struct RecordingSettingsTab: View {
 // MARK: - Shortcut Settings
 
 struct ShortcutSettingsTab: View {
-    @AppStorage(NotchVoiceCapture.actionKey) private var holdAction = "area"
-    @AppStorage(NotchVoiceCapture.holdKey) private var captureHoldKey = NotchCaptureHoldKey.control
-    @AppStorage(NotchVoiceCapture.controlKey) private var holdCaptureEnabled = true
-    @AppStorage(NotchVoiceCapture.gestureKey) private var holdOptionForVoice = false
     @State private var isConfirmingReset = false
     @State private var search = ""
     @State private var category: ShortcutService.Group?
@@ -1175,38 +1142,6 @@ struct ShortcutSettingsTab: View {
 
     var body: some View {
         Form {
-            Section {
-                Toggle("Hold a modifier and drag to capture", isOn: $holdCaptureEnabled)
-                    .onChange(of: holdCaptureEnabled) { NotchVoiceCapture.shared.refreshGesture() }
-                Picker("Capture modifier", selection: $captureHoldKey) {
-                    ForEach(NotchCaptureHoldKey.allCases) { key in
-                        Text("\(key.symbol) \(key.title)").tag(key)
-                    }
-                }
-                .disabled(!holdCaptureEnabled)
-                .onChange(of: captureHoldKey) { NotchVoiceCapture.shared.refreshGesture() }
-                Picker("Hold action", selection: $holdAction) {
-                    Text("Select an area").tag("area")
-                    Text("Draw on screen").tag("draw")
-                }
-                .disabled(!holdCaptureEnabled)
-                .onChange(of: holdAction) { NotchVoiceCapture.shared.refreshGesture() }
-                Text(holdAction == "area"
-                    ? "Hold \(captureHoldKey.title) and drag an area. Pressing the modifier alone does nothing; release it early or press Escape to cancel."
-                    : "Hold \(captureHoldKey.title) briefly to freeze the screen, draw, then release it to save.")
-                    .font(.caption).foregroundStyle(.secondary)
-                Toggle("Hold Option for voice annotation", isOn: $holdOptionForVoice)
-                    .disabled(holdCaptureEnabled && captureHoldKey == .option)
-                    .onChange(of: holdOptionForVoice) { NotchVoiceCapture.shared.refreshGesture() }
-                Text(holdCaptureEnabled && captureHoldKey == .option
-                    ? "Option is assigned to capture. Voice remains available in the quick editor."
-                    : "Off by default so Option remains available to apps such as Wispr Flow. Voice remains available in the quick editor.")
-                    .font(.caption).foregroundStyle(.secondary)
-            } header: {
-                Text("Notch Capture Gesture")
-            } footer: {
-                Text("Available in Notch Mode with Accessibility access. This gesture is separate from the keyboard shortcuts below.")
-            }
             Section {
                 TextField("Search shortcuts", text: $search)
                     .textFieldStyle(.roundedBorder)

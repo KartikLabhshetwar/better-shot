@@ -15,7 +15,6 @@ final class CaptureOrchestrator {
     private init() {}
 
     func performCapture(_ action: ShortcutService.Action, on screen: NSScreen? = nil) async {
-        guard !NotchVoiceCapture.shared.isPreparing, !NotchQuickEditor.shared.listening else { return }
         if action == .scrollCapture, ScrollCaptureSessionPresenter.shared.isActive {
             ScrollCaptureSessionPresenter.shared.stop()
             return
@@ -24,7 +23,6 @@ final class CaptureOrchestrator {
             pendingCaptures.append((action, screen))
             return
         }
-        NotchPresenter.shared.suspendForCapture()
         captureInProgress = true
         captureScreen = screen
         await executeCapture(action)
@@ -39,12 +37,10 @@ final class CaptureOrchestrator {
         }
         captureScreen = nil
         captureInProgress = false
-        NotchPresenter.shared.resumeAfterCapture()
     }
 
     func captureLastRegion(on screen: NSScreen? = nil) async {
         guard !captureInProgress, AppPreferences.lastRegionRect != nil else { return }
-        NotchPresenter.shared.suspendForCapture()
         captureInProgress = true
         captureScreen = screen
         await RecordingBarPresenter.shared.hidePickerForCapture()
@@ -155,7 +151,7 @@ final class CaptureOrchestrator {
         }
     }
 
-    /// Keep the exact clipboard value available for copying again from the notch.
+    /// Copy recognized text or a picked color without changing an empty clipboard result.
     func completeTextCapture(_ text: String, action: ShortcutService.Action, pasteboard: NSPasteboard = .general) {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             ToastWindow.shared.show(isError: true, title: "No text found", message: "Try selecting a clearer text area.",
@@ -164,17 +160,8 @@ final class CaptureOrchestrator {
         }
         let value = action == .ocrSingleLine ? text.split(whereSeparator: \.isNewline).joined(separator: " ") : text
         let isColor = action == .colorPicker
-        let notch = NotchPresenter.shared
-        notch.captureIssue = nil
-        if AppPreferences.presentationMode == .notch {
-            if isColor { notch.colorHex = value } else { notch.ocrText = value }
-            NotchShelfStore.shared.add(text: value, isColor: isColor)
-        }
         let copied = Self.copyText(value, to: pasteboard)
         ScreenCapture.shared.playShutterSound()
-        if AppPreferences.presentationMode == .notch {
-            notch.show(on: captureScreen)
-        }
         ToastWindow.shared.show(isError: !copied, title: copied ? "Copied" : "Couldn’t copy",
             message: copied ? (isColor ? "\(value) copied to clipboard" : "Text copied to clipboard") : "Try Copy again.",
             systemIcon: isColor ? "eyedropper" : "doc.text.viewfinder", on: captureScreen)

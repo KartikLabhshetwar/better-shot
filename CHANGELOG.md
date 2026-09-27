@@ -5,6 +5,18 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.8] - 2026-09-27
+
+### Fixed
+
+- Floating screenshot previews now dismiss after Overlay > Hide After. The timer pauses for the live pointer or a focused action, recovers from missed hover/focus events, and keeps saved files. Keep screenshot previews open now holds only unsaved staged captures; saved and retained captures follow Hide After.
+
+### Changed
+
+- Restored native macOS window screenshot selection.
+- Added Settings > Capture > Region > Use native macOS region selector. Off keeps BetterShot’s adjustable, remembered-area selector; on uses the native crosshair. OCR continues to use native selection.
+- Removed Notch Mode, its shelf, quick editor, capture gestures, and bundled dependencies. Previews use the floating capture deck.
+
 ## [0.5.7] - 2026-09-25
 
 ### Added
@@ -83,7 +95,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Notch Mode never displays toast notifications. Copy confirms directly on the result button; capture and saving failures remain as dismissible inline instructions. Switching modes removes existing toasts immediately. Recent items stay aligned and disabled action icons remain readable.
 
-- Notch shape, hover controls, and interactions reuse Boring Notch code, with contributor attribution, pinned source references, and its GPLv3 license bundled with the app.
 
 - The notch groups capture tools and provides actions on each media card. Its compact state shows the BetterShot logo and readiness/editor status, or the recording timer. Short, interruptible transitions respect Reduce Motion.
 

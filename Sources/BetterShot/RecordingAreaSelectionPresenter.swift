@@ -9,9 +9,8 @@ final class RecordingAreaSelectionPresenter {
     func selectArea(completion: @escaping (SCDisplay, CGRect) -> Void) {
         guard !isSelecting else { return }
         isSelecting = true
-        NotchPresenter.shared.suspendForCapture()
         Task {
-            defer { isSelecting = false; NotchPresenter.shared.resumeAfterCapture() }
+            defer { isSelecting = false }
             let outcome = await RegionSelectionOverlay().selectRegion(allowsWindowSelection: false)
             guard case .region(let selection) = outcome else {
                 RecordingBarPresenter.shared.showPicker(recordingOptions: true)

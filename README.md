@@ -67,7 +67,6 @@ permissions and your first capture.
 - Copy, save, pin, edit, share, or drag captures from the floating preview.
 - Browse screenshots, recordings, and share links in the Media Gallery.
 - Share to [your own Cloudflare R2 bucket](#cloud-sharing) with one click.
-- Optional [Notch Mode](#notch-mode) keeps previews and a capture shelf at the top of the screen.
 - Trigger any capture from Shortcuts, Raycast, or the terminal with [URL actions](#automation).
 
 Original captures and source movies are never modified. Both editors support
@@ -103,6 +102,15 @@ Capture Region & Pin or Edit Clipboard Image, start unassigned.
 
 Set the background, padding, corner radius, and shadow for new captures in
 **Settings > General > Default Look**.
+
+Choose **Settings > Capture > Region > Use native macOS region selector**
+for the macOS crosshair instead of BetterShot’s adjustable selector. Window
+screenshots always use the native macOS window selector. The native selector
+does not update BetterShot’s remembered area.
+
+Saved previews dismiss after **Settings > Overlay > Hide After**, pausing while
+you use the card. **Keep screenshot previews open** holds only unsaved captures;
+choose **Never** under Hide After to keep saved previews open too.
 
 ### Scrolling capture
 
@@ -142,26 +150,13 @@ name. Customize it in **Settings > General > Saving** with templates such as
 | Permission | Used for |
 | --- | --- |
 | Screen & System Audio Recording | Screenshots, recordings, and system audio |
-| Accessibility | Global shortcuts and Notch Mode hold-to-capture |
+| Accessibility | Global shortcuts |
 | Input Monitoring | Cursor effects and shortcut overlays. Plain typing is never recorded. |
-| Microphone | Voice in recordings and voice notes |
+| Microphone | Voice in recordings |
 | Camera | Camera recording |
 
 Manage access in **System Settings > Privacy & Security**. If capture or
 shortcuts still fail after granting access, quit and reopen BetterShot.
-
-## Notch Mode
-
-Turn it on in **Settings > General > Capture Mode**. Normal Mode stays the default.
-
-- **Shelf.** Previews, recordings, OCR text, and picked colors appear in a black shelf at the top of the screen, filtered by All, Text, Images, Videos, or Colors.
-- **Hold to capture.** Hold Control and drag to screenshot an area. Change the key or switch to Draw on screen in **Settings > Shortcuts > Notch Capture Gesture**.
-- **Quick edit.** Click an image to draw, blur, crop, or add a background right below the notch.
-- **Voice notes.** Tap the microphone in the quick editor to talk while you annotate. Transcription runs on your Mac with no cloud fallback.
-- **History.** Copied hex colors are kept by default. Copied text is opt-in under **Settings > General > Notch Shelf**, capped at 50 entries, and skips content that apps mark as private.
-
-Recording controls always stay in the floating bar. On Macs without a notch,
-the shelf appears as a floating panel at the top center of the screen.
 
 ## Cloud sharing
 
