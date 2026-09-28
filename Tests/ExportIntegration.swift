@@ -33,6 +33,12 @@ struct ExportIntegration {
         precondition(!AppPreferences.saveDirectory.hasPrefix(NSHomeDirectory() + "/Desktop"),
                      "Tests must never default to the real Desktop")
         precondition(R2CredentialStore.shared.keychainAccess == .empty)
+        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_AGENT_EDITING"] == "1" {
+            try await checkRecordingEditRevisionAndSave(
+                movieURL: URL(fileURLWithPath: "Resources/Onboarding/recording-demo.mp4")
+            )
+            return
+        }
         if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_CAPTURE_UI"] == "1" {
             try checkCaptureControlsUI()
             return

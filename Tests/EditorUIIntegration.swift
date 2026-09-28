@@ -30,6 +30,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     try await checkMediaGallery(imageURL: imageURL, movieURL: movieURL)
     checkTransferToastPresentation(movieURL: movieURL)
     try await checkGeneralEditorDefaults(movieURL: movieURL)
+    try await checkRecordingEditRevisionAndSave(movieURL: movieURL)
     try await checkCameraAspectRatios(movieURL: movieURL)
     for appearanceName in [NSAppearance.Name.aqua, .darkAqua] {
         NSAppearance(named: appearanceName)!.performAsCurrentDrawingAppearance {
@@ -913,6 +914,86 @@ private func checkGeneralEditorDefaults(movieURL: URL) async throws {
         reopened.teardown()
     }
     print("PASS General defaults for new recordings/imports, image look parity, reset, and saved project preservation")
+}
+
+@MainActor
+func checkRecordingEditRevisionAndSave(movieURL: URL) async throws {
+    let session = RecordingSession(directoryURL: FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString + ".bettershotrec"))
+    try FileManager.default.createDirectory(at: session.directoryURL, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: session.directoryURL) }
+    try FileManager.default.copyItem(at: movieURL, to: session.screenURL)
+
+    let model = RecordingStudioModel(url: session.directoryURL)
+    await model.load()
+    defer { model.teardown() }
+    precondition(model.isLoaded && model.editRevision == 0)
+    let initialRevision = model.editRevision
+    model.timelineHoverTime = model.duration / 2
+    model.selectClip(id: model.clipTimeline.segments[0].id)
+    precondition(model.editRevision == initialRevision, "Selection and hover must not invalidate agent edits")
+
+    let savedPadding = model.style.padding + 0.01
+    model.style.padding = savedPadding
+    precondition(model.editRevision == initialRevision + 1, "Bound inspector edits must advance the revision")
+
+    model.splitClip(at: model.duration / 2)
+    precondition(model.clipTimeline.segments.count == 2 && model.editRevision == initialRevision + 2)
+    model.undo()
+    precondition(model.clipTimeline.segments.count == 1 && model.editRevision == initialRevision + 3,
+                 "Undo must invalidate stale agent edits")
+    model.redo()
+    precondition(model.clipTimeline.segments.count == 2 && model.editRevision == initialRevision + 4,
+                 "Redo must invalidate stale agent edits")
+
+    guard case .saved(let savedRevision) = model.saveProject() else {
+        preconditionFailure("Saving a writable project must return a saved outcome")
+    }
+    precondition(savedRevision == model.editRevision && !model.hasUnsavedChanges
+                 && model.saveErrorMessage == nil)
+    let savedDocument = try Data(contentsOf: session.editDocumentURL)
+
+    model.style.padding = savedPadding + 0.01
+    let beforeFailure = model.editRevision
+    try FileManager.default.removeItem(at: session.editDocumentURL)
+    try FileManager.default.createDirectory(at: session.editDocumentURL, withIntermediateDirectories: false)
+    guard case .failed(let message) = model.saveProject() else {
+        preconditionFailure("An unwritable edit.json must return a failed outcome")
+    }
+    precondition(!message.isEmpty && model.saveErrorMessage == message
+                 && model.hasUnsavedChanges && model.editRevision == beforeFailure,
+                 "A failed save must retain the working edit and its revision")
+    precondition(session.loadDraftDocument()?.style.value.padding == savedPadding + 0.01,
+                 "A failed committed write must leave the latest edit in the recovery draft")
+    try FileManager.default.removeItem(at: session.editDocumentURL)
+    try savedDocument.write(to: session.editDocumentURL, options: .atomic)
+
+    let draft = try Data(contentsOf: session.draftDocumentURL)
+    try FileManager.default.removeItem(at: session.draftDocumentURL)
+    try FileManager.default.createDirectory(at: session.draftDocumentURL, withIntermediateDirectories: false)
+    let draftChild = session.draftDocumentURL.appendingPathComponent("cannot-remove")
+    try Data().write(to: draftChild)
+    try FileManager.default.setAttributes([.posixPermissions: 0o500],
+                                          ofItemAtPath: session.draftDocumentURL.path)
+    let revisionBeforeDiscardFailure = model.editRevision
+    let paddingBeforeDiscardFailure = model.style.padding
+    let discardFailed = await model.discardChanges()
+    precondition(!discardFailed && model.editRevision == revisionBeforeDiscardFailure
+                 && model.style.padding == paddingBeforeDiscardFailure
+                 && model.hasUnsavedChanges && model.discardErrorMessage != nil
+                 && FileManager.default.fileExists(atPath: draftChild.path),
+                 "A failed draft removal must leave the working document and recovery data untouched")
+    try FileManager.default.setAttributes([.posixPermissions: 0o700],
+                                          ofItemAtPath: session.draftDocumentURL.path)
+    try FileManager.default.removeItem(at: session.draftDocumentURL)
+    try draft.write(to: session.draftDocumentURL, options: .atomic)
+
+    let discardSucceeded = await model.discardChanges()
+    precondition(discardSucceeded)
+    precondition(model.style.padding == savedPadding && model.editRevision == beforeFailure + 1
+                 && !model.hasUnsavedChanges,
+                 "Discard must restore the saved document and invalidate stale agent edits once")
+    print("PASS recording edit revisions, save outcomes, failed-save recovery, and atomic discard")
 }
 
 /// Static layout checks need no camera/microphone access or encoded video fixture.

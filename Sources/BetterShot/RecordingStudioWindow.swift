@@ -310,12 +310,10 @@ struct RecordingStudioContent: View {
         closeGuard.onDecision = { decision, done in
             switch decision {
             case .save:
-                model.saveProject()
-                done()
+                if case .saved = model.saveProject() { done() }
             case .discard:
                 Task {
-                    await model.discardChanges()
-                    done()
+                    if await model.discardChanges() { done() }
                 }
             case .delete:
                 model.deleteProject()
@@ -331,20 +329,39 @@ struct RecordingStudioContent: View {
     /// place to look for ⌘S.
     @ViewBuilder
     private var saveStatus: some View {
-        Button {
-            model.saveProject()
-        } label: {
-            if model.saveFlash {
-                Label("Saved", systemImage: "checkmark.circle.fill")
-                    .labelStyle(.titleAndIcon)
-                    .foregroundStyle(.green)
-            } else {
-                Label("Save", systemImage: "square.and.arrow.down")
-                    .labelStyle(.titleAndIcon)
+        HStack(spacing: 8) {
+            Button {
+                model.saveProject()
+            } label: {
+                Label(
+                    model.saveErrorMessage == nil
+                        ? (model.saveFlash ? "Saved" : "Save")
+                        : "Retry Save",
+                    systemImage: model.saveErrorMessage == nil
+                        ? (model.saveFlash ? "checkmark.circle.fill" : "square.and.arrow.down")
+                        : "exclamationmark.triangle"
+                )
+                .labelStyle(.titleAndIcon)
+                .foregroundStyle(model.saveErrorMessage == nil
+                    ? (model.saveFlash ? Color.green : Color.primary)
+                    : Color.red)
+            }
+            .disabled(!model.hasUnsavedChanges)
+            .help(model.saveErrorMessage ?? ShortcutService.shared.help("Save your edits in BetterShot", for: .videoSave))
+            .accessibilityLabel(model.saveErrorMessage == nil ? "Save project" : "Retry saving project")
+
+            if let message = model.saveErrorMessage {
+                Label("Save failed", systemImage: "exclamationmark.triangle")
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .help(message)
+            } else if let message = model.discardErrorMessage {
+                Label("Restore failed", systemImage: "exclamationmark.triangle")
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .help("\(message) Close again to retry.")
             }
         }
-        .disabled(!model.hasUnsavedChanges)
-        .help(ShortcutService.shared.help("Save your edits in BetterShot", for: .videoSave))
     }
 
     @ViewBuilder
