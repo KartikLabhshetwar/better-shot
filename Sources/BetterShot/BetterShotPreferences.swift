@@ -395,6 +395,23 @@ enum ScreenshotFileActions {
         URL(fileURLWithPath: captureName(for: url)).appendingPathExtension(pathExtension).lastPathComponent
     }
 
+    /// The drag item for a retained capture. Leads with a file URL so Finder
+    /// copies `suggestedName` as-is: `NSItemProvider(contentsOf:)` registers
+    /// `public.jpeg` first, and the drop is then named from that type's
+    /// preferred extension (`jpeg`), turning a `.jpg` capture into
+    /// `Name.jpg.jpeg`. Image data is still registered so pixel targets work.
+    static func dragItemProvider(for retainedURL: URL, suggestedName: String) -> NSItemProvider {
+        let provider = NSItemProvider(object: retainedURL as NSURL)
+        if let contentType = UTType(filenameExtension: retainedURL.pathExtension) {
+            provider.registerDataRepresentation(forTypeIdentifier: contentType.identifier, visibility: .all) { completion in
+                completion(try? Data(contentsOf: retainedURL, options: .mappedIfSafe), nil)
+                return nil
+            }
+        }
+        provider.suggestedName = suggestedName
+        return provider
+    }
+
     /// The capture's name without an extension.
     static func captureName(for url: URL) -> String {
         if let session = RecordingDeliverable.session(for: url) {

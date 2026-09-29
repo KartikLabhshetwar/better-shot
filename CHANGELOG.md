@@ -5,6 +5,12 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Dragging a JPEG preview to a folder no longer produces `name.jpg.jpeg`.** The drag item now leads with a file URL, so Finder keeps the capture's `.jpg` name instead of appending `public.jpeg`'s preferred `.jpeg` extension.
+
 ## [0.5.8] - 2026-09-27
 
 ### Fixed
