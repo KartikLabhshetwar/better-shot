@@ -56,6 +56,7 @@ enum RecordingExportNotifier {
     private static let fileURLKey = "fileURL"
 
     static func notifySuccess(fileURL: URL) {
+        guard ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] != "1" else { return }
         let center = UNUserNotificationCenter.current()
         center.getNotificationSettings { settings in
             switch settings.authorizationStatus {
@@ -100,6 +101,7 @@ enum RecordingExportNotifier {
     /// alone leaves them hunting for the export folder.
     @MainActor
     static func revealIfPreferred(fileURL: URL) {
+        guard ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] != "1" else { return }
         guard BetterShotPreferences.revealExportInFinder else { return }
         reveal(path: fileURL.path)
     }

@@ -50,6 +50,7 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
                 Self.promptRestart()
             }
         }
+        Task { await RecordingAgentAccessController.shared.startIfEnabled() }
         didFinishLaunching = true
         performPendingURLActions()
     }
@@ -91,6 +92,7 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         ShortcutService.shared.unregisterAll()
+        Task { await RecordingAgentAccessController.shared.stopForTermination() }
     }
 
     /// Quitting mid-recording finishes and saves the recording first, and

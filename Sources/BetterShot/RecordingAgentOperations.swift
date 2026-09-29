@@ -27,6 +27,14 @@ struct RecordingAgentTimeline: Codable, Equatable {
     let clips: [RecordingAgentClip]
 }
 
+struct RecordingAgentPreview: Codable, Equatable {
+    let handle: UUID
+    let revision: UInt64
+    let editorTime: TimeInterval
+    let width: Int
+    let height: Int
+}
+
 struct RecordingAgentSaveResult: Codable, Equatable {
     let revision: UInt64
     let saved: Bool
@@ -105,10 +113,17 @@ final class RecordingAgentOperations {
         let runID: UUID
     }
 
+    private struct ExportRequestRecord: Equatable {
+        let handle: UUID
+        let revision: UInt64
+        let jobID: UUID
+    }
+
     private var knownProjects: [UUID: URL] = [:]
     private var projectIDsByURL: [URL: UUID] = [:]
     private var exportJobs: [UUID: ExportJobRecord] = [:]
     private var exportJobOrder: [UUID] = []
+    private var exportRequests: [UUID: ExportRequestRecord] = [:]
 
     private init() {}
 
@@ -193,6 +208,53 @@ final class RecordingAgentOperations {
             sourceDuration: model.sourceDuration,
             duration: model.clipTimeline.duration,
             clips: clips
+        )
+    }
+
+    func preview(handle: UUID, expectedRevision: UInt64, at editorTime: TimeInterval) async throws -> (metadata: RecordingAgentPreview, png: Data) {
+        guard editorTime.isFinite, editorTime >= 0 else {
+            throw RecordingAgentOperationError.invalidArgument("Preview time must be a nonnegative timeline time.")
+        }
+        let model = try checkedModel(handle: handle, revision: expectedRevision)
+        guard editorTime <= model.clipTimeline.duration else {
+            throw RecordingAgentOperationError.invalidArgument("Preview time is past the end of the timeline.")
+        }
+        let captured = StudioProjectRegistry.shared.snapshot(for: handle)
+        guard let captured, captured.revision == expectedRevision else {
+            throw RecordingAgentOperationError.staleRevision(expected: expectedRevision, current: model.editRevision)
+        }
+        let configuration = model.makeExportConfiguration()
+        let rendered: (data: Data, size: CGSize)
+        do {
+            rendered = try await RecordingStudioExporter.previewPNG(
+                configuration: configuration,
+                editorTime: editorTime
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw RecordingAgentOperationError.unavailable("BetterShot could not render this preview. Check the Studio window and retry.")
+        }
+        try Task.checkCancellation()
+        let latestEditors = StudioProjectRegistry.shared.snapshots(for: model.sessionURL)
+        guard latestEditors.count == 1,
+              let latest = latestEditors.first,
+              latest.handle == captured.handle,
+              latest.revision == captured.revision else {
+            throw RecordingAgentOperationError.staleRevision(
+                expected: expectedRevision,
+                current: StudioProjectRegistry.shared.snapshot(for: handle)?.revision ?? model.editRevision
+            )
+        }
+        return (
+            RecordingAgentPreview(
+                handle: handle,
+                revision: captured.revision,
+                editorTime: editorTime,
+                width: Int(rendered.size.width),
+                height: Int(rendered.size.height)
+            ),
+            rendered.data
         )
     }
 
@@ -310,7 +372,13 @@ final class RecordingAgentOperations {
         }
     }
 
-    func startExport(handle: UUID, expectedRevision: UInt64) throws -> RecordingAgentExportJob {
+    func startExport(handle: UUID, expectedRevision: UInt64, requestID: UUID) throws -> RecordingAgentExportJob {
+        if let prior = exportRequests[requestID] {
+            guard prior.handle == handle, prior.revision == expectedRevision else {
+                throw RecordingAgentOperationError.invalidArgument("This request ID was already used for a different export request.")
+            }
+            return try exportJob(id: prior.jobID)
+        }
         let model = try checkedModel(handle: handle, revision: expectedRevision)
         guard !model.exportState.isExporting, !model.shareState.isBusy else {
             throw RecordingAgentOperationError.unavailable("An export is already running for this project.")
@@ -320,9 +388,12 @@ final class RecordingAgentOperations {
         }
         let id = UUID()
         exportJobs[id] = ExportJobRecord(handle: handle, revision: expectedRevision, runID: runID)
+        exportRequests[requestID] = ExportRequestRecord(handle: handle, revision: expectedRevision, jobID: id)
         exportJobOrder.append(id)
         while exportJobOrder.count > 16 {
-            exportJobs.removeValue(forKey: exportJobOrder.removeFirst())
+            let removedID = exportJobOrder.removeFirst()
+            exportJobs.removeValue(forKey: removedID)
+            exportRequests = exportRequests.filter { $0.value.jobID != removedID }
         }
         return try exportJob(id: id)
     }

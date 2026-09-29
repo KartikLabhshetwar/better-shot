@@ -69,6 +69,7 @@ permissions and your first capture.
 - Share to [your own Cloudflare R2 bucket](#cloud-sharing) with one click.
 - Optional [Notch Mode](#notch-mode) keeps previews and a capture shelf at the top of the screen.
 - Trigger any capture from Shortcuts, Raycast, or the terminal with [URL actions](#automation).
+- Let a local AI agent inspect and edit saved recordings through [Agent Access](#agent-access).
 
 Original captures and source movies are never modified. Both editors support
 undo, redo, and native full screen.
@@ -162,6 +163,23 @@ Turn it on in **Settings > General > Capture Mode**. Normal Mode stays the defau
 
 Recording controls always stay in the floating bar. On Macs without a notch,
 the shelf appears as a floating panel at the top center of the screen.
+
+## Agent Access
+
+Agent Access is off by default. Turn it on under **Settings > Agent Access**, then
+choose **Copy Client Configuration** and paste the JSON into your agent's MCP
+server settings. The configuration contains a private token; keep it on this
+Mac. **Rotate Token** invalidates old copies, and switching Agent Access off
+closes the local endpoint and revokes its token.
+
+An agent can list recordings in BetterShot's library, open one in Studio,
+inspect its timeline, request a composed PNG preview, split, trim, delete, or
+change the speed of clips, undo or redo, save the project, and start or check an
+export. Exports use your configured save folder. Each edit requires the current
+project revision, so an agent must inspect again if you edit the same project
+in the UI. Export status remains available for the 16 most recent agent jobs
+while their project stays open. The endpoint listens only on this Mac at
+`127.0.0.1:39615`; it does not provide arbitrary file access or cloud-upload tools.
 
 ## Cloud sharing
 

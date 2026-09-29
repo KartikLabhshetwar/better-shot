@@ -1961,7 +1961,7 @@ final class RecordingStudioModel {
                               includeBubble: hasCameraVideo, preview: true)
     }
 
-    private func makeExportConfiguration(preview: Bool = false) -> RecordingStudioExporter.Configuration {
+    func makeExportConfiguration(preview: Bool = false) -> RecordingStudioExporter.Configuration {
         let reframe = preview ? previewReframe : makeReframeTrack(crop: cropRect)
         let exportVideoSize = croppedVideoSize
         let fitContentAspect: CGFloat? =

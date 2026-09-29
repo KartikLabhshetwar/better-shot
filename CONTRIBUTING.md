@@ -281,6 +281,22 @@ normal text-field behavior.
 `bettershot://` routes. The app delegate dispatches them. Preserve malformed-URL
 rejection and the guard against starting a second recording session.
 
+### Local Agent Access
+
+`RecordingAgentAccessController` owns the off-by-default Settings toggle and
+Keychain token. `RecordingAgentHTTPListener` binds only `127.0.0.1:39615`,
+checks the bearer token, Host, Origin, and request size before passing a POST to
+the pinned MCP SDK. Each HTTP request gets its own stateless SDK server/transport
+because that SDK release keys in-flight responses by JSON-RPC request ID;
+`RecordingAgentOperations.shared` preserves project handles and export jobs
+across those requests. `RecordingAgentMCPTools` limits the exposed operations
+to library projects and revision-checked Studio edits. The composed preview
+uses `RecordingStudioExporter`'s frame compositor, not an AVPlayer screenshot.
+Never log or return the token, package paths, or arbitrary file contents from
+tools. Keep editor save/export behavior and revision checks shared with the UI.
+The MCP SDK and SwiftNIO license texts, including SwiftNIO's NOTICE, are
+bundled in `Resources/Licenses/` from the resolved package revisions.
+
 ### 3D video shots
 
 `Recording3DShot.swift` owns pose limits, perspective projection, presets, and the
@@ -411,6 +427,8 @@ with `make test` when production code changes.
 | ScreenCaptureKit window pixels, native resolution, staging, and preview in both modes (requires existing Screen Recording permission) | `BETTERSHOT_CHECK_WINDOW_CAPTURE=1 bash Tests/run-exports.sh` |
 | Screenshot Copy/Save and private storage | `BETTERSHOT_CHECK_SCREENSHOT_SAVING=1 bash Tests/run-exports.sh` |
 | Video compositing and encoded exports | `BETTERSHOT_CHECK_VIDEO_EXPORTS=1 bash Tests/run-exports.sh` |
+| Agent edits and renderer cache freshness | `BETTERSHOT_CHECK_AGENT_EDITING=1 bash Tests/run-exports.sh` |
+| Local MCP endpoint, auth, client workflow, and Agent Access snapshots | `BETTERSHOT_CHECK_AGENT_ACCESS=1 bash Tests/run-exports.sh` |
 | Displayed Gallery and Settings windows | `BETTERSHOT_CHECK_LIBRARY_WINDOWS=1 bash Tests/run-exports.sh` |
 | Editor focus, full screen, and tray handoff | `BETTERSHOT_CHECK_EDITOR_WINDOWS=1 bash Tests/run-exports.sh` |
 | Actual SwiftUI editor scenes, automatic/manual full screen | `BETTERSHOT_CHECK_EDITOR_SCENES=1 bash Tests/run-exports.sh` |
@@ -419,6 +437,11 @@ The screenshot check uses the production post-capture path with fixture media;
 it does not request capture permission. Video checks cover decoded colors,
 masks, camera ratios, cached frames, 30/60 fps, audio, render invalidation, and
 cancellation with GPU work in flight.
+
+Run Agent Access integration checks with `BETTERSHOT_TESTING=1` through the
+provided runner. They use an in-memory token and preference state, bundled
+fixture footage, and a temporary export folder; they must never read the real
+Keychain or R2 credentials. Keep the listener off in normal tests.
 
 Editor snapshots are written to `.build/editor-snapshots/`. Review narrow and
 wide layouts in both appearances. Displayed-window checks need a logged-in

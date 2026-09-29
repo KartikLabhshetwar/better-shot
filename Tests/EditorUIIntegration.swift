@@ -1116,7 +1116,7 @@ func checkRecordingAgentOperations(movieURL: URL) async throws {
 
     model.shareState = .uploading
     expectError("operation_unavailable") {
-        _ = try agent.startExport(handle: handle, expectedRevision: saved.revision)
+        _ = try agent.startExport(handle: handle, expectedRevision: saved.revision, requestID: UUID())
     }
     model.shareState = .idle
 
@@ -1131,7 +1131,13 @@ func checkRecordingAgentOperations(movieURL: URL) async throws {
     AppPreferences.saveDirectory = blockedSaveDirectory.path
     defer { AppPreferences.saveDirectory = originalSaveDirectory }
 
-    var firstJob = try agent.startExport(handle: handle, expectedRevision: saved.revision)
+    let firstRequestID = UUID()
+    var firstJob = try agent.startExport(handle: handle, expectedRevision: saved.revision,
+                                         requestID: firstRequestID)
+    let retriedJob = try agent.startExport(handle: handle, expectedRevision: saved.revision,
+                                           requestID: firstRequestID)
+    precondition(retriedJob.id == firstJob.id,
+                 "A retried export request must not start a second job")
     for _ in 0..<100 {
         if firstJob.state != .running { break }
         try await Task.sleep(for: .milliseconds(20))
@@ -1144,7 +1150,8 @@ func checkRecordingAgentOperations(movieURL: URL) async throws {
     precondition(acknowledgedJob.state == .failed,
                  "Acknowledging the UI error must not erase the agent job result")
 
-    var secondJob = try agent.startExport(handle: handle, expectedRevision: saved.revision)
+    var secondJob = try agent.startExport(handle: handle, expectedRevision: saved.revision,
+                                          requestID: UUID())
     _ = try agent.cancelExportJob(id: firstJob.id)
     for _ in 0..<100 {
         if secondJob.state != .running { break }

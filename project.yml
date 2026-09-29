@@ -23,6 +23,12 @@ packages:
   DockProgress:
     url: https://github.com/sindresorhus/DockProgress
     from: 5.0.0
+  MCP:
+    url: https://github.com/modelcontextprotocol/swift-sdk.git
+    exactVersion: 0.12.1
+  SwiftNIO:
+    url: https://github.com/apple/swift-nio.git
+    from: 2.65.0
 
 targets:
   BetterShot:
@@ -32,6 +38,12 @@ targets:
       - package: DynamicNotchKit
       - package: DockProgress
       - package: TourKit
+      - package: MCP
+      - package: SwiftNIO
+        products:
+          - NIOCore
+          - NIOPosix
+          - NIOHTTP1
     sources:
       - path: Sources
         excludes:

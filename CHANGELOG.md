@@ -5,6 +5,16 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Optional Agent Access in Settings lets a local MCP client inspect and edit BetterShot recording projects, request a composed preview, save, and track exports. Access is off by default, bound to loopback, protected by a rotatable Keychain token, and limited to the recording library and revision-checked Studio tools.
+
+### Fixed
+
+- Recording edits, undo/redo, saves, and export cache checks share the current document revision, so stale agent edits are rejected and failed saves keep their recovery draft.
+
 ## [0.5.7] - 2026-09-25
 
 ### Added

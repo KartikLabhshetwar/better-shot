@@ -5,11 +5,11 @@ import UniformTypeIdentifiers
 import ServiceManagement
 
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case general, capture, overlay, recording, shortcuts, sharing, about
+    case general, capture, overlay, recording, agentAccess, shortcuts, sharing, about
 
     var id: String { rawValue }
 
-    static let preferenceGroup: [SettingsSection] = [.general, .capture, .overlay, .recording, .shortcuts, .sharing]
+    static let preferenceGroup: [SettingsSection] = [.general, .capture, .overlay, .recording, .agentAccess, .shortcuts, .sharing]
 
     var title: String {
         switch self {
@@ -17,6 +17,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .capture: "Capture"
         case .overlay: "Overlay"
         case .recording: "Recording"
+        case .agentAccess: "Agent Access"
         case .shortcuts: "Shortcuts"
         case .sharing: "Sharing"
         case .about: "About"
@@ -29,6 +30,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .capture: "camera.viewfinder"
         case .overlay: "macwindow.on.rectangle"
         case .recording: "video.fill"
+        case .agentAccess: "network"
         case .shortcuts: "keyboard"
         case .sharing: "icloud.and.arrow.up"
         case .about: "info.circle"
@@ -41,6 +43,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .capture: Color(nsColor: .systemOrange)
         case .overlay: Color(nsColor: .systemIndigo)
         case .recording: Color(nsColor: .systemRed)
+        case .agentAccess: Color(nsColor: .systemTeal)
         case .shortcuts: Color(nsColor: .systemPurple)
         case .sharing: Color(nsColor: .systemBlue)
         case .about: Color(nsColor: .systemGray)
@@ -141,6 +144,7 @@ struct PreferencesView: View {
         case .capture: CaptureSettingsTab()
         case .overlay: OverlaySettingsTab()
         case .recording: RecordingSettingsTab()
+        case .agentAccess: RecordingAgentAccessSettingsTab()
         case .shortcuts: ShortcutSettingsTab()
         case .sharing: SharingSettingsTab()
         case .about: AboutTab()
