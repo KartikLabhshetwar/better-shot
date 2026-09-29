@@ -996,6 +996,168 @@ func checkRecordingEditRevisionAndSave(movieURL: URL) async throws {
     print("PASS recording edit revisions, save outcomes, failed-save recovery, and atomic discard")
 }
 
+@MainActor
+func checkRecordingRendererFreshness(movieURL: URL) async throws {
+    let session = RecordingSession(directoryURL: FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString + ".bettershotrec"))
+    try FileManager.default.createDirectory(at: session.directoryURL, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: session.directoryURL) }
+    try FileManager.default.copyItem(at: movieURL, to: session.screenURL)
+
+    let diskDocumentBeforeOpen = session.effectiveEditDocument()
+    let model = RecordingStudioModel(url: session.directoryURL)
+    await model.load()
+    guard let first = StudioProjectRegistry.shared.snapshot(for: session.directoryURL) else {
+        preconditionFailure("A loaded project must expose its document snapshot")
+    }
+    precondition(RecordingSessionRenderer.canInstallRender(
+        for: session, snapshot: first, renderedDocument: first.document))
+    precondition(!RecordingSessionRenderer.canInstallRender(
+        for: session, snapshot: nil, renderedDocument: diskDocumentBeforeOpen),
+        "Opening a project must invalidate a disk-only render")
+
+    let secondModel = RecordingStudioModel(url: session.directoryURL)
+    await secondModel.load()
+    precondition(StudioProjectRegistry.shared.snapshot(for: session.directoryURL) == nil
+                 && StudioProjectRegistry.shared.hasOpenProject(for: session.directoryURL)
+                 && !RecordingSessionRenderer.canInstallRender(
+                    for: session, snapshot: first, renderedDocument: first.document),
+                 "Two editors for one project must not select an arbitrary render snapshot")
+    secondModel.teardown()
+    precondition(StudioProjectRegistry.shared.snapshot(for: session.directoryURL)?.handle == first.handle)
+
+    model.style.padding += 0.01
+    guard let edited = StudioProjectRegistry.shared.snapshot(for: session.directoryURL) else {
+        preconditionFailure("Editing must keep the project handle open")
+    }
+    precondition(edited.handle == first.handle && edited.revision == first.revision + 1)
+    precondition(!RecordingSessionRenderer.canInstallRender(
+        for: session, snapshot: first, renderedDocument: first.document),
+        "An in-memory edit must invalidate a render before the draft is flushed")
+    precondition(RecordingSessionRenderer.canInstallRender(
+        for: session, snapshot: edited, renderedDocument: edited.document))
+
+    model.teardown()
+    precondition(!RecordingSessionRenderer.canInstallRender(
+        for: session, snapshot: edited, renderedDocument: edited.document),
+        "Closing an editor must invalidate its handle")
+    let diskDocumentAfterClose = session.effectiveEditDocument()
+    precondition(diskDocumentAfterClose == edited.document)
+    precondition(RecordingSessionRenderer.canInstallRender(
+        for: session, snapshot: nil, renderedDocument: diskDocumentAfterClose))
+    precondition(!RecordingSessionRenderer.canInstallRender(
+        for: session, snapshot: nil, renderedDocument: diskDocumentBeforeOpen),
+        "A changed draft must invalidate a disk-only render")
+    print("PASS recording renderer cache fence across edits and editor close")
+}
+
+@MainActor
+func checkRecordingAgentOperations(movieURL: URL) async throws {
+    let session = RecordingSession(directoryURL: FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString + ".bettershotrec"))
+    try FileManager.default.createDirectory(at: session.directoryURL, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: session.directoryURL) }
+    try FileManager.default.copyItem(at: movieURL, to: session.screenURL)
+
+    let model = RecordingStudioModel(url: session.directoryURL)
+    await model.load()
+    defer { model.teardown() }
+    let agent = RecordingAgentOperations.shared
+    guard let handle = StudioProjectRegistry.shared.snapshot(for: session.directoryURL)?.handle else {
+        preconditionFailure("A loaded recording must have an agent handle")
+    }
+
+    func expectError(_ code: String, _ action: () throws -> Void) {
+        do {
+            try action()
+            preconditionFailure("Expected \(code)")
+        } catch let error as RecordingAgentOperationError {
+            precondition(error.code == code, "Expected \(code), got \(error.code)")
+        } catch {
+            preconditionFailure("Expected \(code), got \(error)")
+        }
+    }
+
+    let initial = try agent.inspect(handle: handle)
+    precondition(initial.revision == 0 && initial.clips.count == 1)
+    expectError("invalid_argument") {
+        _ = try agent.split(handle: handle, expectedRevision: initial.revision, at: .nan)
+    }
+    expectError("invalid_argument") {
+        _ = try agent.split(handle: handle, expectedRevision: initial.revision, at: 0.01)
+    }
+    let afterInvalid = try agent.inspect(handle: handle)
+    precondition(afterInvalid.revision == initial.revision)
+
+    let split = try agent.split(handle: handle, expectedRevision: initial.revision,
+                                at: initial.duration / 2)
+    precondition(split.clips.count == 2 && split.revision == initial.revision + 1)
+    expectError("stale_revision") {
+        _ = try agent.deleteClip(handle: handle, expectedRevision: initial.revision,
+                                 clipID: split.clips[0].id)
+    }
+    expectError("invalid_argument") {
+        _ = try agent.setSpeed(handle: handle, expectedRevision: split.revision,
+                               clipID: split.clips[0].id, speed: .infinity)
+    }
+    let sped = try agent.setSpeed(handle: handle, expectedRevision: split.revision,
+                                  clipID: split.clips[0].id, speed: 2)
+    precondition(sped.revision == split.revision + 1 && sped.clips[0].speed == 2)
+
+    let secondModel = RecordingStudioModel(url: session.directoryURL)
+    await secondModel.load()
+    expectError("ambiguous_project") { _ = try agent.inspect(handle: handle) }
+    secondModel.teardown()
+    let afterDuplicate = try agent.inspect(handle: handle)
+    precondition(afterDuplicate.revision == sped.revision)
+
+    let saved = try agent.save(handle: handle, expectedRevision: sped.revision)
+    precondition(saved.saved && saved.revision == sped.revision)
+
+    model.shareState = .uploading
+    expectError("operation_unavailable") {
+        _ = try agent.startExport(handle: handle, expectedRevision: saved.revision)
+    }
+    model.shareState = .idle
+
+    let cachedMovie = session.directoryURL.appendingPathComponent("cached.mp4")
+    try FileManager.default.copyItem(at: movieURL, to: cachedMovie)
+    try session.installFinalVideo(movingFrom: cachedMovie, renderedFrom: model.currentEditDocument)
+    precondition(session.freshFinalURL(matching: model.currentEditDocument) != nil)
+
+    let blockedSaveDirectory = session.directoryURL.appendingPathComponent("not-a-directory")
+    try Data().write(to: blockedSaveDirectory)
+    let originalSaveDirectory = AppPreferences.saveDirectory
+    AppPreferences.saveDirectory = blockedSaveDirectory.path
+    defer { AppPreferences.saveDirectory = originalSaveDirectory }
+
+    var firstJob = try agent.startExport(handle: handle, expectedRevision: saved.revision)
+    for _ in 0..<100 {
+        if firstJob.state != .running { break }
+        try await Task.sleep(for: .milliseconds(20))
+        firstJob = try agent.exportJob(id: firstJob.id)
+    }
+    precondition(firstJob.state == .failed && firstJob.error?.isEmpty == false,
+                 "An export to an unusable folder must reach a failed job outcome")
+    model.acknowledgeExportResult()
+    let acknowledgedJob = try agent.exportJob(id: firstJob.id)
+    precondition(acknowledgedJob.state == .failed,
+                 "Acknowledging the UI error must not erase the agent job result")
+
+    var secondJob = try agent.startExport(handle: handle, expectedRevision: saved.revision)
+    _ = try agent.cancelExportJob(id: firstJob.id)
+    for _ in 0..<100 {
+        if secondJob.state != .running { break }
+        try await Task.sleep(for: .milliseconds(20))
+        secondJob = try agent.exportJob(id: secondJob.id)
+    }
+    precondition(secondJob.state == .failed && firstJob.id != secondJob.id)
+    let retainedJob = try agent.exportJob(id: firstJob.id)
+    precondition(retainedJob.state == .failed,
+                 "A newer export must not replace an earlier job outcome")
+    print("PASS agent edit bounds, revision rejection, shared timeline, save, duplicate-window guard, and export job retention")
+}
+
 /// Static layout checks need no camera/microphone access or encoded video fixture.
 @MainActor
 func checkCaptureControlsUI() throws {

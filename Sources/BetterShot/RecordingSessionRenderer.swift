@@ -15,9 +15,18 @@ import CoreGraphics
 enum RecordingSessionRenderer {
     private enum RenderError: LocalizedError {
         case missingCameraTrack
+        case projectChanged
+        case ambiguousProject
 
         var errorDescription: String? {
-            "The camera recording does not contain a readable video track."
+            switch self {
+            case .missingCameraTrack:
+                "The camera recording does not contain a readable video track."
+            case .projectChanged:
+                "The project changed while the video was rendering. Try again."
+            case .ambiguousProject:
+                "This recording is open in more than one editor. Close the other editor window and try again."
+            }
         }
     }
 
@@ -34,7 +43,11 @@ enum RecordingSessionRenderer {
         let pointerSynthesized = manifest?.pointerSynthesized == true
         // Draft edits count: a flatten made for an upload must show what the
         // user last saw in Studio, not the last state they pressed Save on.
-        let editDocument = session.effectiveEditDocument()
+        let openedSnapshot = StudioProjectRegistry.shared.snapshot(for: session.directoryURL)
+        guard openedSnapshot != nil || !StudioProjectRegistry.shared.hasOpenProject(for: session.directoryURL) else {
+            throw RenderError.ambiguousProject
+        }
+        let editDocument = openedSnapshot?.document ?? session.effectiveEditDocument()
         guard session.hasCamera || pointerSynthesized || editDocument != nil else {
             return session.screenURL
         }
@@ -161,6 +174,9 @@ enum RecordingSessionRenderer {
             onProgress?(progress)
         }
         do {
+            guard canInstallRender(for: session, snapshot: openedSnapshot, renderedDocument: editDocument) else {
+                throw RenderError.projectChanged
+            }
             return try session.installFinalVideo(
                 movingFrom: temporaryURL,
                 renderedFrom: editDocument
@@ -169,6 +185,22 @@ enum RecordingSessionRenderer {
             try? FileManager.default.removeItem(at: temporaryURL)
             throw error
         }
+    }
+
+    /// A render may outlive its editor or an edit to the working document.
+    /// Keep the package cache tied to the exact document used for its frames.
+    static func canInstallRender(
+        for session: RecordingSession,
+        snapshot: RecordingStudioDocumentSnapshot?,
+        renderedDocument: RecordingEditDocument?
+    ) -> Bool {
+        let current = StudioProjectRegistry.shared.snapshot(for: session.directoryURL)
+        if let snapshot {
+            return current == snapshot && renderedDocument == snapshot.document
+        }
+        return current == nil
+            && !StudioProjectRegistry.shared.hasOpenProject(for: session.directoryURL)
+            && session.effectiveEditDocument() == renderedDocument
     }
 
     static func presentFailure(_ error: Error) {

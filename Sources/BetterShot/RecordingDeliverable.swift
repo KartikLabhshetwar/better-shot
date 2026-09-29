@@ -64,7 +64,16 @@ enum RecordingDeliverable {
     /// instead of appearing to hang.
     static func needsRender(for mediaURL: URL) -> Bool {
         guard let session = session(for: mediaURL) else { return false }
-        return session.freshFinalURL(matching: session.effectiveEditDocument()) == nil
+        let registry = StudioProjectRegistry.shared
+        let snapshot = registry.snapshot(for: session.directoryURL)
+        // An open editor can have edits that have not reached the draft file
+        // yet. If multiple windows make the current document ambiguous, force
+        // resolve through the renderer, which reports the ambiguity safely.
+        if snapshot == nil && registry.hasOpenProject(for: session.directoryURL) {
+            return true
+        }
+        let document = snapshot?.document ?? session.effectiveEditDocument()
+        return session.freshFinalURL(matching: document) == nil
     }
 
     /// The file to actually give the user. Renders the flattened deliverable

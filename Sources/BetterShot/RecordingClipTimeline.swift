@@ -405,6 +405,8 @@ nonisolated struct RecordingClipSpeedDraft: Equatable, Sendable {
     private(set) var speed: Double?
     private var isEditing = false
 
+    var hasActiveEdit: Bool { isEditing }
+
     mutating func begin() { isEditing = true }
 
     /// Returns true when the change should apply now rather than on `end()`.

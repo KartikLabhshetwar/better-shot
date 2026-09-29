@@ -43,6 +43,12 @@ enum RecordingProjectSaveOutcome: Equatable {
     case failed(message: String)
 }
 
+enum RecordingClipEditOutcome: Equatable {
+    case changed
+    case unchanged
+    case failed(String)
+}
+
 /// Share-to-cloud pipeline: render the current edits, upload, copy link.
 enum RecordingStudioShareState: Equatable {
     case idle
@@ -194,6 +200,9 @@ final class RecordingStudioModel {
         }
     }
     var exportState: RecordingStudioExportState = .idle
+    private(set) var currentExportRunID: UUID?
+    private var exportRunStates: [UUID: RecordingStudioExportState] = [:]
+    private var exportRunOrder: [UUID] = []
     var audioExportState: RecordingStudioExportState = .idle
     var shareState: RecordingStudioShareState = .idle
     /// Upload identity while sharing, so the UI can read the uploader's
@@ -651,9 +660,10 @@ final class RecordingStudioModel {
         undoRevision &+= 1
     }
 
-    func splitClip(at editorTime: TimeInterval) {
-        guard let result = clipTimeline.split(at: editorTime) else { return }
-        applyClipTimeline(
+    @discardableResult
+    func splitClip(at editorTime: TimeInterval) -> RecordingClipEditOutcome {
+        guard let result = clipTimeline.split(at: editorTime) else { return .unchanged }
+        return applyClipTimeline(
             result.timeline,
             selectedID: result.selectedID,
             playheadTime: min(max(editorTime, 0), duration),
@@ -666,16 +676,17 @@ final class RecordingStudioModel {
         splitClip(at: timelineHoverTime)
     }
 
-    func deleteSelectedClip() {
+    @discardableResult
+    func deleteSelectedClip() -> RecordingClipEditOutcome {
         guard let selectedClipID,
               let deletedRange = clipTimeline.editorRange(for: selectedClipID),
               let next = clipTimeline.deleting(segmentID: selectedClipID) else {
-            return
+            return .unchanged
         }
         let seekTime = min(deletedRange.lowerBound, next.duration)
         let nextSelection = next.location(at: seekTime)?.segmentID
             ?? next.segments.last?.id
-        applyClipTimeline(
+        return applyClipTimeline(
             next,
             selectedID: nextSelection,
             playheadTime: seekTime,
@@ -683,11 +694,12 @@ final class RecordingStudioModel {
         )
     }
 
-    func trimClip(_ replacement: RecordingClipSegment) {
+    @discardableResult
+    func trimClip(_ replacement: RecordingClipSegment) -> RecordingClipEditOutcome {
         let next = clipTimeline.replacing(replacement)
-        guard next != clipTimeline else { return }
+        guard next != clipTimeline else { return .unchanged }
         let editorTime = next.editorRange(for: replacement.id)?.lowerBound ?? currentTime
-        applyClipTimeline(
+        return applyClipTimeline(
             next,
             selectedID: replacement.id,
             playheadTime: min(currentTime, next.duration),
@@ -696,15 +708,16 @@ final class RecordingStudioModel {
         )
     }
 
-    func setClipSpeed(_ speed: Double, forClipID id: UUID) {
-        guard let segment = clipTimeline.segments.first(where: { $0.id == id }) else { return }
+    @discardableResult
+    func setClipSpeed(_ speed: Double, forClipID id: UUID) -> RecordingClipEditOutcome {
+        guard let segment = clipTimeline.segments.first(where: { $0.id == id }) else { return .unchanged }
         let clamped = min(max(speed, RecordingClipSegment.minimumSpeed), RecordingClipSegment.maximumSpeed)
-        guard clipSpeedDraft.propose(clamped, forClipID: id),
-              abs(segment.speed - clamped) > 0.000_001 else { return }
+        guard clipSpeedDraft.propose(clamped, forClipID: id) else { return .unchanged }
+        guard abs(segment.speed - clamped) > 0.000_001 else { return .unchanged }
         var replacement = segment
         replacement.speed = clamped
         let next = clipTimeline.replacing(replacement)
-        applyClipTimeline(
+        return applyClipTimeline(
             next,
             selectedID: id,
             playheadTime: min(currentTime, next.duration),
@@ -730,15 +743,16 @@ final class RecordingStudioModel {
         )
     }
 
+    @discardableResult
     private func applyClipTimeline(
         _ requestedTimeline: RecordingClipTimeline,
         selectedID: UUID?,
         playheadTime: TimeInterval,
         actionName: String,
         hoverTime: TimeInterval? = nil
-    ) {
+    ) -> RecordingClipEditOutcome {
         let next = requestedTimeline.normalized(to: sourceDuration)
-        guard !next.segments.isEmpty, next != clipTimeline else { return }
+        guard !next.segments.isEmpty, next != clipTimeline else { return .unchanged }
 
         let playbackAsset: AVAsset?
         do {
@@ -748,7 +762,7 @@ final class RecordingStudioModel {
             )
         } catch {
             loadError = "Could not update the recording timeline: \(error.localizedDescription)"
-            return
+            return .failed(error.localizedDescription)
         }
 
         let previousTimeline = clipTimeline
@@ -789,6 +803,7 @@ final class RecordingStudioModel {
         }
         updateActiveTranscriptWord()
         scheduleProjectSave()
+        return .changed
     }
 
     private func rebuildScreenPlayerItem(preserving editorTime: TimeInterval) throws {
@@ -1390,6 +1405,10 @@ final class RecordingStudioModel {
             masks: maskSegments.isEmpty ? nil : maskSegments,
             shots3D: shots3D
         )
+    }
+
+    var currentEditDocument: RecordingEditDocument {
+        currentDocument()
     }
 
     /// True until the project has been saved at least once. Only these get
@@ -2434,24 +2453,28 @@ final class RecordingStudioModel {
     /// Entry point for the export options popover. Assigning settings marks
     /// the project dirty and drops the cached render, so an unchanged
     /// confirmation must not touch them.
-    func export(settings: VideoCompressionSettings) {
+    @discardableResult
+    func export(settings: VideoCompressionSettings) -> UUID? {
         if settings != exportSettings {
             exportSettings = settings
         }
-        export()
+        return export()
     }
 
-    func export() {
+    @discardableResult
+    func export() -> UUID? {
         // One render at a time: the share pipeline uses the same exporter,
         // so a second encode would just fight it for the media engine.
-        guard !exportState.isExporting, !shareState.isBusy, isLoaded else { return }
+        guard !exportState.isExporting, !shareState.isBusy, isLoaded else { return nil }
         pause()
+        let runID = UUID()
+        currentExportRunID = runID
 
         // A fresh deliverable (e.g. right after a share) is byte-identical
         // to what this render would produce - same configuration builds
         // both - so exporting becomes a plain copy into the save folder.
         if let cached = freshDeliverableURL {
-            exportState = .exporting(progress: 0.98)
+            setExportState(.exporting(progress: 0.98), runID: runID)
             let suggestedFileName = makeExportFileName()
             exportTask = Task { [weak self] in
                 do {
@@ -2459,17 +2482,18 @@ final class RecordingStudioModel {
                         from: cached,
                         suggestedFileName: suggestedFileName
                     )
+                    try Task.checkCancellation()
                     RecordingExportNotifier.notifySuccess(fileURL: savedURL)
                     RecordingExportNotifier.revealIfPreferred(fileURL: savedURL)
-                    self?.exportState = .finished(savedURL)
+                    self?.setExportState(.finished(savedURL), runID: runID)
                 } catch {
-                    self?.exportState = .failed(error.localizedDescription)
+                    self?.setExportState(.failed(error.localizedDescription), runID: runID)
                 }
             }
-            return
+            return runID
         }
 
-        exportState = .exporting(progress: 0)
+        setExportState(.exporting(progress: 0), runID: runID)
 
         let configuration = makeExportConfiguration()
         let suggestedFileName = makeExportFileName()
@@ -2485,8 +2509,9 @@ final class RecordingStudioModel {
                 let temporaryURL = try await exporter.export(configuration) { progress in
                     Task { @MainActor [weak self] in
                         DockExportProgressCoordinator.shared.update(dockProgressID, progress: progress)
-                        if self?.exportState.isExporting == true {
-                            self?.exportState = .exporting(progress: progress)
+                        if self?.currentExportRunID == runID,
+                           self?.exportState.isExporting == true {
+                            self?.setExportState(.exporting(progress: progress), runID: runID)
                         }
                     }
                 }
@@ -2504,28 +2529,46 @@ final class RecordingStudioModel {
                     from: deliverableURL,
                     suggestedFileName: suggestedFileName
                 )
+                try Task.checkCancellation()
                 DockExportProgressCoordinator.shared.finish(dockProgressID)
                 RecordingExportNotifier.notifySuccess(fileURL: savedURL)
                 RecordingExportNotifier.revealIfPreferred(fileURL: savedURL)
-                self?.exportState = .finished(savedURL)
+                self?.setExportState(.finished(savedURL), runID: runID)
             } catch is CancellationError {
                 DockExportProgressCoordinator.shared.finish(dockProgressID)
-                self?.exportState = .idle
+                self?.setExportState(.idle, runID: runID)
             } catch RecordingStudioExporter.ExportError.cancelled {
                 DockExportProgressCoordinator.shared.finish(dockProgressID)
-                self?.exportState = .idle
+                self?.setExportState(.idle, runID: runID)
             } catch {
                 DockExportProgressCoordinator.shared.finish(dockProgressID)
-                self?.exportState = .failed(error.localizedDescription)
+                self?.setExportState(.failed(error.localizedDescription), runID: runID)
             }
         }
+        return runID
+    }
+
+    func exportState(for runID: UUID) -> RecordingStudioExportState? {
+        exportRunStates[runID]
     }
 
     func cancelExport() {
+        let runID = currentExportRunID
         exportTask?.cancel()
         exportTask = nil
-        if exportState.isExporting {
-            exportState = .idle
+        if let runID, exportState.isExporting {
+            setExportState(.idle, runID: runID)
+            currentExportRunID = nil
+        }
+    }
+
+    private func setExportState(_ state: RecordingStudioExportState, runID: UUID) {
+        guard currentExportRunID == runID else { return }
+        exportState = state
+        exportRunStates[runID] = state
+        if !exportRunOrder.contains(runID) { exportRunOrder.append(runID) }
+        while exportRunOrder.count > 16 {
+            exportRunStates.removeValue(forKey: exportRunOrder.removeFirst())
         }
     }
 

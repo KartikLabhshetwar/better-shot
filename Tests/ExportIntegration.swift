@@ -37,6 +37,12 @@ struct ExportIntegration {
             try await checkRecordingEditRevisionAndSave(
                 movieURL: URL(fileURLWithPath: "Resources/Onboarding/recording-demo.mp4")
             )
+            try await checkRecordingRendererFreshness(
+                movieURL: URL(fileURLWithPath: "Resources/Onboarding/recording-demo.mp4")
+            )
+            try await checkRecordingAgentOperations(
+                movieURL: URL(fileURLWithPath: "Resources/Onboarding/recording-demo.mp4")
+            )
             return
         }
         if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_CAPTURE_UI"] == "1" {

@@ -181,11 +181,20 @@ final class RecordingProjectOpener {
 
 /// Knows which Studio windows are currently holding uncommitted edits, so
 /// quitting can say so.
+struct RecordingStudioDocumentSnapshot: Equatable {
+    let handle: UUID
+    let revision: UInt64
+    let document: RecordingEditDocument
+}
+
 @MainActor
 final class StudioProjectRegistry {
     static let shared = StudioProjectRegistry()
 
     private var models: [ObjectIdentifier: WeakModel] = [:]
+    private var handlesByModel: [ObjectIdentifier: UUID] = [:]
+    private var modelsByHandle: [UUID: ObjectIdentifier] = [:]
+    private var handlesByProjectURL: [URL: Set<UUID>] = [:]
 
     private struct WeakModel {
         weak var model: RecordingStudioModel?
@@ -194,11 +203,59 @@ final class StudioProjectRegistry {
     private init() {}
 
     func register(_ model: RecordingStudioModel) {
-        models[ObjectIdentifier(model)] = WeakModel(model: model)
+        let modelID = ObjectIdentifier(model)
+        let projectURL = model.sessionURL.standardizedFileURL
+        let handle = handlesByModel[modelID] ?? UUID()
+        models[modelID] = WeakModel(model: model)
+        handlesByModel[modelID] = handle
+        modelsByHandle[handle] = modelID
+        handlesByProjectURL[projectURL, default: []].insert(handle)
     }
 
     func unregister(_ model: RecordingStudioModel) {
-        models.removeValue(forKey: ObjectIdentifier(model))
+        let modelID = ObjectIdentifier(model)
+        models.removeValue(forKey: modelID)
+        guard let handle = handlesByModel.removeValue(forKey: modelID) else { return }
+        modelsByHandle.removeValue(forKey: handle)
+        let projectURL = model.sessionURL.standardizedFileURL
+        handlesByProjectURL[projectURL]?.remove(handle)
+        if handlesByProjectURL[projectURL]?.isEmpty == true {
+            handlesByProjectURL.removeValue(forKey: projectURL)
+        }
+    }
+
+    func model(for handle: UUID) -> RecordingStudioModel? {
+        guard let modelID = modelsByHandle[handle],
+              let model = models[modelID]?.model,
+              model.isLoaded,
+              model.isProject else { return nil }
+        return model
+    }
+
+    func snapshot(for handle: UUID) -> RecordingStudioDocumentSnapshot? {
+        guard let model = model(for: handle),
+              let handle = handlesByModel[ObjectIdentifier(model)] else { return nil }
+        return RecordingStudioDocumentSnapshot(
+            handle: handle,
+            revision: model.editRevision,
+            document: model.currentEditDocument
+        )
+    }
+
+    func snapshot(for sessionURL: URL) -> RecordingStudioDocumentSnapshot? {
+        guard let handles = handlesByProjectURL[sessionURL.standardizedFileURL],
+              handles.count == 1,
+              let handle = handles.first else { return nil }
+        return snapshot(for: handle)
+    }
+
+    func hasOpenProject(for sessionURL: URL) -> Bool {
+        !(handlesByProjectURL[sessionURL.standardizedFileURL]?.isEmpty ?? true)
+    }
+
+    func snapshots(for sessionURL: URL) -> [RecordingStudioDocumentSnapshot] {
+        (handlesByProjectURL[sessionURL.standardizedFileURL] ?? [])
+            .compactMap(snapshot(for:))
     }
 
     var unsavedProjectCount: Int {

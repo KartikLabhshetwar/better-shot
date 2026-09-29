@@ -63,6 +63,7 @@
 		3AA2E443AA076D9AA4BCFFA9 /* PinnedScreenshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B3D8697A2AEA9FD3527BA3D /* PinnedScreenshot.swift */; };
 		3AA56BD8027AACABC1257B3D /* AnnotationWallpaperPreviewCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06C8996BCFE669700EEF01EE /* AnnotationWallpaperPreviewCache.swift */; };
 		3BF5DBCBE10B92005C121A2D /* RecordingSourceCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7711E5BB4466B588EE32C7BC /* RecordingSourceCatalog.swift */; };
+		3C9898E9A4E59D060C2D6899 /* RecordingAgentOperations.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC54A02DBE71AB28C478391C /* RecordingAgentOperations.swift */; };
 		3CA0F0B61AD84D125B91E9AF /* NotchVoiceCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DF3A00AA83CB4F8ED8C7F30 /* NotchVoiceCapture.swift */; };
 		3DFD0AFCC40248A410ACC8BD /* AnnotationEditorZoom.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FC217457F424CFCD7667853 /* AnnotationEditorZoom.swift */; };
 		3EB30B21F2F488EC0524A801 /* TeleprompterOverlayPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A5FFC877AB3AB6B64894072 /* TeleprompterOverlayPresenter.swift */; };
@@ -427,6 +428,7 @@
 		C7881A05DB7FD7C0160C3D30 /* RecordingExportOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingExportOptions.swift; sourceTree = "<group>"; };
 		C96F75A7EB8769B15A71CCD1 /* Recording3DInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Recording3DInspector.swift; sourceTree = "<group>"; };
 		CA1C53D4E064EC5B6570D913 /* EditorCloseGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorCloseGuard.swift; sourceTree = "<group>"; };
+		CC54A02DBE71AB28C478391C /* RecordingAgentOperations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingAgentOperations.swift; sourceTree = "<group>"; };
 		CC94C1BE0CE4840EE91F1A8C /* AnnotationInspectorSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationInspectorSlider.swift; sourceTree = "<group>"; };
 		CEC5745BD6B7DD30BD91DEA0 /* RecordingTranscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingTranscription.swift; sourceTree = "<group>"; };
 		CEF466A0DB404559DBF22E36 /* AnnotationInspectorStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationInspectorStyle.swift; sourceTree = "<group>"; };
@@ -523,13 +525,6 @@
 				451695CAAFEDDEA2ECE3CEF7 /* ShareManifest.swift */,
 			);
 			path = Sharing;
-			sourceTree = "<group>";
-		};
-		299E86DC313097FC40D543B7 /* Presets */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Presets;
 			sourceTree = "<group>";
 		};
 		39D4566D88515C653CF4F4DB /* Models */ = {
@@ -679,6 +674,7 @@
 				DEB2AEB81BE4A6B5313E0654 /* Recording3DOrbitPad.swift */,
 				3034437BB87F62844847BB2E /* Recording3DPreview.swift */,
 				C315ACDB8155CA8169D8CEFF /* Recording3DShot.swift */,
+				CC54A02DBE71AB28C478391C /* RecordingAgentOperations.swift */,
 				868BDBFEC12D9D90939923A2 /* RecordingAreaHighlightPresenter.swift */,
 				73420E1B5D54DB5C494DE244 /* RecordingAreaSelectionPresenter.swift */,
 				E3E685ECE9C1BF7E62754119 /* RecordingAudioExport.swift */,
@@ -809,7 +805,6 @@
 				749E9D00F818F70E06F34BB9 /* History */,
 				39D4566D88515C653CF4F4DB /* Models */,
 				BDA590964BECE51622E85075 /* Notch */,
-				299E86DC313097FC40D543B7 /* Presets */,
 				99E8726305BC9AF4B98FA73B /* Preview */,
 				02E0E07267FD5201B631F82C /* Services */,
 				E4007FFA622C92BA5142F86A /* Settings */,
@@ -885,7 +880,6 @@
 				};
 			};
 			buildConfigurationList = FDE4C5BE7F87318CFEAA3DDB /* Build configuration list for PBXProject "BetterShot" */;
-			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -900,6 +894,7 @@
 				CE593FB0F9EB3F1B2ECE8BEE /* XCLocalSwiftPackageReference "Vendor/TourKit" */,
 			);
 			preferredProjectObjectVersion = 77;
+			productRefGroup = 4B049A4676B9CFEECB1A3DF6 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -1055,6 +1050,7 @@
 				F0F4CD24EA88F07B1C477D47 /* Recording3DOrbitPad.swift in Sources */,
 				DEF24106429AF3B516278F72 /* Recording3DPreview.swift in Sources */,
 				CD703C2110FDB5F74D7B1924 /* Recording3DShot.swift in Sources */,
+				3C9898E9A4E59D060C2D6899 /* RecordingAgentOperations.swift in Sources */,
 				1B0581442F771F48B16539BE /* RecordingAreaHighlightPresenter.swift in Sources */,
 				ADA5C9BD650F6C9FDCBDE7DD /* RecordingAreaSelectionPresenter.swift in Sources */,
 				769B39FE27CFCD06F376C8ED /* RecordingAudioExport.swift in Sources */,

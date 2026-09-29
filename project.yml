@@ -33,7 +33,9 @@ targets:
       - package: DockProgress
       - package: TourKit
     sources:
-      - Sources
+      - path: Sources
+        excludes:
+          - graphify-out/**
       - path: CHANGELOG.md
         buildPhase: resources
       - path: Resources/Assets.xcassets

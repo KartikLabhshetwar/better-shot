@@ -378,7 +378,7 @@ struct RecordingStudioContent: View {
     private var exportStatus: some View {
         RecordingExportButton(
             currentSettings: model.exportSettings,
-            onExport: model.export(settings:), shortcutAction: .videoExport
+            onExport: { settings in _ = model.export(settings: settings) }, shortcutAction: .videoExport
         ) {
             Label("Export", systemImage: "arrow.down.circle")
                 .labelStyle(.titleAndIcon)
