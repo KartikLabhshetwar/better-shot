@@ -2,7 +2,7 @@
 //  RecordingPickerBar.swift
 //  BetterShot
 //
-//  Shared screenshot controls and native recording setup for the bar and notch.
+//  Shared screenshot controls and native recording setup for the capture bar.
 //  The panel, chrome, and recording handoff live in RecordingBarPresenter.
 
 import AppKit
@@ -122,7 +122,7 @@ struct RecordingPickerControls: View {
     }
 }
 
-/// The compact 0.5.4 recording setup shared by the capture bar and notch.
+/// The compact 0.5.4 recording setup in the capture bar.
 struct RecordingOptionsView: View {
     @State private var sources = RecordingSourceCatalog.shared
     @AppStorage(BetterShotPreferences.recordingCameraDeviceIDKey) private var cameraID = ""

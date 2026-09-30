@@ -16,16 +16,6 @@ final class ToastWindow {
         dismiss(animated: false)
         panelGeneration &+= 1
 
-        #if canImport(DynamicNotchKit)
-        // Notch Mode never creates a toast, either inside the notch or above an editor.
-        if AppPreferences.presentationMode == .notch {
-            if isError {
-                NotchPresenter.shared.captureIssue = (title, message)
-                NotchPresenter.shared.show(on: preferredScreen)
-            }
-            return
-        }
-        #endif
         let toastView = ToastContentView(title: title, message: message, icon: icon, systemIcon: systemIcon)
         let hostingView = NSHostingView(rootView: toastView)
 

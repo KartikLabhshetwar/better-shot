@@ -29,8 +29,7 @@ extension ShortcutService {
             if manager.state == .paused { manager.resumeRecording() }
             else if manager.state == .recording { manager.pauseRecording() }
         case .restartRecording, .discardRecording:
-            guard manager.state == .recording || manager.state == .paused else { return }
-            RecordingBarPresenter.shared.recordingConfirmation = action
+            RecordingBarPresenter.shared.confirmRecordingAction(action)
         case .mediaGallery:
             MediaGalleryWindowController.shared.open(on: screen)
         case .openSettings:

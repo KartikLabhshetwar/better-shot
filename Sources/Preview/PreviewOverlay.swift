@@ -17,6 +17,7 @@ final class PreviewOverlay {
     private(set) var thumbnails: [URL: NSImage] = [:]
     private var failedSaves: Set<URL> = []
     private var panel: NSPanel?
+    private var focusedActions: Set<URL> = []
     private var dismissTasks: [URL: Task<Void, Never>] = [:]
     private var targetScreen: NSScreen?
     private(set) var shareStatuses: [URL: TransferStatus] = [:]
@@ -65,6 +66,7 @@ final class PreviewOverlay {
     }
 
     func remove(_ url: URL) {
+        focusedActions.remove(url)
         failedSaves.remove(url)
         cancelShare(for: url)
         shareStatuses.removeValue(forKey: url)
@@ -88,6 +90,7 @@ final class PreviewOverlay {
         toastURL = nil
         dismissTasks.values.forEach { $0.cancel() }
         dismissTasks.removeAll()
+        focusedActions.removeAll()
 
         stopMouseTracking()
         let dismissedPanel = panel
@@ -96,14 +99,12 @@ final class PreviewOverlay {
         thumbnails.removeAll()
         Task { @MainActor in
             dismissedPanel?.orderOut(nil)
-            NotchPresenter.shared.refresh()
         }
     }
 
     func hide() {
         isPresented = false
         panel?.orderOut(nil)
-        NotchPresenter.shared.refresh()
     }
 
     func toggleVisibility() {
@@ -116,21 +117,16 @@ final class PreviewOverlay {
     }
 
     func refreshPresentation() {
-        let isNormal = isPresented && !items.isEmpty && AppPreferences.presentationMode != .notch
-        if !isNormal || panel?.screen != (targetScreen ?? ActiveDisplayResolver.screenForScreenshotCapture()) {
+        let shouldShow = isPresented && !items.isEmpty
+        if !shouldShow || panel?.screen != (targetScreen ?? ActiveDisplayResolver.screenForScreenshotCapture()) {
             teardownPanel()
         }
         guard isPresented, !items.isEmpty else { return }
-        if AppPreferences.presentationMode == .notch {
-            NotchPresenter.shared.show(on: targetScreen ?? ActiveDisplayResolver.screenForScreenshotCapture())
-            startMouseTrackingIfNeeded()
-        } else {
-            // Create on the final display to preserve hit testing across mixed DPI screens.
-            if panel == nil { createPanel() }
-            positionPanel()
-            panel?.orderFrontRegardless()
-            startMouseTrackingIfNeeded()
-        }
+        // Create on the final display to preserve hit testing across mixed DPI screens.
+        if panel == nil { createPanel() }
+        positionPanel()
+        panel?.orderFrontRegardless()
+        startMouseTrackingIfNeeded()
     }
 
     func clearAll() {
@@ -364,7 +360,6 @@ final class PreviewOverlay {
               newScreen != targetScreen else { return }
         guard panelGeneration == generation else { return }
 
-        guard AppPreferences.presentationMode != .notch || !RecordingBarPresenter.shared.isVisible else { return }
         targetScreen = newScreen
         refreshPresentation()
     }
@@ -382,7 +377,6 @@ final class PreviewOverlay {
     }
 
     func perform(_ tool: OverlayTool, for url: URL) {
-        NotchPresenter.shared.captureIssue = nil
         switch tool {
         case .pin:
             let savedURL = DeckStaging.retain(url)
@@ -420,6 +414,7 @@ final class PreviewOverlay {
         panel.hasShadow = false
         panel.level = .floating
         panel.hidesOnDeactivate = false
+        panel.becomesKeyOnlyIfNeeded = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isMovableByWindowBackground = false
 
@@ -456,16 +451,37 @@ final class PreviewOverlay {
         panel.setFrame(NSRect(origin: NSPoint(x: x, y: y), size: panelSize), display: true)
     }
 
+    func setActionFocused(_ focused: Bool, for url: URL) {
+        if focused { focusedActions.insert(url) }
+        else { focusedActions.remove(url) }
+    }
+
+    private func dismissalIsPaused(for url: URL) -> Bool {
+        guard let panel, panel.isVisible else { return false }
+        return panel.frame.contains(NSEvent.mouseLocation)
+            || (panel.isKeyWindow && focusedActions.contains(url))
+    }
+
     func scheduleDismiss(for url: URL) {
         cancelScheduledDismiss(for: url)
-        guard AppPreferences.presentationMode == .normal, items.contains(url), !failedSaves.contains(url) else { return }
-        guard AppPreferences.overlayDismisses(after: AppPreferences.overlayDismissDelay),
-              (Self.isVideo(url) || !AppPreferences.keepInDeckUntilSaved),
+        guard items.contains(url), !failedSaves.contains(url), !savingItems.contains(url) else { return }
+        let delay = AppPreferences.overlayDismissDelay
+        guard AppPreferences.overlayDismisses(after: delay),
+              (Self.isVideo(url) || !AppPreferences.keepInDeckUntilSaved || !DeckStaging.isStaged(url)),
               shareStatuses[url] == nil else { return }
-        dismissTasks[url] = Task {
-            try? await Task.sleep(for: .seconds(AppPreferences.overlayDismissDelay))
-            guard !Task.isCancelled else { return }
-            remove(url)
+        dismissTasks[url] = Task { [weak self] in
+            var deadline = ContinuousClock.now.advanced(by: .seconds(delay))
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(min(0.1, delay)))
+                guard !Task.isCancelled, let self, items.contains(url) else { return }
+                // Read live panel state: missing hover/focus-exit events cannot kill the timer.
+                if dismissalIsPaused(for: url) {
+                    deadline = .now.advanced(by: .seconds(delay))
+                } else if ContinuousClock.now >= deadline {
+                    remove(url)
+                    return
+                }
+            }
         }
     }
 }
@@ -524,8 +540,6 @@ struct PreviewDeckView: View {
 struct PreviewCardView: View {
     let overlay: PreviewOverlay
     let url: URL
-    var usesNotchActions = false
-    var notchCardSize: CGSize?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovered = false
     @FocusState private var hasFocus: Bool
@@ -536,16 +550,14 @@ struct PreviewCardView: View {
     @State private var thumbnail: NSImage?
     @State private var isLoadingThumbnail = true
 
-    init(overlay: PreviewOverlay, url: URL, thumbnail: NSImage? = nil, usesNotchActions: Bool = false, notchCardSize: CGSize? = nil) {
+    init(overlay: PreviewOverlay, url: URL, thumbnail: NSImage? = nil) {
         self.overlay = overlay
         self.url = url
-        self.usesNotchActions = usesNotchActions
-        self.notchCardSize = notchCardSize
         _thumbnail = State(initialValue: thumbnail)
     }
 
-    private var size: OverlayCardSize { usesNotchActions ? .medium : overlay.cardSize }
-    private var cardSize: CGSize { notchCardSize ?? size.thumbnailSize }
+    private var size: OverlayCardSize { overlay.cardSize }
+    private var cardSize: CGSize { size.thumbnailSize }
     private var controlScale: CGFloat { size.controlScale }
 
     private var isVideo: Bool { PreviewOverlay.isVideo(url) }
@@ -574,7 +586,7 @@ struct PreviewCardView: View {
                     // this only showed up with a mouse.
                     Image(nsImage: image)
                         .resizable()
-                        .aspectRatio(contentMode: usesNotchActions ? .fill : .fit)
+                        .aspectRatio(contentMode: .fit)
                         .frame(width: cardSize.width, height: cardSize.height)
                         .background(Color.black.opacity(0.9))
                         .clipped()
@@ -592,7 +604,7 @@ struct PreviewCardView: View {
                             return NSItemProvider(object: image)
                         }
 
-                    if isVideo && (!usesNotchActions || !showsActions) {
+                    if isVideo {
                         Image(systemName: "play.circle.fill")
                             .font(.system(size: 28 * controlScale))
                             .foregroundStyle(.white.opacity(0.9))
@@ -601,12 +613,6 @@ struct PreviewCardView: View {
                             .accessibilityHidden(true)
                     }
 
-                    if usesNotchActions {
-                        notchCaption
-                            .opacity(showsActions ? 0 : 1)
-                            .allowsHitTesting(false)
-                            .accessibilityHidden(true)
-                    }
                     hoverOverlay()
                         .opacity(showsActions ? 1 : 0)
                         .allowsHitTesting(showsActions)
@@ -615,16 +621,14 @@ struct PreviewCardView: View {
 
                 }
                 .frame(width: cardSize.width, height: cardSize.height)
-                .clipShape(RoundedRectangle(cornerRadius: usesNotchActions ? 18 : 12, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: usesNotchActions ? 18 : 12, style: .continuous)
-                        .strokeBorder(Color.white.opacity(usesNotchActions ? 0 : 0.2), lineWidth: 0.5)
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
                 )
-                .shadow(color: .black.opacity(usesNotchActions ? 0 : 0.25), radius: 10, y: 4)
+                .shadow(color: .black.opacity(0.25), radius: 10, y: 4)
                 .onHover { hovering in
                     isHovered = hovering
-                    if hovering { overlay.cancelScheduledDismiss(for: url) }
-                    else if !hasFocus && focusedAction == nil { overlay.scheduleDismiss(for: url) }
                 }
             } else {
                 Button {
@@ -649,14 +653,10 @@ struct PreviewCardView: View {
         }
         .focusable()
         .focused($hasFocus)
-        .onChange(of: hasFocus) {
-            if hasFocus { overlay.cancelScheduledDismiss(for: url) }
-            else if !isHovered { overlay.scheduleDismiss(for: url) }
-        }
         .onChange(of: focusedAction) {
-            if focusedAction != nil { overlay.cancelScheduledDismiss(for: url) }
-            else if !isHovered && !hasFocus { overlay.scheduleDismiss(for: url) }
+            overlay.setActionFocused(focusedAction != nil, for: url)
         }
+        .onDisappear { overlay.setActionFocused(false, for: url) }
         .onKeyPress(.return) {
             guard overlay.transferStatus(for: url) == nil else { return .ignored }
             openEditor()
@@ -705,37 +705,12 @@ struct PreviewCardView: View {
         isLoadingThumbnail = false
     }
 
-    private var notchCaption: some View {
-        VStack {
-            Spacer(minLength: 0)
-            HStack(spacing: 8) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(isVideo ? "Recording" : "Screenshot")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text("Open in editor")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.white.opacity(0.85))
-                }
-                Spacer(minLength: 0)
-
-            }
-            .foregroundStyle(.white)
-            .padding(14)
-        }
-        .background(alignment: .bottom) {
-            LinearGradient(colors: [.clear, .black.opacity(0.85)],
-                           startPoint: .top, endPoint: .bottom)
-                .frame(height: 90)
-        }
-    }
-
     private func hoverOverlay() -> some View {
         ZStack {
             Color.black.opacity(0.28)
                 .allowsHitTesting(false)
             OverlayToolArrangement(scale: controlScale) { slot in
-                if let tool = (usesNotchActions ? OverlayToolLayout.standard : OverlayToolLayout(data: layoutData)).assignments[slot],
-                   tool != .dismiss || !usesNotchActions || overlay.items.contains(url) {
+                if let tool = OverlayToolLayout(data: layoutData).assignments[slot] {
                     Button { overlay.perform(tool, for: url) } label: {
                         OverlayToolLabel(tool: tool, slot: slot, scale: controlScale)
                     }

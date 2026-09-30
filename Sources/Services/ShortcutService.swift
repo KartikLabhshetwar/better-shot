@@ -76,9 +76,7 @@ final class ShortcutService {
             return
         }
 
-        let eventMask: CGEventMask = [CGEventType.keyDown, .flagsChanged, .leftMouseDown,
-                                     .leftMouseDragged, .leftMouseUp, .rightMouseDown]
-            .reduce(0) { $0 | (1 << $1.rawValue) }
+        let eventMask: CGEventMask = 1 << CGEventType.keyDown.rawValue
 
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -200,10 +198,6 @@ final class ShortcutService {
                 }
             }
             return Unmanaged.passUnretained(event)
-        }
-
-        if MainActor.assumeIsolated({ NotchVoiceCapture.shared.handleControlEvent(type: type, event: event) }) {
-            return nil
         }
 
         guard type == .keyDown else {

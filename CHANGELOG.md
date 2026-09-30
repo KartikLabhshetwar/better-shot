@@ -15,6 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Recording edits, undo/redo, saves, and export cache checks share the current document revision, so stale agent edits are rejected and failed saves keep their recovery draft.
 
+## [0.5.8] - 2026-09-27
+
+### Fixed
+
+- **Recording confirmations no longer show a black rectangle.** Discard and Start Over now use standalone native macOS alerts instead of SwiftUI alerts attached to the transparent recording bar. Buttons and keyboard shortcuts share the same confirmation; Cancel keeps the current recording.
+- Floating screenshot previews now dismiss after Overlay > Hide After. The timer pauses for the live pointer or a focused action, recovers from missed hover/focus events, and keeps saved files. Keep screenshot previews open now holds only unsaved staged captures; saved and retained captures follow Hide After.
+
+### Changed
+
+- Restored native macOS window screenshot selection.
+- Simplified region capture to BetterShot’s adjustable selector and removed the separate native region-selector option. Use Settings > Capture > Region > Capture as soon as I let go to capture on mouse release, or leave it off to adjust the area before confirming. Both keep the previous area for reuse. Window screenshots and OCR retain native macOS selection.
+- Removed Notch Mode, its shelf, quick editor, capture gestures, and bundled dependencies. Previews use the floating capture deck.
+
 ## [0.5.7] - 2026-09-25
 
 ### Added
@@ -93,7 +106,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Notch Mode never displays toast notifications. Copy confirms directly on the result button; capture and saving failures remain as dismissible inline instructions. Switching modes removes existing toasts immediately. Recent items stay aligned and disabled action icons remain readable.
 
-- Notch shape, hover controls, and interactions reuse Boring Notch code, with contributor attribution, pinned source references, and its GPLv3 license bundled with the app.
 
 - The notch groups capture tools and provides actions on each media card. Its compact state shows the BetterShot logo and readiness/editor status, or the recording timer. Short, interruptible transitions respect Reduce Motion.
 

@@ -10,20 +10,11 @@ import TourKit
 /// AVPlayer layers and interactive capture still require manual testing.
 @MainActor
 func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
-    // A failed notch check may leave the test executable's defaults in notch mode.
-    // The general overlay/toast checks explicitly exercise normal presentation.
-    let defaults = UserDefaults.standard
-    let previousMode = defaults.object(forKey: AppPreferences.presentationModeKey)
-    defaults.set("normal", forKey: AppPreferences.presentationModeKey)
-    defer {
-        if let previousMode { defaults.set(previousMode, forKey: AppPreferences.presentationModeKey) }
-        else { defaults.removeObject(forKey: AppPreferences.presentationModeKey) }
-    }
     if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_EDITOR_WINDOWS"] == "1" {
         try await checkEditorWindowInteractions(imageURL: imageURL, movieURL: movieURL)
     }
     try checkCaptureControlsUI()
-    try await checkNotchPresentation(imageURL: imageURL, movieURL: movieURL)
+    checkRecordingConfirmations()
     try checkImageTransforms(imageURL: imageURL)
     try await checkColorPickerAndToast()
     try await checkPreviewOverlay(imageURL: imageURL)
@@ -1165,6 +1156,55 @@ func checkRecordingAgentOperations(movieURL: URL) async throws {
     print("PASS agent edit bounds, revision rejection, shared timeline, save, duplicate-window guard, and export job retention")
 }
 
+/// Exercises real native dialogs without starting a capture or accessing microphone/camera.
+@MainActor
+private func checkRecordingConfirmations() {
+    let manager = ScreenRecordingManager.shared
+    let presenter = RecordingBarPresenter.shared
+    let previousState = manager.state
+    let previousAppearance = NSApp.appearance
+    defer {
+        manager.state = previousState
+        NSApp.appearance = previousAppearance
+        presenter.hide()
+    }
+    for state in [ScreenRecordingState.idle, .starting, .finishing] {
+        manager.state = state
+        presenter.confirmRecordingAction(.discardRecording)
+        presenter.confirmRecordingAction(.restartRecording)
+        precondition(NSApp.modalWindow == nil, "Inactive/settling recordings must not open a destructive confirmation")
+    }
+    for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+        NSApp.appearance = NSAppearance(named: appearance)
+        for action in [ShortcutService.Action.discardRecording, .restartRecording] {
+            manager.state = action == .discardRecording ? .recording : .paused
+            let state = manager.state
+            presenter.showRecording(displayID: nil)
+            let bar = NSApp.windows.first { $0.identifier?.rawValue == "BetterShot.RecordingBar" }!
+            var observed = false
+            let timer = Timer(timeInterval: 0.1, repeats: false) { _ in
+                MainActor.assumeIsolated {
+                    guard let alertWindow = NSApp.modalWindow else { preconditionFailure("Missing native recording confirmation") }
+                    observed = true
+                    precondition(alertWindow !== bar && alertWindow.sheetParent == nil && bar.attachedSheet == nil,
+                                 "Recording confirmations must be standalone, not sheets on the transparent bar")
+                    precondition(!bar.isOpaque && bar.backgroundColor == .clear)
+                    precondition(alertWindow.sharingType == (PreviewWindowCaptureExclusion.includesAppWindowsInCaptures ? .readOnly : .none))
+                    presenter.confirmRecordingAction(action)
+                    precondition(NSApp.modalWindow === alertWindow, "Repeated shortcuts must not nest confirmations")
+                    NSApp.stopModal(withCode: .alertFirstButtonReturn) // Cancel is the safe default.
+                }
+            }
+            RunLoop.main.add(timer, forMode: .modalPanel)
+            presenter.confirmRecordingAction(action)
+            timer.invalidate()
+            precondition(observed && manager.state == state, "Cancel must preserve recording/paused state")
+            precondition(NSApp.modalWindow == nil && bar.attachedSheet == nil)
+        }
+    }
+    print("PASS standalone native recording confirmations, cancellation, duplicate protection, capture exclusion, and both appearances")
+}
+
 /// Static layout checks need no camera/microphone access or encoded video fixture.
 @MainActor
 func checkCaptureControlsUI() throws {
@@ -1178,6 +1218,8 @@ func checkCaptureControlsUI() throws {
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
+        try snapshot(PreferencesView(selection: .capture), scheme: scheme, width: 780,
+                     to: output.appendingPathComponent("capture-settings-\(name).png"), height: 740)
         if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_CAPTURE_UI"] == "1" {
             try snapshot(MenuBarContentView(dismissPopover: {}), scheme: scheme, width: 296,
                          to: output.appendingPathComponent("capture-menu-\(name).png"), height: 540)
@@ -1970,6 +2012,41 @@ private func checkPreviewOverlay(imageURL: URL) async throws {
     precondition(R2Uploader.shared.failedItems[id] == nil && R2Uploader.shared.uploadProgress[id] == nil,
                  "Cancelled preparation must never enter the R2 uploader")
 
+    AppPreferences.overlayDismissDelay = 0.15
+    overlay.show(url: imageURL)
+    let livePanel = NSApp.windows.first { $0.identifier?.rawValue == "BetterShot.CaptureOverlay" && $0.isVisible }! as! NSPanel
+    precondition(livePanel.becomesKeyOnlyIfNeeded, "Presenting a preview must not pull focus into it")
+    let mouse = NSEvent.mouseLocation
+    livePanel.setFrameOrigin(NSPoint(x: mouse.x - livePanel.frame.width / 2, y: mouse.y - livePanel.frame.height / 2))
+    try await Task.sleep(for: .milliseconds(350))
+    precondition(overlay.items.contains(imageURL), "Live pointer over the panel pauses dismissal")
+    let activationPolicy = NSApp.activationPolicy()
+    defer { NSApp.setActivationPolicy(activationPolicy) }
+    NSApp.setActivationPolicy(.regular)
+    NSApp.activate(ignoringOtherApps: true)
+    livePanel.makeKey()
+    try await Task.sleep(for: .milliseconds(150))
+    precondition(livePanel.isKeyWindow, "Focus test requires a key preview panel")
+    livePanel.setFrameOrigin(NSPoint(x: mouse.x + 40, y: mouse.y + 40))
+    overlay.setActionFocused(true, for: imageURL)
+    try await Task.sleep(for: .milliseconds(350))
+    precondition(overlay.items.contains(imageURL), "A focused tool keeps its card available")
+    let otherWindow = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 160, height: 100),
+                               styleMask: [.titled], backing: .buffered, defer: false)
+    otherWindow.isReleasedWhenClosed = false
+    defer { otherWindow.close() }
+    otherWindow.makeKeyAndOrderFront(nil) // Deliberately leave the tool focus flag set.
+    precondition(!livePanel.isKeyWindow, "Moving keyboard focus must leave the preview panel")
+    try await Task.sleep(for: .milliseconds(350))
+    precondition(!overlay.items.contains(imageURL), "Leaving the panel resumes dismissal without a focus-exit callback")
+    precondition(FileManager.default.fileExists(atPath: imageURL.path), "Timer dismissal preserves retained files")
+    AppPreferences.overlayDismissDelay = AppPreferences.overlayDismissNever
+    overlay.show(url: imageURL)
+    try await Task.sleep(for: .milliseconds(250))
+    precondition(overlay.items.contains(imageURL), "Never disables automatic dismissal")
+    overlay.remove(imageURL)
+    print("PASS visible preview pointer pause, tool focus, stale focus recovery, and Never")
+
     AppPreferences.resetOverlaySettings()
     precondition(AppPreferences.overlayPosition == .bottomRight && AppPreferences.overlayCardSize == .small)
     precondition(AppPreferences.overlayDismissDelay == 5 && AppPreferences.overlayEdgeMargin == 20)
@@ -2028,6 +2105,18 @@ private func checkPreviewOverlay(imageURL: URL) async throws {
 
 @MainActor
 private func checkColorPickerAndToast() async throws {
+    let pasteboard = NSPasteboard.withUniqueName()
+    let oldSound = AppPreferences.playSound
+    AppPreferences.playSound = false
+    defer { pasteboard.releaseGlobally(); AppPreferences.playSound = oldSound }
+    let capture = CaptureOrchestrator.shared
+    capture.completeTextCapture("First line\nSecond line", action: .ocr, pasteboard: pasteboard)
+    precondition(pasteboard.string(forType: .string) == "First line\nSecond line")
+    capture.completeTextCapture("First line\nSecond line", action: .ocrSingleLine, pasteboard: pasteboard)
+    precondition(pasteboard.string(forType: .string) == "First line Second line")
+    capture.completeTextCapture("#FF8000", action: .colorPicker, pasteboard: pasteboard)
+    capture.completeTextCapture(" \n", action: .ocr, pasteboard: pasteboard)
+    precondition(pasteboard.string(forType: .string) == "#FF8000", "Empty OCR preserves the clipboard")
     let samples: [(NSColor, String)] = [
         (.black, "#000000"), (.white, "#FFFFFF"),
         (NSColor(srgbRed: 1, green: 0.5, blue: 0, alpha: 1), "#FF8000"),
