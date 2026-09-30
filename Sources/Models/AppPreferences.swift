@@ -91,6 +91,11 @@ enum AppPreferences {
         set { UserDefaults.standard.set(newValue.map(NSStringFromRect), forKey: lastRegionRectKey) }
     }
 
+    static let nativeRegionSelectorKey = "bs_nativeRegionSelector"
+    static var nativeRegionSelector: Bool {
+        UserDefaults.standard.bool(forKey: nativeRegionSelectorKey)
+    }
+
     // MARK: - Overlay
     static let overlayToolLayoutKey = "bs_overlayToolLayout"
 
