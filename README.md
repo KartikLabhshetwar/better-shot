@@ -99,6 +99,9 @@ undo, redo, and native full screen.
 
 Change or add bindings in **Settings > Shortcuts**. Extra actions, such as
 Capture Region & Pin or Edit Clipboard Image, start unassigned.
+Click a shortcut field to record a combination. Held modifiers appear immediately;
+Escape or clicking away cancels, and Delete or the inline clear button removes
+the binding. Restore Default remains in the field's options menu.
 
 Set the background, padding, corner radius, and shadow for new captures in
 **Settings > General > Default Look**.

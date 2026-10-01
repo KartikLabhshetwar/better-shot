@@ -1204,27 +1204,24 @@ struct ShortcutRow: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Text(action.title).frame(maxWidth: .infinity, alignment: .leading)
-                if recordingAction == action {
-                    ShortcutRecorderView { keyCode, modifiers in
-                        persist(.init(keyCode: keyCode, modifiers: modifiers, enabled: true))
-                        recordingAction = nil
-                    } onCancel: {
-                        recordingAction = nil
+                ShortcutRecorderView(shortcut: shortcut, isRecording: Binding(
+                    get: { recordingAction == action },
+                    set: { recording in
+                        if recording {
+                            errorMessage = nil
+                            recordingAction = action
+                        } else if recordingAction == action {
+                            recordingAction = nil
+                        }
                     }
-                    .frame(width: 124, height: 28)
-                    Button("Cancel") { recordingAction = nil }.controlSize(.small)
-                } else {
-                    Button {
-                        errorMessage = nil
-                        recordingAction = action
-                    } label: {
-                        Text(shortcut?.displayString ?? "Record Shortcut")
-                            .font(.system(.callout, design: .monospaced))
-                            .foregroundStyle(shortcut?.enabled == false ? .secondary : .primary)
-                            .frame(width: 124)
-                    }
-                    .accessibilityLabel("Record shortcut for \(action.title)")
-                    .accessibilityValue(shortcut?.accessibilityDescription ?? "Unassigned")
+                )) { keyCode, modifiers in
+                    persist(.init(keyCode: keyCode, modifiers: modifiers, enabled: true))
+                } onClear: {
+                    persist(.init(keyCode: .max, modifiers: 0, enabled: false))
+                }
+                .frame(width: 124, height: 28)
+                .accessibilityLabel("Record shortcut for \(action.title)")
+                if recordingAction != action {
                     Toggle("Enable \(action.title)", isOn: Binding(
                         get: { shortcut?.enabled ?? false },
                         set: { enabled in
@@ -1236,9 +1233,6 @@ struct ShortcutRow: View {
                     .toggleStyle(.switch).labelsHidden()
                     .disabled(shortcut == nil)
                     Menu {
-                        Button("Clear Shortcut") {
-                            persist(.init(keyCode: .max, modifiers: 0, enabled: false))
-                        }.disabled(shortcut == nil)
                         Button("Restore Default") {
                             if let fallback = action.defaultShortcut,
                                let error = service.validationError(for: fallback, action: action) {
@@ -1275,99 +1269,41 @@ struct ShortcutRow: View {
 // MARK: - Shortcut Recorder
 
 struct ShortcutRecorderView: NSViewRepresentable {
+    let shortcut: ShortcutService.Shortcut?
+    @Binding var isRecording: Bool
     let onRecord: (UInt32, UInt32) -> Void
-    let onCancel: () -> Void
+    let onClear: () -> Void
 
-    func makeNSView(context: Context) -> ShortcutRecorderNSView {
-        let view = ShortcutRecorderNSView()
-        view.onRecord = onRecord
-        view.onCancel = onCancel
-        ShortcutService.shared.beginRecordingShortcut()
-        DispatchQueue.main.async {
-            view.window?.makeFirstResponder(view)
-        }
+    func makeNSView(context: Context) -> ShortcutRecorderField {
+        let view = ShortcutRecorderField()
+        updateNSView(view, context: context)
         return view
     }
 
-    func updateNSView(_ nsView: ShortcutRecorderNSView, context: Context) {}
-
-    static func dismantleNSView(_ nsView: ShortcutRecorderNSView, coordinator: ()) {
-        nsView.removeMonitor()
-        ShortcutService.shared.endRecordingShortcut()
-    }
-}
-
-final class ShortcutRecorderNSView: NSView {
-    var onRecord: ((UInt32, UInt32) -> Void)?
-    var onCancel: (() -> Void)?
-    private var eventMonitor: Any?
-
-    override var acceptsFirstResponder: Bool { true }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        if window != nil {
-            installMonitor()
+    func updateNSView(_ view: ShortcutRecorderField, context: Context) {
+        view.onRecord = { keyCode, modifiers in
+            onRecord(keyCode, ShortcutService.Shortcut.modifiers(from: modifiers))
         }
-    }
-
-    private func installMonitor() {
-        guard eventMonitor == nil else { return }
-        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, self.window?.isKeyWindow == true, self.window?.firstResponder === self else { return event }
-
-            let keyCode = UInt32(event.keyCode)
-
-            if keyCode == 53 {
-                self.onCancel?()
-                return nil
+        view.onClear = onClear
+        view.onRecordingChanged = { recording in
+            if recording {
+                ShortcutService.shared.beginRecordingShortcut()
+            } else {
+                ShortcutService.shared.endRecordingShortcut()
             }
-
-            let flags = event.modifierFlags
-            var carbonMods: UInt32 = 0
-            if flags.contains(.command) { carbonMods |= UInt32(cmdKey) }
-            if flags.contains(.shift) { carbonMods |= UInt32(shiftKey) }
-            if flags.contains(.option) { carbonMods |= UInt32(optionKey) }
-            if flags.contains(.control) { carbonMods |= UInt32(controlKey) }
-
-            if keyCode == UInt32(kVK_Tab) { self.onCancel?(); return event }
-            guard !event.isARepeat else { return nil }
-
-            self.onRecord?(keyCode, carbonMods)
-            return nil
+            isRecording = recording
+        }
+        view.shortcutDescription = shortcut?.accessibilityDescription ?? "Unassigned"
+        view.shortcutLabel = shortcut?.displayString
+        view.textColor = shortcut?.enabled == false ? .secondaryLabelColor : .labelColor
+        if view.isRecording && !isRecording {
+            view.cancelRecording()
         }
     }
 
-    func removeMonitor() {
-        if let monitor = eventMonitor {
-            NSEvent.removeMonitor(monitor)
-            eventMonitor = nil
-        }
+    static func dismantleNSView(_ view: ShortcutRecorderField, coordinator: ()) {
+        view.stopObserving()
     }
-
-    override func draw(_ dirtyRect: NSRect) {
-        let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 4, yRadius: 4)
-        StudioChrome.accentNSColor.withAlphaComponent(0.15).setFill()
-        path.fill()
-        StudioChrome.accentNSColor.setStroke()
-        path.lineWidth = 1.5
-        path.stroke()
-
-        let text = "Press shortcut..." as NSString
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 11, weight: .medium),
-            .foregroundColor: StudioChrome.accentNSColor,
-        ]
-        let size = text.size(withAttributes: attrs)
-        let point = NSPoint(
-            x: (bounds.width - size.width) / 2,
-            y: (bounds.height - size.height) / 2
-        )
-        text.draw(at: point, withAttributes: attrs)
-    }
-
-    override func keyDown(with event: NSEvent) {}
-    override func flagsChanged(with event: NSEvent) {}
 }
 
 // MARK: - About

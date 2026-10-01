@@ -42,3 +42,8 @@ jobs:
           app=".build/Build/Products/Release/BetterShot.app"
           test -d "$app" || { echo "::error::$app was not produced"; exit 1; }
           echo "Built $app"
+
+      - name: Check native shortcut recorder
+        run: |
+          swiftc -swift-version 6 -enable-actor-data-race-checks -o .build/ShortcutRecorderFieldCheck Tests/ShortcutRecorderFieldCheck.swift Sources/Settings/ShortcutRecorderField.swift
+          BETTERSHOT_TESTING=1 .build/ShortcutRecorderFieldCheck
