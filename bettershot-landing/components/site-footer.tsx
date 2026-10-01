@@ -89,8 +89,8 @@ export function SiteFooter() {
                 <img
                   src="https://usefulshelf.co/badge/usefulshelf.svg"
                   alt="Featured on UsefulShelf"
-                  width={210}
-                  height={56}
+                  width={248}
+                  height={66}
                   className="h-10 w-auto"
                 />
               </a>
