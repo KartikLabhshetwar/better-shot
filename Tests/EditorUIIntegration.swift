@@ -1607,6 +1607,11 @@ private func checkShortcutCustomization(defaults: UserDefaults) {
     let service = ShortcutService(defaults: defaults)
     service.restoreDefaults()
     let actions = ShortcutService.Action.allCases
+    let home = ShortcutService.Shortcut(keyCode: UInt32(kVK_Home), modifiers: UInt32(cmdKey), enabled: true)
+    precondition(home.displayString == "⌘↖")
+    precondition(home.accessibilityDescription == "Command Home")
+    let function = ShortcutService.Shortcut(keyCode: UInt32(kVK_F20), modifiers: UInt32(optionKey), enabled: true)
+    precondition(function.displayString == "⌥F20")
     precondition(Set(actions.map(\.rawValue)).count == actions.count)
     precondition(Set(actions.compactMap(\.annotationTool)) == Set(AnnotationTool.allCases))
     for action in actions where action.defaultShortcut == nil {

@@ -30,6 +30,12 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
+      - name: Check keyboard labels
+        run: |
+          mkdir -p .build
+          swiftc -swift-version 6 -enable-actor-data-race-checks -o .build/KeyLabelCheck Tests/KeyLabelCheck.swift Sources/Services/KeyLabel.swift
+          BETTERSHOT_TESTING=1 .build/KeyLabelCheck
+
       # `make release` already builds unsigned (CODE_SIGN_IDENTITY=""
       # CODE_SIGNING_REQUIRED=NO), so it works without the maintainer's
       # Developer ID. `make build` does not — it inherits DEVELOPMENT_TEAM

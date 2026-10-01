@@ -97,6 +97,9 @@ undo, redo, and native full screen.
 | OCR text scan | `⌘⇧O` |
 | Color picker | `⌘⇧C` |
 
+Key labels follow your current keyboard layout; number-row shortcuts retain digit
+labels on layouts such as AZERTY. Changing layouts does not change saved bindings.
+
 Change or add bindings in **Settings > Shortcuts**. Extra actions, such as
 Capture Region & Pin or Edit Clipboard Image, start unassigned.
 
