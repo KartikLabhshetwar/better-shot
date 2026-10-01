@@ -95,7 +95,12 @@ a PR unless explicitly requested.
   `⌘⇧1` Capture Previous Region. `⌘⇧2` always opens the capture bar.
   Use `ShortcutService` as the source for UI labels and settings. Migrations must
   preserve customized bindings and disabled states.
-- Region screenshots use BetterShot's adjustable AppKit selector. Capture as soon
+- Region screenshots default to BetterShot's adjustable AppKit selector. Use native
+  macOS region selector in Settings > Capture > Region routes screenshot actions
+  through `screencapture -i` without activating BetterShot. Native selection does
+  not update the remembered rectangle; Capture Previous Region keeps the last area
+  chosen with BetterShot's selector. Scrolling capture and recording areas still
+  need the adjustable selector. Capture as soon
   as I let go in Settings > Capture > Region chooses capture on mouse release
   or adjustment before confirmation. Window screenshots use macOS's native window
   selector. Recording areas use the adjustable AppKit selector

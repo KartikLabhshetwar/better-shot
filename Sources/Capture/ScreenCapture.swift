@@ -52,11 +52,15 @@ final class ScreenCapture {
 
     // MARK: - Region
 
-    /// Opens BetterShot's adjustable selector, including the capture-on-release setting.
+    /// Region screenshots follow Settings; OCR always uses the native selector.
     func captureRegion() async throws -> URL? {
         guard !isCapturing else { return nil }
         isCapturing = true
         defer { isCapturing = false }
+
+        if AppPreferences.nativeRegionSelector {
+            return try await interactiveShot(window: false, includeShadow: false)
+        }
 
         switch await RegionSelectionOverlay().selectRegion() {
         case .cancelled:
