@@ -267,6 +267,10 @@ groups, scopes, and defaults. Do not renumber persisted IDs. New actions start
 unassigned; customized and disabled bindings must survive migration. Active
 editor bindings take priority over matching global bindings without intercepting
 normal text-field behavior.
+`KeyLabel` owns layout-aware shortcut labels, special-key glyphs, VoiceOver names,
+and the recording overlay's existing special-key style. Input-source changes
+refresh labels without changing stored key codes. Number-row labels stay digits,
+and printable keypad keys still pass through the recording modifier guard.
 
 [CaptureURLAction.swift](Sources/App/CaptureURLAction.swift) parses the supported
 `bettershot://` routes. The app delegate dispatches them. Preserve malformed-URL
