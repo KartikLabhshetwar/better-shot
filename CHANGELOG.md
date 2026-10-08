@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Optional **Freeze screen while selecting a region** in Settings > Capture > Region. Select moving or temporary content from a still frame and capture the same pixels when confirming the area.
 
+### Fixed
+
+- Settings sidebar symbols now fit inside their colored tiles with consistent padding.
+
 ## [0.5.8] - 2026-09-27
 
 ### Fixed

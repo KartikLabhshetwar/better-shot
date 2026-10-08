@@ -123,12 +123,7 @@ struct PreferencesView: View {
         Label {
             Text(section.title).foregroundStyle(.primary)
         } icon: {
-            Image(systemName: section.icon)
-                .font(.system(size: 15, weight: .regular))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(.white)
-                .frame(width: 24, height: 24)
-                .background(section.iconColor, in: RoundedRectangle(cornerRadius: 6))
+            SettingsSidebarIcon(symbol: section.icon, color: section.iconColor)
         }
         .padding(.vertical, 1)
         .tag(section)
