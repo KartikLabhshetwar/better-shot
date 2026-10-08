@@ -58,12 +58,27 @@ final class ScreenCapture {
         isCapturing = true
         defer { isCapturing = false }
 
-        switch await RegionSelectionOverlay().selectRegion() {
+        var frozenFrames = AppPreferences.freezeScreenDuringRegionCapture ? try await FrozenScreenCapture.capture() : [:]
+        switch await RegionSelectionOverlay().selectRegion(frozenFrames: frozenFrames) {
         case .cancelled:
             return nil
         case .window:
+            frozenFrames.removeAll()
             return try await interactiveShot(window: true, includeShadow: false)
         case .region(let selection):
+            if !frozenFrames.isEmpty {
+                guard let frame = frozenFrames[selection.displayID], frame.pointsRect == CGDisplayBounds(selection.displayID) else {
+                    throw NSError(domain: "BetterShot.FrozenScreenCapture", code: 2, userInfo: [
+                        NSLocalizedDescriptionKey: "The selected display changed during capture. Try capturing again."
+                    ])
+                }
+                frozenFrames.removeAll()
+                let url = URL(fileURLWithPath: makeTempPath())
+                try await Task.detached(priority: .userInitiated) {
+                    try frame.writePNG(in: selection.pointsRect, to: url)
+                }.value
+                return url
+            }
             return try await regionShot(selection.pointsRect)
         }
     }

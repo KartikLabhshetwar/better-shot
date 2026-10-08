@@ -29,6 +29,10 @@ cloud service required.
 
 ![BetterShot image editor with editable annotations and background controls](bettershot-landing/public/features/screenshot-editor-dark.webp)
 
+Region screenshots can freeze moving or temporary content while you select it.
+Enable **Settings > Capture > Region > Freeze screen while selecting a region**.
+The screenshot uses the frame shown by the selector; background apps keep running.
+
 ## Install
 
 Requires macOS 26 or later.

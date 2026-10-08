@@ -43,10 +43,13 @@ final class RegionSelectionOverlay {
     private var selectionViews: [SelectionView] = []
     private var continuation: CheckedContinuation<RegionSelectionOutcome, Never>?
     private var previousApp: NSRunningApplication?
+    private var frozenFrames: [CGDirectDisplayID: FrozenScreenFrame] = [:]
 
     /// Returns once the app that was frontmost is active again, so captures show its windows as focused.
-    func selectRegion(allowsWindowSelection: Bool = true) async -> RegionSelectionOutcome {
+    func selectRegion(allowsWindowSelection: Bool = true, frozenFrames: [CGDirectDisplayID: FrozenScreenFrame] = [:]) async -> RegionSelectionOutcome {
         self.allowsWindowSelection = allowsWindowSelection
+        self.frozenFrames = frozenFrames
+        defer { self.frozenFrames = [:] }
         previousApp = NSWorkspace.shared.frontmostApplication.flatMap {
             $0.processIdentifier == ProcessInfo.processInfo.processIdentifier ? nil : $0
         }
@@ -87,7 +90,8 @@ final class RegionSelectionOverlay {
                 screen: screen,
                 cursor: crosshair,
                 selection: previousRegion,
-                capturesOnRelease: capturesOnRelease
+                capturesOnRelease: capturesOnRelease,
+                frozenImage: ActiveDisplayResolver.displayID(for: screen).flatMap { frozenFrames[$0]?.image }
             ) { [weak self] rect in
                 self?.finishSelection(rect: rect, screen: screen)
             } onCancel: { [weak self] in
@@ -174,6 +178,7 @@ private final class SelectionView: NSView {
     private let screen: NSScreen
     private let crosshairCursor: NSCursor
     private let capturesOnRelease: Bool
+    private let frozenImage: NSImage?
     private let onSelect: (CGRect) -> Void
     private let onCancel: () -> Void
     private let onWindow: () -> Void
@@ -183,6 +188,7 @@ private final class SelectionView: NSView {
         cursor: NSCursor,
         selection: CGRect?,
         capturesOnRelease: Bool,
+        frozenImage: CGImage? = nil,
         onSelect: @escaping (CGRect) -> Void,
         onCancel: @escaping () -> Void,
         onWindow: @escaping () -> Void
@@ -192,6 +198,7 @@ private final class SelectionView: NSView {
         self.selection = selection
         self.movesSelection = selection == nil
         self.capturesOnRelease = capturesOnRelease
+        self.frozenImage = frozenImage.map { NSImage(cgImage: $0, size: screen.frame.size) }
         self.onSelect = onSelect
         self.onCancel = onCancel
         self.onWindow = onWindow
@@ -238,6 +245,7 @@ private final class SelectionView: NSView {
     // MARK: - Drawing
 
     override func draw(_ dirtyRect: NSRect) {
+        frozenImage?.draw(in: bounds, from: .zero, operation: .copy, fraction: 1)
         NSColor.black.withAlphaComponent(0.3).setFill()
         bounds.fill()
 
@@ -272,8 +280,7 @@ private final class SelectionView: NSView {
         let selectionRect = rectFromPoints(start, current)
         guard selectionRect.width > 2, selectionRect.height > 2 else { return }
 
-        NSColor.clear.setFill()
-        selectionRect.fill(using: .copy)
+        revealSelection(selectionRect)
 
         NSColor.white.setStroke()
         let borderPath = NSBezierPath(rect: selectionRect)
@@ -284,8 +291,7 @@ private final class SelectionView: NSView {
     }
 
     private func drawAdjustableSelection(_ rect: CGRect) {
-        NSColor.clear.setFill()
-        rect.fill(using: .copy)
+        revealSelection(rect)
 
         NSColor.white.setStroke()
         let borderPath = NSBezierPath(rect: rect)
@@ -308,6 +314,18 @@ private final class SelectionView: NSView {
 
     private func pixelSize(_ rect: CGRect) -> String {
         "\(Int(rect.width * screen.backingScaleFactor)) × \(Int(rect.height * screen.backingScaleFactor))"
+    }
+
+    private func revealSelection(_ rect: CGRect) {
+        if let frozenImage {
+            NSGraphicsContext.saveGraphicsState()
+            NSBezierPath(rect: rect).addClip()
+            frozenImage.draw(in: bounds, from: .zero, operation: .copy, fraction: 1)
+            NSGraphicsContext.restoreGraphicsState()
+        } else {
+            NSColor.clear.setFill()
+            rect.fill(using: .copy)
+        }
     }
 
     private func drawLabel(_ text: String, below rect: CGRect) {

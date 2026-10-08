@@ -29,6 +29,7 @@ enum AppPreferences {
     private static let recordingMicrophoneDeviceIDKey = "bs_recordingMicrophoneDeviceID"
     private static let lastRegionRectKey = "bs_lastRegionRect"
     private static let captureRegionOnReleaseKey = "bs_captureRegionOnRelease"
+    private static let freezeScreenDuringRegionCaptureKey = "bs_freezeScreenDuringRegionCapture"
 
     // MARK: - Appearance
     static var appearance: AppAppearance {
@@ -264,6 +265,12 @@ enum AppPreferences {
     static var captureRegionOnRelease: Bool {
         get { UserDefaults.standard.bool(forKey: captureRegionOnReleaseKey) }
         set { UserDefaults.standard.set(newValue, forKey: captureRegionOnReleaseKey) }
+    }
+
+    /// Show and crop a captured frame while selecting a screenshot region.
+    static var freezeScreenDuringRegionCapture: Bool {
+        get { UserDefaults.standard.bool(forKey: freezeScreenDuringRegionCaptureKey) }
+        set { UserDefaults.standard.set(newValue, forKey: freezeScreenDuringRegionCaptureKey) }
     }
 
     // MARK: - History

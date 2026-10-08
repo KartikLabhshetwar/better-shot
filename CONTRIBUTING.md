@@ -170,6 +170,17 @@ Region screenshots use `RegionSelectionOverlay` with the previous area
 reactivate the previously frontmost app before `screencapture -R` takes the shot.
 OCR keeps macOS's native `/usr/sbin/screencapture -i` selector.
 Region screenshots always use BetterShot’s selector.
+`AppPreferences.freezeScreenDuringRegionCapture`, exposed as Freeze screen while
+selecting a region, snapshots displays with `FrozenScreenCapture` before the
+selector becomes key. `RegionSelectionOverlay` draws those frames and
+`FrozenScreenFrame` crops the selected display at its native pixel dimensions;
+never recapture after confirmation. The setting defaults off, resets with Capture
+defaults, and applies only to region screenshots. Countdown runs before freezing;
+previous-region, native window/OCR, scrolling, and recording selections retain
+their existing capture paths. Check negative display origins, per-display scale,
+crop orientation, cancellation, focus restoration, and exclusion of private app
+windows. The standalone `FrozenScreenFrameCheck` verifies crop and PNG pixels;
+live signed-app interactions and permission behavior still require manual checks.
 `AppPreferences.captureRegionOnRelease`, exposed as Capture as soon as I let go
 in Settings > Capture > Region, chooses immediate capture on release or adjustment
 before confirmation. Both paths preserve the remembered rectangle.

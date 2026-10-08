@@ -880,6 +880,7 @@ struct CaptureSettingsTab: View {
     @AppStorage("bs_openEditorAfterCapture") private var openEditorAfterCapture = false
     @AppStorage("bs_keepInDeckUntilSaved") private var keepInDeckUntilSaved = false
     @AppStorage("bs_captureRegionOnRelease") private var captureRegionOnRelease = false
+    @AppStorage("bs_freezeScreenDuringRegionCapture") private var freezeScreenDuringRegionCapture = false
     @State private var isConfirmingReset = false
 
     private var selfTimerDelay: Binding<SelfTimerDelay> {
@@ -924,6 +925,11 @@ struct CaptureSettingsTab: View {
                 Toggle(isOn: $captureRegionOnRelease) {
                     Text("Capture as soon as I let go")
                     Text("Off, the rectangle stays up with handles so you can nudge it, and Return or a double-click takes the shot.")
+                }
+
+                Toggle(isOn: $freezeScreenDuringRegionCapture) {
+                    Text("Freeze screen while selecting a region")
+                    Text("Select from a still frame to capture moving or temporary content. Window, scrolling, recording, and text capture stay live.")
                 }
 
                 Picker("Show it on", selection: $overlayFollowsMouse) {
@@ -982,6 +988,7 @@ struct CaptureSettingsTab: View {
                 openEditorAfterCapture = false
                 keepInDeckUntilSaved = false
                 captureRegionOnRelease = false
+                freezeScreenDuringRegionCapture = false
             }
             Button("Cancel", role: .cancel) {}
         }
