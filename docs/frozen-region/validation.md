@@ -1,12 +1,5 @@
 # Frozen region capture validation
 
-The selector images in this directory use a generated blue/orange fixture, not
-desktop content. They render the production `RegionSelectionOverlay` at 2x scale
-with a 400 × 240 point selection. `selection-light.png` shows the drag before
-capture-on-release; `selection-dark.png` shows the adjustable selection before
-Return. The selected area reveals the original frozen frame while the surrounding
-frame remains dimmed.
-
 A temporary AppKit driver exercised the production overlay with injected frames,
 isolated preference collaborators, and synthesized mouse/key events. It checked
 capture-on-release, confirmation with Return, cancellation with Escape, switching
