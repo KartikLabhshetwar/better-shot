@@ -19,8 +19,23 @@ production crop/PNG code to check 1x and 2x dimensions, negative display origins
 AppKit-to-display conversion, fractional edges, crop orientation, bounds rejection,
 and lossless PNG pixels.
 
-Before marking the feature ready, build with Xcode 26+ and run `make test`, then
-check these interactions in a signed development app:
+The combined capture and sidebar-icon changes passed an arm64 Release build on
+GitHub Actions using Xcode 26.6. The tester ran that build on macOS 27.0.1 after
+giving a distinct, locally signed test copy its own Accessibility permission,
+confirmed menu capture and the physical Command-Shift-4 shortcut, and reported
+that the capture workflow worked correctly.
+
+The standalone suite passed 31 checks with desktop access. `PinnedResizeCheck`
+could not compile because the local Command Line Tools lack
+`SwiftUIMacros.StateMacro`; the same check fails against unchanged `main`.
+Full `make test` was attempted locally but stopped at missing XcodeGen; the local
+host also lacks full Xcode. The Release CI build does not run the integration
+suite. Hardware with multiple displays, countdown timing, focus restoration,
+permission denial/recovery, and every alternative capture mode have not been
+individually verified in the live app.
+
+For further coverage, run `make test` with Xcode 26+ and check these interactions
+in a signed development app:
 
 - With freezing enabled, start region capture over a playing video; wait before
   confirming and verify that the exported image matches the displayed still.
