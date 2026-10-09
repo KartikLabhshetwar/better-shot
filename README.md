@@ -9,6 +9,10 @@
 </p>
 
 <p align="center">
+<a href="https://trendshift.io/repositories/18174?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-18174" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/18174/daily?language=Swift" alt="KartikLabhshetwar%2Fbetter-shot | Trendshift" width="250" height="55"/></a>
+</p>
+
+<p align="center">
   <a href="https://github.com/KartikLabhshetwar/better-shot/releases/latest"><img src="https://img.shields.io/github/v/release/KartikLabhshetwar/better-shot?label=release" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/macOS-26.0+-black.svg" alt="macOS 26 or later">
   <a href="https://github.com/KartikLabhshetwar/better-shot/actions/workflows/build.yml"><img src="https://github.com/KartikLabhshetwar/better-shot/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
