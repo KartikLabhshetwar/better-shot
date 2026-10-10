@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Settings opens to a new Home page.** Start a Region, Screen, Window, Scrolling, Record, or Text capture with one click, each tile showing its current shortcut. Your five most recent captures are listed below and open directly; one that was moved or deleted points you to the Media Gallery instead. A Setup section shows the status of Screen Recording, Accessibility, Microphone, and Camera access.
+- **Freeze the screen while selecting a region.** Turn it on in Settings > Capture > Region to select from a still frame of every display, so video, animations, and other moving content hold still while you choose the area. The screenshot is cropped from that same frame at full resolution, so it shows exactly what you selected from. It works with Capture as soon as I let go, adjusting the area, the remembered area, and the countdown, which finishes before the screen freezes. Window, scrolling, and text capture stay live. Off by default ([#184](https://github.com/KartikLabhshetwar/better-shot/pull/184), closes [#182](https://github.com/KartikLabhshetwar/better-shot/issues/182), thanks [@solid-pixel](https://github.com/solid-pixel))
 
 ### Changed
 

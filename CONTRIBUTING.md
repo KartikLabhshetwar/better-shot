@@ -173,6 +173,14 @@ Region screenshots always use BetterShot’s selector.
 `AppPreferences.captureRegionOnRelease`, exposed as Capture as soon as I let go
 in Settings > Capture > Region, chooses immediate capture on release or adjustment
 before confirmation. Both paths preserve the remembered rectangle.
+`AppPreferences.freezeScreenDuringRegionCapture`, exposed as Freeze the screen
+while selecting, snapshots every display with `FrozenScreenCapture` before the
+selector appears. `RegionSelectionOverlay` shows each frame behind its selection
+view, and `FrozenScreenFrame` crops the confirmed area from that frame at native
+pixel size; never take a second shot after confirmation. It defaults off and
+applies only to region screenshots: the countdown runs first, and window, OCR,
+previous-region, scrolling, and recording captures stay live.
+`Tests/FrozenScreenFrameCheck.swift` covers crop origins, scales, and PNG pixels.
 Window screenshots use `/usr/sbin/screencapture -i -w`, retaining cancellation,
 shadow options, native pixel dimensions, and private PNG staging.
 OCR and color results copy through `CaptureOrchestrator.completeTextCapture`;

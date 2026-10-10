@@ -43,10 +43,13 @@ final class RegionSelectionOverlay {
     private var selectionViews: [SelectionView] = []
     private var continuation: CheckedContinuation<RegionSelectionOutcome, Never>?
     private var previousApp: NSRunningApplication?
+    private var frozenFrames: [CGDirectDisplayID: FrozenScreenFrame] = [:]
 
     /// Returns once the app that was frontmost is active again, so captures show its windows as focused.
-    func selectRegion(allowsWindowSelection: Bool = true) async -> RegionSelectionOutcome {
+    func selectRegion(allowsWindowSelection: Bool = true, frozenFrames: [CGDirectDisplayID: FrozenScreenFrame] = [:]) async -> RegionSelectionOutcome {
         self.allowsWindowSelection = allowsWindowSelection
+        self.frozenFrames = frozenFrames
+        defer { self.frozenFrames = [:] }
         previousApp = NSWorkspace.shared.frontmostApplication.flatMap {
             $0.processIdentifier == ProcessInfo.processInfo.processIdentifier ? nil : $0
         }
@@ -99,7 +102,15 @@ final class RegionSelectionOverlay {
             overlayView.onBeginSelection = { [weak self, weak overlayView] in
                 self?.selectionViews.forEach { if $0 !== overlayView { $0.clearSelection() } }
             }
-            window.contentView = overlayView
+            if let frozenImage = ActiveDisplayResolver.displayID(for: screen).flatMap({ frozenFrames[$0]?.image }) {
+                let backdrop = FrozenBackdropView(image: frozenImage, frame: NSRect(origin: .zero, size: screen.frame.size))
+                overlayView.frame = backdrop.bounds
+                overlayView.autoresizingMask = [.width, .height]
+                backdrop.addSubview(overlayView)
+                window.contentView = backdrop
+            } else {
+                window.contentView = overlayView
+            }
             if controlScreen != nil { window.orderFrontRegardless() }
             else { window.makeKeyAndOrderFront(nil) }
             overlayWindows.append(window)
@@ -154,6 +165,26 @@ private final class OverlayWindow: NSWindow {
 
     override func cursorUpdate(with event: NSEvent) {
         // Swallow cursor updates — we manage the cursor ourselves in SelectionView
+    }
+}
+
+// MARK: - Frozen Backdrop
+
+private final class FrozenBackdropView: NSView {
+    private let image: CGImage
+
+    init(image: CGImage, frame: NSRect) {
+        self.image = image
+        super.init(frame: frame)
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var wantsUpdateLayer: Bool { true }
+
+    override func updateLayer() {
+        layer?.contents = image
     }
 }
 

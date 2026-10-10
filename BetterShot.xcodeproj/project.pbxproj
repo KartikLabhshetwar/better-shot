@@ -63,6 +63,7 @@
 		3EB30B21F2F488EC0524A801 /* TeleprompterOverlayPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A5FFC877AB3AB6B64894072 /* TeleprompterOverlayPresenter.swift */; };
 		40B553DB8E65CE93297F3D11 /* SmartRedactionRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2DD10CB10250C7A3DEC3186 /* SmartRedactionRecognizer.swift */; };
 		42417A5044EED4E149F8DDBD /* DeckStaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5A66CB2E63EE52F1277C1F9 /* DeckStaging.swift */; };
+		425C6E74CB9DE1912B5B974B /* FrozenScreenCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BF61F2C22A1A1DBA6FA0CE4 /* FrozenScreenCapture.swift */; };
 		428051CE7498067FA05216D9 /* RecordingOverlayEffects.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF44DA79DA0F8C173F4D8299 /* RecordingOverlayEffects.swift */; };
 		435989A6E7CFD7DC8AE1B593 /* Mat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E1854845C0B1A123F908A41 /* Mat.swift */; };
 		44601DAC2783F0755C8D58BA /* AnnotationCropModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F7378F3CC5B8D8FDD885D11 /* AnnotationCropModels.swift */; };
@@ -97,6 +98,7 @@
 		61BB1B90D49DA0006C882330 /* BetterShotPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3560130094EAB274FBD6EE6E /* BetterShotPreferences.swift */; };
 		61E7E40D2B4D4891ABCC8C98 /* AnnotationEditorWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 293EA45B51DD6073E49641F4 /* AnnotationEditorWindow.swift */; };
 		63ECA013285D8804B1096228 /* OverlaySettingsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC91594D79B3D54FA54835A1 /* OverlaySettingsTab.swift */; };
+		65B99E86B5CF68B181BA2015 /* FrozenScreenFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = D87A9F3B02F89B32726FC039 /* FrozenScreenFrame.swift */; };
 		6682480DF2FDA028736D23D2 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9822447B9DE8F15B9CC94381 /* PreferencesView.swift */; };
 		6E19D91F47B4566546BF95C7 /* AnnotationInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35712AC357C535000CF633D8 /* AnnotationInspector.swift */; };
 		6E21C6975713C6FDBB95AF4C /* AnnoCanvasLayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27B9B3F0836AF531CFB09F8C /* AnnoCanvasLayerView.swift */; };
@@ -317,6 +319,7 @@
 		585BD4DB8B9D1DEAEF5027E4 /* RecordingCompositionBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingCompositionBuilder.swift; sourceTree = "<group>"; };
 		5A2447A291F173A51086F77C /* ActiveDisplayResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveDisplayResolver.swift; sourceTree = "<group>"; };
 		5BADFC6B5CCEDC123DF696D8 /* AppUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdater.swift; sourceTree = "<group>"; };
+		5BF61F2C22A1A1DBA6FA0CE4 /* FrozenScreenCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrozenScreenCapture.swift; sourceTree = "<group>"; };
 		5C57F353C924B2EAE57C53C0 /* RecordingBarPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingBarPresenter.swift; sourceTree = "<group>"; };
 		5D7E69E0EAA9CE007DACC8EE /* RecordingZoomFocusPad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingZoomFocusPad.swift; sourceTree = "<group>"; };
 		607F5851AD22C54D3C1E13C8 /* ClipboardImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardImage.swift; sourceTree = "<group>"; };
@@ -421,6 +424,7 @@
 		D10A6B033CF2B257451A9159 /* RecordingControlPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingControlPresenter.swift; sourceTree = "<group>"; };
 		D373EFB76FA1254F635BB9A5 /* AnnoShapeDrawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnoShapeDrawing.swift; sourceTree = "<group>"; };
 		D58300A37E3A994CE15987C5 /* BeautifierRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeautifierRenderer.swift; sourceTree = "<group>"; };
+		D87A9F3B02F89B32726FC039 /* FrozenScreenFrame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrozenScreenFrame.swift; sourceTree = "<group>"; };
 		D9CAA6D017C7FB19CD3466D7 /* MathUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MathUtils.swift; sourceTree = "<group>"; };
 		DAB3C2075FF2BEF2BC2650CB /* Geometry2d.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Geometry2d.swift; sourceTree = "<group>"; };
 		DC01231A76D0FEF4269A0806 /* OverlayLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayLayout.swift; sourceTree = "<group>"; };
@@ -528,6 +532,8 @@
 				4B626577BDFABF32D144DC8B /* CaptureOrchestrator.swift */,
 				3E1907B91A013BCA494AB08A /* ColorPickerOverlay.swift */,
 				7DB9ADF51148B7B593827415 /* CountdownOverlay.swift */,
+				5BF61F2C22A1A1DBA6FA0CE4 /* FrozenScreenCapture.swift */,
+				D87A9F3B02F89B32726FC039 /* FrozenScreenFrame.swift */,
 				C2B128F33D1CBF0CBB6A6852 /* RegionGeometry.swift */,
 				868F0E1B6C8FC7DF50B4A79B /* RegionSelectionOverlay.swift */,
 				4495302A23BB2192D91C5ED3 /* ScreenCapture.swift */,
@@ -965,6 +971,8 @@
 				FCF6D15042D5341FE0B8F8CC /* EditorCloseGuard.swift in Sources */,
 				328ADEC511F4BFC1C5DBE414 /* EscapeKey.swift in Sources */,
 				D8AE5ACE0841050A49E7B483 /* FailureAlert.swift in Sources */,
+				425C6E74CB9DE1912B5B974B /* FrozenScreenCapture.swift in Sources */,
+				65B99E86B5CF68B181BA2015 /* FrozenScreenFrame.swift in Sources */,
 				B0D43AF92D661FDC828C1399 /* GeoPaths.swift in Sources */,
 				17099ECB1C55AEEF4D94F468 /* Geometry2d.swift in Sources */,
 				F87FBF6D449686856AD05561 /* GlassSurface.swift in Sources */,
