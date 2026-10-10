@@ -947,6 +947,25 @@ private func checkCapturesKeepTheirName(
         await Task.yield()
     }
 
+    let storedFormat = AppPreferences.exportFormat
+    AppPreferences.exportFormat = .jpeg
+    UserDefaults.standard.set("dragged", forKey: templateKey)
+    let jpeg = try await capture(.region)
+    AppPreferences.exportFormat = storedFormat
+    let dragged = DeckStaging.retain(jpeg)
+    let drag = try ScreenshotFileActions.dragItemProvider(for: dragged, of: jpeg)
+    precondition(drag.registeredTypeIdentifiers == [UTType.fileURL.identifier],
+                 "Any image-data flavor makes Finder drop a JPEG as name.jpg.jpeg, got \(drag.registeredTypeIdentifiers)")
+    let dropped: URL = try await withCheckedThrowingContinuation { continuation in
+        _ = drag.loadObject(ofClass: URL.self) { url, error in
+            continuation.resume(with: url.map(Result.success) ?? .failure(error ?? CocoaError(.fileReadUnknown)))
+        }
+    }
+    precondition(dropped.lastPathComponent == "dragged.jpg" && (try? Data(contentsOf: dropped)) == (try? Data(contentsOf: dragged)),
+                 "A JPEG card drags out as the capture's .jpg file, got \(dropped.lastPathComponent)")
+    PreviewOverlay.shared.clearAll()
+    await Task.yield()
+
     // A template without tokens names every capture the same. Library storage
     // numbers the files, but the capture's name stays the name it was given.
     AppPreferences.keepInDeckUntilSaved = false

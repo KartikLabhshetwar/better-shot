@@ -44,7 +44,6 @@
 		24A92D5E02A892E928CE1D5B /* ColorGrade.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADD96168EC491E4A46366640 /* ColorGrade.swift */; };
 		2586A51024C6154C47BCD872 /* RecordingStudioStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4304694812C833847090F918 /* RecordingStudioStyle.swift */; };
 		25A54F46D3F80738AEFEF3A9 /* AnnotationRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2532AE9303B012F07C0FC4F /* AnnotationRenderer.swift */; };
-		266F345A43B69C9ABD40386E /* TourKit in Frameworks */ = {isa = PBXBuildFile; productRef = 21A5326AB43CA6E519B6D062 /* TourKit */; };
 		27495F9E313930753A6E726A /* AnnotationRedactionImageProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 977759233837DBEB3EB78A1E /* AnnotationRedactionImageProcessor.swift */; };
 		2BDDF4C68FA168E537AF4029 /* Onboarding in Resources */ = {isa = PBXBuildFile; fileRef = 110CD327D097B8F42B0B8BA1 /* Onboarding */; };
 		2D2CFBFFDA6767FA9FB2C2E9 /* BeautifierRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D58300A37E3A994CE15987C5 /* BeautifierRenderer.swift */; };
@@ -327,7 +326,6 @@
 		6353D473E35901B731FD85B2 /* RecordingTimelineInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingTimelineInput.swift; sourceTree = "<group>"; };
 		642868DA29695992EB9C1C30 /* PerCornerRadii.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerCornerRadii.swift; sourceTree = "<group>"; };
 		65090633B7C4C7E83B55DD7E /* ScrollCaptureSessionPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollCaptureSessionPresenter.swift; sourceTree = "<group>"; };
-		67286F43B4AFB101C5237B22 /* TourKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = TourKit; path = Vendor/TourKit; sourceTree = SOURCE_ROOT; };
 		674519179B33EE7750D1D543 /* ArrowTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArrowTypes.swift; sourceTree = "<group>"; };
 		679F127F74BFC991CCDCA27B /* R2CredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = R2CredentialStore.swift; sourceTree = "<group>"; };
 		6C7176ADE1967DC48C637FA1 /* TeleprompterSpeechEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeleprompterSpeechEngine.swift; sourceTree = "<group>"; };
@@ -462,7 +460,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				8FF02B0E696C78A093B2477C /* DockProgress in Frameworks */,
-				266F345A43B69C9ABD40386E /* TourKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -482,14 +479,6 @@
 				0837CDA77E08CBA5E8D80F3B /* SilenceDetector.swift */,
 			);
 			path = Services;
-			sourceTree = "<group>";
-		};
-		090F96DFBC3404F9624EC32C /* Packages */ = {
-			isa = PBXGroup;
-			children = (
-				67286F43B4AFB101C5237B22 /* TourKit */,
-			);
-			name = Packages;
 			sourceTree = "<group>";
 		};
 		10094F5FED8623DFE2FA9F1D /* Resources */ = {
@@ -765,7 +754,6 @@
 				0040945A2278113BCCE4247E /* CHANGELOG.md */,
 				A700AB85604C73318DAF5692 /* Licenses */,
 				110CD327D097B8F42B0B8BA1 /* Onboarding */,
-				090F96DFBC3404F9624EC32C /* Packages */,
 				10094F5FED8623DFE2FA9F1D /* Resources */,
 				C750A8B0B7E68485E0FF536F /* Sources */,
 				4B049A4676B9CFEECB1A3DF6 /* Products */,
@@ -835,7 +823,6 @@
 			name = BetterShot;
 			packageProductDependencies = (
 				1E4513356E30E8574136C7F3 /* DockProgress */,
-				21A5326AB43CA6E519B6D062 /* TourKit */,
 			);
 			productName = BetterShot;
 			productReference = F46A331394FBCD6FCFD29F62 /* BetterShot.app */;
@@ -868,7 +855,6 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				B9709ABD91AC8272F8C2A2BB /* XCRemoteSwiftPackageReference "DockProgress" */,
-				CE593FB0F9EB3F1B2ECE8BEE /* XCLocalSwiftPackageReference "Vendor/TourKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
@@ -1310,13 +1296,6 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		CE593FB0F9EB3F1B2ECE8BEE /* XCLocalSwiftPackageReference "Vendor/TourKit" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = Vendor/TourKit;
-		};
-/* End XCLocalSwiftPackageReference section */
-
 /* Begin XCRemoteSwiftPackageReference section */
 		B9709ABD91AC8272F8C2A2BB /* XCRemoteSwiftPackageReference "DockProgress" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -1333,10 +1312,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B9709ABD91AC8272F8C2A2BB /* XCRemoteSwiftPackageReference "DockProgress" */;
 			productName = DockProgress;
-		};
-		21A5326AB43CA6E519B6D062 /* TourKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = TourKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

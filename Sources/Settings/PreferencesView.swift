@@ -528,37 +528,56 @@ private struct DefaultBackgroundPicker: View {
     private let swatchColumns = Array(repeating: GridItem(.fixed(24), spacing: 5), count: 9)
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 14) {
             noneButton
-            LazyVGrid(columns: swatchColumns, spacing: 5) {
-                ForEach(SolidColor.presets) { color in
-                    solidButton(color)
+
+            swatchSection("Color") {
+                LazyVGrid(columns: swatchColumns, spacing: 5) {
+                    ForEach(SolidColor.presets) { color in
+                        solidButton(color)
+                    }
+                }
+                .fixedSize()
+                HStack(spacing: 6) {
+                    ColorPicker("Custom Color", selection: customColor, supportsOpacity: false)
+                        .labelsHidden()
+                        .controlSize(.small)
+                    Text("Custom Color")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                 }
             }
 
-            HStack(spacing: 6) {
-                ColorPicker("Custom Color", selection: customColor, supportsOpacity: false)
-                    .labelsHidden()
-                    .controlSize(.small)
-                Text("Custom Color")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
-            }
-
-            LazyVGrid(columns: swatchColumns, spacing: 5) {
-                ForEach(GradientPreset.presets) { preset in
-                    gradientButton(preset)
+            swatchSection("Gradient") {
+                LazyVGrid(columns: swatchColumns, spacing: 5) {
+                    ForEach(GradientPreset.presets) { preset in
+                        gradientButton(preset)
+                    }
                 }
+                .fixedSize()
             }
 
-            LazyVGrid(columns: Array(repeating: GridItem(.fixed(38), spacing: 5), count: 6), spacing: 5) {
-                ForEach(BundledBackgrounds.macAssets) { asset in
-                    bundledImageButton(asset)
+            swatchSection("Image") {
+                LazyVGrid(columns: Array(repeating: GridItem(.fixed(38), spacing: 5), count: 6), spacing: 5) {
+                    ForEach(BundledBackgrounds.macAssets) { asset in
+                        bundledImageButton(asset)
+                    }
                 }
+                .fixedSize()
+                customImageRow
             }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
-            customImageRow
+    private func swatchSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+                .accessibilityAddTraits(.isHeader)
+            content()
         }
     }
 
@@ -681,7 +700,7 @@ private struct DefaultBackgroundPicker: View {
             Button { pickCustomImage() } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "plus").font(.caption2)
-                    Text("Custom Image...").font(.caption2)
+                    Text("Custom Image\u{2026}").font(.caption)
                 }
             }
             .buttonStyle(.bordered)
@@ -1004,7 +1023,7 @@ struct RecordingSettingsTab: View {
                         }
                     }
                     .labelsHidden()
-                    .frame(maxWidth: 240)
+                    .fixedSize()
                 }
                 SettingsDivider()
                 SettingRow("Microphone", caption: ScreenRecordingCaptureOptions.supportsMicrophone ? nil : "Requires macOS 15 or later.") {
@@ -1018,7 +1037,7 @@ struct RecordingSettingsTab: View {
                         }
                     }
                     .labelsHidden()
-                    .frame(maxWidth: 240)
+                    .fixedSize()
                     .disabled(!ScreenRecordingCaptureOptions.supportsMicrophone)
                 }
                 SettingsDivider()

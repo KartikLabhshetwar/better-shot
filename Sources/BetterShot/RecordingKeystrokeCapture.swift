@@ -224,7 +224,7 @@ final class RecordingKeystrokeRecorder {
                 triggerKeyCode: event.keyCode
             )
 
-            if let special = Self.specialKeyLabel(for: event.keyCode) {
+            if let special = KeyLabel.recordingName(for: UInt32(event.keyCode)) {
                 record(
                     modifiers: Self.modifierSymbols(for: modifiers),
                     key: special,
@@ -308,46 +308,4 @@ final class RecordingKeystrokeRecorder {
         return symbols
     }
 
-    /// Display label for special keys (Return, Tab, arrows, F-keys, …).
-    /// Returns nil for letter/number/punctuation keys.
-    static func specialKeyLabel(for keyCode: UInt16) -> String? {
-        switch keyCode {
-        case 36: return "\u{23CE}"           // Return
-        case 48: return "\u{21E5}"           // Tab
-        case 49: return "space"
-        case 51: return "\u{232B}"           // Delete
-        case 53: return "esc"
-        case 71: return "clear"
-        case 76: return "\u{2305}"           // Enter
-        case 115: return "\u{2196}"          // Home
-        case 116: return "\u{21DE}"          // Page Up
-        case 117: return "\u{2326}"          // Forward Delete
-        case 119: return "\u{2198}"          // End
-        case 121: return "\u{21DF}"          // Page Down
-        case 123: return "\u{2190}"
-        case 124: return "\u{2192}"
-        case 125: return "\u{2193}"
-        case 126: return "\u{2191}"
-        case 122: return "F1"
-        case 120: return "F2"
-        case 99: return "F3"
-        case 118: return "F4"
-        case 96: return "F5"
-        case 97: return "F6"
-        case 98: return "F7"
-        case 100: return "F8"
-        case 101: return "F9"
-        case 109: return "F10"
-        case 103: return "F11"
-        case 111: return "F12"
-        case 105: return "F13"
-        case 107: return "F14"
-        case 113: return "F15"
-        case 106: return "F16"
-        case 64: return "F17"
-        case 79: return "F18"
-        case 80: return "F19"
-        default: return nil
-        }
-    }
 }

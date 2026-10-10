@@ -408,37 +408,29 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
                     height: width == 520 ? 560 : 680)
             }
         }
-        let recoveryRows = { (isFormRow: Bool) in
-            Group {
-                OnboardingPermissionRow(permission: .screen, status: .notEnabled, attempted: true,
-                    isFormRow: isFormRow, request: {}, openSettings: {})
-                OnboardingPermissionRow(permission: .camera, status: .denied, isFormRow: isFormRow,
-                    request: {}, openSettings: {})
-                OnboardingPermissionRow(permission: .microphone, status: .restricted, isFormRow: isFormRow,
-                    request: {}, openSettings: {})
-                OnboardingPermissionRow(permission: .accessibility, status: .allowed, isFormRow: isFormRow,
-                    request: {}, openSettings: {})
-                OnboardingPermissionRow(permission: .microphone, status: .notEnabled, attempted: true,
-                    isFormRow: isFormRow, request: {}, openSettings: {})
-                OnboardingPermissionRow(permission: .screen, status: .notEnabled, attempted: true,
-                    errorMessage: "Couldn’t open settings. Try again, or open System Settings manually.",
-                    isFormRow: isFormRow, request: {}, openSettings: {})
-            }
+        let recoveryRows = Group {
+            OnboardingPermissionRow(permission: .screen, status: .notEnabled, attempted: true,
+                request: {}, openSettings: {})
+            OnboardingPermissionRow(permission: .camera, status: .denied, request: {}, openSettings: {})
+            OnboardingPermissionRow(permission: .microphone, status: .restricted, request: {}, openSettings: {})
+            OnboardingPermissionRow(permission: .accessibility, status: .allowed, request: {}, openSettings: {})
+            OnboardingPermissionRow(permission: .microphone, status: .notEnabled, attempted: true,
+                request: {}, openSettings: {})
+            OnboardingPermissionRow(permission: .screen, status: .notEnabled, attempted: true,
+                errorMessage: "Couldn’t open settings. Try again, or open System Settings manually.",
+                request: {}, openSettings: {})
         }
         for width: CGFloat in [520, 760] {
             try snapshot(OnboardingDemoView(demo: .recording, resourceBundle: appBundle).padding(32),
                 scheme: scheme, width: width,
                 to: output.appendingPathComponent("onboarding-recording-demo-\(scheme)-\(Int(width)).png"), height: 460)
-            try snapshot(Form { Section { recoveryRows(true) } }
+            try snapshot(Form { Section { recoveryRows } }
                 .formStyle(.grouped).scrollContentBackground(.hidden)
                 .frame(maxWidth: 520).padding(.horizontal, 40)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top),
                 scheme: scheme, width: width,
                 to: output.appendingPathComponent("onboarding-permission-recovery-\(scheme)-\(Int(width)).png"), height: 760)
         }
-        try snapshot(VStack(spacing: 12) { recoveryRows(false) }.padding(16)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top), scheme: scheme, width: 520,
-            to: output.appendingPathComponent("settings-permission-recovery-\(scheme).png"), height: 900)
     }
     print("PASS onboarding artwork copies, permission status mapping/testing guard, recovery states, bundled silent demos, and all three steps in compact/light/dark snapshots")
     try snapshot(LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 12) {
@@ -1620,6 +1612,11 @@ private func checkShortcutCustomization(defaults: UserDefaults) {
     let service = ShortcutService(defaults: defaults)
     service.restoreDefaults()
     let actions = ShortcutService.Action.allCases
+    let home = ShortcutService.Shortcut(keyCode: UInt32(kVK_Home), modifiers: UInt32(cmdKey), enabled: true)
+    precondition(home.displayString == "⌘↖")
+    precondition(home.accessibilityDescription == "Command Home")
+    let function = ShortcutService.Shortcut(keyCode: UInt32(kVK_F20), modifiers: UInt32(optionKey), enabled: true)
+    precondition(function.displayString == "⌥F20")
     precondition(Set(actions.map(\.rawValue)).count == actions.count)
     precondition(Set(actions.compactMap(\.annotationTool)) == Set(AnnotationTool.allCases))
     for action in actions where action.defaultShortcut == nil {

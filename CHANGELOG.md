@@ -7,8 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.9] - 2026-10-10
 
+### Added
+
+- **Settings opens to a new Home page.** Start a Region, Screen, Window, Scrolling, Record, or Text capture with one click, each tile showing its current shortcut. Your five most recent captures are listed below and open directly; one that was moved or deleted points you to the Media Gallery instead. A Setup section shows the status of Screen Recording, Accessibility, Microphone, and Camera access.
+
+### Changed
+
+- **BetterShot runs on macOS 14 Sonoma and macOS 15 Sequoia again.** The minimum is back to macOS 14 after requiring macOS 26 since 0.4.0. A few features need a newer system: microphone narration needs macOS 15, and narration subtitles and teleprompter speech tracking need macOS 26. On older systems the Mic button is disabled and says why, a recording that asks for the microphone continues without narration and tells you so, and Subtitles explains the requirement ([#177](https://github.com/KartikLabhshetwar/better-shot/issues/177), thanks [@pareshbhangale](https://github.com/pareshbhangale))
+- **Settings pages are reorganized** into grouped cards, with a short caption under each option explaining what it does. The sidebar lists Home, then the Settings pages, then About. Its section search field is gone; the Shortcuts page keeps its own search. Shortcuts now shows Accessibility access and tells you when shortcuts need a relaunch to start working. About shows the version, software updates, release notes, and the tour together, with links to the source code and issue tracker. Default Look groups its backgrounds under Color, Gradient, and Image.
+- **Onboarding is rebuilt as three short steps.** Welcome, Permissions, and First Capture each open with one clear title, and a single bar at the bottom holds Skip or Back, progress dots, and Continue. Permissions lists Screen Recording, Accessibility, Microphone, and Camera together and keeps every recovery step. First Capture shows the capture bar shortcut, points out shortcuts or screen access that are still off, offers the practice image, and keeps the short demos one click away. The swipe-through slideshow is gone, and Settings > About > Take the Tour reopens the new flow.
+
 ### Fixed
 
+- **Settings is always one window.** `⌘,` now opens the same Settings window as the menu bar instead of a second copy, opening Settings to a specific page switches the open window to that page, and a minimized Settings window is restored.
+- Typing in one Settings > Sharing field now saves only that field. Previously every keystroke saved all five again, including the keys stored in your Keychain.
 - **Capture Text (OCR) is fast and reliable again, including on macOS 27.** Text recognition now uses the same Live Text engine as Preview and Photos, so a scan finishes in a fraction of a second instead of stalling for up to half a minute on the first use after a macOS update, and BetterShot stays responsive while it runs. Languages are detected automatically, including Chinese, Japanese, Korean, Cyrillic, and accented Latin text. QR codes and barcodes in the selection are copied first, followed by the text. Selecting an area with no text still leaves the clipboard unchanged.
 
 ## [0.5.8] - 2026-09-27

@@ -177,7 +177,6 @@ struct OnboardingView: View {
             isRequesting: permissions.requesting == permission,
             requestsDisabled: permissions.requesting != nil || isPermissionPreview,
             errorMessage: permissions.settingsErrorPermission == permission ? permissions.settingsError : nil,
-            isFormRow: true,
             request: { Task { await permissions.request(permission) } },
             openSettings: { permissions.openSettings(permission) })
     }

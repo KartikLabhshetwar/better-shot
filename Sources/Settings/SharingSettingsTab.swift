@@ -36,6 +36,17 @@ struct SharingSettingsTab: View {
             SettingsGroup("Cloudflare R2") {
                 credentialField("Account ID", text: $accountID, prompt: "From the R2 overview page", saving: \.accountID)
                 SettingsDivider()
+                SettingRow("Jurisdiction", caption: "Match the bucket's jurisdiction in the R2 dashboard. Most buckets have none.") {
+                    Picker("Jurisdiction", selection: $store.jurisdiction) {
+                        ForEach(R2Jurisdiction.allCases, id: \.self) { jurisdiction in
+                            Text(jurisdiction.title).tag(jurisdiction)
+                        }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                    .onChange(of: store.jurisdiction) { _, _ in testStatus = .idle }
+                }
+                SettingsDivider()
                 secureField("Access Key ID", text: $accessKeyID, prompt: "From your API token", saving: \.accessKeyID)
                 SettingsDivider()
                 secureField("Secret Access Key", text: $secretAccessKey, prompt: "Shown once when the token is created", saving: \.secretAccessKey)

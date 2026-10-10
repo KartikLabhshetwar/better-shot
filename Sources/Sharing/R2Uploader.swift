@@ -185,7 +185,7 @@ final class R2Uploader {
         }
 
         let probeKey = "bettershot-connection-probe"
-        let host = "\(credentials.accountID).r2.cloudflarestorage.com"
+        let host = credentials.host
         let canonicalURI = "/" + uriEncodePath(credentials.bucket) + "/" + uriEncodePath(probeKey)
         guard let url = URL(string: "https://\(host)\(canonicalURI)") else {
             throw R2UploadError(message: "Invalid R2 endpoint URL.")
@@ -215,7 +215,7 @@ final class R2Uploader {
         }
         if (200..<300).contains(http.statusCode) { return }
         if http.statusCode == 404, errorCode(data: data) != "NoSuchBucket" { return }
-        throw R2UploadError(message: parseErrorMessage(data: data, statusCode: http.statusCode))
+        throw R2UploadError(message: parseErrorMessage(data: data, statusCode: http.statusCode, credentials: credentials))
     }
 
     nonisolated static func slug(fromShareLink link: String) -> String? {
@@ -258,7 +258,7 @@ final class R2Uploader {
         }
         if http.statusCode == 404 { return nil }
         guard (200..<300).contains(http.statusCode) else {
-            throw R2UploadError(message: parseErrorMessage(data: data, statusCode: http.statusCode))
+            throw R2UploadError(message: parseErrorMessage(data: data, statusCode: http.statusCode, credentials: credentials))
         }
         return (try? JSONDecoder().decode(ShareManifest.self, from: data))?.media
     }
@@ -270,7 +270,7 @@ final class R2Uploader {
             throw R2UploadError(message: "No response from R2.")
         }
         guard (200..<300).contains(http.statusCode) || http.statusCode == 404 else {
-            throw R2UploadError(message: parseErrorMessage(data: data, statusCode: http.statusCode))
+            throw R2UploadError(message: parseErrorMessage(data: data, statusCode: http.statusCode, credentials: credentials))
         }
     }
 
@@ -279,7 +279,7 @@ final class R2Uploader {
         key: String,
         credentials: R2Credentials
     ) throws -> URLRequest {
-        let host = "\(credentials.accountID).r2.cloudflarestorage.com"
+        let host = credentials.host
         let canonicalURI = "/" + uriEncodePath(credentials.bucket) + "/" + uriEncodePath(key)
         guard let url = URL(string: "https://\(host)\(canonicalURI)") else {
             throw R2UploadError(message: "Invalid R2 endpoint URL.")
@@ -380,7 +380,7 @@ final class R2Uploader {
         session: URLSession,
         progress: (@Sendable (Double) -> Void)? = nil
     ) async throws {
-        let host = "\(credentials.accountID).r2.cloudflarestorage.com"
+        let host = credentials.host
         let canonicalURI = "/" + uriEncodePath(credentials.bucket) + "/" + uriEncodePath(key)
         guard let uploadURL = URL(string: "https://\(host)\(canonicalURI)") else {
             throw R2UploadError(message: "Invalid R2 endpoint URL.")
@@ -417,7 +417,7 @@ final class R2Uploader {
             throw R2UploadError(message: "No response from R2.")
         }
         guard (200..<300).contains(http.statusCode) else {
-            throw R2UploadError(message: parseErrorMessage(data: data, statusCode: http.statusCode))
+            throw R2UploadError(message: parseErrorMessage(data: data, statusCode: http.statusCode, credentials: credentials))
         }
     }
 
@@ -425,14 +425,16 @@ final class R2Uploader {
         R2SigV4.uriEncodePath(path)
     }
 
-    nonisolated private static func parseErrorMessage(data: Data, statusCode: Int) -> String {
+    nonisolated private static func parseErrorMessage(data: Data, statusCode: Int, credentials: R2Credentials) -> String {
         guard let text = String(data: data, encoding: .utf8), let code = extractXMLValue(tag: "Code", from: text) else {
             return "R2 request failed with status \(statusCode)."
         }
+        var message = code
         if let detail = extractXMLValue(tag: "Message", from: text), !detail.isEmpty {
-            return "\(code): \(detail)"
+            message = "\(code): \(detail)"
         }
-        return code
+        guard code == "AccessDenied" else { return message }
+        return "\(message). If the keys are correct, set Jurisdiction in Settings > Sharing to match the bucket (requests went to \(credentials.host))."
     }
 
     nonisolated private static func errorCode(data: Data) -> String? {

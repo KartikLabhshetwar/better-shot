@@ -267,6 +267,10 @@ groups, scopes, and defaults. Do not renumber persisted IDs. New actions start
 unassigned; customized and disabled bindings must survive migration. Active
 editor bindings take priority over matching global bindings without intercepting
 normal text-field behavior.
+`KeyLabel` owns layout-aware shortcut labels, special-key glyphs, VoiceOver names,
+and the recording overlay's existing special-key style. Input-source changes
+refresh labels without changing stored key codes. Number-row labels stay digits,
+and printable keypad keys still pass through the recording modifier guard.
 
 [CaptureURLAction.swift](Sources/App/CaptureURLAction.swift) parses the supported
 `bettershot://` routes. The app delegate dispatches them. Preserve malformed-URL
@@ -498,12 +502,12 @@ Contributions are licensed under the project's [BSD 3-Clause License](LICENSE).
 `OnboardingView` is a three-step native flow: Welcome, Permissions, and First
 Capture. Each `OnboardingStep` page has a hero, a large title, and its content above
 one bottom bar with Skip or Back, progress dots, and Continue or Open Capture Bar.
-Permissions reuse `OnboardingPermissions` and `OnboardingPermissionRow`, which
-Settings shares. Skip and Open Capture Bar finish through
+Permissions use `OnboardingPermissions`, the same model behind Settings'
+`SettingsPermissionRow`. Skip and Open Capture Bar finish through
 `OnboardingWindowController.finish`, and closing the window also marks onboarding
 seen. Pages change with a 0.2-second ease-out move, or a fade with Reduce Motion.
-`Vendor/TourKit` is still linked by `project.yml`, but onboarding no longer uses it.
-Run `make test` for the onboarding checks.
+Settings › About › Take the Tour reopens the same flow. Run `make test` for the
+onboarding checks.
 
 `CHANGELOG.md` is bundled directly. Every `version.json` version must have a
 `## [x.y.z]` entry. `ReleaseNotes` parses these entries and tracks dismissed versions

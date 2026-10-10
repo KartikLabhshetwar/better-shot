@@ -155,22 +155,10 @@ struct OnboardingPermissionRow: View {
     var isRequesting = false
     var requestsDisabled = false
     var errorMessage: String?
-    var isFormRow = false
     var request: () -> Void
     var openSettings: () -> Void
 
     var body: some View {
-        if isFormRow {
-            content
-        } else {
-            content
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .studioEffectCard()
-        }
-    }
-
-    private var content: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 12) {
                 Image(systemName: permission.symbol)
@@ -230,28 +218,5 @@ struct OnboardingPermissionRow: View {
                 .disabled(requestsDisabled)
                 .accessibilityLabel(settings ? "Open \(permission.title) settings" : "Allow \(permission.displayTitle) access")
         }
-    }
-}
-
-/// Settings retains the same recovery controls for people who skip onboarding.
-struct ShortcutPermissionView: View {
-    @State private var permissions = OnboardingPermissions()
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            OnboardingPermissionRow(permission: .accessibility, status: permissions.status(.accessibility),
-                attempted: permissions.attempted.contains(.accessibility),
-                isRequesting: permissions.requesting == .accessibility,
-                requestsDisabled: permissions.requesting != nil,
-                errorMessage: permissions.settingsError,
-                request: { Task { await permissions.request(.accessibility) } },
-                openSettings: { permissions.openSettings(.accessibility) })
-            if permissions.shortcutsNeedRestart {
-                Text("Access is allowed, but shortcuts aren’t active. Save your work, then quit and reopen BetterShot.")
-                    .font(.callout).foregroundStyle(.secondary)
-            }
-        }
-        .onAppear { permissions.refresh() }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in permissions.refresh() }
     }
 }

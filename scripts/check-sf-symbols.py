@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 AVAILABILITY = Path("/System/Library/CoreServices/CoreGlyphs.bundle/Contents/Resources/name_availability.plist")
-SOURCE_ROOTS = ("Sources", "Vendor/TourKit/Sources")
+SOURCE_ROOTS = ("Sources",)
 SYMBOL_ARGUMENT = re.compile(r"\b(systemName|systemImage|systemSymbolName)\s*:")
 LITERAL = re.compile(r'"([a-z0-9]+(?:\.[a-z0-9]+)*)"')
 

@@ -1,6 +1,23 @@
 import Foundation
 import Security
 
+/// Where an R2 bucket's data is held. Cloudflare serves a jurisdictional bucket only from that jurisdiction's endpoint.
+enum R2Jurisdiction: String, CaseIterable, Sendable {
+    case standard = ""
+    case eu
+    case us
+    case fedramp
+
+    var title: String {
+        switch self {
+        case .standard: "None"
+        case .eu: "European Union"
+        case .us: "United States"
+        case .fedramp: "FedRAMP"
+        }
+    }
+}
+
 /// Immutable snapshot of R2 credentials for passing across actor boundaries.
 struct R2Credentials: Sendable {
     let accountID: String
@@ -10,6 +27,12 @@ struct R2Credentials: Sendable {
     let accessKeyID: String
     let secretAccessKey: String
     let enabled: Bool
+    let jurisdiction: R2Jurisdiction
+
+    var host: String {
+        let subdomain = jurisdiction == .standard ? accountID : "\(accountID).\(jurisdiction.rawValue)"
+        return "\(subdomain).r2.cloudflarestorage.com"
+    }
 
     var isConfigured: Bool {
         !accountID.isEmpty && !bucket.isEmpty && !publicBaseURL.isEmpty && !accessKeyID.isEmpty && !secretAccessKey.isEmpty
@@ -40,6 +63,7 @@ final class R2CredentialStore {
         static let useDirectLinks = "bs_r2_useDirectLinks"
         static let enabled = "bs_r2_enabled"
         static let enabledMigrated = "bs_r2_enabledMigrated"
+        static let jurisdiction = "bs_r2_jurisdiction"
         static let accessKeyID = "accessKeyID"
         static let secretAccessKey = "secretAccessKey"
     }
@@ -49,6 +73,7 @@ final class R2CredentialStore {
     private(set) var _publicBaseURL: String = ""
     private(set) var _useDirectLinks: Bool = false
     private(set) var _enabled: Bool = false
+    private(set) var _jurisdiction: R2Jurisdiction = .standard
     private(set) var _accessKeyID: String = ""
     private(set) var _secretAccessKey: String = ""
     private(set) var keychainAccess: KeychainAccess = .empty
@@ -103,6 +128,14 @@ final class R2CredentialStore {
         }
     }
 
+    var jurisdiction: R2Jurisdiction {
+        get { _jurisdiction }
+        set {
+            _jurisdiction = newValue
+            defaults.set(newValue.rawValue, forKey: Keys.jurisdiction)
+        }
+    }
+
     var accessKeyID: String {
         get { _accessKeyID }
         set {
@@ -138,7 +171,8 @@ final class R2CredentialStore {
             useDirectLinks: _useDirectLinks,
             accessKeyID: _accessKeyID,
             secretAccessKey: _secretAccessKey,
-            enabled: _enabled
+            enabled: _enabled,
+            jurisdiction: _jurisdiction
         )
     }
 
@@ -147,6 +181,7 @@ final class R2CredentialStore {
         _bucket = defaults.string(forKey: Keys.bucket) ?? ""
         _publicBaseURL = defaults.string(forKey: Keys.publicBaseURL) ?? ""
         _useDirectLinks = defaults.bool(forKey: Keys.useDirectLinks)
+        _jurisdiction = defaults.string(forKey: Keys.jurisdiction).flatMap(R2Jurisdiction.init(rawValue:)) ?? .standard
 
         let accessKey = Self.getKeychainItem(key: Keys.accessKeyID)
         let secret = Self.getKeychainItem(key: Keys.secretAccessKey)
