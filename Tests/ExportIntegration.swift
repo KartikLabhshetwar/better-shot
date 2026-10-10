@@ -302,6 +302,7 @@ struct ExportIntegration {
 
     @MainActor static func checkVideoExports(movie: URL, directory: URL) async throws {
         try await checkVideoFileSaving(movie: movie, directory: directory)
+        try await checkStudioSaveUpdatesSavedVideo(movie: movie, directory: directory)
         checkZoomCamera()
         let clips = RecordingClipTimeline.full(sourceDuration: 2)
         let viewport = ViewportTimeline.build(
@@ -855,6 +856,45 @@ private func checkVideoFileSaving(movie: URL, directory: URL) async throws {
 }
 
 @MainActor
+private func checkStudioSaveUpdatesSavedVideo(movie: URL, directory: URL) async throws {
+    let saveFolder = directory.appendingPathComponent("studio-save")
+    try FileManager.default.createDirectory(at: saveFolder, withIntermediateDirectories: true)
+    let oldDirectory = AppPreferences.saveDirectory
+    AppPreferences.saveDirectory = saveFolder.path
+    defer { AppPreferences.saveDirectory = oldDirectory }
+    func videoSize(_ url: URL) async throws -> CGSize {
+        try await AVURLAsset(url: url).loadTracks(withMediaType: .video)[0].load(.naturalSize)
+    }
+
+    let session = RecordingSession(directoryURL: directory.appendingPathComponent("StudioSave.bettershotrec"))
+    try FileManager.default.createDirectory(at: session.directoryURL, withIntermediateDirectories: true)
+    try FileManager.default.copyItem(at: movie, to: session.screenURL)
+    var manifest = CaptureManifest()
+    manifest.pointerSynthesized = true
+    try session.writeCaptureManifest(manifest)
+    try session.writePointerCapture(PointerCaptureFile(travel: [PointerTravelSample(time: 0, x: 0.5, y: 0.5)]))
+    let saved = try await RecordingDeliverable.saveToDefaultLocation(for: session.screenURL)
+    let before = try await videoSize(saved)
+    precondition(before.width != before.height, "The first save keeps the recording's wide frame")
+
+    let model = RecordingStudioModel(url: session.directoryURL)
+    await model.load()
+    defer { model.teardown() }
+    model.exportAspect = .square
+    model.saveProject()
+    precondition(model.exportState.isExporting, "Save re-renders the recording's saved file")
+    await model.waitForExport()
+    precondition(model.exportState == .finished(saved), "Save reports the file it updated, got \(model.exportState)")
+    let after = try await videoSize(saved)
+    precondition(after.width == after.height, "Studio Save must write its edits into the saved file, got \(after)")
+    let savedFiles = try FileManager.default.contentsOfDirectory(atPath: saveFolder.path).filter { !$0.hasPrefix(".") }
+    precondition(savedFiles == [saved.lastPathComponent], "Save replaces the saved file instead of adding a copy, got \(savedFiles)")
+    precondition(session.freshFinalURL(matching: session.effectiveEditDocument()) != nil,
+                 "Save leaves a render matching the saved edits in the package")
+    print("PASS Studio Save updates the recording's saved file in place")
+}
+
+@MainActor
 private func checkAnnotationExport(image: CGImage, source: URL, directory: URL) async throws {
     let history = HistoryStore(storageDirectory: directory.appendingPathComponent("annotation-history"))
     let record = history.importCapture(from: source, deleteSource: false)!
@@ -954,8 +994,9 @@ private func checkCapturesKeepTheirName(
     AppPreferences.exportFormat = storedFormat
     let dragged = DeckStaging.retain(jpeg)
     let drag = try ScreenshotFileActions.dragItemProvider(for: dragged, of: jpeg)
-    precondition(drag.registeredTypeIdentifiers == [UTType.fileURL.identifier],
-                 "Any image-data flavor makes Finder drop a JPEG as name.jpg.jpeg, got \(drag.registeredTypeIdentifiers)")
+    let flavors = drag.registeredTypeIdentifiers
+    precondition(flavors.contains(UTType.fileURL.identifier) && !flavors.contains { UTType($0)?.conforms(to: .image) == true },
+                 "Any image-data flavor makes Finder drop a JPEG as name.jpg.jpeg, got \(flavors)")
     let dropped: URL = try await withCheckedThrowingContinuation { continuation in
         _ = drag.loadObject(ofClass: URL.self) { url, error in
             continuation.resume(with: url.map(Result.success) ?? .failure(error ?? CocoaError(.fileReadUnknown)))

@@ -206,6 +206,12 @@ Image-editor Save commits to history and creates or atomically replaces the
 associated export, even for an untouched image. Copy and Share do not update
 that export. Export opens a save panel for a new destination.
 
+A recording package's `exportPath` metadata names its save-folder file.
+`RecordingDeliverable.save` replaces that file in its own format while it exists,
+and otherwise writes a new file and records it. Video-editor Save re-renders it;
+video-editor Export always writes a new file. `checkStudioSaveUpdatesSavedVideo`
+in `Tests/ExportIntegration.swift` covers this against the production editor.
+
 [ScreenshotFileNaming](Sources/BetterShot/ScreenshotFileNaming.swift) is the shared,
 Foundation-only deliverable name renderer. Preserve sanitization and keep
 previews from advancing counters. Recording package directory names identify
