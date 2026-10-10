@@ -105,7 +105,7 @@ private final class TeleprompterComposerPanel: NSPanel {
     }
 }
 
-private final class TeleprompterComposerHostingView<Content: View>: NSHostingView<Content> {
+private final class TeleprompterComposerHostingView: NSHostingView<TeleprompterComposerView> {
     override var isOpaque: Bool {
         false
     }

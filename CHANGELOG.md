@@ -5,6 +5,12 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.9] - 2026-10-10
+
+### Fixed
+
+- **Capture Text (OCR) is fast and reliable again, including on macOS 27.** Text recognition now uses the same Live Text engine as Preview and Photos, so a scan finishes in a fraction of a second instead of stalling for up to half a minute on the first use after a macOS update, and BetterShot stays responsive while it runs. Languages are detected automatically, including Chinese, Japanese, Korean, Cyrillic, and accented Latin text. QR codes and barcodes in the selection are copied first, followed by the text. Selecting an area with no text still leaves the clipboard unchanged.
+
 ## [0.5.8] - 2026-09-27
 
 ### Fixed

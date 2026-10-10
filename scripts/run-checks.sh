@@ -2,6 +2,7 @@
 set -u
 out="$(mktemp -d)"
 failed=0
+target="$(uname -m)-apple-macos$(python3 -c "import json; print(json.load(open('version.json'))['minimumOS'])")"
 
 for src in Tests/*Check.swift; do
     name="$(basename "$src" .swift)"
@@ -11,7 +12,7 @@ for src in Tests/*Check.swift; do
             [ -n "$dep" ] && extra+=("$dep")
         done < "Tests/$name.sources"
     fi
-    if ! swiftc -swift-version 6 -enable-actor-data-race-checks -o "$out/$name" "$src" "${extra[@]+"${extra[@]}"}" 2>"$out/$name.build"; then
+    if ! swiftc -swift-version 6 -enable-actor-data-race-checks -target "$target" -o "$out/$name" "$src" "${extra[@]+"${extra[@]}"}" 2>"$out/$name.build"; then
         echo "FAIL (build) $name"
         cat "$out/$name.build"
         failed=1
@@ -25,6 +26,14 @@ for src in Tests/*Check.swift; do
         failed=1
     fi
 done
+
+if python3 -I scripts/check-sf-symbols.py . >"$out/SFSymbolsCheck.run" 2>&1; then
+    echo "PASS SFSymbolsCheck: $(tail -1 "$out/SFSymbolsCheck.run")"
+else
+    echo "FAIL (run) SFSymbolsCheck"
+    cat "$out/SFSymbolsCheck.run"
+    failed=1
+fi
 
 if command -v node >/dev/null 2>&1 && [ -f bettershot-landing/scripts/share-check.mts ]; then
     if (cd bettershot-landing && node scripts/share-check.mts) >"$out/ShareOriginCheck.run" 2>&1; then

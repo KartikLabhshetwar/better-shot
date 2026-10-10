@@ -262,7 +262,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             AVVideoHeightKey: canvasHeight,
             AVVideoColorPropertiesKey: [
                 AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
-                AVVideoTransferFunctionKey: AVVideoTransferFunction_IEC_sRGB,
+                AVVideoTransferFunctionKey: Self.transferFunction.writer,
                 AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2
             ],
             AVVideoCompressionPropertiesKey: [
@@ -467,7 +467,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
 
             CVBufferSetAttachments(destinationBuffer, [
                 kCVImageBufferColorPrimariesKey: kCVImageBufferColorPrimaries_ITU_R_709_2,
-                kCVImageBufferTransferFunctionKey: kCVImageBufferTransferFunction_sRGB,
+                kCVImageBufferTransferFunctionKey: Self.transferFunction.buffer,
                 kCVImageBufferYCbCrMatrixKey: kCVImageBufferYCbCrMatrix_ITU_R_709_2
             ] as CFDictionary, .shouldPropagate)
             try autoreleasepool {
@@ -547,6 +547,14 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             width: source.width * requestedHeight / source.height,
             height: requestedHeight
         )
+    }
+
+    /// sRGB tagging needs macOS 15; earlier writers keep the BT.709 transfer for encoder and buffers alike.
+    private static var transferFunction: (writer: String, buffer: CFString) {
+        if #available(macOS 15.0, *) {
+            return (AVVideoTransferFunction_IEC_sRGB, kCVImageBufferTransferFunction_sRGB)
+        }
+        return (AVVideoTransferFunction_ITU_R_709_2, kCVImageBufferTransferFunction_ITU_R_709_2)
     }
 
     private static func averageBitRate(

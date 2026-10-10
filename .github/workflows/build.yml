@@ -13,8 +13,8 @@ concurrency:
 jobs:
   build:
     name: Release build
-    # macos-26 is the arm64 image and carries Xcode 26, which is what
-    # project.yml targets (arm64-apple-macosx26.0).
+    # macos-26 is the arm64 image and carries Xcode 26 and its macOS 26 SDK.
+    # project.yml deploys back to macOS 14.0 (arm64-apple-macosx14.0).
     runs-on: macos-26
     timeout-minutes: 45
 

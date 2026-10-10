@@ -171,7 +171,7 @@ struct InspectorSlider: View {
     @FocusState private var focusedPart: FocusedPart?
     @State private var draftText = ""
     @State private var editingBaselineText = ""
-    @State private var valueSelection: TextSelection?
+    @State private var valueSelection: Any?
     @State private var isTrackHovering = false
     @State private var isDragging = false
 
@@ -277,7 +277,7 @@ struct InspectorSlider: View {
         )
         .onHover { isTrackHovering = $0 }
         .allowsHitTesting(isEnabled)
-        .pointerStyle(isEnabled ? PointerStyle.columnResize : nil)
+        .hoverPointer(isEnabled ? .columnResize : nil)
         .focusable(isEnabled)
         .focused($focusedPart, equals: .track)
         .onKeyPress(.leftArrow) {
@@ -310,8 +310,22 @@ struct InspectorSlider: View {
         }
     }
 
+    @available(macOS 15.0, *)
+    private var textSelection: Binding<TextSelection?> {
+        Binding { valueSelection as? TextSelection } set: { valueSelection = $0 }
+    }
+
+    @ViewBuilder
+    private var valueTextField: some View {
+        if #available(macOS 15.0, *) {
+            TextField(title, text: $draftText, selection: textSelection)
+        } else {
+            TextField(title, text: $draftText)
+        }
+    }
+
     private var valueField: some View {
-        TextField(title, text: $draftText, selection: $valueSelection)
+        valueTextField
             .labelsHidden()
             .textFieldStyle(.plain)
             .font(.inspectorNumeric)
@@ -456,7 +470,9 @@ struct InspectorSlider: View {
         let editingText = format.editingString(for: value)
         editingBaselineText = editingText
         draftText = editingText
-        valueSelection = TextSelection(range: editingText.startIndex..<editingText.endIndex)
+        if #available(macOS 15.0, *) {
+            valueSelection = TextSelection(range: editingText.startIndex..<editingText.endIndex)
+        }
     }
 
     private func commitDraftText() {

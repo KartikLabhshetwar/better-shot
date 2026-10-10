@@ -14,7 +14,7 @@
 
 <p align="center">
   <a href="https://github.com/KartikLabhshetwar/better-shot/releases/latest"><img src="https://img.shields.io/github/v/release/KartikLabhshetwar/better-shot?label=release" alt="Latest release"></a>
-  <img src="https://img.shields.io/badge/macOS-26.0+-black.svg" alt="macOS 26 or later">
+  <img src="https://img.shields.io/badge/macOS-14.0+-black.svg" alt="macOS 14 or later">
   <a href="https://github.com/KartikLabhshetwar/better-shot/actions/workflows/build.yml"><img src="https://github.com/KartikLabhshetwar/better-shot/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-BSD%203--Clause-green.svg" alt="BSD 3-Clause license"></a>
 </p>
@@ -35,7 +35,7 @@ cloud service required.
 
 ## Install
 
-Requires macOS 26 or later.
+Requires macOS 14 or later. Microphone narration needs macOS 15, and narration transcription and teleprompter speech tracking need macOS 26.
 
 ```bash
 brew install --cask bettershot

@@ -142,8 +142,19 @@ final class CaptureOrchestrator {
     }
 
     private func performOCR(singleLine: Bool = false) async {
+        var progress: Task<Void, Never>?
+        defer { progress?.cancel() }
         do {
-            guard let text = try await ScreenCapture.shared.captureAndOCR() else { return }
+            let text = try await ScreenCapture.shared.captureAndOCR {
+                progress = Task {
+                    try? await Task.sleep(for: .milliseconds(400))
+                    guard !Task.isCancelled else { return }
+                    ToastWindow.shared.show(title: "Recognizing text…", message: "This can take a moment.",
+                        systemIcon: "doc.text.viewfinder", duration: 120, on: captureScreen)
+                }
+            }
+            progress?.cancel()
+            guard let text else { return }
             completeTextCapture(text, action: singleLine ? .ocrSingleLine : .ocr)
         } catch {
             ToastWindow.shared.show(isError: true, title: "Couldn’t recognize text", message: error.localizedDescription,

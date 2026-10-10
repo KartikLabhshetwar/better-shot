@@ -1531,8 +1531,12 @@ final class RecordingStudioModel {
 
     /// Only narrated sessions can be transcribed; the mic requirement means
     /// legacy bare movies and silent captures never show the section.
-    var canTranscribe: Bool {
+    var hasNarration: Bool {
         manifest?.includesMicrophone == true
+    }
+
+    var canTranscribe: Bool {
+        hasNarration && RecordingTranscriptionService.isAvailable
     }
 
     var hasSubtitles: Bool {
@@ -1558,7 +1562,7 @@ final class RecordingStudioModel {
     }
 
     func transcribe() {
-        guard !transcriptionState.isTranscribing, isLoaded else { return }
+        guard #available(macOS 26.0, *), !transcriptionState.isTranscribing, isLoaded else { return }
         transcriptionState = .transcribing
         let movieURL = screenURL
         transcriptionTask = Task { [weak self] in

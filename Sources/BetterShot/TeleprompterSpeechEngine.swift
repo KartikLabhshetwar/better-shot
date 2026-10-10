@@ -19,7 +19,15 @@
 import Foundation
 import Speech
 
-nonisolated final class TeleprompterSpeechEngine: @unchecked Sendable {
+/// The recording-facing side of live narration tracking, so callers need no macOS 26 checks.
+nonisolated protocol TeleprompterSpeechTracking: AnyObject, Sendable {
+    func ingest(_ sampleBuffer: CMSampleBuffer)
+    func setPaused(_ paused: Bool)
+    func finish()
+}
+
+@available(macOS 26.0, *)
+nonisolated final class TeleprompterSpeechEngine: TeleprompterSpeechTracking, @unchecked Sendable {
     private let matcher: TeleprompterScriptMatcher
     /// Called with the (monotonic) count of script display words spoken.
     private let onProgress: @Sendable (Int) -> Void

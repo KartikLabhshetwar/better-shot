@@ -136,6 +136,7 @@
 		9454ECB25AF9B03FCD92505D /* RecordingTimelineInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6353D473E35901B731FD85B2 /* RecordingTimelineInput.swift */; };
 		95BF5ABBDFFA409D4DF830C2 /* RecordingTimelineThumbnails.swift in Sources */ = {isa = PBXBuildFile; fileRef = 538F755422768325F4665A48 /* RecordingTimelineThumbnails.swift */; };
 		97383F31B5ECF0EEC7F205B3 /* ScrollCaptureSessionPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65090633B7C4C7E83B55DD7E /* ScrollCaptureSessionPresenter.swift */; };
+		98860D470B9B2F661FFD88A9 /* SettingsHomeTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 319DB64F21A64C00C345ADD5 /* SettingsHomeTab.swift */; };
 		9C1746F297C6D211CDB4500B /* CHANGELOG.md in Resources */ = {isa = PBXBuildFile; fileRef = 0040945A2278113BCCE4247E /* CHANGELOG.md */; };
 		9E706EC495738239096A37E8 /* StrokeOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CF3030FEFF60A9E00ACF22C /* StrokeOptions.swift */; };
 		9EE3EA8300A179104B10FDCA /* AnnotationProgressiveBlurGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D1CE0648EC6540156A8EF27 /* AnnotationProgressiveBlurGeometry.swift */; };
@@ -192,6 +193,7 @@
 		D27CCDE7BAF033771F9277B4 /* ArrowShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 458342AE76A103B886AA98AC /* ArrowShared.swift */; };
 		D4228DF9AE3F84716EC8E673 /* RecordingVideoMask.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCA325987B11058BD383F07F /* RecordingVideoMask.swift */; };
 		D7BE3EA091A12262CC4E7894 /* R2CredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 679F127F74BFC991CCDCA27B /* R2CredentialStore.swift */; };
+		D895A1BE54C5EE7811BF0291 /* SettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3279FC924876E4B5B74CBCDB /* SettingsComponents.swift */; };
 		D8AE5ACE0841050A49E7B483 /* FailureAlert.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41B1FFF560349A356C312F34 /* FailureAlert.swift */; };
 		D925251B051AC2433DEE6D1E /* ShareManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 451695CAAFEDDEA2ECE3CEF7 /* ShareManifest.swift */; };
 		DC1BBAE2ABD17F92CB589901 /* TransferStatusCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EDA57621906E0853E3239C7 /* TransferStatusCard.swift */; };
@@ -275,6 +277,8 @@
 		2FC217457F424CFCD7667853 /* AnnotationEditorZoom.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationEditorZoom.swift; sourceTree = "<group>"; };
 		3034437BB87F62844847BB2E /* Recording3DPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Recording3DPreview.swift; sourceTree = "<group>"; };
 		3172D4B0B4183CA936794DA1 /* AnnotationInspectorStyleMenus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationInspectorStyleMenus.swift; sourceTree = "<group>"; };
+		319DB64F21A64C00C345ADD5 /* SettingsHomeTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsHomeTab.swift; sourceTree = "<group>"; };
+		3279FC924876E4B5B74CBCDB /* SettingsComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsComponents.swift; sourceTree = "<group>"; };
 		3384F12707602584788258C8 /* PreviewBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewBridge.swift; sourceTree = "<group>"; };
 		3560130094EAB274FBD6EE6E /* BetterShotPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BetterShotPreferences.swift; sourceTree = "<group>"; };
 		35712AC357C535000CF633D8 /* AnnotationInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationInspector.swift; sourceTree = "<group>"; };
@@ -805,6 +809,8 @@
 				8629959CD33DDE1BF29CABCF /* MediaGalleryActions.swift */,
 				EC91594D79B3D54FA54835A1 /* OverlaySettingsTab.swift */,
 				9822447B9DE8F15B9CC94381 /* PreferencesView.swift */,
+				3279FC924876E4B5B74CBCDB /* SettingsComponents.swift */,
+				319DB64F21A64C00C345ADD5 /* SettingsHomeTab.swift */,
 				90E774656DB29A1792294977 /* SettingsWindowController.swift */,
 				0D62F387131F8D7E1EF8BD54 /* SharingSettingsTab.swift */,
 			);
@@ -1074,6 +1080,8 @@
 				BC3024BE9954759663767B8D /* ScrollCapturePreviewPanel.swift in Sources */,
 				97383F31B5ECF0EEC7F205B3 /* ScrollCaptureSessionPresenter.swift in Sources */,
 				B59A11814CC73A048E1A925D /* ScrollFrameAnalyzer.swift in Sources */,
+				D895A1BE54C5EE7811BF0291 /* SettingsComponents.swift in Sources */,
+				98860D470B9B2F661FFD88A9 /* SettingsHomeTab.swift in Sources */,
 				C46DD6DBAA95F563F2EC6E4E /* SettingsWindowController.swift in Sources */,
 				541183DBA6BB9EC649F2B9BB /* Shape.swift in Sources */,
 				54B7FEFC77CCBC22A4735094 /* ShapeRenderer.swift in Sources */,
@@ -1158,7 +1166,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1224,7 +1232,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -1247,12 +1255,12 @@
 				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				DEVELOPMENT_TEAM = 8JL39GK2DC;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 0.5.8;
+				MARKETING_VERSION = 0.5.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bettershot.app;
 				PRODUCT_NAME = BetterShot;
 				SDKROOT = macosx;
@@ -1267,12 +1275,12 @@
 				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				DEVELOPMENT_TEAM = 8JL39GK2DC;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
-				MARKETING_VERSION = 0.5.8;
+				MARKETING_VERSION = 0.5.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.bettershot.app;
 				PRODUCT_NAME = BetterShot;
 				SDKROOT = macosx;

@@ -17,9 +17,14 @@ struct BetterShotApp: App {
         let _ = configureEditorPresentation()
 
         Settings {
-            PreferencesView()
+            EmptyView()
         }
-        .defaultLaunchBehavior(.suppressed)
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") { SettingsWindowController.shared.open() }
+                    .keyboardShortcut(",")
+            }
+        }
 
         WindowGroup("BetterShot Annotate", id: "ANNOTATION_EDITOR", for: URL.self) { value in
             AnnotationEditorWindow(url: value)

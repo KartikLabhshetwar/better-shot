@@ -67,7 +67,7 @@ enum AnnotationTool: String, CaseIterable, Identifiable, Codable {
         case .numberedCircle:
             "1.circle.fill"
         case .pixelate:
-            "app.background.dotted"
+            "squareshape.split.3x3"
         case .blur:
             "drop.fill"
         case .text:

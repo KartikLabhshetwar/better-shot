@@ -28,91 +28,68 @@ struct SharingSettingsTab: View {
     private static let dashboardURL = URL(string: "https://dash.cloudflare.com/?to=/:account/r2")!
 
     var body: some View {
-        Form {
-            Section {
+        SettingsPage {
+            SettingsCard {
                 statusRow
             }
 
-            Section {
-                credentialField("Account ID", text: $accountID, prompt: "From the R2 overview page")
-                secureField("Access Key ID", text: $accessKeyID, prompt: "From your API token")
-                secureField("Secret Access Key", text: $secretAccessKey, prompt: "Shown once when the token is created")
-                credentialField("Bucket", text: $bucket, prompt: "my-bucket")
+            SettingsGroup("Cloudflare R2") {
+                credentialField("Account ID", text: $accountID, prompt: "From the R2 overview page", saving: \.accountID)
+                SettingsDivider()
+                secureField("Access Key ID", text: $accessKeyID, prompt: "From your API token", saving: \.accessKeyID)
+                SettingsDivider()
+                secureField("Secret Access Key", text: $secretAccessKey, prompt: "Shown once when the token is created", saving: \.secretAccessKey)
+                SettingsDivider()
+                credentialField("Bucket", text: $bucket, prompt: "my-bucket", saving: \.bucket)
+                SettingsDivider()
                 publicURLField
-            } header: {
-                HStack {
-                    Text("Cloudflare R2")
-                    Spacer()
-                    Link("Open R2 Dashboard", destination: Self.dashboardURL)
-                        .font(.callout)
-                        .textCase(.none)
-                }
+            } accessory: {
+                Link("Open R2 Dashboard", destination: Self.dashboardURL)
+                    .font(.callout)
             } footer: {
-                Text("In the dashboard, create a bucket, turn on public access or bind a custom domain to it, then create an API token under R2 \u{203A} Manage API Tokens with Object Read & Write. Public Bucket URL is that public address - your files are served from there, and it is the only place they are stored. Keys are saved to your login Keychain and never leave this Mac.")
+                Text("In the dashboard, create a bucket, turn on public access or bind a custom domain to it, then create an API token under R2 \u{203A} Manage API Tokens with Object Read & Write. Public Bucket URL is that public address. Your files are served from there, and it is the only place they are stored. Keys are saved to your login Keychain and never leave this Mac.")
             }
 
-            Section {
-                HStack(spacing: 12) {
-                    Button {
-                        Task { await testConnection() }
-                    } label: {
-                        if isTesting {
-                            ProgressView()
-                                .controlSize(.small)
-                                .frame(width: 44)
-                        } else {
-                            Text("Test Connection")
+            SettingsGroup("Sharing") {
+                VStack(alignment: .leading, spacing: 0) {
+                    SettingRow("Connection", caption: store.isConfigured ? "Checks that BetterShot can upload to this bucket." : "Fill in all five fields first.") {
+                        Button {
+                            Task { await testConnection() }
+                        } label: {
+                            if isTesting {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .frame(width: 44)
+                            } else {
+                                Text("Test Connection")
+                            }
                         }
+                        .disabled(isTesting || !store.isConfigured)
                     }
-                    .disabled(isTesting || !store.isConfigured)
+                    testStatusLabel
+                }
 
-                    switch testStatus {
-                    case .idle:
-                        if !store.isConfigured {
-                            Text("Fill in all five fields first.")
-                                .foregroundStyle(.secondary)
-                                .font(.callout)
-                        }
-                    case .success:
-                        Label("Connected", systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                            .font(.callout)
-                    case .failed(let message):
-                        Label(message, systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red)
-                            .font(.callout)
-                            .lineLimit(3)
-                            .fixedSize(horizontal: false, vertical: true)
+                SettingsDivider()
+
+                SettingToggle("Upload when I share", caption: "Sharing a screenshot or recording uploads it to this bucket and copies a link.", isOn: $enabled)
+                    .disabled(!store.isConfigured)
+                    .onChange(of: enabled) { _, isOn in store.enabled = isOn }
+
+                SettingsDivider()
+
+                VStack(alignment: .leading, spacing: 0) {
+                    SettingToggle("Copy direct file links", caption: "Link straight to the file in your bucket instead of a viewer page on bettershot.site.", isOn: $useDirectLinks)
+                        // Not gated on isConfigured, which an empty URL already fails: a dead switch cannot explain itself.
+                        .onChange(of: useDirectLinks) { _, isOn in directLinksToggled(isOn) }
+
+                    if let directLinksProblem {
+                        problemLabel(directLinksProblem)
                     }
-
-                    Spacer(minLength: 0)
-                }
-
-                Toggle(isOn: $enabled) {
-                    Text("Upload when I share")
-                    Text("Sharing a screenshot or recording uploads it to this bucket and copies a link.")
-                }
-                .disabled(!store.isConfigured)
-                .onChange(of: enabled) { _, isOn in store.enabled = isOn }
-
-                Toggle(isOn: $useDirectLinks) {
-                    Text("Copy direct file links")
-                    Text("Link straight to the file in your bucket instead of a viewer page on bettershot.site.")
-                }
-                // Not gated on isConfigured, which an empty URL already fails: a dead switch cannot explain itself.
-                .onChange(of: useDirectLinks) { _, isOn in directLinksToggled(isOn) }
-
-                if let directLinksProblem {
-                    Label(directLinksProblem, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                        .font(.callout)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
             } footer: {
                 Text("A successful test turns uploads on for you. With uploads off, everything stays on this Mac. A viewer link shows the title, a poster and a download button, and hides the filename behind a random ID; a direct link is the raw file, filename and all.")
             }
         }
-        .formStyle(.grouped)
         .onAppear { loadFromStore() }
         .alert("Clear saved keys?", isPresented: $confirmingClearKeys) {
             Button("Clear Keys", role: .destructive) {
@@ -192,11 +169,12 @@ struct SharingSettingsTab: View {
     }
 
     private var publicURLField: some View {
-        LabeledContent("Public Bucket URL") {
-            VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 0) {
+            SettingRow("Public Bucket URL") {
                 TextField("Public Bucket URL", text: $publicBaseURL, prompt: Text("https://share.example.com"))
                     .labelsHidden()
                     .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 280)
                     .focused($publicURLFocused)
                     .onChange(of: publicBaseURL) { _, _ in publicURLChanged() }
                     .onChange(of: publicURLFocused) { _, focused in
@@ -204,16 +182,38 @@ struct SharingSettingsTab: View {
                         guard !focused else { return }
                         showPublicURLProblem = publicURLProblem != nil && publicURLProblem != .empty
                     }
+            }
 
-                if showPublicURLProblem, let publicURLProblem {
-                    Label(publicURLProblem.message, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                        .font(.callout)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+            if showPublicURLProblem, let publicURLProblem {
+                problemLabel(publicURLProblem.message)
             }
         }
+    }
+
+    @ViewBuilder
+    private var testStatusLabel: some View {
+        switch testStatus {
+        case .idle:
+            EmptyView()
+        case .success:
+            Label("Connected", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+                .font(.callout)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 11)
+        case .failed(let message):
+            problemLabel(message)
+        }
+    }
+
+    private func problemLabel(_ message: String) -> some View {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+            .foregroundStyle(.red)
+            .font(.callout)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 11)
     }
 
     private static func blockedMessage(for problem: ShareBundle.PublicBaseURLProblem) -> String {
@@ -223,7 +223,7 @@ struct SharingSettingsTab: View {
     }
 
     private func publicURLChanged() {
-        save()
+        save(publicBaseURL, to: \.publicBaseURL)
 
         if useDirectLinks, publicURLProblem != nil {
             // Store first, so the echo below sees the new value.
@@ -258,21 +258,23 @@ struct SharingSettingsTab: View {
         store.useDirectLinks = true
     }
 
-    private func credentialField(_ label: String, text: Binding<String>, prompt: String) -> some View {
-        LabeledContent(label) {
+    private func credentialField(_ label: String, text: Binding<String>, prompt: String, saving key: ReferenceWritableKeyPath<R2CredentialStore, String>) -> some View {
+        SettingRow(label) {
             TextField(label, text: text, prompt: Text(prompt))
                 .labelsHidden()
                 .textFieldStyle(.roundedBorder)
-                .onChange(of: text.wrappedValue) { _, _ in save() }
+                .frame(maxWidth: 280)
+                .onChange(of: text.wrappedValue) { _, value in save(value, to: key) }
         }
     }
 
-    private func secureField(_ label: String, text: Binding<String>, prompt: String) -> some View {
-        LabeledContent(label) {
+    private func secureField(_ label: String, text: Binding<String>, prompt: String, saving key: ReferenceWritableKeyPath<R2CredentialStore, String>) -> some View {
+        SettingRow(label) {
             SecureField(label, text: text, prompt: Text(prompt))
                 .labelsHidden()
                 .textFieldStyle(.roundedBorder)
-                .onChange(of: text.wrappedValue) { _, _ in save() }
+                .frame(maxWidth: 280)
+                .onChange(of: text.wrappedValue) { _, value in save(value, to: key) }
         }
     }
 
@@ -292,12 +294,11 @@ struct SharingSettingsTab: View {
         }
     }
 
-    private func save() {
-        store.accountID = accountID.trimmingCharacters(in: .whitespacesAndNewlines)
-        store.accessKeyID = accessKeyID.trimmingCharacters(in: .whitespacesAndNewlines)
-        store.secretAccessKey = secretAccessKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        store.bucket = bucket.trimmingCharacters(in: .whitespacesAndNewlines)
-        store.publicBaseURL = publicBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// Writes only the edited field, so typing in one field never rewrites the stored Keychain keys.
+    private func save(_ value: String, to key: ReferenceWritableKeyPath<R2CredentialStore, String>) {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard store[keyPath: key] != trimmed else { return }
+        store[keyPath: key] = trimmed
         testStatus = .idle
         if !store.isConfigured {
             enabled = false

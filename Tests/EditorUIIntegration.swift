@@ -465,6 +465,8 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         }
         try snapshot(PreferencesView(selection: .sharing), scheme: scheme, width: 780,
                      to: output.appendingPathComponent("sharing-buttons-\(name).png"), height: 720)
+        try snapshot(PreferencesView(selection: .home), scheme: scheme, width: 780,
+                     to: output.appendingPathComponent("settings-home-\(name).png"), height: 900)
         try snapshot(VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
                 Button("Test Connection") {}
@@ -1314,7 +1316,7 @@ private func checkLibraryWindowToolbars(items: [MediaGalleryItem]) async throws 
             ] {
                 let window = NSWindow(contentViewController: NSHostingController(rootView: root.environment(\.colorScheme, scheme)))
                 window.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
-                window.title = name == "settings" ? SettingsSection.general.title : MediaGalleryCategory.all.title
+                window.title = name == "settings" ? SettingsSection.home.title : MediaGalleryCategory.all.title
                 window.styleMask = [.titled, .closable, .resizable, .fullSizeContentView]
                 window.toolbarStyle = .unified
                 window.titlebarAppearsTransparent = true
@@ -1326,6 +1328,8 @@ private func checkLibraryWindowToolbars(items: [MediaGalleryItem]) async throws 
                 try await Task.sleep(for: .milliseconds(100))
                 precondition(window.toolbar?.items.contains(where: { $0.label == "Toggle Sidebar" }) == true,
                              "Gallery and Settings must provide the native sidebar toggle")
+                precondition(window.toolbar?.items.filter({ $0.label.localizedCaseInsensitiveContains("sidebar") || $0.itemIdentifier == .toggleSidebar }).count == 1,
+                             "Gallery and Settings must show exactly one sidebar toggle: \(window.toolbar?.items.map(\.label) ?? [])")
                 // cacheDisplay cannot capture macOS's compositor-backed sidebar/search surfaces.
                 // Check the real window rather than mistaking white offscreen placeholders for UI.
                 if live {
@@ -1378,7 +1382,16 @@ private func checkLibraryWindowToolbars(items: [MediaGalleryItem]) async throws 
             }
         }
     }
-    print("PASS native gallery/Settings sidebar toolbars in both appearances" + (live ? ", displayed compact/wide snapshots and dark material rendering" : ""))
+    let settings = SettingsWindowController.shared
+    settings.open(section: .sharing)
+    settings.open(section: .about)
+    try await Task.sleep(for: .milliseconds(200))
+    let settingsWindows = NSApp.windows.filter { $0.delegate === settings }
+    precondition(settingsWindows.count == 1, "Reopening Settings must reuse its window")
+    precondition(settingsWindows[0].title == SettingsSection.about.title, "Reopening Settings on a section must switch pages")
+    settings.close()
+    precondition(!settings.hasOpenWindow, "Closing Settings must release its window")
+    print("PASS native gallery/Settings sidebar toolbars in both appearances, single reused Settings window" + (live ? ", displayed compact/wide snapshots and dark material rendering" : ""))
 }
 
 @MainActor

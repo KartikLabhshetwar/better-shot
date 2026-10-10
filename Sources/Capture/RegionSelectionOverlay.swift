@@ -352,6 +352,14 @@ private final class SelectionView: NSView {
     }
 
     private static func cursor(for handle: RegionHandle, dragging: Bool) -> NSCursor {
+        guard #available(macOS 15.0, *) else {
+            switch handle {
+            case .move: return dragging ? .closedHand : .openHand
+            case .top, .bottom: return .resizeUpDown
+            case .left, .right: return .resizeLeftRight
+            case .topLeft, .topRight, .bottomLeft, .bottomRight: return .crosshair
+            }
+        }
         let position: NSCursor.FrameResizePosition
         switch handle {
         case .move: return dragging ? .closedHand : .openHand

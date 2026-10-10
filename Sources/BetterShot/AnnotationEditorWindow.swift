@@ -73,7 +73,7 @@ struct AnnotationEditorWindow: View {
             .accentColor(EditorChrome.accent)
             .editorFullScreenSupport()
             .navigationTitle(url?.deletingPathExtension().lastPathComponent ?? "Image Editor")
-            .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
+            .toolbarBackground(.visible, for: .windowToolbar)
             .toolbar {
                 ToolbarItemGroup(placement: .navigation) {
                     Button {
@@ -92,7 +92,8 @@ struct AnnotationEditorWindow: View {
                     .disabled(!model.canRedo)
                     .help(ShortcutService.shared.help("Redo", for: .imageRedo))
                 }
-
+            }
+            .toolbarHidingSharedBackground {
                 ToolbarItemGroup(placement: .primaryAction) {
                     if model.isCropping {
                         cropActions
@@ -100,7 +101,6 @@ struct AnnotationEditorWindow: View {
                         editingActions
                     }
                 }
-                .sharedBackgroundVisibility(.hidden)
             }
             .task(id: url) {
                 clearInspectorFocus()
@@ -217,17 +217,7 @@ struct AnnotationEditorWindow: View {
             Divider().frame(height: 24)
 
             ForEach(AnnotationTool.allCases) { tool in
-                Button {
-                    clearInspectorFocus()
-                    model.selectTool(tool)
-                    if tool == .arrow { ImageEditingTip().invalidate(reason: .actionPerformed) }
-                } label: {
-                    Label(tool.title, systemImage: tool.systemImage).labelStyle(.iconOnly)
-                }
-                .buttonStyle(EditorButtonStyle(selected: model.selectedTool == tool, horizontalPadding: 6))
-                .accessibilityAddTraits(model.selectedTool == tool ? .isSelected : [])
-                .help(ShortcutService.shared.help(tool.helpText, for: ShortcutService.Action.allCases.first { $0.annotationTool == tool }))
-                .popoverTip(tool == .arrow && !OnboardingState.shouldPresent() ? ImageEditingTip() : nil, arrowEdge: .bottom)
+                toolButton(tool)
             }
 
             EditorPopover(title: "Smart Redaction", systemImage: "eye.slash") {
@@ -253,6 +243,27 @@ struct AnnotationEditorWindow: View {
         .frame(height: 48)
         .studioGlass(cornerRadius: 0)
         .disabled(model.previewImage == nil || model.isCropping)
+    }
+
+    @ViewBuilder
+    private func toolButton(_ tool: AnnotationTool) -> some View {
+        let isSelected = model.selectedTool == tool
+        let shortcut = ShortcutService.Action.allCases.first { $0.annotationTool == tool }
+        let button = Button {
+            clearInspectorFocus()
+            model.selectTool(tool)
+            if tool == .arrow { ImageEditingTip().invalidate(reason: .actionPerformed) }
+        } label: {
+            Label(tool.title, systemImage: tool.systemImage).labelStyle(.iconOnly)
+        }
+        .buttonStyle(EditorButtonStyle(selected: isSelected, horizontalPadding: 6))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .help(ShortcutService.shared.help(tool.helpText, for: shortcut))
+        if tool == .arrow && !OnboardingState.shouldPresent() {
+            button.popoverTip(ImageEditingTip(), arrowEdge: .bottom)
+        } else {
+            button
+        }
     }
 
     private func transformImage(_ transform: AnnotationImageTransform) {

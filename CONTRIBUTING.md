@@ -32,7 +32,7 @@ A useful bug report includes:
 
 ### Requirements
 
-- macOS 26 or later.
+- macOS 14 or later to run BetterShot. Development uses Xcode 26, below.
 - Xcode 26 or later, including its command-line tools. Open Xcode once to finish
   setup and select it under **Xcode > Settings > Locations > Command Line Tools**.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen), available through Homebrew.
@@ -388,7 +388,9 @@ For a logic regression, add a small check against production code. Standalone
 checks are `Tests/*Check.swift`; an optional matching `.sources` file lists the
 production files to compile. For example, [FileNamingCheck.sources](Tests/FileNamingCheck.sources)
 points directly to the production filename renderer. Run the standalone suite
-with `bash scripts/run-checks.sh`.
+with `bash scripts/run-checks.sh`. It compiles each check for the `minimumOS` in
+`version.json` and runs `scripts/check-sf-symbols.py`, which fails on any SF
+Symbol name that is missing or newer than that minimum.
 
 ### Focused integration checks
 

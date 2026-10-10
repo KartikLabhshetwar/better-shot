@@ -12,7 +12,9 @@ a PR unless explicitly requested.
 
 - The macOS app in `Sources/` uses SwiftUI, AppKit, CoreGraphics, AVFoundation,
   and ScreenCaptureKit. Use native controls and existing project primitives.
-- The deployment target is macOS 26.0. Read `project.yml` for actual compiler
+- The deployment target is macOS 14.0, set by `minimumOS` in `version.json`.
+  Gate macOS 15 and 26 APIs with `#available` and give each a working fallback
+  on macOS 14. Read `project.yml` for actual compiler
   settings: the app currently uses Swift 5 language compatibility with main-actor
   default isolation and approachable concurrency. Standalone checks use Swift 6.
   Do not change toolchain settings as a side effect of a feature or UI fix.
@@ -34,7 +36,8 @@ a PR unless explicitly requested.
   `NSImage(systemSymbolName:accessibilityDescription:)`.
 - Do not reintroduce Nucleo, third-party UI icon packs, or asset-mapping wrappers.
   Choose symbols available on the deployment target; installing the SF Symbols
-  design app is not an application dependency.
+  design app is not an application dependency. `scripts/check-sf-symbols.py`
+  enforces this in `scripts/run-checks.sh`.
 - Keep cloud sharing recognizable with `icloud.and.arrow.up`. Use the same
   symbol for the same action across editors, menus, settings, and capture bars.
 

@@ -27,6 +27,7 @@ APP_DEBUG    = $(DERIVED_DIR)/Build/Products/$(CONFIG_DEBUG)/$(SCHEME).app
 APP_RELEASE  = $(DERIVED_DIR)/Build/Products/$(CONFIG_REL)/$(SCHEME).app
 VERSION     := $(shell python3 -c "import json; print(json.load(open('version.json'))['version'])")
 BUILD_NUM   := $(shell python3 -c "import json; print(json.load(open('version.json'))['build'])")
+MIN_OS      := $(shell python3 -c "import json; print(json.load(open('version.json'))['minimumOS'])")
 DMG_NAME     = BetterShot-$(VERSION).dmg
 DMG_DIR      = release
 
@@ -35,10 +36,12 @@ DMG_DIR      = release
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-generate: ## Sync version from version.json and regenerate the Xcode project
+generate: ## Sync version and minimum macOS from version.json and regenerate the Xcode project
 	@sed -i '' \
 		-e 's/MARKETING_VERSION: ".*"/MARKETING_VERSION: "$(VERSION)"/' \
 		-e 's/CURRENT_PROJECT_VERSION: ".*"/CURRENT_PROJECT_VERSION: "$(BUILD_NUM)"/' \
+		-e 's/^    macOS: ".*"/    macOS: "$(MIN_OS)"/' \
+		-e 's/MACOSX_DEPLOYMENT_TARGET: ".*"/MACOSX_DEPLOYMENT_TARGET: "$(MIN_OS)"/' \
 		project.yml
 	@xcodegen generate
 
