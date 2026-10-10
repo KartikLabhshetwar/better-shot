@@ -2,7 +2,6 @@ import AppKit
 import AVFoundation
 import Carbon
 import SwiftUI
-import TourKit
 @testable import BetterShot
 
 /// Offscreen snapshots and model checks, plus a brief native transfer-toast lifecycle check.
@@ -390,30 +389,18 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     let releaseVersion = appBundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as! String
     let currentNotes = releaseNotes.filter { $0.version == releaseVersion }
     precondition(currentNotes.count == 1 && !currentNotes[0].body.isEmpty, "Every shipped version needs bundled release notes")
-    let tourPages = OnboardingView.tourPages(in: appBundle)
-    precondition(tourPages.count == 3)
-    for page in tourPages {
-        precondition(appBundle.url(forResource: page.imageName, withExtension: nil) != nil, "Tour artwork must ship in the app")
-    }
     for scheme in [ColorScheme.light, .dark] {
         for width: CGFloat in [420, 640] {
             try snapshot(ReleaseNotesView(version: releaseVersion, notes: currentNotes, onClose: {}),
                 scheme: scheme, width: width,
                 to: output.appendingPathComponent("release-notes-\(scheme)-\(Int(width)).png"), height: 660)
         }
-        for index in tourPages.indices {
-            try snapshot(TourSlideshowView(pages: tourPages, width: 472, initialPageIndex: index,
-                finishButtonTitle: "Set Up Permissions", onFinish: {}, onClose: {})
-                .transaction { $0.disablesAnimations = true },
-                scheme: scheme, width: 472,
-                to: output.appendingPathComponent("tour-page-\(index)-\(scheme).png"), height: 510)
-        }
         try snapshot(ZStack(alignment: .topLeading) {
             Color.secondary.opacity(0.1)
             Recording3DInsertionGhost(range: 1...4, pointsPerSecond: 100)
         }.frame(height: 36).padding(12), scheme: scheme, width: 600,
             to: output.appendingPathComponent("3d-insertion-ghost-\(scheme).png"), height: 60)
-        for step in OnboardingView.Step.allCases {
+        for step in OnboardingStep.allCases {
             for width: CGFloat in [520, 760] {
                 try snapshot(OnboardingView(step: step, resourceBundle: appBundle, isPermissionPreview: false),
                     scheme: scheme, width: width,
@@ -421,24 +408,37 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
                     height: width == 520 ? 560 : 680)
             }
         }
+        let recoveryRows = { (isFormRow: Bool) in
+            Group {
+                OnboardingPermissionRow(permission: .screen, status: .notEnabled, attempted: true,
+                    isFormRow: isFormRow, request: {}, openSettings: {})
+                OnboardingPermissionRow(permission: .camera, status: .denied, isFormRow: isFormRow,
+                    request: {}, openSettings: {})
+                OnboardingPermissionRow(permission: .microphone, status: .restricted, isFormRow: isFormRow,
+                    request: {}, openSettings: {})
+                OnboardingPermissionRow(permission: .accessibility, status: .allowed, isFormRow: isFormRow,
+                    request: {}, openSettings: {})
+                OnboardingPermissionRow(permission: .microphone, status: .notEnabled, attempted: true,
+                    isFormRow: isFormRow, request: {}, openSettings: {})
+                OnboardingPermissionRow(permission: .screen, status: .notEnabled, attempted: true,
+                    errorMessage: "Couldn’t open settings. Try again, or open System Settings manually.",
+                    isFormRow: isFormRow, request: {}, openSettings: {})
+            }
+        }
         for width: CGFloat in [520, 760] {
             try snapshot(OnboardingDemoView(demo: .recording, resourceBundle: appBundle).padding(32),
                 scheme: scheme, width: width,
                 to: output.appendingPathComponent("onboarding-recording-demo-\(scheme)-\(Int(width)).png"), height: 460)
+            try snapshot(Form { Section { recoveryRows(true) } }
+                .formStyle(.grouped).scrollContentBackground(.hidden)
+                .frame(maxWidth: 520).padding(.horizontal, 40)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top),
+                scheme: scheme, width: width,
+                to: output.appendingPathComponent("onboarding-permission-recovery-\(scheme)-\(Int(width)).png"), height: 760)
         }
-        try snapshot(VStack(spacing: 12) {
-            OnboardingPermissionRow(permission: .screen, status: .notEnabled, attempted: true,
-                request: {}, openSettings: {})
-            OnboardingPermissionRow(permission: .camera, status: .denied, request: {}, openSettings: {})
-            OnboardingPermissionRow(permission: .microphone, status: .restricted, request: {}, openSettings: {})
-            OnboardingPermissionRow(permission: .accessibility, status: .allowed, request: {}, openSettings: {})
-            OnboardingPermissionRow(permission: .microphone, status: .notEnabled, attempted: true,
-                request: {}, openSettings: {})
-            OnboardingPermissionRow(permission: .screen, status: .notEnabled, attempted: true,
-                errorMessage: "Couldn’t open settings. Try again, or open System Settings manually.",
-                request: {}, openSettings: {})
-        }.padding(16), scheme: scheme, width: 520,
-            to: output.appendingPathComponent("onboarding-permission-recovery-\(scheme).png"), height: 900)
+        try snapshot(VStack(spacing: 12) { recoveryRows(false) }.padding(16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top), scheme: scheme, width: 520,
+            to: output.appendingPathComponent("settings-permission-recovery-\(scheme).png"), height: 900)
     }
     print("PASS onboarding artwork copies, permission status mapping/testing guard, recovery states, bundled silent demos, and all three steps in compact/light/dark snapshots")
     try snapshot(LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 12) {

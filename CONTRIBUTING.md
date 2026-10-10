@@ -493,14 +493,17 @@ explicit maintainer request.
 
 Contributions are licensed under the project's [BSD 3-Clause License](LICENSE).
 
-### Tour and release notes
+### Onboarding and release notes
 
-TourKit is a local Swift package in `Vendor/TourKit`, pinned to the upstream
-revision and MIT license listed in `BETTERSHOT.md`. Its slideshow is hosted in the
-existing native onboarding window; keep local appearance/accessibility patches
-when updating it. The permission/restart flow and optional video demos remain
-owned by BetterShot. Run `BETTERSHOT_TESTING=1 swift test --package-path Vendor/TourKit`
-for the upstream package checks, and `make test` for app integration.
+`OnboardingView` is a three-step native flow: Welcome, Permissions, and First
+Capture. Each `OnboardingStep` page has a hero, a large title, and its content above
+one bottom bar with Skip or Back, progress dots, and Continue or Open Capture Bar.
+Permissions reuse `OnboardingPermissions` and `OnboardingPermissionRow`, which
+Settings shares. Skip and Open Capture Bar finish through
+`OnboardingWindowController.finish`, and closing the window also marks onboarding
+seen. Pages change with a 0.2-second ease-out move, or a fade with Reduce Motion.
+`Vendor/TourKit` is still linked by `project.yml`, but onboarding no longer uses it.
+Run `make test` for the onboarding checks.
 
 `CHANGELOG.md` is bundled directly. Every `version.json` version must have a
 `## [x.y.z]` entry. `ReleaseNotes` parses these entries and tracks dismissed versions
@@ -512,7 +515,7 @@ versions; Settings → About can reopen the notes or tour.
 3D insertion hover and click share `Recording3DTimeline.insertionRange`. Keep the
 ghost non-interactive and avoid project mutations/render-cache invalidation while
 skimming. Tests cover placement boundaries, undo/persistence, and compact light/dark
-snapshots of the ghost, tour pages, and release notes.
+snapshots of the ghost, onboarding steps, and release notes.
 
 For window screenshot changes, also select a window and cancel with Escape in the
 signed dev app. Standalone test executables use their terminal’s capture identity

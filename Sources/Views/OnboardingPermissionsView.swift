@@ -155,10 +155,22 @@ struct OnboardingPermissionRow: View {
     var isRequesting = false
     var requestsDisabled = false
     var errorMessage: String?
+    var isFormRow = false
     var request: () -> Void
     var openSettings: () -> Void
 
     var body: some View {
+        if isFormRow {
+            content
+        } else {
+            content
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .studioEffectCard()
+        }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 12) {
                 Image(systemName: permission.symbol)
@@ -176,7 +188,7 @@ struct OnboardingPermissionRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                action.frame(minWidth: 88)
+                action.frame(minWidth: 88, alignment: .trailing)
             }
             if status == .restricted {
                 Text("Restricted by this Mac’s settings or administrator. You can continue without this feature.")
@@ -195,9 +207,6 @@ struct OnboardingPermissionRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .studioEffectCard()
     }
 
     @ViewBuilder private var action: some View {
