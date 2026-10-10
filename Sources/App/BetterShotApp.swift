@@ -19,6 +19,7 @@ struct BetterShotApp: App {
         Settings {
             EmptyView()
         }
+        .suppressedAtLaunch()
         .commands {
             CommandGroup(replacing: .appSettings) {
                 Button("Settings…") { SettingsWindowController.shared.open() }
@@ -78,5 +79,15 @@ struct BetterShotApp: App {
                 }
             }
         }
+    }
+}
+
+private extension Scene {
+    /// Keeps this scene closed at launch, which macOS 15 and later otherwise open; earlier systems never do.
+    func suppressedAtLaunch() -> some Scene {
+        guard #available(macOS 15, *) else {
+            return SceneBuilder.buildOptional(SceneBuilder.buildLimitedAvailability(self))
+        }
+        return SceneBuilder.buildOptional(SceneBuilder.buildLimitedAvailability(defaultLaunchBehavior(.suppressed)))
     }
 }
