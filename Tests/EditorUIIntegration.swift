@@ -353,17 +353,6 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
             preconditionFailure("An unwritable destination must report failure")
         } catch {}
     }
-    for demo in OnboardingDemo.allCases {
-        let posterURL = demo.url(extension: "png", in: appBundle)!
-        let poster = NSImage(contentsOf: posterURL)!
-        precondition(poster.size.width / poster.size.height == 16 / 9, "Demo posters must match the player aspect ratio")
-        let movie = AVURLAsset(url: demo.url(extension: "mp4", in: appBundle)!)
-        let playable = try await movie.load(.isPlayable)
-        let duration = try await movie.load(.duration).seconds
-        let audio = try await movie.loadTracks(withMediaType: .audio)
-        precondition(playable && abs(duration - 6) < 0.1 && audio.isEmpty,
-                     "Onboarding demos must be playable, six seconds, and silent")
-    }
     precondition(OnboardingPermissionStatus.media(.authorized) == .allowed)
     precondition(OnboardingPermissionStatus.media(.notDetermined) == .notEnabled)
     precondition(OnboardingPermissionStatus.media(.denied) == .denied)
@@ -421,9 +410,6 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
                 request: {}, openSettings: {})
         }
         for width: CGFloat in [520, 760] {
-            try snapshot(OnboardingDemoView(demo: .recording, resourceBundle: appBundle).padding(32),
-                scheme: scheme, width: width,
-                to: output.appendingPathComponent("onboarding-recording-demo-\(scheme)-\(Int(width)).png"), height: 460)
             try snapshot(Form { Section { recoveryRows } }
                 .formStyle(.grouped).scrollContentBackground(.hidden)
                 .frame(maxWidth: 520).padding(.horizontal, 40)
@@ -432,7 +418,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
                 to: output.appendingPathComponent("onboarding-permission-recovery-\(scheme)-\(Int(width)).png"), height: 760)
         }
     }
-    print("PASS onboarding artwork copies, permission status mapping/testing guard, recovery states, bundled silent demos, and all three steps in compact/light/dark snapshots")
+    print("PASS onboarding artwork copies, permission status mapping/testing guard, recovery states, and all four steps in compact/light/dark snapshots")
     try snapshot(LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 12) {
         ForEach(GradientPreset.presets) { preset in
             VStack {

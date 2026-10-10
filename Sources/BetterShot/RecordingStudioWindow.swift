@@ -311,7 +311,15 @@ struct RecordingStudioContent: View {
             switch decision {
             case .save:
                 model.saveProject()
-                done()
+                guard model.exportState.isExporting else {
+                    done()
+                    return
+                }
+                Task {
+                    await model.waitForExport()
+                    if case .failed = model.exportState { return }
+                    done()
+                }
             case .discard:
                 Task {
                     await model.discardChanges()
@@ -412,7 +420,7 @@ struct RecordingStudioContent: View {
         if case .failed = model.shareState {
             model.retryShare()
         } else if case .failed = model.exportState {
-            model.export()
+            model.retryExport()
         }
     }
 

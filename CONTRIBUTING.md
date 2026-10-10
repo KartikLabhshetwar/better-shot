@@ -499,11 +499,16 @@ Contributions are licensed under the project's [BSD 3-Clause License](LICENSE).
 
 ### Onboarding and release notes
 
-`OnboardingView` is a three-step native flow: Welcome, Permissions, and First
-Capture. Each `OnboardingStep` page has a hero, a large title, and its content above
-one bottom bar with Skip or Back, progress dots, and Continue or Open Capture Bar.
-Permissions use `OnboardingPermissions`, the same model behind Settings'
-`SettingsPermissionRow`. Skip and Open Capture Bar finish through
+`OnboardingView` is a four-step native flow: Welcome, Permissions, Saving, and
+Practice. Each `OnboardingStep` page has a hero, a large title, and its content above
+one bottom bar with Skip or Back, progress dots, and Continue or Done. Permissions
+asks only for screen capture and Accessibility through `OnboardingPermissionRow`
+and `OnboardingPermissions`, the model behind Settings' `SettingsPermissionRow`;
+recordings request the microphone and camera when they need them. Saving edits the
+same folder and automatic-saving preferences as Settings › General. Practice watches
+`CaptureOrchestrator.lastCaptureURL` and shows the first capture taken after it
+appears. Every step change is saved through `OnboardingState.save(step:)`, so a
+permission restart reopens setup on that step. Skip and Done finish through
 `OnboardingWindowController.finish`, and closing the window also marks onboarding
 seen. Pages change with a 0.2-second ease-out move, or a fade with Reduce Motion.
 Settings › About › Take the Tour reopens the same flow. Run `make test` for the

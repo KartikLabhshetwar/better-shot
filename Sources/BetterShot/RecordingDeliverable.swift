@@ -21,13 +21,32 @@ enum RecordingDeliverable {
         if let task = saveTasks[key] { return try await task.value }
         let task = Task {
             let deliverable = try await resolve(for: mediaURL)
-            let suggestedFileName = session(for: mediaURL).map { fileName(for: $0, extension: deliverable.pathExtension) }
+            let session = session(for: mediaURL)
+            let suggestedFileName = session.map { fileName(for: $0, extension: deliverable.pathExtension) }
                 ?? ScreenshotFileNaming.currentFileName(extension: deliverable.pathExtension, kind: .recording)
-            return try await VideoFileActions.saveToDefaultLocation(from: deliverable, suggestedFileName: suggestedFileName)
+            return try await save(deliverable, named: suggestedFileName, for: session, replacingExport: true)
         }
         saveTasks[key] = task
         defer { saveTasks.removeValue(forKey: key) }
         return try await task.value
+    }
+
+    /// Writes over the recording's saved file, in that file's format, when `replacingExport` finds one.
+    /// Otherwise writes a new file to the save folder, which later saves replace.
+    static func save(_ deliverable: URL, named fileName: String, for session: RecordingSession?, replacingExport: Bool) async throws -> URL {
+        if replacingExport, let session, let existing = exportURL(for: session) {
+            try await VideoFileActions.save(from: deliverable, to: existing)
+            return existing
+        }
+        let savedURL = try await VideoFileActions.saveToDefaultLocation(from: deliverable, suggestedFileName: fileName)
+        session?.updateProjectMetadata { $0.exportPath = savedURL.path }
+        return savedURL
+    }
+
+    /// The file the recording was last saved or exported to, while it is still there.
+    static func exportURL(for session: RecordingSession) -> URL? {
+        guard let path = session.loadProjectMetadata()?.exportPath, FileManager.default.fileExists(atPath: path) else { return nil }
+        return URL(fileURLWithPath: path)
     }
 
     /// The recording's name, carrying `pathExtension`. It is rendered from the

@@ -51,6 +51,11 @@ enum VideoFileActions {
         try FileManager.default.copyItem(at: source, to: destination)
         return destination
     }
+    static var replaced: [URL] = []
+    static func save(from source: URL, to destination: URL) async throws {
+        replaced.append(destination)
+        try Data(contentsOf: source).write(to: destination, options: .atomic)
+    }
 }
 
 @main
@@ -83,8 +88,14 @@ struct RecordingSaveCheck {
         } catch {}
         assert(VideoFileActions.calls == 1)
         RecordingSessionRenderer.shouldFail = false
-        _ = try await RecordingDeliverable.saveToDefaultLocation(for: raw)
-        assert(VideoFileActions.calls == 2)
+        try Data("stale".utf8).write(to: first)
+        let resaved = try await RecordingDeliverable.saveToDefaultLocation(for: raw)
+        assert(resaved == first && VideoFileActions.calls == 1 && VideoFileActions.replaced == [first],
+               "saving a recording again replaces the file it was saved to instead of adding a copy")
+        assert((try? Data(contentsOf: first)) == Data("flattened".utf8))
+        try FileManager.default.removeItem(at: first)
+        let afterMove = try await RecordingDeliverable.saveToDefaultLocation(for: raw)
+        assert(afterMove != first && VideoFileActions.calls == 2, "a saved file that was moved away is written again as a new file")
         let standalone = root.appendingPathComponent("standalone.mp4")
         try Data("standalone".utf8).write(to: standalone)
         let copied = try await RecordingDeliverable.saveToDefaultLocation(for: standalone)
@@ -114,6 +125,7 @@ struct RecordingSaveCheck {
         let firstName = VideoFileActions.lastSuggestedFileName
         assert(firstName == "rec-001.mp4", "a recording takes its name from the template, got \(firstName ?? "nil")")
         defaults.set("later-{counter}", forKey: ScreenshotFileNaming.templateKey)
+        try FileManager.default.removeItem(atPath: RecordingDeliverable.session(for: namedRaw)!.loadProjectMetadata()!.exportPath!)
         _ = try await RecordingDeliverable.saveToDefaultLocation(for: namedRaw)
         assert(VideoFileActions.lastSuggestedFileName == firstName,
                "saving again keeps the recording's name, got \(VideoFileActions.lastSuggestedFileName ?? "nil")")
@@ -126,6 +138,6 @@ struct RecordingSaveCheck {
         assert(RecordingDeliverable.name(for: dotted) == "launch v2.1",
                "a dotted name must survive, got \(RecordingDeliverable.name(for: dotted))")
         assert(RecordingDeliverable.fileName(for: dotted, extension: "mov") == "launch v2.1.mov")
-        print("RecordingSaveCheck: flattened output, concurrent saves, failure retry, template naming, one name per recording, and source preservation verified")
+        print("RecordingSaveCheck: flattened output, concurrent saves, failure retry, in-place resave, template naming, one name per recording, and source preservation verified")
     }
 }

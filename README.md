@@ -44,7 +44,7 @@ brew install --cask bettershot
 Or download the Apple silicon or Intel `.dmg` from
 [Releases](https://github.com/KartikLabhshetwar/better-shot/releases/latest),
 drag BetterShot into Applications, and open it. A short tour walks you through
-permissions and your first capture.
+permissions, where screenshots are saved, and your first capture.
 
 ## Features
 

@@ -82,17 +82,12 @@ enum OnboardingPermissionStatus: Equatable {
 
 @MainActor @Observable
 final class OnboardingPermissions {
-    private let resumesOnboarding: Bool
     private(set) var statuses: [OnboardingPermission: OnboardingPermissionStatus] = [:]
     private(set) var attempted: Set<OnboardingPermission> = []
     private(set) var requesting: OnboardingPermission?
     private(set) var settingsError: String?
     private(set) var settingsErrorPermission: OnboardingPermission?
     private(set) var shortcutsNeedRestart = false
-
-    init(resumesOnboarding: Bool = false) {
-        self.resumesOnboarding = resumesOnboarding
-    }
 
     func status(_ permission: OnboardingPermission) -> OnboardingPermissionStatus {
         statuses[permission] ?? .notEnabled
@@ -126,7 +121,6 @@ final class OnboardingPermissions {
         attempted.insert(permission)
         settingsError = nil
         settingsErrorPermission = nil
-        if resumesOnboarding && permission.mayNeedRestart { OnboardingState.resumeAtPermissions() }
         defer { requesting = nil; refresh() }
         switch permission {
         case .screen: _ = CGRequestScreenCaptureAccess()
@@ -140,7 +134,6 @@ final class OnboardingPermissions {
     func openSettings(_ permission: OnboardingPermission) {
         guard ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] != "1",
               requesting == nil, status(permission) != .restricted else { return }
-        if resumesOnboarding && permission.mayNeedRestart { OnboardingState.resumeAtPermissions() }
         attempted.insert(permission)
         settingsError = NSWorkspace.shared.open(permission.settingsURL) ? nil
             : "Couldn’t open settings. Try again, or open System Settings → Privacy & Security → \(permission.title)."
@@ -148,6 +141,7 @@ final class OnboardingPermissions {
     }
 }
 
+/// One onboarding permission as a native form row, with its recovery steps in the detail text.
 struct OnboardingPermissionRow: View {
     let permission: OnboardingPermission
     let status: OnboardingPermissionStatus
@@ -158,65 +152,48 @@ struct OnboardingPermissionRow: View {
     var request: () -> Void
     var openSettings: () -> Void
 
+    private var needsSettings: Bool { permission.needsSettings(status: status, attempted: attempted) }
+
+    private var detail: String {
+        if status == .restricted {
+            return "Restricted by this Mac’s settings or administrator. You can continue without it."
+        }
+        if status != .allowed && needsSettings {
+            let restart = permission.mayNeedRestart ? " If macOS asks you to quit, reopen BetterShot to continue setup." : ""
+            return "In Privacy & Security \u{203A} \(permission.title), turn on BetterShot, then return here.\(restart)"
+        }
+        return "\(permission == .screen ? "Required" : "Optional"). \(permission.explanation)"
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 12) {
-                Image(systemName: permission.symbol)
-                    .font(.system(size: 19))
-                    .foregroundStyle(permission == .screen ? EditorChrome.accent : .secondary)
-                    .frame(width: 28)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text(permission.displayTitle).font(.system(size: 13, weight: .semibold))
-                        Text(permission == .screen ? "Required" : "Optional")
-                            .font(.system(size: 10)).foregroundStyle(.secondary)
-                    }
-                    Text(permission.explanation).font(.system(size: 12)).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                action.frame(minWidth: 88, alignment: .trailing)
-            }
-            if status == .restricted {
-                Text("Restricted by this Mac’s settings or administrator. You can continue without this feature.")
-                    .font(.caption).foregroundStyle(.secondary)
-            } else if status != .allowed && permission.needsSettings(status: status, attempted: attempted) {
-                Text("In Privacy & Security → \(permission.title), turn on BetterShot, then return here.")
-                    .font(.caption).foregroundStyle(.secondary)
-                if permission.mayNeedRestart {
-                    Text("If macOS asks you to quit, save your work and reopen BetterShot.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
+        LabeledContent {
+            control
+        } label: {
+            Text(permission.displayTitle)
+            Text(detail)
             if let errorMessage {
-                Label(errorMessage, systemImage: "exclamationmark.triangle")
-                    .font(.caption).foregroundStyle(.red)
-                    .fixedSize(horizontal: false, vertical: true)
+                Label(errorMessage, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
             }
         }
     }
 
-    @ViewBuilder private var action: some View {
+    @ViewBuilder private var control: some View {
         if isRequesting {
             ProgressView().controlSize(.small).accessibilityLabel("Waiting for \(permission.displayTitle) permission")
         } else if status == .allowed {
             Label {
-                Text("Allowed").foregroundStyle(.primary)
+                Text("Allowed")
             } icon: {
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
             }
-                .font(.caption.weight(.medium))
-                .accessibilityLabel("\(permission.displayTitle) access allowed")
+            .foregroundStyle(.secondary)
+            .accessibilityLabel("\(permission.displayTitle) access allowed")
         } else if status == .restricted {
-            Label("Restricted", systemImage: "lock.fill")
-                .font(.caption).foregroundStyle(.secondary)
+            Label("Restricted", systemImage: "lock.fill").foregroundStyle(.secondary)
         } else {
-            let settings = permission.needsSettings(status: status, attempted: attempted)
-            Button(settings ? "Open Settings" : "Allow", action: settings ? openSettings : request)
-                .buttonStyle(EditorButtonStyle(selected: permission == .screen, bordered: true))
+            Button(needsSettings ? "Open Settings\u{2026}" : "Allow\u{2026}", action: needsSettings ? openSettings : request)
                 .disabled(requestsDisabled)
-                .accessibilityLabel(settings ? "Open \(permission.title) settings" : "Allow \(permission.displayTitle) access")
+                .accessibilityLabel(needsSettings ? "Open \(permission.title) settings" : "Allow \(permission.displayTitle) access")
         }
     }
 }

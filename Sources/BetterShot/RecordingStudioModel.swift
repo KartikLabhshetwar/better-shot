@@ -207,6 +207,8 @@ final class RecordingStudioModel {
     private var timeObserver: Any?
     private var endObserver: NSObjectProtocol?
     private var exportTask: Task<Void, Never>?
+    /// Whether the last export was a Save updating the recording's saved file, so Retry repeats it.
+    private var exportReplacesSavedFile = false
     private var audioExportTask: Task<Void, Never>?
     private var replacementAudioTask: Task<Void, Never>?
     /// The screen movie's video track, kept from load so the player item
@@ -1394,7 +1396,7 @@ final class RecordingStudioModel {
         writeDraftNow()
     }
 
-    /// ⌘S. Commits the working copy to `edit.json` and clears the draft.
+    /// ⌘S. Commits the working copy to `edit.json`, clears the draft, and re-renders the file the recording was saved to.
     func saveProject() {
         guard isLoaded, let session else { return }
         projectSaveTask?.cancel()
@@ -1408,6 +1410,9 @@ final class RecordingStudioModel {
             dropStaleRender(for: document, in: session)
             RecordingProjectStore.shared.reload()
             flashSaveConfirmation()
+            if RecordingDeliverable.exportURL(for: session) != nil {
+                export(replacingExport: true)
+            }
         } catch {
             print("Failed to save recording project: \(error)")
         }
@@ -2348,10 +2353,25 @@ final class RecordingStudioModel {
     }
 
     func export() {
+        export(replacingExport: false)
+    }
+
+    func retryExport() {
+        export(replacingExport: exportReplacesSavedFile)
+    }
+
+    /// Waits for a running export, so closing after Save does not cancel the update to the saved file.
+    func waitForExport() async {
+        await exportTask?.value
+    }
+
+    private func export(replacingExport: Bool) {
         // One render at a time: the share pipeline uses the same exporter,
         // so a second encode would just fight it for the media engine.
         guard !exportState.isExporting, !shareState.isBusy, isLoaded else { return }
         pause()
+        exportReplacesSavedFile = replacingExport
+        let session = session
 
         // A fresh deliverable (e.g. right after a share) is byte-identical
         // to what this render would produce - same configuration builds
@@ -2361,12 +2381,12 @@ final class RecordingStudioModel {
             let suggestedFileName = makeExportFileName()
             exportTask = Task { [weak self] in
                 do {
-                    let savedURL = try await VideoFileActions.saveToDefaultLocation(
-                        from: cached,
-                        suggestedFileName: suggestedFileName
-                    )
-                    RecordingExportNotifier.notifySuccess(fileURL: savedURL)
-                    RecordingExportNotifier.revealIfPreferred(fileURL: savedURL)
+                    let savedURL = try await RecordingDeliverable.save(
+                        cached, named: suggestedFileName, for: session, replacingExport: replacingExport)
+                    if !replacingExport {
+                        RecordingExportNotifier.notifySuccess(fileURL: savedURL)
+                        RecordingExportNotifier.revealIfPreferred(fileURL: savedURL)
+                    }
                     self?.exportState = .finished(savedURL)
                 } catch {
                     self?.exportState = .failed(error.localizedDescription)
@@ -2379,7 +2399,6 @@ final class RecordingStudioModel {
 
         let configuration = makeExportConfiguration()
         let suggestedFileName = makeExportFileName()
-        let session = session
         let renderedDocument = currentDocument()
 
         let dockProgressID = DockExportProgressCoordinator.shared.start()
@@ -2400,13 +2419,13 @@ final class RecordingStudioModel {
                 let deliverableURL = try session?.installFinalVideo(
                     movingFrom: temporaryURL, renderedFrom: renderedDocument
                 ) ?? temporaryURL
-                let savedURL = try await VideoFileActions.saveToDefaultLocation(
-                    from: deliverableURL,
-                    suggestedFileName: suggestedFileName
-                )
+                let savedURL = try await RecordingDeliverable.save(
+                    deliverableURL, named: suggestedFileName, for: session, replacingExport: replacingExport)
                 DockExportProgressCoordinator.shared.finish(dockProgressID)
-                RecordingExportNotifier.notifySuccess(fileURL: savedURL)
-                RecordingExportNotifier.revealIfPreferred(fileURL: savedURL)
+                if !replacingExport {
+                    RecordingExportNotifier.notifySuccess(fileURL: savedURL)
+                    RecordingExportNotifier.revealIfPreferred(fileURL: savedURL)
+                }
                 self?.exportState = .finished(savedURL)
             } catch is CancellationError {
                 DockExportProgressCoordinator.shared.finish(dockProgressID)
