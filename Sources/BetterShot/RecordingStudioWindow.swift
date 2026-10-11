@@ -307,6 +307,8 @@ struct RecordingStudioContent: View {
         closeGuard.hasUnsavedChanges = { model.hasUnsavedChanges }
         closeGuard.offersDelete = { model.hasNeverBeenSaved }
         closeGuard.projectName = { model.projectDisplayName }
+        closeGuard.isFinishingSave = { model.exportState.isExporting && model.exportReplacesSavedFile }
+        closeGuard.finishSave = { await model.waitForExport() }
         closeGuard.onDecision = { decision, done in
             switch decision {
             case .save:
@@ -316,9 +318,7 @@ struct RecordingStudioContent: View {
                     return
                 }
                 Task {
-                    await model.waitForExport()
-                    if case .failed = model.exportState { return }
-                    done()
+                    if await model.waitForExport() { done() }
                 }
             case .discard:
                 Task {

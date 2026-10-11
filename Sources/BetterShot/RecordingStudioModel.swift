@@ -207,8 +207,8 @@ final class RecordingStudioModel {
     private var timeObserver: Any?
     private var endObserver: NSObjectProtocol?
     private var exportTask: Task<Void, Never>?
-    /// Whether the last export was a Save updating the recording's saved file, so Retry repeats it.
-    private var exportReplacesSavedFile = false
+    /// Whether the last export was a Save updating the recording's saved file, so Retry repeats it and closing waits for it.
+    private(set) var exportReplacesSavedFile = false
     private var audioExportTask: Task<Void, Never>?
     private var replacementAudioTask: Task<Void, Never>?
     /// The screen movie's video track, kept from load so the player item
@@ -2360,9 +2360,12 @@ final class RecordingStudioModel {
         export(replacingExport: exportReplacesSavedFile)
     }
 
-    /// Waits for a running export, so closing after Save does not cancel the update to the saved file.
-    func waitForExport() async {
+    /// Waits for a running export, so closing after Save does not cancel the update to the saved file, and returns false when it failed.
+    @discardableResult
+    func waitForExport() async -> Bool {
         await exportTask?.value
+        if case .failed = exportState { return false }
+        return true
     }
 
     private func export(replacingExport: Bool) {
