@@ -908,7 +908,7 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
                 if let cached = cachedMasks[index] {
                     region = cached
                 } else {
-                    guard let filtered = RecordingMaskRenderer.filteredRegion(source: sourceImage, segment: segment) else {
+                    guard let filtered = RecordingMaskRenderer.filteredRegion(source: CIImage(cvPixelBuffer: screenFrame), segment: segment) else {
                         throw RecordingStudioExporter.ExportError.writerFailed(nil)
                     }
                     let bytes = Int(filtered.extent.width.rounded(.up) * filtered.extent.height.rounded(.up)) * 8
