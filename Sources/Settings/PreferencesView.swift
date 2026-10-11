@@ -877,6 +877,7 @@ struct CaptureSettingsTab: View {
     @AppStorage("bs_captureRegionOnRelease") private var captureRegionOnRelease = false
     @AppStorage("bs_freezeScreenDuringRegionCapture") private var freezeScreenDuringRegionCapture = false
     @AppStorage(AppPreferences.nativeRegionSelectorKey) private var nativeRegionSelector = false
+    @AppStorage(AppPreferences.preselectPreviousRegionKey) private var preselectPreviousRegion = true
     @State private var isConfirmingReset = false
 
     private var selfTimerDelay: Binding<SelfTimerDelay> {
@@ -915,6 +916,12 @@ struct CaptureSettingsTab: View {
             : "Select from a still frame to capture video, animations, and other moving content. Window, scrolling, and text capture stay live."
     }
 
+    private var preselectCaption: String {
+        preselectPreviousRegion
+            ? "Return captures it again. Scrolling capture and recording areas open with it too."
+            : "Every selection starts empty. Capture Previous Region still uses your last area."
+    }
+
     var body: some View {
         SettingsPage {
             SettingsGroup("Timer") {
@@ -939,6 +946,8 @@ struct CaptureSettingsTab: View {
                 SettingsDivider()
                 SettingToggle("Freeze the screen while selecting", caption: freezeScreenCaption, isOn: $freezeScreenDuringRegionCapture)
                     .disabled(nativeRegionSelector)
+                SettingsDivider()
+                SettingToggle("Start with the last area selected", caption: preselectCaption, isOn: $preselectPreviousRegion)
                 SettingsDivider()
                 SettingRow("Show the selector on") {
                     Picker("Show the selector on", selection: $overlayFollowsMouse) {
@@ -972,7 +981,9 @@ struct CaptureSettingsTab: View {
             } footer: {
                 Text(nativeRegionSelector
                     ? "Draw an area with the macOS crosshair and release to capture. Hold Space while dragging to move the area, or press Space before dragging to select a window. Escape cancels. Capture Previous Region keeps the last area chosen with BetterShot’s selector."
-                    : "Your last area opens already selected. Press Return to capture it again, drag its handles to adjust it, or draw a new one. Space switches to window selection, and Escape cancels.")
+                    : preselectPreviousRegion
+                        ? "Your last area opens already selected. Press Return to capture it again, drag its handles to adjust it, or draw a new one. Space switches to window selection, and Escape cancels."
+                        : "Draw an area, then press Return to capture it or drag its handles to adjust it. Space switches to window selection, and Escape cancels.")
             }
 
             SettingsGroup("After Capture") {
@@ -996,6 +1007,7 @@ struct CaptureSettingsTab: View {
                 captureRegionOnRelease = false
                 freezeScreenDuringRegionCapture = false
                 nativeRegionSelector = false
+                preselectPreviousRegion = true
             }
             Button("Cancel", role: .cancel) {}
         }

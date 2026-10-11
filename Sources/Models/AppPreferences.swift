@@ -31,6 +31,7 @@ enum AppPreferences {
     private static let captureRegionOnReleaseKey = "bs_captureRegionOnRelease"
     private static let freezeScreenDuringRegionCaptureKey = "bs_freezeScreenDuringRegionCapture"
     static let nativeRegionSelectorKey = "bs_nativeRegionSelector"
+    static let preselectPreviousRegionKey = "bs_preselectPreviousRegion"
 
     // MARK: - Appearance
     static var appearance: AppAppearance {
@@ -278,6 +279,12 @@ enum AppPreferences {
     static var nativeRegionSelector: Bool {
         get { UserDefaults.standard.bool(forKey: nativeRegionSelectorKey) }
         set { UserDefaults.standard.set(newValue, forKey: nativeRegionSelectorKey) }
+    }
+
+    /// Opens BetterShot's selector with the last area already selected. On unless turned off.
+    static var preselectPreviousRegion: Bool {
+        get { UserDefaults.standard.object(forKey: preselectPreviousRegionKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: preselectPreviousRegionKey) }
     }
 
     // MARK: - History

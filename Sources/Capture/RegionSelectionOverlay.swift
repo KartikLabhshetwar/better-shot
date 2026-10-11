@@ -84,7 +84,7 @@ final class RegionSelectionOverlay {
             window.acceptsMouseMovedEvents = true
             window.collectionBehavior = [.canJoinAllSpaces, .fullScreenPrimary]
 
-            let previousRegion = (controlScreen == nil ? AppPreferences.lastRegionRect : nil)
+            let previousRegion = (controlScreen == nil && AppPreferences.preselectPreviousRegion ? AppPreferences.lastRegionRect : nil)
                 .flatMap { screen.frame.contains($0) ? RegionGeometry.localRect(global: $0, screenFrame: screen.frame) : nil }
             let overlayView = SelectionView(
                 screen: screen,

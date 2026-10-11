@@ -948,6 +948,14 @@ func checkCaptureControlsUI() throws {
     precondition(AppPreferences.nativeRegionSelector, "Native selection must follow the persisted toggle")
     defaults.set(false, forKey: selectorKey)
     precondition(!AppPreferences.nativeRegionSelector, "Disabling native selection restores the adjustable selector")
+    let preselectKey = AppPreferences.preselectPreviousRegionKey
+    let storedPreselect = defaults.object(forKey: preselectKey)
+    defer { defaults.set(storedPreselect, forKey: preselectKey) }
+    defaults.removeObject(forKey: preselectKey)
+    precondition(AppPreferences.preselectPreviousRegion, "Unset preferences keep opening with the last area selected")
+    defaults.set(false, forKey: preselectKey)
+    precondition(!AppPreferences.preselectPreviousRegion, "Turning preselection off must persist")
+    defaults.removeObject(forKey: preselectKey)
     try checkScrollCaptureStitching()
     let sources = RecordingSourceCatalog.shared
     precondition(!sources.containsSelection(.fullscreen, displayID: nil, windowID: nil))
