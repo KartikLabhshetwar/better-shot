@@ -30,6 +30,7 @@ enum AppPreferences {
     private static let lastRegionRectKey = "bs_lastRegionRect"
     private static let captureRegionOnReleaseKey = "bs_captureRegionOnRelease"
     private static let freezeScreenDuringRegionCaptureKey = "bs_freezeScreenDuringRegionCapture"
+    static let nativeRegionSelectorKey = "bs_nativeRegionSelector"
 
     // MARK: - Appearance
     static var appearance: AppAppearance {
@@ -271,6 +272,12 @@ enum AppPreferences {
     static var freezeScreenDuringRegionCapture: Bool {
         get { UserDefaults.standard.bool(forKey: freezeScreenDuringRegionCaptureKey) }
         set { UserDefaults.standard.set(newValue, forKey: freezeScreenDuringRegionCaptureKey) }
+    }
+
+    /// Routes region screenshots through macOS's `screencapture -i` instead of BetterShot's selector.
+    static var nativeRegionSelector: Bool {
+        get { UserDefaults.standard.bool(forKey: nativeRegionSelectorKey) }
+        set { UserDefaults.standard.set(newValue, forKey: nativeRegionSelectorKey) }
     }
 
     // MARK: - History

@@ -51,11 +51,15 @@ final class ScreenCapture {
 
     // MARK: - Region
 
-    /// Opens BetterShot's adjustable selector, over a frozen frame when that setting is on.
+    /// Uses the native macOS selector when enabled, else BetterShot's, over a frozen frame when that setting is on.
     func captureRegion() async throws -> URL? {
         guard !isCapturing else { return nil }
         isCapturing = true
         defer { isCapturing = false }
+
+        if AppPreferences.nativeRegionSelector {
+            return try await interactiveShot(window: false, includeShadow: false)
+        }
 
         var frozenFrames = AppPreferences.freezeScreenDuringRegionCapture ? try await FrozenScreenCapture.capture() : [:]
         switch await RegionSelectionOverlay().selectRegion(frozenFrames: frozenFrames) {

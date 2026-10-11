@@ -169,17 +169,28 @@ Region screenshots use `RegionSelectionOverlay` with the previous area
 (`AppPreferences.lastRegionRect`) preselected, so Return captures it again, then
 reactivate the previously frontmost app before `screencapture -R` takes the shot.
 OCR keeps macOS's native `/usr/sbin/screencapture -i` selector.
-Region screenshots always use BetterShot’s selector.
+Region screenshots can instead use macOS's native selector via
+`AppPreferences.nativeRegionSelector`, exposed as Use native macOS region selector
+in Settings > Capture > Region. It defaults off. `ScreenCapture.captureRegion`
+checks it first and reuses `interactiveShot(window: false, includeShadow: false)`
+without activating BetterShot, so open menus and popovers remain available for
+capture. It does not update the remembered rectangle; Capture Previous Region keeps
+the last area chosen with BetterShot's selector. Scrolling and recording area
+selection still use BetterShot's selector because they need the rectangle.
 `AppPreferences.captureRegionOnRelease`, exposed as Capture as soon as I let go
 in Settings > Capture > Region, chooses immediate capture on release or adjustment
-before confirmation. Both paths preserve the remembered rectangle.
+before confirmation in BetterShot's selector, which preserves the remembered
+rectangle on both paths. Native selection always captures on release, so the
+control is disabled there.
 `AppPreferences.freezeScreenDuringRegionCapture`, exposed as Freeze the screen
 while selecting, snapshots every display with `FrozenScreenCapture` before the
 selector appears. `RegionSelectionOverlay` shows each frame behind its selection
 view, and `FrozenScreenFrame` crops the confirmed area from that frame at native
 pixel size; never take a second shot after confirmation. It defaults off and
-applies only to region screenshots: the countdown runs first, and window, OCR,
-previous-region, scrolling, and recording captures stay live.
+applies only to region screenshots using BetterShot's selector: the countdown runs
+first, and native-selector, window, OCR, previous-region, scrolling, and recording
+captures stay live. The setting is disabled while native selection is on, and
+native mode must never snapshot displays.
 `Tests/FrozenScreenFrameCheck.swift` covers crop origins, scales, and PNG pixels.
 Window screenshots use `/usr/sbin/screencapture -i -w`, retaining cancellation,
 shadow options, native pixel dimensions, and private PNG staging.

@@ -114,13 +114,17 @@ their key. Restore Default remains in the field's options menu.
 Set the background, padding, corner radius, and shadow for new captures in
 **Settings > General > Default Look**.
 
-Region screenshots use BetterShot’s adjustable selector. Enable
-**Settings > Capture > Region > Capture as soon as I let go** to capture on mouse
-release, or leave it off to adjust the area before confirming. Window screenshots
-and OCR use the native macOS selectors.
+Region screenshots use BetterShot’s adjustable selector by default. Enable
+**Settings > Capture > Region > Use native macOS region selector** to capture
+open context menus and popovers with the keyboard shortcut. The native selector
+captures on mouse release from the live screen and does not update the remembered
+area; **Capture Previous Region** keeps the last area chosen with BetterShot’s
+selector. With the adjustable selector, enable **Capture as soon as I let go** to
+capture on mouse release, or leave it off to adjust the area before confirming.
+Window screenshots and OCR use the native macOS selectors.
 Turn on **Freeze the screen while selecting** in the same section to select from a
 still frame, so video and other moving content hold still; the screenshot uses
-exactly the frame you selected from.
+exactly the frame you selected from. It applies only to BetterShot’s selector.
 
 Saved previews dismiss after **Settings > Overlay > Hide After**, pausing while
 you use the card. **Keep screenshot previews open** holds only unsaved captures;

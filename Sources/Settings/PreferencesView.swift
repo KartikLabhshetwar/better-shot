@@ -876,6 +876,7 @@ struct CaptureSettingsTab: View {
     @AppStorage("bs_keepInDeckUntilSaved") private var keepInDeckUntilSaved = false
     @AppStorage("bs_captureRegionOnRelease") private var captureRegionOnRelease = false
     @AppStorage("bs_freezeScreenDuringRegionCapture") private var freezeScreenDuringRegionCapture = false
+    @AppStorage(AppPreferences.nativeRegionSelectorKey) private var nativeRegionSelector = false
     @State private var isConfirmingReset = false
 
     private var selfTimerDelay: Binding<SelfTimerDelay> {
@@ -901,6 +902,19 @@ struct CaptureSettingsTab: View {
         )
     }
 
+    private var captureOnReleaseCaption: String {
+        if nativeRegionSelector { return "The macOS selector always takes the shot when you release the mouse." }
+        return captureRegionOnRelease
+            ? "The shot is taken when you release the mouse."
+            : "The area stays up with handles to adjust it. Return or a double-click takes the shot."
+    }
+
+    private var freezeScreenCaption: String {
+        nativeRegionSelector
+            ? "The macOS selector captures the live screen, so a still frame is not available."
+            : "Select from a still frame to capture video, animations, and other moving content. Window, scrolling, and text capture stay live."
+    }
+
     var body: some View {
         SettingsPage {
             SettingsGroup("Timer") {
@@ -917,13 +931,14 @@ struct CaptureSettingsTab: View {
             }
 
             SettingsGroup("Region") {
-                SettingToggle("Capture as soon as I let go", caption: captureRegionOnRelease
-                    ? "The shot is taken when you release the mouse."
-                    : "The area stays up with handles to adjust it. Return or a double-click takes the shot.",
-                    isOn: $captureRegionOnRelease)
+                SettingToggle("Use native macOS region selector", caption: "Capture open menus and popovers without BetterShot taking focus first.",
+                    isOn: $nativeRegionSelector)
                 SettingsDivider()
-                SettingToggle("Freeze the screen while selecting", caption: "Select from a still frame to capture video, animations, and other moving content. Window, scrolling, and text capture stay live.",
-                    isOn: $freezeScreenDuringRegionCapture)
+                SettingToggle("Capture as soon as I let go", caption: captureOnReleaseCaption, isOn: $captureRegionOnRelease)
+                    .disabled(nativeRegionSelector)
+                SettingsDivider()
+                SettingToggle("Freeze the screen while selecting", caption: freezeScreenCaption, isOn: $freezeScreenDuringRegionCapture)
+                    .disabled(nativeRegionSelector)
                 SettingsDivider()
                 SettingRow("Show the selector on") {
                     Picker("Show the selector on", selection: $overlayFollowsMouse) {
@@ -955,7 +970,9 @@ struct CaptureSettingsTab: View {
                     }
                 }
             } footer: {
-                Text("Your last area opens already selected. Press Return to capture it again, drag its handles to adjust it, or draw a new one. Space switches to window selection, and Escape cancels.")
+                Text(nativeRegionSelector
+                    ? "Draw an area with the macOS crosshair and release to capture. Hold Space while dragging to move the area, or press Space before dragging to select a window. Escape cancels. Capture Previous Region keeps the last area chosen with BetterShot’s selector."
+                    : "Your last area opens already selected. Press Return to capture it again, drag its handles to adjust it, or draw a new one. Space switches to window selection, and Escape cancels.")
             }
 
             SettingsGroup("After Capture") {
@@ -978,6 +995,7 @@ struct CaptureSettingsTab: View {
                 keepInDeckUntilSaved = false
                 captureRegionOnRelease = false
                 freezeScreenDuringRegionCapture = false
+                nativeRegionSelector = false
             }
             Button("Cancel", role: .cancel) {}
         }
