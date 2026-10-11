@@ -415,7 +415,10 @@ This builds unsigned Debug in `.build/tests` with testability enabled, runs
 [scripts/run-checks.sh](scripts/run-checks.sh), then
 [Tests/run-exports.sh](Tests/run-exports.sh). The runners set
 `BETTERSHOT_TESTING=1` so tests use isolated storage and do not access real R2
-Keychain credentials. The separate test build directory keeps unsigned tests from replacing
+Keychain credentials. `Tests/run-exports.sh` names each run's program
+`ExportIntegration-<pid>`, which gives its `UserDefaults.standard` a private
+domain that the runner deletes afterwards, so overlapping runs in other worktrees
+cannot rewrite its save folder or dismiss delay. The separate test build directory keeps unsigned tests from replacing
 a running signed dev app and invalidating its Screen Recording permission. Quit the dev
 app before rebuilding its `.build` bundle. Always use the runners; never substitute production
 credentials to make a test pass.

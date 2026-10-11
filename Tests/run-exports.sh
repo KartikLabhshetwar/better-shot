@@ -3,7 +3,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 out="$(mktemp -d)"
-trap 'rm -rf "$out"' EXIT
+program="ExportIntegration-$$"
+trap 'rm -rf "$out"; defaults delete "$program" >/dev/null 2>&1 || true; rm -f "$HOME/Library/Preferences/$program.plist"' EXIT
 arch="$(uname -m)"
 configuration="${BETTERSHOT_BUILD_CONFIGURATION:-Debug}"
 derived="${BETTERSHOT_DERIVED_DATA:-.build/tests}"
@@ -39,9 +40,9 @@ if [[ "${BETTERSHOT_CHECK_EDITOR_SCENES:-0}" == "1" ]]; then
     done
     exit 0
 fi
-swiftc -parse-as-library -module-cache-path .build/ExportCheckModules \
+swiftc -parse-as-library -module-name ExportIntegration -module-cache-path .build/ExportCheckModules \
     -I "$derived/Build/Products/$configuration" Tests/ExportIntegration.swift Tests/EditorUIIntegration.swift Tests/ImageTransformIntegration.swift Tests/Recording3DIntegration.swift \
     "${objects[@]}" "$derived/Build/Products/$configuration/DockProgress.o" \
-    -o "$out/ExportIntegration"
+    -o "$out/$program"
 # The snapshots instantiate sharing UI; do not read the real R2 Keychain from this test binary.
-BETTERSHOT_TESTING=1 "$out/ExportIntegration"
+BETTERSHOT_TESTING=1 "$out/$program"
