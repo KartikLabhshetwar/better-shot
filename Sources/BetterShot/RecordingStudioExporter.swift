@@ -963,7 +963,11 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
             result = try Recording3DBlurRenderer.warp(result.cropped(to: canvas), projection: projection, canvas: canvas)
                 .composited(over: cleanBackground).cropped(to: canvas)
         }
-        result = try Recording3DBlurRenderer.apply(timeline3D.defocus(at: editorTime), to: result, canvas: canvas)
+        let defocus = timeline3D.defocus(at: editorTime)
+        result = try Recording3DBlurRenderer.apply(defocus, to: result, canvas: canvas)
+        if defocus.isActive && (keystrokeTimeline != nil || subtitleTimeline != nil) {
+            result = try flattened(result, in: canvas)
+        }
         if keystrokeTimeline != nil {
             result = try raster { drawKeystrokeCaption(at: sourceTime, in: $0) }.composited(over: result)
         }
@@ -971,6 +975,16 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
             result = try raster { drawSubtitleBar(at: sourceTime, in: $0) }.composited(over: result)
         }
         return result
+    }
+
+    /// Renders the image into a pixel buffer so later overlays never fuse with the blur kernels.
+    private func flattened(_ image: CIImage, in canvas: CGRect) throws -> CIImage {
+        guard let pool = overlayPool else { throw RecordingStudioExporter.ExportError.writerFailed(nil) }
+        var buffer: CVPixelBuffer?
+        CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer)
+        guard let buffer else { throw RecordingStudioExporter.ExportError.writerFailed(nil) }
+        renderContext.render(image, to: buffer, bounds: canvas, colorSpace: colorSpace)
+        return CIImage(cvPixelBuffer: buffer, options: [.colorSpace: colorSpace])
     }
 
     private func raster(_ draw: (CGContext) -> Void) throws -> CIImage {

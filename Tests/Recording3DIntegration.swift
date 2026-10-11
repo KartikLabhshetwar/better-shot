@@ -179,6 +179,22 @@ func check3DShots(movie: URL, directory: URL) async throws {
             keystrokePlacement: .bottomCenter, subtitleTimeline: nil, includeBubble: false,
             masks: masks, timeline3D: timeline)
     }
+    var framed = style; framed.padding = 0.1
+    let keys = KeystrokeCaptionTimeline(events: [RecordingKeystrokeEvent(time: 10, modifiers: ["⌘"], key: "K")])
+    for bokeh in [false, true] {
+        var shot = Recording3DShot(start: 31, end: 39); shot.apply(.perspective); shot.transition = 0
+        shot.blur = Recording3DBlur(mode: .radial, strength: 19, bokeh: bokeh)
+        let renderer = StudioFrameCompositor(canvasSize: size, style: framed, viewportTimeline: .identity,
+            pointerTimeline: nil, showsPressEffects: false, keystrokeTimeline: keys,
+            keystrokePlacement: .bottomCenter, subtitleTimeline: nil, includeBubble: false,
+            timeline3D: Recording3DTimeline(shots: [shot], duration: 40))
+        for time in [33.0, 35.0, 38.0] {
+            try renderer.render(screenFrame: source, cameraFrame: nil, editorTime: time, sourceTime: time, into: output)
+            let corner = color(output, at: CGPoint(x: 4, y: 4))
+            precondition(corner[1] > 200 && corner[0] < 40 && corner[3] == 255,
+                "Depth blur with keystroke captions keeps the background: bokeh \(bokeh), \(corner)")
+        }
+    }
     for preset in Recording3DPreset.allCases {
         var shot = Recording3DShot(start: 0, end: 2); shot.apply(preset); shot.transition = 0
         let timeline = Recording3DTimeline(shots: [shot], duration: 2)
