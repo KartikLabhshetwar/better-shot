@@ -276,6 +276,13 @@ resolution when recording exports move or disappear, native table sorting,
 single-click selection, double-click opening, and deletion confirmations.
 Gallery and Settings use resizable native navigation columns.
 
+`ShortcutRecorderField` uses a native search-field bezel, focus ring, and inline
+clear button. Recording suspends global shortcuts through the existing
+`ShortcutService` recording guard, commits through `validationError`, and cancels
+on focus/window loss. With `clearsOnDelete`, set for global-scope rows, unmodified
+Delete clears; editor-scope rows record it (`imageDelete` and `videoDelete` default
+to it), and modified Delete is always recordable.
+
 [ShortcutCatalog.swift](Sources/Services/ShortcutCatalog.swift) defines action IDs,
 groups, scopes, and defaults. Do not renumber persisted IDs. New actions start
 unassigned; customized and disabled bindings must survive migration. Active

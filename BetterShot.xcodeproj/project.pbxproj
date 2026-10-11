@@ -169,6 +169,7 @@
 		BC3024BE9954759663767B8D /* ScrollCapturePreviewPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDFB9ADE951E2EB3D7A4AB3D /* ScrollCapturePreviewPanel.swift */; };
 		BC6170740B05997D27830D0B /* RecordingKeystrokeCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8944EFA56AE64C38C83ED9E1 /* RecordingKeystrokeCapture.swift */; };
 		BC811FEA82E635D6292A80FD /* MenuBarContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE87F338892DCBFEA8FD7BDA /* MenuBarContentView.swift */; };
+		BC9018D13E8A53B68FC01699 /* ShortcutRecorderField.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7F33276A5315E7A07A7B58B /* ShortcutRecorderField.swift */; };
 		BC91FECA9CA43F0585BE1836 /* StudioInspectorTabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C6D5B9A6634007DC09C4A81 /* StudioInspectorTabs.swift */; };
 		BCBAEB221B1C4CDEF4C96424 /* ViewModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BF1FA787AC739460BAB2EB2 /* ViewModifiers.swift */; };
 		BCFE4A22239F0F1F256911EC /* AnnotationDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9AE3D9E0B57D78980112DD4 /* AnnotationDocument.swift */; };
@@ -397,6 +398,7 @@
 		B5B6D30AC545D7DFDE178FED /* CloudUploader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudUploader.swift; sourceTree = "<group>"; };
 		B5E7DD00F35603BFDCA7EBDD /* AnnotationScreenshotBorderInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationScreenshotBorderInspector.swift; sourceTree = "<group>"; };
 		B6A3E940C262BCFCF8AEF1DC /* AnnotationCursor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationCursor.swift; sourceTree = "<group>"; };
+		B7F33276A5315E7A07A7B58B /* ShortcutRecorderField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutRecorderField.swift; sourceTree = "<group>"; };
 		B82D1374FAD185152D19D7E7 /* GlassSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassSurface.swift; sourceTree = "<group>"; };
 		BAE1EE5C32D7D0D099A88951 /* ShortcutService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutService.swift; sourceTree = "<group>"; };
 		BB86758B02F912A3E117CC99 /* AnnoEditorInteraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnoEditorInteraction.swift; sourceTree = "<group>"; };
@@ -807,6 +809,7 @@
 				319DB64F21A64C00C345ADD5 /* SettingsHomeTab.swift */,
 				90E774656DB29A1792294977 /* SettingsWindowController.swift */,
 				0D62F387131F8D7E1EF8BD54 /* SharingSettingsTab.swift */,
+				B7F33276A5315E7A07A7B58B /* ShortcutRecorderField.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -1085,6 +1088,7 @@
 				B9B5CCB2FE5EDEA8A879E245 /* SharingSettingsTab.swift in Sources */,
 				338611E83AC0C47B0B3272F7 /* ShortcutActions.swift in Sources */,
 				4FE02626471F7BD1FDB37393 /* ShortcutCatalog.swift in Sources */,
+				BC9018D13E8A53B68FC01699 /* ShortcutRecorderField.swift in Sources */,
 				8782829F9AD2E1BE2B796AC7 /* ShortcutService.swift in Sources */,
 				6EE4DDA9308DBD7BDF01C954 /* SilenceDetector.swift in Sources */,
 				40B553DB8E65CE93297F3D11 /* SmartRedactionRecognizer.swift in Sources */,

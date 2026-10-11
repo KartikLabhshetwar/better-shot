@@ -106,6 +106,10 @@ labels on layouts such as AZERTY. Changing layouts does not change saved binding
 
 Change or add bindings in **Settings > Shortcuts**. Extra actions, such as
 Capture Region & Pin or Edit Clipboard Image, start unassigned.
+Click a shortcut field to record a combination. Held modifiers appear immediately;
+Escape or clicking away cancels, and the inline clear button removes the binding.
+Delete also clears a global shortcut, while editor shortcuts can record Delete as
+their key. Restore Default remains in the field's options menu.
 
 Set the background, padding, corner radius, and shadow for new captures in
 **Settings > General > Default Look**.
