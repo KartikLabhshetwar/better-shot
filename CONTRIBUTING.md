@@ -32,7 +32,9 @@ A useful bug report includes:
 
 ### Requirements
 
-- macOS 14 or later to run BetterShot. Development uses Xcode 26, below.
+- macOS 14 or later to run BetterShot. Microphone narration needs macOS 15, and
+  narration subtitles and teleprompter speech tracking need macOS 26. Gate those
+  APIs with `#available` and keep the macOS 14 fallbacks working.
 - Xcode 26 or later, including its command-line tools. Open Xcode once to finish
   setup and select it under **Xcode > Settings > Locations > Command Line Tools**.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen), available through Homebrew.

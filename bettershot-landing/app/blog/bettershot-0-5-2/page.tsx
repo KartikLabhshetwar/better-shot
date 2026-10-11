@@ -420,7 +420,7 @@ export default async function Article() {
                   Try BetterShot 0.5
                 </h2>
                 <p className="mb-7 mt-4 max-w-[46ch] text-[16px] leading-[28px] text-zinc-600">
-                  Free, open source, macOS 26.0+. Screenshots, recording, and editing in one
+                  Free, open source, macOS 14.0+. Screenshots, recording, and editing in one
                   native app. No account, no subscription.
                 </p>
                 <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">

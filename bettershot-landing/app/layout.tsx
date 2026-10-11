@@ -69,7 +69,7 @@ const jsonLd = {
   alternateName: "BetterShot",
   applicationCategory: "MultimediaApplication",
   applicationSubCategory: "Screen capture and screen recording",
-  operatingSystem: "macOS 26.0 or later",
+  operatingSystem: "macOS 14.0 or later",
   offers: {
     "@type": "Offer",
     price: "0",
