@@ -144,12 +144,14 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
         alert.addButton(withTitle: "Restart")
         alert.addButton(withTitle: "Later")
 
-        if alert.runModal() == .alertFirstButtonReturn {
-            let task = Process()
-            task.launchPath = "/bin/sh"
-            task.arguments = ["-c", "sleep 0.5; open \"$0\"", Bundle.main.bundlePath]
-            try? task.run()
-            NSApp.terminate(nil)
-        }
+        if alert.runModal() == .alertFirstButtonReturn { relaunch() }
+    }
+
+    static func relaunch() {
+        let task = Process()
+        task.launchPath = "/bin/sh"
+        task.arguments = ["-c", "sleep 0.5; open \"$0\"", Bundle.main.bundlePath]
+        try? task.run()
+        NSApp.terminate(nil)
     }
 }

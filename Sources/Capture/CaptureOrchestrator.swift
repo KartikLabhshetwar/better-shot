@@ -19,6 +19,7 @@ final class CaptureOrchestrator {
             ScrollCaptureSessionPresenter.shared.stop()
             return
         }
+        guard action == .colorPicker || ScreenCapturePermission.isReadyToCapture() else { return }
         if captureInProgress {
             pendingCaptures.append((action, screen))
             return
@@ -40,7 +41,8 @@ final class CaptureOrchestrator {
     }
 
     func captureLastRegion(on screen: NSScreen? = nil) async {
-        guard !captureInProgress, AppPreferences.lastRegionRect != nil else { return }
+        guard !captureInProgress, AppPreferences.lastRegionRect != nil,
+              ScreenCapturePermission.isReadyToCapture() else { return }
         captureInProgress = true
         captureScreen = screen
         await RecordingBarPresenter.shared.hidePickerForCapture()
