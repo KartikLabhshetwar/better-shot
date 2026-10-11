@@ -170,6 +170,15 @@ check stitching and the compact capture controls in both appearances.
 Region screenshots use `RegionSelectionOverlay` with the previous area
 (`AppPreferences.lastRegionRect`) preselected, so Return captures it again, then
 reactivate the previously frontmost app before `screencapture -R` takes the shot.
+`AppPreferences.preselectPreviousRegion`, exposed as Start with the last area
+selected in Settings > Capture > Region, defaults on. Turning it off opens every
+use of the selector empty, including scrolling and recording areas, and still
+stores the chosen area for Capture Previous Region.
+`ScreenCapturePermission.isReadyToCapture` runs before every screenshot except
+the color picker, and before recording sources load. Once BetterShot has seen
+Screen Recording access, a later launch that preflights as denied, as a login
+item can before macOS applies the grant, offers a restart once instead of failing.
+It never runs at launch.
 OCR keeps macOS's native `/usr/sbin/screencapture -i` selector.
 Region screenshots can instead use macOS's native selector via
 `AppPreferences.nativeRegionSelector`, exposed as Use native macOS region selector

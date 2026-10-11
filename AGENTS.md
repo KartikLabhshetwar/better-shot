@@ -108,12 +108,16 @@ a PR unless explicitly requested.
   capture and recording areas still need it. With BetterShot's selector, Capture
   as soon as I let go chooses capture on mouse release or adjustment before
   confirmation. Window screenshots use macOS's native window selector. Recording
-  areas use the adjustable AppKit selector and system crosshair. It opens with
-  the previous area selected, so Return captures it again; its edges resize it,
+  areas use the adjustable AppKit selector and system crosshair. By default it
+  opens with the previous area selected, so Return captures it again; Start with
+  the last area selected in Settings > Capture > Region turns that off for every
+  use of the selector without forgetting the area. Its edges resize it,
   and a drag anywhere, even inside it, draws a new area. OCR keeps macOS's native `screencapture` selector. Do not describe the
   recording selector as Apple's system recording picker.
 - Preserve capture-window exclusion, correct display/coordinate conversion,
   cancellation, and focus restoration. Never start a recording after cancellation.
+  Check Screen Recording access at capture time through `ScreenCapturePermission`,
+  never at launch.
 - Keep untouched capture pixels and editable project sources. Full-resolution
   image previews are the default; an optional low-resolution preview must never
   become the source for saving, copying, or export. Keep screenshot framing aligned

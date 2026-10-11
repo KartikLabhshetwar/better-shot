@@ -96,6 +96,8 @@ Desktop; change the folder, file names, or automatic saving in
 | Camera | Camera recording |
 
 If capture or shortcuts still fail after granting access, quit and reopen BetterShot.
+When BetterShot opens at login before macOS applies Screen Recording access, it
+offers to restart itself the first time you capture.
 
 ## Cloud sharing
 
