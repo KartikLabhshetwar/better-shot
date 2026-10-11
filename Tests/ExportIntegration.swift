@@ -1245,7 +1245,7 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
         AppPreferences.overlayDismissDelay = 0.05
         let privateCapture = try await capture()
         let panel = NSApp.windows.first { $0.identifier?.rawValue == "BetterShot.CaptureOverlay" && $0.isVisible }!
-        panel.setFrameOrigin(NSPoint(x: NSEvent.mouseLocation.x + 40, y: NSEvent.mouseLocation.y + 40))
+        panel.setFrameOrigin(overlayOriginAwayFromPointer(for: panel))
         try await Task.sleep(for: .milliseconds(250))
         precondition(PreviewOverlay.shared.items.contains(privateCapture) == keep,
                      "Only staged captures with Keep enabled bypass Hide After")
@@ -1261,7 +1261,7 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
         let automaticallySaved = try await capture()
         // Keep the native panel visible, with the live pointer outside it.
         let panel = NSApp.windows.first { $0.identifier?.rawValue == "BetterShot.CaptureOverlay" && $0.isVisible }!
-        panel.setFrameOrigin(NSPoint(x: NSEvent.mouseLocation.x + 40, y: NSEvent.mouseLocation.y + 40))
+        panel.setFrameOrigin(overlayOriginAwayFromPointer(for: panel))
         try await Task.sleep(for: .milliseconds(250))
         precondition(!PreviewOverlay.shared.items.contains(automaticallySaved),
                      "Saved previews must follow Hide After even when Keep is enabled")

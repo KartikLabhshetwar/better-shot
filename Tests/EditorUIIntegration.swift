@@ -1711,6 +1711,15 @@ private final class ShortcutTestWindow: NSWindow {
     override var isKeyWindow: Bool { simulatesKeyWindow }
 }
 
+/// Returns the visible-frame corner farthest from the live pointer so hover cannot pause dismissal.
+@MainActor
+func overlayOriginAwayFromPointer(for panel: NSWindow) -> NSPoint {
+    let screen = (panel.screen ?? NSScreen.main)!.visibleFrame
+    let mouse = NSEvent.mouseLocation
+    return NSPoint(x: mouse.x < screen.midX ? screen.maxX - panel.frame.width : screen.minX,
+                   y: mouse.y < screen.midY ? screen.maxY - panel.frame.height : screen.minY)
+}
+
 @MainActor
 private func checkPreviewOverlay(imageURL: URL) async throws {
     let defaults = UserDefaults.standard
@@ -1775,9 +1784,11 @@ private func checkPreviewOverlay(imageURL: URL) async throws {
     overlay.show(url: imageURL)
     let livePanel = NSApp.windows.first { $0.identifier?.rawValue == "BetterShot.CaptureOverlay" && $0.isVisible }! as! NSPanel
     precondition(livePanel.becomesKeyOnlyIfNeeded, "Presenting a preview must not pull focus into it")
-    let mouse = NSEvent.mouseLocation
-    livePanel.setFrameOrigin(NSPoint(x: mouse.x - livePanel.frame.width / 2, y: mouse.y - livePanel.frame.height / 2))
-    try await Task.sleep(for: .milliseconds(350))
+    for _ in 0..<35 {
+        let mouse = NSEvent.mouseLocation
+        livePanel.setFrameOrigin(NSPoint(x: mouse.x - livePanel.frame.width / 2, y: mouse.y - livePanel.frame.height / 2))
+        try await Task.sleep(for: .milliseconds(10))
+    }
     precondition(overlay.items.contains(imageURL), "Live pointer over the panel pauses dismissal")
     let activationPolicy = NSApp.activationPolicy()
     defer { NSApp.setActivationPolicy(activationPolicy) }
@@ -1786,7 +1797,7 @@ private func checkPreviewOverlay(imageURL: URL) async throws {
     livePanel.makeKey()
     try await Task.sleep(for: .milliseconds(150))
     precondition(livePanel.isKeyWindow, "Focus test requires a key preview panel")
-    livePanel.setFrameOrigin(NSPoint(x: mouse.x + 40, y: mouse.y + 40))
+    livePanel.setFrameOrigin(overlayOriginAwayFromPointer(for: livePanel))
     overlay.setActionFocused(true, for: imageURL)
     try await Task.sleep(for: .milliseconds(350))
     precondition(overlay.items.contains(imageURL), "A focused tool keeps its card available")
