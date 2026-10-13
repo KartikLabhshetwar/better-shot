@@ -34,7 +34,9 @@ final class EditorCloseGuard: NSObject, NSWindowDelegate {
     var finishSave: () async -> Bool = { true }
 
     private weak var attachedWindow: NSWindow?
-    private nonisolated(unsafe) weak var previousDelegate: NSWindowDelegate?
+    // AppKit registers notifications using responds(to:) when the delegate is set.
+    // Keep the forwarding target alive until those registrations are removed.
+    private nonisolated(unsafe) var previousDelegate: NSWindowDelegate?
     private var isPrompting = false
     private var isWaitingForSave = false
     private var isCloseApproved = false
@@ -57,6 +59,13 @@ final class EditorCloseGuard: NSObject, NSWindowDelegate {
         }
         attachedWindow = nil
         previousDelegate = nil
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        // SwiftUI can release its window controller before onDisappear runs.
+        // Forward its teardown, then remove our callbacks before releasing it.
+        defer { detach() }
+        previousDelegate?.windowWillClose?(notification)
     }
 
     /// Mirrors the dirty state onto the close button's dot, so the prompt is
