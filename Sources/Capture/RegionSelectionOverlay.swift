@@ -1,5 +1,7 @@
 import AppKit
 import ScreenCaptureKit
+import OSLog
+import QuartzCore
 
 struct RegionSelection {
     let pointsRect: CGRect  // In global display points (top-left origin, matching SCK coordinates)
@@ -15,6 +17,12 @@ enum RegionSelectionOutcome {
 
 @MainActor
 final class RegionSelectionOverlay {
+
+    private let dimsOutsideSelection: Bool
+
+    init(dimsOutsideSelection: Bool = true) {
+        self.dimsOutsideSelection = dimsOutsideSelection
+    }
 
     private var allowsWindowSelection = true
     private var controlScreen: NSScreen?
@@ -66,6 +74,7 @@ final class RegionSelectionOverlay {
     }
 
     private func showOverlays() {
+        let started = ContinuousClock.now
         let crosshair = NSCursor.crosshair
         let capturesOnRelease = controlScreen != nil || AppPreferences.captureRegionOnRelease
 
@@ -78,11 +87,12 @@ final class RegionSelectionOverlay {
             )
             window.isOpaque = false
             window.backgroundColor = .clear
-            window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.maximumWindow)))
+            window.level = .screenSaver
             window.hasShadow = false
+            window.animationBehavior = .none
             window.ignoresMouseEvents = false
             window.acceptsMouseMovedEvents = true
-            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenPrimary]
+            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
 
             let previousRegion = (controlScreen == nil && AppPreferences.preselectPreviousRegion ? AppPreferences.lastRegionRect : nil)
                 .flatMap { screen.frame.contains($0) ? RegionGeometry.localRect(global: $0, screenFrame: screen.frame) : nil }
@@ -90,7 +100,8 @@ final class RegionSelectionOverlay {
                 screen: screen,
                 cursor: crosshair,
                 selection: previousRegion,
-                capturesOnRelease: capturesOnRelease
+                capturesOnRelease: capturesOnRelease,
+                dimsOutsideSelection: dimsOutsideSelection
             ) { [weak self] rect in
                 self?.finishSelection(rect: rect, screen: screen)
             } onCancel: { [weak self] in
@@ -103,6 +114,10 @@ final class RegionSelectionOverlay {
                 self?.selectionViews.forEach { if $0 !== overlayView { $0.clearSelection() } }
             }
             if let frozenImage = ActiveDisplayResolver.displayID(for: screen).flatMap({ frozenFrames[$0]?.image }) {
+                // The frozen frame covers the whole display. Let the window server
+                // occlude the live windows behind it instead of blending with them.
+                window.isOpaque = true
+                window.backgroundColor = .black
                 let backdrop = FrozenBackdropView(image: frozenImage, frame: NSRect(origin: .zero, size: screen.frame.size))
                 overlayView.frame = backdrop.bounds
                 overlayView.autoresizingMask = [.width, .height]
@@ -111,18 +126,39 @@ final class RegionSelectionOverlay {
             } else {
                 window.contentView = overlayView
             }
-            if controlScreen != nil { window.orderFrontRegardless() }
-            else { window.makeKeyAndOrderFront(nil) }
             overlayWindows.append(window)
             selectionViews.append(overlayView)
         }
 
         if controlScreen == nil {
             NSApp.activate(ignoringOtherApps: true)
-            selectionViews.first(where: \.hasSelection)?.window?.makeKeyAndOrderFront(nil)
         }
+        // Order independently of activation, which may still be pending when a
+        // menu-bar shortcut invokes us. Hidden windows can defer their first draw.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        CATransaction.setCompletionBlock {
+            Logger(subsystem: "com.bettershot.app", category: "CaptureStartup").info(
+                "Selector initial layer transaction completed in \(String(describing: started.duration(to: .now)), privacy: .public)"
+            )
+        }
+        for window in overlayWindows {
+            window.orderFrontRegardless()
+            if controlScreen == nil { window.makeKey() }
+            window.displayIfNeeded()
+        }
+        if controlScreen == nil {
+            selectionViews.first(where: \.hasSelection)?.window?.makeKey()
+        }
+        CATransaction.commit()
+        // This one-shot overlay needs its initial frame submitted immediately;
+        // the crosshair must not get ahead of AppKit's deferred layer drawing.
+        CATransaction.flush()
         crosshair.push()
         crosshair.set()
+        Logger(subsystem: "com.bettershot.app", category: "CaptureStartup").info(
+            "Selector window setup finished in \(String(describing: started.duration(to: .now)), privacy: .public)"
+        )
     }
 
     private func finishSelection(rect: CGRect, screen: NSScreen) {
@@ -176,10 +212,21 @@ private final class FrozenBackdropView: NSView {
     init(image: CGImage, frame: NSRect) {
         self.image = image
         super.init(frame: frame)
+        layerContentsRedrawPolicy = .onSetNeedsDisplay
         wantsLayer = true
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    override var isOpaque: Bool { true }
+
+    override func makeBackingLayer() -> CALayer {
+        let backingLayer = super.makeBackingLayer()
+        backingLayer.backgroundColor = NSColor.black.cgColor
+        backingLayer.isOpaque = true
+        backingLayer.contents = image
+        return backingLayer
+    }
 
     override var wantsUpdateLayer: Bool { true }
 
@@ -191,6 +238,7 @@ private final class FrozenBackdropView: NSView {
 // MARK: - Selection View
 
 private final class SelectionView: NSView {
+    private var firstDrawStarted: ContinuousClock.Instant? = .now
     private var dragStart: NSPoint?
     private var dragCurrent: NSPoint?
     private var mouseLocation: NSPoint?
@@ -205,6 +253,12 @@ private final class SelectionView: NSView {
     private let screen: NSScreen
     private let crosshairCursor: NSCursor
     private let capturesOnRelease: Bool
+    private let dimsOutsideSelection: Bool
+    private let dimLayers = (0..<4).map { _ in CALayer() }
+    private let borderLayer = CALayer()
+    private let guideLayers = (0..<2).map { _ in CALayer() }
+    private let handleLayers = (0..<8).map { _ in CALayer() }
+    private let selectionLabel = SelectionLabelView()
     private let onSelect: (CGRect) -> Void
     private let onCancel: () -> Void
     private let onWindow: () -> Void
@@ -214,6 +268,7 @@ private final class SelectionView: NSView {
         cursor: NSCursor,
         selection: CGRect?,
         capturesOnRelease: Bool,
+        dimsOutsideSelection: Bool,
         onSelect: @escaping (CGRect) -> Void,
         onCancel: @escaping () -> Void,
         onWindow: @escaping () -> Void
@@ -223,10 +278,15 @@ private final class SelectionView: NSView {
         self.selection = selection
         self.movesSelection = selection == nil
         self.capturesOnRelease = capturesOnRelease
+        self.dimsOutsideSelection = dimsOutsideSelection
         self.onSelect = onSelect
         self.onCancel = onCancel
         self.onWindow = onWindow
         super.init(frame: screen.frame)
+        layerContentsRedrawPolicy = .onSetNeedsDisplay
+        wantsLayer = true
+        configureLayers()
+        updateLayer()
     }
 
     @available(*, unavailable)
@@ -266,99 +326,101 @@ private final class SelectionView: NSView {
         crosshairCursor.set()
     }
 
-    // MARK: - Drawing
+    // MARK: - Composited selection chrome
 
-    override func draw(_ dirtyRect: NSRect) {
-        NSColor.black.withAlphaComponent(0.3).setFill()
-        bounds.fill()
+    // Solid layer rectangles need no screen-sized bitmap. Pointer movement only
+    // changes their geometry; the frozen image remains the same layer contents.
+    override var wantsUpdateLayer: Bool { true }
 
+    private func configureLayers() {
+        for dim in dimLayers {
+            dim.backgroundColor = NSColor.black.withAlphaComponent(0.3).cgColor
+            layer?.addSublayer(dim)
+        }
+        for guide in guideLayers {
+            guide.backgroundColor = NSColor.white.withAlphaComponent(0.4).cgColor
+            layer?.addSublayer(guide)
+        }
+        borderLayer.borderColor = NSColor.white.cgColor
+        borderLayer.borderWidth = 1.5
+        layer?.addSublayer(borderLayer)
+        for handle in handleLayers {
+            handle.backgroundColor = NSColor.white.cgColor
+            handle.borderColor = NSColor.black.withAlphaComponent(0.5).cgColor
+            handle.borderWidth = 1
+            handle.cornerRadius = 4
+            layer?.addSublayer(handle)
+        }
+        addSubview(selectionLabel)
+    }
+
+    override func updateLayer() {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+
+        borderLayer.isHidden = true
+        guideLayers.forEach { $0.isHidden = true }
+        handleLayers.forEach { $0.isHidden = true }
+
+        var visibleSelection: CGRect?
         if let start = dragStart, let current = dragCurrent {
-            drawSelection(start: start, current: current)
+            let rect = rectFromPoints(start, current)
+            if rect.width > 2, rect.height > 2 {
+                visibleSelection = rect
+                showSelection(rect, adjustable: false)
+            }
         } else if let selection {
-            drawAdjustableSelection(selection)
+            visibleSelection = selection
+            showSelection(selection, adjustable: true)
         } else if let mouse = mouseLocation {
-            drawGuideLines(at: mouse)
+            guideLayers[0].frame = CGRect(x: mouse.x - 0.25, y: bounds.minY, width: 0.5, height: bounds.height)
+            guideLayers[1].frame = CGRect(x: bounds.minX, y: mouse.y - 0.25, width: bounds.width, height: 0.5)
+            guideLayers.forEach { $0.isHidden = false }
+        }
+        if visibleSelection == nil { selectionLabel.isHidden = true }
+        updateDimming(excluding: visibleSelection)
+        if let started = firstDrawStarted {
+            firstDrawStarted = nil
+            Logger(subsystem: "com.bettershot.app", category: "CaptureStartup").info(
+                "Selector layers prepared in \(String(describing: started.duration(to: .now)), privacy: .public)"
+            )
         }
     }
 
-    private func drawGuideLines(at point: NSPoint) {
-        let lineColor = NSColor.white.withAlphaComponent(0.4)
-        lineColor.setStroke()
-
-        let path = NSBezierPath()
-        path.lineWidth = 0.5
-
-        // Vertical guide line
-        path.move(to: NSPoint(x: point.x, y: bounds.minY))
-        path.line(to: NSPoint(x: point.x, y: bounds.maxY))
-
-        // Horizontal guide line
-        path.move(to: NSPoint(x: bounds.minX, y: point.y))
-        path.line(to: NSPoint(x: bounds.maxX, y: point.y))
-
-        path.stroke()
-    }
-
-    private func drawSelection(start: NSPoint, current: NSPoint) {
-        let selectionRect = rectFromPoints(start, current)
-        guard selectionRect.width > 2, selectionRect.height > 2 else { return }
-
-        NSColor.clear.setFill()
-        selectionRect.fill(using: .copy)
-
-        NSColor.white.setStroke()
-        let borderPath = NSBezierPath(rect: selectionRect)
-        borderPath.lineWidth = 1.5
-        borderPath.stroke()
-
-        drawLabel(pixelSize(selectionRect), below: selectionRect)
-    }
-
-    private func drawAdjustableSelection(_ rect: CGRect) {
-        NSColor.clear.setFill()
-        rect.fill(using: .copy)
-
-        NSColor.white.setStroke()
-        let borderPath = NSBezierPath(rect: rect)
-        borderPath.lineWidth = 1.5
-        borderPath.stroke()
-
-        for handle in RegionHandle.allCases where handle != .move {
-            let p = handle.point(in: rect)
-            let dot = NSBezierPath(ovalIn: CGRect(x: p.x - 4, y: p.y - 4, width: 8, height: 8))
-            NSColor.white.setFill()
-            dot.fill()
-            NSColor.black.withAlphaComponent(0.5).setStroke()
-            dot.lineWidth = 1
-            dot.stroke()
+    private func updateDimming(excluding selection: CGRect?) {
+        var rectangles = [bounds, .zero, .zero, .zero]
+        if let hole = selection?.intersection(bounds), !hole.isEmpty, !hole.isNull {
+            rectangles = [
+                CGRect(x: bounds.minX, y: bounds.minY, width: bounds.width, height: hole.minY - bounds.minY),
+                CGRect(x: bounds.minX, y: hole.maxY, width: bounds.width, height: bounds.maxY - hole.maxY),
+                CGRect(x: bounds.minX, y: hole.minY, width: hole.minX - bounds.minX, height: hole.height),
+                CGRect(x: hole.maxX, y: hole.minY, width: bounds.maxX - hole.maxX, height: hole.height),
+            ]
         }
+        for (dim, rect) in zip(dimLayers, rectangles) {
+            dim.frame = rect
+            dim.isHidden = !dimsOutsideSelection || rect.isEmpty
+        }
+    }
 
+    private func showSelection(_ rect: CGRect, adjustable: Bool) {
+        borderLayer.frame = rect.insetBy(dx: -0.75, dy: -0.75)
+        borderLayer.isHidden = false
+        if adjustable {
+            for (layer, handle) in zip(handleLayers, RegionHandle.allCases.filter({ $0 != .move })) {
+                let point = handle.point(in: rect)
+                layer.frame = CGRect(x: point.x - 4, y: point.y - 4, width: 8, height: 8)
+                layer.isHidden = false
+            }
+        }
         let hint = movesSelection ? "drag to adjust" : "drag the edges to resize, or draw a new area"
-        drawLabel("\(pixelSize(rect))  ·  ↩ to capture  ·  \(hint)  ·  esc", below: rect)
+        let text = adjustable ? "\(pixelSize(rect))  ·  ↩ to capture  ·  \(hint)  ·  esc" : pixelSize(rect)
+        selectionLabel.show(text, below: rect, within: bounds)
     }
 
     private func pixelSize(_ rect: CGRect) -> String {
         "\(Int(rect.width * screen.backingScaleFactor)) × \(Int(rect.height * screen.backingScaleFactor))"
-    }
-
-    private func drawLabel(_ text: String, below rect: CGRect) {
-        let label = text as NSString
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .medium),
-            .foregroundColor: NSColor.white,
-        ]
-        let labelSize = label.size(withAttributes: attrs)
-        let width = labelSize.width + 12
-        let height = labelSize.height + 4
-        let labelRect = CGRect(
-            x: min(max(rect.midX - width / 2, bounds.minX + 8), bounds.maxX - width - 8),
-            y: max(rect.minY - height - 4, bounds.minY + 8),
-            width: width,
-            height: height
-        )
-        NSColor.black.withAlphaComponent(0.7).setFill()
-        NSBezierPath(roundedRect: labelRect, xRadius: 4, yRadius: 4).fill()
-        label.draw(at: NSPoint(x: labelRect.minX + 6, y: labelRect.minY + 2), withAttributes: attrs)
     }
 
     // MARK: - Mouse Events
@@ -507,5 +569,46 @@ private final class SelectionView: NSView {
             width: abs(b.x - a.x),
             height: abs(b.y - a.y)
         )
+    }
+}
+
+/// Only the small dimension label uses AppKit bitmap drawing, never the display.
+private final class SelectionLabelView: NSView {
+    private var text = ""
+    private let attributes: [NSAttributedString.Key: Any] = [
+        .font: NSFont.monospacedSystemFont(ofSize: 11, weight: .medium),
+        .foregroundColor: NSColor.white,
+    ]
+
+    init() {
+        super.init(frame: .zero)
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    func show(_ text: String, below rect: CGRect, within bounds: CGRect) {
+        if self.text != text {
+            self.text = text
+            needsDisplay = true
+        }
+        let size = (text as NSString).size(withAttributes: attributes)
+        let width = size.width + 12
+        let height = size.height + 4
+        frame = CGRect(
+            x: min(max(rect.midX - width / 2, bounds.minX + 8), bounds.maxX - width - 8),
+            y: max(rect.minY - height - 4, bounds.minY + 8),
+            width: width,
+            height: height
+        )
+        isHidden = false
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.black.withAlphaComponent(0.7).setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: 4, yRadius: 4).fill()
+        (text as NSString).draw(at: NSPoint(x: 6, y: 2), withAttributes: attributes)
     }
 }

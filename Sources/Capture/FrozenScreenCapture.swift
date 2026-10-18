@@ -1,12 +1,17 @@
 import AppKit
 import ScreenCaptureKit
+import OSLog
 
 @MainActor
 enum FrozenScreenCapture {
     /// Capture before any selector windows become key, preserving transient content.
     static func capture() async throws -> [CGDirectDisplayID: FrozenScreenFrame] {
         let screens = NSScreen.screens
+        let started = ContinuousClock.now
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        let enumerated = ContinuousClock.now
+        let log = Logger(subsystem: "com.bettershot.app", category: "CaptureStartup")
+        log.info("Capture content enumerated in \(String(describing: started.duration(to: enumerated)), privacy: .public)")
         let excludedIDs = Set(NSApp.windows.filter { $0.sharingType == .none && $0.windowNumber > 0 }.map { CGWindowID($0.windowNumber) })
         let excludedWindows = content.windows.filter { excludedIDs.contains($0.windowID) }
         var frames: [CGDirectDisplayID: FrozenScreenFrame] = [:]
@@ -28,6 +33,7 @@ enum FrozenScreenCapture {
             frames[id] = FrozenScreenFrame(displayID: id, pointsRect: display.frame, image: image)
         }
         try Task.checkCancellation()
+        log.info("Frozen frames ready in \(String(describing: enumerated.duration(to: .now)), privacy: .public)")
         return frames
     }
 }

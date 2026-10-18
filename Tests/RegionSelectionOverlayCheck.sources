@@ -1,0 +1,4 @@
+Sources/Capture/RegionSelectionOverlay.swift
+Sources/Capture/RegionGeometry.swift
+Sources/Capture/FrozenScreenFrame.swift
+Sources/BetterShot/ActiveDisplayResolver.swift
