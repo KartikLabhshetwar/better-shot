@@ -41,6 +41,7 @@ final class DockExportProgressCoordinator {
     }
 
     private func updateDockIcon() {
+        guard ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] != "1" else { return }
         guard !progressByTask.isEmpty else {
             DockProgress.resetProgress()
             return

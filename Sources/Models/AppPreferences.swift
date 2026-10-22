@@ -29,6 +29,9 @@ enum AppPreferences {
     private static let recordingMicrophoneDeviceIDKey = "bs_recordingMicrophoneDeviceID"
     private static let lastRegionRectKey = "bs_lastRegionRect"
     private static let captureRegionOnReleaseKey = "bs_captureRegionOnRelease"
+    private static let freezeScreenDuringRegionCaptureKey = "bs_freezeScreenDuringRegionCapture"
+    static let nativeRegionSelectorKey = "bs_nativeRegionSelector"
+    static let preselectPreviousRegionKey = "bs_preselectPreviousRegion"
 
     // MARK: - Appearance
     static var appearance: AppAppearance {
@@ -264,6 +267,24 @@ enum AppPreferences {
     static var captureRegionOnRelease: Bool {
         get { UserDefaults.standard.bool(forKey: captureRegionOnReleaseKey) }
         set { UserDefaults.standard.set(newValue, forKey: captureRegionOnReleaseKey) }
+    }
+
+    /// Show and crop a captured frame while selecting a screenshot region.
+    static var freezeScreenDuringRegionCapture: Bool {
+        get { UserDefaults.standard.bool(forKey: freezeScreenDuringRegionCaptureKey) }
+        set { UserDefaults.standard.set(newValue, forKey: freezeScreenDuringRegionCaptureKey) }
+    }
+
+    /// Routes region screenshots through macOS's `screencapture -i` instead of BetterShot's selector.
+    static var nativeRegionSelector: Bool {
+        get { UserDefaults.standard.bool(forKey: nativeRegionSelectorKey) }
+        set { UserDefaults.standard.set(newValue, forKey: nativeRegionSelectorKey) }
+    }
+
+    /// Opens BetterShot's selector with the last area already selected. On unless turned off.
+    static var preselectPreviousRegion: Bool {
+        get { UserDefaults.standard.object(forKey: preselectPreviousRegionKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: preselectPreviousRegionKey) }
     }
 
     // MARK: - History

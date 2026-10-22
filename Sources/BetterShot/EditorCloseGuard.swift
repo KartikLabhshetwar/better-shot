@@ -28,10 +28,15 @@ final class EditorCloseGuard: NSObject, NSWindowDelegate {
     var offersDelete: () -> Bool = { false }
     var projectName: () -> String = { "" }
     var onDecision: (Decision, @escaping () -> Void) -> Void = { _, done in done() }
+    /// A Save still writing the saved file, which closing waits for instead of cancelling.
+    var isFinishingSave: () -> Bool = { false }
+    /// Waits for that Save and returns false when it failed, keeping the window open for Retry.
+    var finishSave: () async -> Bool = { true }
 
     private weak var attachedWindow: NSWindow?
     private nonisolated(unsafe) weak var previousDelegate: NSWindowDelegate?
     private var isPrompting = false
+    private var isWaitingForSave = false
     private var isCloseApproved = false
 
     func attach(to window: NSWindow?) {
@@ -62,6 +67,16 @@ final class EditorCloseGuard: NSObject, NSWindowDelegate {
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         if isCloseApproved { return true }
+        if isFinishingSave() {
+            guard !isWaitingForSave else { return false }
+            isWaitingForSave = true
+            Task { [weak self, weak sender] in
+                let saved = await self?.finishSave() == true
+                self?.isWaitingForSave = false
+                if saved { sender?.performClose(nil) }
+            }
+            return false
+        }
         guard hasUnsavedChanges() else { return true }
         guard !isPrompting else { return false }
 

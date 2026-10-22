@@ -1,5 +1,5 @@
 {
-  "version": "0.5.8",
-  "build": 25,
-  "minimumOS": "26.0"
+  "version": "0.5.9",
+  "build": 26,
+  "minimumOS": "14.0"
 }

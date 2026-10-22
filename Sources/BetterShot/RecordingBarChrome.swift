@@ -246,7 +246,7 @@ struct BarActionLabel: View {
             // panel key when showing it. While BetterShot is inactive the
             // engine doesn't consult it at all and BarControlHover's NSCursor
             // path takes over.
-            .pointerStyle(isEnabled ? .link : nil)
+            .hoverPointer(isEnabled ? .link : nil)
             .onGeometryChange(for: CGRect.self) {
                 $0.frame(in: .named(BarCoordinateSpace.bar))
             } action: {

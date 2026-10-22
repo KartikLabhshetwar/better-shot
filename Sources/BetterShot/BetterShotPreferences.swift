@@ -282,14 +282,8 @@ enum ScreenshotFileActions {
                                               text: String? = nil, pasteboard: NSPasteboard = .general) throws {
         let imageData = try Data(contentsOf: url, options: .mappedIfSafe)
         // Keep a clipboard snapshot independent of later dismissal, edits, or Save.
-        // Paste targets show the file name, so it carries the capture's name;
-        // a per-copy folder keeps two copies of one capture apart.
-        let clipboardDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("BetterShot-Clipboard", isDirectory: true)
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: clipboardDirectory, withIntermediateDirectories: true)
-        let clipboardURL = clipboardDirectory
-            .appendingPathComponent(captureFileName(for: captureURL, extension: url.pathExtension))
+        // Paste targets show the file name, so it carries the capture's name.
+        let clipboardURL = try captureNamedURL(for: url, of: captureURL, in: "BetterShot-Clipboard")
         try imageData.write(to: clipboardURL, options: .atomic)
         pasteboard.clearContents()
 
@@ -393,6 +387,26 @@ enum ScreenshotFileActions {
     /// to it through the capture's record; any other file keeps its own name.
     static func captureFileName(for url: URL, extension pathExtension: String) -> String {
         URL(fileURLWithPath: captureName(for: url)).appendingPathExtension(pathExtension).lastPathComponent
+    }
+
+    /// Drags a file named after the capture; an image-data flavor would make Finder drop `name.jpg.jpeg`.
+    static func dragItemProvider(for url: URL, of captureURL: URL) throws -> NSItemProvider {
+        let dragURL = try captureNamedURL(for: url, of: captureURL, in: "BetterShot-Drag")
+        do {
+            try FileManager.default.linkItem(at: url, to: dragURL)
+        } catch {
+            try FileManager.default.copyItem(at: url, to: dragURL)
+        }
+        return NSItemProvider(object: dragURL as NSURL)
+    }
+
+    /// A temporary path carrying the capture's name, in its own folder so two copies of one capture stay apart.
+    private static func captureNamedURL(for url: URL, of captureURL: URL, in folder: String) throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(folder, isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory.appendingPathComponent(captureFileName(for: captureURL, extension: url.pathExtension))
     }
 
     /// The capture's name without an extension.

@@ -13,34 +13,46 @@ struct OverlaySettingsTab: View {
     private var layout: OverlayToolLayout { OverlayToolLayout(data: layoutData) }
 
     var body: some View {
-        Form {
-            Section {
-                Picker("Layout preset", selection: Binding(
-                    get: { layout.preset },
-                    set: { if let preset = $0.layout { layoutData = preset.data } }
-                )) {
-                    ForEach(OverlayLayoutPreset.allCases) { preset in
-                        Text(preset.title).tag(preset).disabled(preset == .custom)
+        SettingsPage {
+            SettingsGroup("Quick Setup") {
+                SettingRow("Layout") {
+                    Picker("Layout preset", selection: Binding(
+                        get: { layout.preset },
+                        set: { if let preset = $0.layout { layoutData = preset.data } }
+                    )) {
+                        ForEach(OverlayLayoutPreset.allCases) { preset in
+                            Text(preset.title).tag(preset).disabled(preset == .custom)
+                        }
                     }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
                 }
-                .pickerStyle(.segmented)
-                Picker("Screen position", selection: $position) {
-                    Text("Bottom Right").tag(OverlayPosition.bottomRight.rawValue)
-                    Text("Bottom Left").tag(OverlayPosition.bottomLeft.rawValue)
-                }
-                Picker("Card size", selection: $size) {
-                    ForEach(OverlayCardSize.allCases) { size in
-                        Text(size.label).tag(size.rawValue)
+                SettingsDivider()
+                SettingRow("Screen position") {
+                    Picker("Screen position", selection: $position) {
+                        Text("Bottom Right").tag(OverlayPosition.bottomRight.rawValue)
+                        Text("Bottom Left").tag(OverlayPosition.bottomLeft.rawValue)
                     }
+                    .labelsHidden()
+                    .fixedSize()
                 }
-                .pickerStyle(.segmented)
-            } header: {
-                Text("Quick Setup")
+                SettingsDivider()
+                SettingRow("Card size") {
+                    Picker("Card size", selection: $size) {
+                        ForEach(OverlayCardSize.allCases) { size in
+                            Text(size.label).tag(size.rawValue)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                }
             } footer: {
                 Text("Standard keeps every action. Sharing puts cloud sharing in the center. Minimal keeps Copy, Save, and Dismiss; click the image to edit.")
             }
 
-            Section {
+            SettingsGroup("Tool Positions") {
                 VStack(spacing: 12) {
                     OverlayLayoutEditor(layout: Binding(
                         get: { layout }, set: { layoutData = $0.data }
@@ -49,37 +61,33 @@ struct OverlaySettingsTab: View {
                         .font(.callout).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-            } header: {
-                Text("Tool Positions")
+                .padding(.vertical, 16)
             } footer: {
                 Text("Move Pin, Copy, Save, Edit, Cloud Share, or Dismiss to any of the six positions. Choosing a tool already on the card swaps positions. Choose Empty to hide a tool. Dismiss always stays available.")
             }
 
-            Section {
-                Toggle("Always show actions", isOn: $alwaysShowActions)
-                InspectorSlider("Edge Margin", value: Binding(
-                    get: { CGFloat(margin) }, set: { margin = (Double($0) / 4).rounded() * 4 }
-                ), range: CGFloat(AppPreferences.overlayEdgeMarginRange.lowerBound)...CGFloat(AppPreferences.overlayEdgeMarginRange.upperBound),
-                   format: .points)
-                InspectorSlider("Hide After", value: Binding(
-                    get: { CGFloat(delay) }, set: { delay = Double($0.rounded()) }
-                ), range: CGFloat(AppPreferences.overlayDismissRange.lowerBound)...CGFloat(AppPreferences.overlayDismissRange.upperBound),
-                   format: .seconds(never: CGFloat(AppPreferences.overlayDismissNever)))
-            } header: {
-                Text("Advanced")
+            SettingsGroup("Behavior") {
+                SettingToggle("Always show actions", caption: "Otherwise actions appear on hover or keyboard focus.", isOn: $alwaysShowActions)
+                SettingsDivider()
+                VStack(spacing: 10) {
+                    InspectorSlider("Edge Margin", value: Binding(
+                        get: { CGFloat(margin) }, set: { margin = (Double($0) / 4).rounded() * 4 }
+                    ), range: CGFloat(AppPreferences.overlayEdgeMarginRange.lowerBound)...CGFloat(AppPreferences.overlayEdgeMarginRange.upperBound),
+                       format: .points)
+                    InspectorSlider("Hide After", value: Binding(
+                        get: { CGFloat(delay) }, set: { delay = Double($0.rounded()) }
+                    ), range: CGFloat(AppPreferences.overlayDismissRange.lowerBound)...CGFloat(AppPreferences.overlayDismissRange.upperBound),
+                       format: .seconds(never: CGFloat(AppPreferences.overlayDismissNever)))
+                }
+                .settingsRowPadding()
             } footer: {
-                Text("Actions otherwise appear on hover or keyboard focus. Choose Never to keep previews visible. Unsaved captures, sharing progress, errors, and finished links stay available until you act on them. Changes apply immediately.")
+                Text("Choose Never to keep previews visible. Unsaved captures, sharing progress, errors, and finished links stay available until you act on them. Changes apply immediately.")
             }
 
-            Section {
-                Button("Restore Overlay Defaults…", role: .destructive) { confirmingReset = true }
-            } footer: {
-                Text("Resets only the overlay. Your captures, cloud links, and other settings are kept.")
+            SettingsResetRow(caption: "Resets only the overlay. Your captures, cloud links, and other settings are kept.") {
+                confirmingReset = true
             }
         }
-        .formStyle(.grouped)
-        .scrollIndicators(.hidden)
         .onChange(of: position) { PreviewOverlay.shared.refreshSettings() }
         .onChange(of: size) { PreviewOverlay.shared.refreshSettings() }
         .onChange(of: margin) { PreviewOverlay.shared.refreshSettings() }
@@ -117,7 +125,7 @@ struct OverlayLayoutEditor: View {
                     if let tool = layout.assignments[slot] {
                         OverlayToolLabel(tool: tool, slot: slot, scale: OverlayCardSize.large.controlScale)
                     } else {
-                        Image(systemName: "plus.circle.dashed")
+                        Image(systemName: "plus.circle")
                             .font(.system(size: 24)).foregroundStyle(.white)
                             .frame(width: 33, height: 33)
                     }

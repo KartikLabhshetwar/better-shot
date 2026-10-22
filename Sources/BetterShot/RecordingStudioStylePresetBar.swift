@@ -234,9 +234,10 @@ private struct RecordingStudioStylePresetPopUpButton: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSPopUpButton {
         let button = NSPopUpButton(frame: .zero, pullsDown: true)
-        button.usesItemFromMenu = false
+        let cell = button.cell as? NSPopUpButtonCell
+        cell?.usesItemFromMenu = false
         button.autoenablesItems = false
-        button.altersStateOfSelectedItem = false
+        cell?.altersStateOfSelectedItem = false
         button.preferredEdge = .minY
         button.bezelStyle = .rounded
         button.controlSize = .regular

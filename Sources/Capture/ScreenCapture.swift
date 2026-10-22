@@ -1,5 +1,4 @@
 import AppKit
-import Vision
 import CoreGraphics
 
 @MainActor
@@ -52,18 +51,37 @@ final class ScreenCapture {
 
     // MARK: - Region
 
-    /// Opens BetterShot's adjustable selector, including the capture-on-release setting.
+    /// Uses the native macOS selector when enabled, else BetterShot's, over a frozen frame when that setting is on.
     func captureRegion() async throws -> URL? {
         guard !isCapturing else { return nil }
         isCapturing = true
         defer { isCapturing = false }
 
-        switch await RegionSelectionOverlay().selectRegion() {
+        if AppPreferences.nativeRegionSelector {
+            return try await interactiveShot(window: false, includeShadow: false)
+        }
+
+        var frozenFrames = AppPreferences.freezeScreenDuringRegionCapture ? try await FrozenScreenCapture.capture() : [:]
+        switch await RegionSelectionOverlay().selectRegion(frozenFrames: frozenFrames) {
         case .cancelled:
             return nil
         case .window:
+            frozenFrames.removeAll()
             return try await interactiveShot(window: true, includeShadow: false)
         case .region(let selection):
+            if !frozenFrames.isEmpty {
+                guard let frame = frozenFrames[selection.displayID], frame.pointsRect == CGDisplayBounds(selection.displayID) else {
+                    throw NSError(domain: "BetterShot.FrozenScreenCapture", code: 2, userInfo: [
+                        NSLocalizedDescriptionKey: "The selected display changed during capture. Try capturing again."
+                    ])
+                }
+                frozenFrames.removeAll()
+                let url = URL(fileURLWithPath: makeTempPath())
+                try await Task.detached(priority: .userInitiated) {
+                    try frame.writePNG(in: selection.pointsRect, to: url)
+                }.value
+                return url
+            }
             return try await regionShot(selection.pointsRect)
         }
     }
@@ -108,59 +126,14 @@ final class ScreenCapture {
 
     // MARK: - OCR Region
 
-    func captureAndOCR() async throws -> String? {
+    func captureAndOCR(onRecognizing: () -> Void = {}) async throws -> String? {
         guard !isCapturing else { return nil }
         isCapturing = true
         defer { isCapturing = false }
         guard let url = try await interactiveShot(window: false, includeShadow: false) else { return nil }
         defer { try? FileManager.default.removeItem(at: url) }
-
-        guard let image = NSImage(contentsOf: url),
-              let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            return nil
-        }
-
-        return try await recognizeContent(in: cgImage)
-    }
-
-    private func recognizeContent(in image: CGImage) async throws -> String {
-        return try await withCheckedThrowingContinuation { continuation in
-            let textRequest = VNRecognizeTextRequest()
-            textRequest.recognitionLevel = .accurate
-            textRequest.usesLanguageCorrection = true
-
-            let barcodeRequest = VNDetectBarcodesRequest()
-
-            let handler = VNImageRequestHandler(cgImage: image)
-            do {
-                try handler.perform([textRequest, barcodeRequest])
-
-                var parts: [String] = []
-
-                // QR/Barcode results first
-                if let barcodeResults = barcodeRequest.results {
-                    for barcode in barcodeResults {
-                        if let payload = barcode.payloadStringValue, !payload.isEmpty {
-                            parts.append(payload)
-                        }
-                    }
-                }
-
-                // Text results
-                if let textResults = textRequest.results {
-                    let text = textResults
-                        .compactMap { $0.topCandidates(1).first?.string }
-                        .joined(separator: "\n")
-                    if !text.isEmpty {
-                        parts.append(text)
-                    }
-                }
-
-                continuation.resume(returning: parts.joined(separator: "\n"))
-            } catch {
-                continuation.resume(throwing: error)
-            }
-        }
+        onRecognizing()
+        return try await ImageTextRecognizer.recognizeContent(at: url)
     }
 
     // MARK: - Sound

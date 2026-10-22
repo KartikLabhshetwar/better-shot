@@ -92,6 +92,12 @@ nonisolated struct ScreenRecordingCaptureOptions: Sendable {
     var microphoneDeviceID: String?
     var cameraDeviceID: String?
 
+    /// ScreenCaptureKit records microphones from macOS 15; there is no other narration capture path.
+    static var supportsMicrophone: Bool {
+        if #available(macOS 15.0, *) { return true }
+        return false
+    }
+
     @MainActor
     static func fromPreferences() -> ScreenRecordingCaptureOptions {
         var options = ScreenRecordingCaptureOptions()
@@ -531,7 +537,11 @@ final class ScreenRecordingManager {
         var warnings: [String] = []
 
         if let microphoneID = requested.microphoneDeviceID {
-            if RecordingDeviceCatalog.microphone(withID: microphoneID) == nil {
+            if !ScreenRecordingCaptureOptions.supportsMicrophone {
+                resolved.microphoneDeviceID = nil
+                BetterShotPreferences.recordingMicrophoneDeviceID = ""
+                warnings.append("Microphone recording requires macOS 15 or later, so this recording will not include narration.")
+            } else if RecordingDeviceCatalog.microphone(withID: microphoneID) == nil {
                 resolved.microphoneDeviceID = nil
                 BetterShotPreferences.recordingMicrophoneDeviceID = ""
                 warnings.append("The selected microphone is no longer available, so it was turned off.")
@@ -867,11 +877,12 @@ nonisolated final class ScreenRecordingCapture: NSObject, SCStreamOutput, SCStre
         let stream = SCStream(filter: filter, configuration: configuration, delegate: self)
         try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: videoQueue)
         streamHasAudio = configuration.capturesAudio
-        streamHasMicrophone = configuration.captureMicrophone
+        streamHasMicrophone = false
         if streamHasAudio {
             try stream.addStreamOutput(self, type: .audio, sampleHandlerQueue: audioQueue)
         }
-        if streamHasMicrophone {
+        if #available(macOS 15.0, *), configuration.captureMicrophone {
+            streamHasMicrophone = true
             try stream.addStreamOutput(self, type: .microphone, sampleHandlerQueue: audioQueue)
         }
         try await stream.startCapture()
@@ -886,7 +897,7 @@ nonisolated final class ScreenRecordingCapture: NSObject, SCStreamOutput, SCStre
             if streamHasAudio {
                 try? stream.removeStreamOutput(self, type: .audio)
             }
-            if streamHasMicrophone {
+            if #available(macOS 15.0, *), streamHasMicrophone {
                 try? stream.removeStreamOutput(self, type: .microphone)
             }
         }
@@ -930,14 +941,16 @@ nonisolated final class ScreenRecordingCapture: NSObject, SCStreamOutput, SCStre
         // input.json and Studio/exports draw a synthetic, smoothed pointer
         // instead (see RecordingPointerTimeline).
         configuration.showsCursor = false
-        configuration.showMouseClicks = false
         configuration.capturesAudio = options.capturesSystemAudio
         if options.capturesSystemAudio {
             configuration.excludesCurrentProcessAudio = true
         }
-        configuration.captureMicrophone = options.microphoneDeviceID != nil
-        if let microphoneDeviceID = options.microphoneDeviceID {
-            configuration.microphoneCaptureDeviceID = microphoneDeviceID
+        if #available(macOS 15.0, *) {
+            configuration.showMouseClicks = false
+            configuration.captureMicrophone = options.microphoneDeviceID != nil
+            if let microphoneDeviceID = options.microphoneDeviceID {
+                configuration.microphoneCaptureDeviceID = microphoneDeviceID
+            }
         }
         return configuration
     }

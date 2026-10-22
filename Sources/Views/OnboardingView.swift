@@ -1,268 +1,327 @@
 import AppKit
-import Combine
 import SwiftUI
-import TourKit
 
-struct OnboardingView: View {
-    enum Step: Int, CaseIterable {
-        case welcome, permissions, ready
+enum OnboardingStep: Int, CaseIterable {
+    case welcome, permissions, saving, practice
 
-        var title: String {
-            switch self {
-            case .welcome: "Welcome"
-            case .permissions: "Permissions"
-            case .ready: "First Capture"
-            }
+    var title: String {
+        switch self {
+        case .welcome: "Capture anything on your screen"
+        case .permissions: "Two quick permissions"
+        case .saving: "Choose where screenshots go"
+        case .practice: "Try it now"
         }
     }
 
-    @State var step: Step = .welcome
+    var subtitle: String {
+        switch self {
+        case .welcome: "Screenshots and recordings, polished and ready to share."
+        case .permissions: "BetterShot needs screen access to capture. Accessibility lets your shortcuts work in any app."
+        case .saving: "Every capture opens in a preview first. Keep a copy in your folder, or save only when you choose."
+        case .practice: "Take a screenshot and watch it land here."
+        }
+    }
+
+    var symbol: String? {
+        switch self {
+        case .welcome: nil
+        case .permissions: "hand.raised.fill"
+        case .saving: "folder.fill"
+        case .practice: "viewfinder"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .welcome: EditorChrome.accent
+        case .permissions: .blue
+        case .saving: .purple
+        case .practice: .orange
+        }
+    }
+}
+
+struct OnboardingView: View {
+    private static let permissionList: [OnboardingPermission] = [.screen, .accessibility]
+
+    @State var step: OnboardingStep = .welcome
     var resourceBundle: Bundle = .main
     var isPermissionPreview = ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] == "1"
-    @State private var permissions = OnboardingPermissions(resumesOnboarding: true)
+    @State private var forward = true
+    @State private var permissions = OnboardingPermissions()
+    @State private var practiceStart = CaptureOrchestrator.shared.lastCaptureURL
+    @State private var practiceThumbnail: NSImage?
     @State private var errorMessage: String?
-    @State private var demo: OnboardingDemo = .screenshot
-    private let permissionRefresh = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
+    @AppStorage("bs_saveDirectory") private var saveDirectory = AppPreferences.saveDirectory
+    @AppStorage(AfterCaptureAction.save.storageKey(for: .screenshot))
+    private var savesScreenshots = AfterCaptureAction.save.defaultValue(for: .screenshot)
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var capture: CaptureOrchestrator { .shared }
+    private var regionShortcut: ShortcutService.Shortcut? { ShortcutService.shared.effectiveShortcut(for: .region) }
+    private var practiceCapture: URL? { capture.lastCaptureURL == practiceStart ? nil : capture.lastCaptureURL }
 
     var body: some View {
         VStack(spacing: 0) {
-            ScrollViewReader { proxy in
-                GeometryReader { geometry in
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 24) {
-                            switch step {
-                            case .welcome: welcome(width: min(560, max(320, geometry.size.width - 48)))
-                            case .permissions: permissionSetup
-                            case .ready: ready
-                            }
-                            if let errorMessage {
-                                Label(errorMessage, systemImage: "exclamationmark.triangle")
-                                    .font(.callout).foregroundStyle(.red)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                        .frame(maxWidth: 560)
-                        .padding(24)
-                        .frame(maxWidth: .infinity, minHeight: geometry.size.height)
-                        .id("stepContent")
-                    }
-                }
-                .onChange(of: step) { _, _ in
-                    errorMessage = nil
-                    proxy.scrollTo("stepContent", anchor: .top)
-                    permissions.refresh()
-                }
-            }
-            if step != .welcome { navigation }
+            page
+                .id(step)
+                .transition(pageTransition)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            bottomBar
         }
         .background(EditorChrome.workspace)
         .tint(EditorChrome.accent)
         .frame(minWidth: 520, minHeight: 560)
-        .onAppear { permissions.refresh() }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in permissions.refresh() }
-        .onReceive(permissionRefresh) { _ in
-            if step != .welcome { permissions.refresh() }
+        .task {
+            while !Task.isCancelled {
+                permissions.refresh()
+                try? await Task.sleep(for: .seconds(1))
+            }
         }
     }
 
-    private var navigation: some View {
-        HStack(spacing: 12) {
-            if step != .welcome {
-                Button { step = Step(rawValue: step.rawValue - 1) ?? .welcome } label: {
-                    Label("Back", systemImage: "chevron.left").labelStyle(.iconOnly)
-                }
-                .buttonStyle(EditorButtonStyle())
-                .accessibilityLabel("Previous step")
-                .help("Back")
-            }
-            Text("\(step.rawValue + 1) of \(Step.allCases.count)")
-                .font(.caption).monospacedDigit().foregroundStyle(.secondary)
-            Spacer(minLength: 0)
-            Button("Skip Setup") { OnboardingWindowController.shared.finish(openCaptureBar: true) }
-                .buttonStyle(EditorButtonStyle())
-                .keyboardShortcut(.cancelAction)
-            Button(nextTitle) {
-                if step == .ready {
-                    OnboardingWindowController.shared.finish(openCaptureBar: true)
-                } else {
-                    step = Step(rawValue: step.rawValue + 1) ?? .ready
-                }
-            }
-            .buttonStyle(EditorButtonStyle(selected: true, horizontalPadding: 16))
-            .keyboardShortcut(.defaultAction)
-        }
-        .disabled(permissions.requesting != nil)
-        .padding(20)
-        .background(EditorChrome.workspace)
-        .overlay(alignment: .top) { Divider() }
+    private var pageTransition: AnyTransition {
+        guard !reduceMotion else { return .opacity }
+        return .asymmetric(insertion: .move(edge: forward ? .trailing : .leading).combined(with: .opacity),
+                           removal: .move(edge: forward ? .leading : .trailing).combined(with: .opacity))
     }
 
-    private var nextTitle: String {
+    private var page: some View {
+        VStack(spacing: 28) {
+            hero.frame(height: 96)
+            VStack(spacing: 10) {
+                Text(step.title)
+                    .font(.largeTitle.bold())
+                    .accessibilityAddTraits(.isHeader)
+                Text(step.subtitle)
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+            }
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            content
+        }
+        .frame(maxWidth: 520)
+        .padding(.horizontal, 40)
+    }
+
+    @ViewBuilder private var hero: some View {
+        if let symbol = step.symbol {
+            Image(systemName: symbol)
+                .font(.system(size: 48, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(width: 88, height: 88)
+                .background(step.tint.gradient, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .accessibilityHidden(true)
+        } else {
+            Image(nsImage: resourceBundle.image(forResource: "AppIcon") ?? NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 96, height: 96)
+                .accessibilityHidden(true)
+        }
+    }
+
+    @ViewBuilder private var content: some View {
         switch step {
-        case .welcome: "Get Started"
-        case .permissions: "Continue"
-        case .ready: "Open Capture Bar"
+        case .welcome: welcome
+        case .permissions: permissionSetup
+        case .saving: saving
+        case .practice: practice
         }
     }
 
-    private func welcome(width: CGFloat) -> some View {
-        TourSlideshowView(pages: Self.tourPages(in: resourceBundle), width: width,
-            finishButtonTitle: "Set Up Permissions",
-            onFinish: { step = .permissions }, onClose: { step = .permissions })
-    }
-
-    static func tourPages(in bundle: Bundle) -> [TourPage] {
-        [
-            TourPage(imageName: "Onboarding/screenshot-demo.png", imageBundle: bundle,
-                title: "Capture and make it clear",
-                description: "Add arrows, text, and a background. Copy privately, or save and share when you’re ready."),
-            TourPage(imageName: "Onboarding/recording-demo.png", imageBundle: bundle,
-                title: "Turn recordings into a story",
-                description: "Trim the timeline, then use + Add for Zoom or a 3D Shot. Hover over an empty 3D lane to preview where a shot will fit."),
-            TourPage(imageName: "Onboarding/3d-demo.png", imageBundle: bundle,
-                title: "Give your video depth",
-                description: "Select a 3D shot to explore Moves and Angles in Effects. Adjust Camera, Blur, and Keyframes, then play the shot to check the result.")
-        ]
+    private var welcome: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label {
+                Text(captureHint(spoken: false)).accessibilityLabel(captureHint(spoken: true))
+            } icon: {
+                Image(systemName: "rectangle.dashed")
+            }
+            Label("Add arrows, text, and a soft background", systemImage: "pencil.tip.crop.circle")
+            Label("Record your screen with zoom and 3D shots", systemImage: "record.circle")
+            Label {
+                Text("Find everything in the clover in your menu bar")
+            } icon: {
+                Image("MenuBarIcon", bundle: resourceBundle)
+            }
+        }
+        .font(.body)
+        .foregroundStyle(.secondary)
+        .labelStyle(OnboardingLabelStyle())
     }
 
     private var permissionSetup: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            heading("Set up permissions",
-                detail: "Allow screen capture to get started. Choose the other features you’ll use.")
-            if isPermissionPreview {
-                Label("Preview only. Open BetterShot to grant permissions.", systemImage: "info.circle")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            VStack(spacing: 8) {
-                ForEach(OnboardingPermission.allCases) { permission in
-                    permissionRow(permission)
+        VStack(spacing: 12) {
+            Form {
+                ForEach(Self.permissionList) { permission in
+                    OnboardingPermissionRow(permission: permission, status: permissions.status(permission),
+                        attempted: permissions.attempted.contains(permission),
+                        isRequesting: permissions.requesting == permission,
+                        requestsDisabled: permissions.requesting != nil || isPermissionPreview,
+                        errorMessage: permissions.settingsErrorPermission == permission ? permissions.settingsError : nil,
+                        request: { Task { await permissions.request(permission) } },
+                        openSettings: { permissions.openSettings(permission) })
                 }
             }
-            Text("Microphone and camera stay off until you choose them for a recording.")
-                .font(.caption).foregroundStyle(.secondary)
+            .formStyle(.grouped)
+            .scrollDisabled(true)
+            .scrollContentBackground(.hidden)
+            .fixedSize(horizontal: false, vertical: true)
             if permissions.shortcutsNeedRestart {
-                Label("Save your work and reopen BetterShot to activate shortcuts.", systemImage: "arrow.clockwise")
-                    .font(.callout).foregroundStyle(.secondary)
-            }
-            HStack(spacing: 12) {
-                Text("Access updates when you return here.")
-                    .font(.caption).foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-                Button("Check Again") { permissions.refresh() }
-                    .buttonStyle(EditorButtonStyle(bordered: true))
-                    .disabled(permissions.requesting != nil || isPermissionPreview)
+                Label("Save your work and reopen BetterShot to turn on shortcuts.", systemImage: "arrow.clockwise")
+                    .foregroundStyle(.secondary)
+            } else if isPermissionPreview {
+                Label("Preview only. Open BetterShot to grant permissions.", systemImage: "info.circle")
+                    .foregroundStyle(.secondary)
             }
         }
     }
 
-    private func permissionRow(_ permission: OnboardingPermission) -> some View {
-        OnboardingPermissionRow(permission: permission, status: permissions.status(permission),
-            attempted: permissions.attempted.contains(permission),
-            isRequesting: permissions.requesting == permission,
-            requestsDisabled: permissions.requesting != nil || isPermissionPreview,
-            errorMessage: permissions.settingsErrorPermission == permission ? permissions.settingsError : nil,
-            request: { Task { await permissions.request(permission) } },
-            openSettings: { permissions.openSettings(permission) })
+    private var saving: some View {
+        Form {
+            Toggle(isOn: $savesScreenshots) {
+                Text("Save screenshots automatically")
+                Text(savesScreenshots ? "Each new screenshot is saved to your folder right away."
+                                      : "Choose Save or Export when you want a file.")
+            }
+            .toggleStyle(.switch)
+            LabeledContent {
+                Button("Choose\u{2026}", action: chooseSaveDirectory)
+            } label: {
+                Text("Save folder")
+                Text(URL(fileURLWithPath: saveDirectory).abbreviatedHomePath)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+        }
+        .formStyle(.grouped)
+        .scrollDisabled(true)
+        .scrollContentBackground(.hidden)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
-    private var ready: some View {
+    private var practice: some View {
         VStack(spacing: 16) {
-            heading("Take your first capture", detail: "Choose Area for a screenshot, or Recording for a video.")
-            HStack(spacing: 14) {
-                Image("MenuBarIcon", bundle: resourceBundle)
-                    .padding(12).background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Find the clover in your menu bar").font(.headline)
-                    Text("Your captures and tools are always there.")
-                        .font(.callout).foregroundStyle(.secondary)
+            VStack(spacing: 14) {
+                if let practiceThumbnail {
+                    Image(nsImage: practiceThumbnail)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxHeight: 110)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .accessibilityLabel("Your screenshot")
+                } else {
+                    Image(systemName: capture.captureInProgress ? "rectangle.dashed" : "viewfinder")
+                        .font(.system(size: 34, weight: .light))
+                        .foregroundStyle(EditorChrome.accent)
+                        .accessibilityHidden(true)
                 }
-                Spacer(minLength: 0)
+                Text(practiceText(spoken: false))
+                    .accessibilityLabel(practiceText(spoken: true))
+                    .font(practiceCapture == nil ? .body : .title3)
+                    .foregroundStyle(practiceCapture == nil ? .secondary : .primary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(16).studioEffectCard()
-            shortcutRow("Open capture bar", symbol: "rectangle.bottomthird.inset.filled", action: .recording)
-            if permissions.status(.accessibility) != .allowed || permissions.shortcutsNeedRestart {
-                HStack(alignment: .top, spacing: 12) {
-                    Text(permissions.shortcutsNeedRestart
-                         ? "Reopen BetterShot to activate shortcuts. The clover menu works now."
-                         : "Shortcuts need Accessibility access. The clover menu works without it.")
-                        .font(.callout).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
-                    Button("Enable Shortcuts") {
-                        step = .permissions
-                    }
-                }
+            .frame(maxWidth: .infinity, minHeight: 130)
+            .padding(20)
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            HStack(spacing: 12) {
+                Button("Capture an Area", systemImage: "rectangle.dashed", action: captureArea)
+                    .disabled(capture.captureInProgress)
+                Button("Open a Practice Image", systemImage: "photo") { openSample(.coast) }
             }
-            if permissions.status(.screen) != .allowed {
-                HStack {
-                    Text("Screen access is off. Practice works without it.")
-                        .font(.callout).foregroundStyle(.secondary)
-                    Spacer(minLength: 8)
-                    Button("Allow Access") { step = .permissions }
-                }
+            if let errorMessage {
+                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Button { openSample(.coast) } label: {
-                HStack(spacing: 14) {
-                    if let url = OnboardingSample.coast.sourceURL(in: resourceBundle), let image = NSImage(contentsOf: url) {
-                        Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
-                            .frame(width: 76, height: 60).clipped()
-                            .clipShape(RoundedRectangle(cornerRadius: 6)).accessibilityHidden(true)
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Try a practice image").font(.headline)
-                        Text("Add an arrow, change the background, then export.")
-                            .font(.callout).foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right").foregroundStyle(.secondary).accessibilityHidden(true)
-                }
-                .padding(14).studioEffectCard()
+        }
+        .onAppear { practiceStart = capture.lastCaptureURL }
+        .task(id: practiceCapture) {
+            guard let url = practiceCapture else {
+                practiceThumbnail = nil
+                return
             }
-            .buttonStyle(.plain)
-            .accessibilityHint("Opens a separate copy in the image editor. No screen access needed.")
-            DisclosureGroup("Watch a short demo") {
-                Picker("Explore BetterShot", selection: $demo) {
-                    ForEach(OnboardingDemo.allCases) { demo in Text(demo.title).tag(demo) }
-                }.pickerStyle(.segmented)
-                OnboardingDemoView(demo: demo, resourceBundle: resourceBundle).id(demo)
-            }
-            Text("Change your shortcuts anytime in Settings → Shortcuts.")
-                .font(.caption).foregroundStyle(.secondary)
+            let decoded = await Task.detached(priority: .utility) {
+                HistoryStore.decodeThumbnail(.init(url: url, kind: .screenshot), maxSize: 480)
+            }.value
+            guard !Task.isCancelled else { return }
+            practiceThumbnail = decoded
         }
     }
 
-    private func heading(_ title: String, detail: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.system(size: 30, weight: .semibold)).accessibilityAddTraits(.isHeader)
-            Text(detail).font(.system(size: 14)).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .multilineTextAlignment(.leading)
-        .frame(maxWidth: .infinity, alignment: .leading)
+    private func captureHint(spoken: Bool) -> String {
+        guard let regionShortcut else { return "Capture an area from the capture bar" }
+        return "Press \(spoken ? regionShortcut.accessibilityDescription : regionShortcut.displayString) to capture an area"
     }
 
-    private func shortcutRow(_ title: String, symbol: String, action: ShortcutService.Action) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: symbol).frame(width: 24).foregroundStyle(.secondary).accessibilityHidden(true)
-            Text(title)
-            Spacer()
-            shortcutValue(action, size: 15)
-        }
-        .padding(.vertical, 12)
+    private func practiceText(spoken: Bool) -> String {
+        if practiceCapture != nil { return "Nice. Your screenshot is ready in the floating preview." }
+        if capture.captureInProgress { return "Drag across any part of your screen." }
+        guard let regionShortcut else { return "Click Capture an Area, then drag across any part of your screen." }
+        return "Press \(spoken ? regionShortcut.accessibilityDescription : regionShortcut.displayString), then drag across any part of your screen."
     }
 
-    private func shortcutValue(_ action: ShortcutService.Action, size: CGFloat) -> some View {
-        Group {
-            if let shortcut = ShortcutService.shared.effectiveShortcut(for: action) {
-                Text(shortcut.displayString).font(.system(size: size, weight: .medium, design: .monospaced))
-                    .accessibilityLabel(shortcut.accessibilityDescription)
+    private var bottomBar: some View {
+        HStack {
+            if step == .welcome {
+                Button("Skip") { OnboardingWindowController.shared.finish(openCaptureBar: true) }
+                    .keyboardShortcut(.cancelAction)
             } else {
-                Text("Shortcut disabled").font(.callout).foregroundStyle(.secondary)
+                Button("Back") { go(to: OnboardingStep(rawValue: step.rawValue - 1)) }
+            }
+            Spacer()
+            if step == .practice {
+                Button("Done") { OnboardingWindowController.shared.finish(openCaptureBar: true) }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
+            } else {
+                Button("Continue") { go(to: OnboardingStep(rawValue: step.rawValue + 1)) }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
             }
         }
-        .fixedSize()
+        .overlay { progressDots }
+        .controlSize(.large)
+        .disabled(permissions.requesting != nil)
+        .padding(20)
+    }
+
+    private var progressDots: some View {
+        HStack(spacing: 6) {
+            ForEach(OnboardingStep.allCases, id: \.self) { item in
+                Capsule()
+                    .fill(item == step ? EditorChrome.accent : Color.secondary.opacity(0.3))
+                    .frame(width: item == step ? 20 : 7, height: 7)
+            }
+        }
+        .accessibilityElement()
+        .accessibilityLabel("Step \(step.rawValue + 1) of \(OnboardingStep.allCases.count)")
+    }
+
+    private func go(to target: OnboardingStep?) {
+        guard let target else { return }
+        forward = target.rawValue > step.rawValue
+        errorMessage = nil
+        withAnimation(.easeOut(duration: 0.2)) { step = target }
+        OnboardingState.save(step: target.rawValue)
+        permissions.refresh()
+    }
+
+    private func captureArea() {
+        let screen = ActiveDisplayResolver.screenForScreenshotCapture()
+        Task { await CaptureOrchestrator.shared.performCapture(.region, on: screen) }
+    }
+
+    private func chooseSaveDirectory() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.prompt = "Save Here"
+        panel.message = "Choose where BetterShot saves new screenshots and recordings."
+        panel.directoryURL = URL(fileURLWithPath: saveDirectory)
+        if panel.runModal() == .OK, let url = panel.url { saveDirectory = url.path }
     }
 
     private func openSample(_ sample: OnboardingSample) {
@@ -279,7 +338,18 @@ struct OnboardingView: View {
             OnboardingWindowController.shared.finish()
             openEditor(url)
         } catch {
-            errorMessage = "Couldn’t prepare the sample. Check that your Mac has free space, then try the practice image again."
+            errorMessage = "Couldn’t prepare the practice image. Check that your Mac has free space, then try again."
+        }
+    }
+}
+
+private struct OnboardingLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 12) {
+            configuration.icon
+                .foregroundStyle(EditorChrome.accent)
+                .frame(width: 22)
+            configuration.title
         }
     }
 }

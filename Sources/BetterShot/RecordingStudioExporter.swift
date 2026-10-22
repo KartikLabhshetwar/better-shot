@@ -376,7 +376,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             AVVideoHeightKey: canvasHeight,
             AVVideoColorPropertiesKey: [
                 AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
-                AVVideoTransferFunctionKey: AVVideoTransferFunction_IEC_sRGB,
+                AVVideoTransferFunctionKey: Self.transferFunction.writer,
                 AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2
             ],
             AVVideoCompressionPropertiesKey: [
@@ -581,7 +581,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
 
             CVBufferSetAttachments(destinationBuffer, [
                 kCVImageBufferColorPrimariesKey: kCVImageBufferColorPrimaries_ITU_R_709_2,
-                kCVImageBufferTransferFunctionKey: kCVImageBufferTransferFunction_sRGB,
+                kCVImageBufferTransferFunctionKey: Self.transferFunction.buffer,
                 kCVImageBufferYCbCrMatrixKey: kCVImageBufferYCbCrMatrix_ITU_R_709_2
             ] as CFDictionary, .shouldPropagate)
             try autoreleasepool {
@@ -661,6 +661,14 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             width: source.width * requestedHeight / source.height,
             height: requestedHeight
         )
+    }
+
+    /// sRGB tagging needs macOS 15; earlier writers keep the BT.709 transfer for encoder and buffers alike.
+    private static var transferFunction: (writer: String, buffer: CFString) {
+        if #available(macOS 15.0, *) {
+            return (AVVideoTransferFunction_IEC_sRGB, kCVImageBufferTransferFunction_sRGB)
+        }
+        return (AVVideoTransferFunction_ITU_R_709_2, kCVImageBufferTransferFunction_ITU_R_709_2)
     }
 
     private static func averageBitRate(
@@ -1014,7 +1022,7 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
                 if let cached = cachedMasks[index] {
                     region = cached
                 } else {
-                    guard let filtered = RecordingMaskRenderer.filteredRegion(source: sourceImage, segment: segment) else {
+                    guard let filtered = RecordingMaskRenderer.filteredRegion(source: CIImage(cvPixelBuffer: screenFrame), segment: segment) else {
                         throw RecordingStudioExporter.ExportError.writerFailed(nil)
                     }
                     let bytes = Int(filtered.extent.width.rounded(.up) * filtered.extent.height.rounded(.up)) * 8
@@ -1069,7 +1077,11 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
             result = try Recording3DBlurRenderer.warp(result.cropped(to: canvas), projection: projection, canvas: canvas)
                 .composited(over: cleanBackground).cropped(to: canvas)
         }
-        result = try Recording3DBlurRenderer.apply(timeline3D.defocus(at: editorTime), to: result, canvas: canvas)
+        let defocus = timeline3D.defocus(at: editorTime)
+        result = try Recording3DBlurRenderer.apply(defocus, to: result, canvas: canvas)
+        if defocus.isActive && (keystrokeTimeline != nil || subtitleTimeline != nil) {
+            result = try flattened(result, in: canvas)
+        }
         if keystrokeTimeline != nil {
             result = try raster { drawKeystrokeCaption(at: sourceTime, in: $0) }.composited(over: result)
         }
@@ -1077,6 +1089,16 @@ nonisolated final class StudioFrameCompositor: @unchecked Sendable {
             result = try raster { drawSubtitleBar(at: sourceTime, in: $0) }.composited(over: result)
         }
         return result
+    }
+
+    /// Renders the image into a pixel buffer so later overlays never fuse with the blur kernels.
+    private func flattened(_ image: CIImage, in canvas: CGRect) throws -> CIImage {
+        guard let pool = overlayPool else { throw RecordingStudioExporter.ExportError.writerFailed(nil) }
+        var buffer: CVPixelBuffer?
+        CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer)
+        guard let buffer else { throw RecordingStudioExporter.ExportError.writerFailed(nil) }
+        renderContext.render(image, to: buffer, bounds: canvas, colorSpace: colorSpace)
+        return CIImage(cvPixelBuffer: buffer, options: [.colorSpace: colorSpace])
     }
 
     private func raster(_ draw: (CGContext) -> Void) throws -> CIImage {

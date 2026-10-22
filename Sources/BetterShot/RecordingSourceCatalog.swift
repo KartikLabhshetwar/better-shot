@@ -22,6 +22,10 @@ final class RecordingSourceCatalog {
     private init() {}
 
     func refresh() async {
+        guard ScreenCapturePermission.isReadyToCapture() else {
+            errorMessage = "Restart BetterShot so macOS applies its Screen Recording permission, then try again."
+            return
+        }
         isLoading = true
         errorMessage = nil
 

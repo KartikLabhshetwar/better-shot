@@ -272,7 +272,7 @@ struct AnnotationSmartRedactionControls: View {
             HStack(spacing: 8) {
                 SmartRedactionButton(
                     title: "Pixelate",
-                    systemImage: "app.background.dotted",
+                    systemImage: "squareshape.split.3x3",
                     isRunning: model.isSmartRedacting
                 ) {
                     onEditorAction()

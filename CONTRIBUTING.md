@@ -32,7 +32,9 @@ A useful bug report includes:
 
 ### Requirements
 
-- macOS 26 or later.
+- macOS 14 or later to run BetterShot. Microphone narration needs macOS 15, and
+  narration subtitles and teleprompter speech tracking need macOS 26. Gate those
+  APIs with `#available` and keep the macOS 14 fallbacks working.
 - Xcode 26 or later, including its command-line tools. Open Xcode once to finish
   setup and select it under **Xcode > Settings > Locations > Command Line Tools**.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen), available through Homebrew.
@@ -168,11 +170,39 @@ check stitching and the compact capture controls in both appearances.
 Region screenshots use `RegionSelectionOverlay` with the previous area
 (`AppPreferences.lastRegionRect`) preselected, so Return captures it again, then
 reactivate the previously frontmost app before `screencapture -R` takes the shot.
+`AppPreferences.preselectPreviousRegion`, exposed as Start with the last area
+selected in Settings > Capture > Region, defaults on. Turning it off opens every
+use of the selector empty, including scrolling and recording areas, and still
+stores the chosen area for Capture Previous Region.
+`ScreenCapturePermission.isReadyToCapture` runs before every screenshot except
+the color picker, and before recording sources load. Once BetterShot has seen
+Screen Recording access, a later launch that preflights as denied, as a login
+item can before macOS applies the grant, offers a restart once instead of failing.
+It never runs at launch.
 OCR keeps macOS's native `/usr/sbin/screencapture -i` selector.
-Region screenshots always use BetterShot’s selector.
+Region screenshots can instead use macOS's native selector via
+`AppPreferences.nativeRegionSelector`, exposed as Use native macOS region selector
+in Settings > Capture > Region. It defaults off. `ScreenCapture.captureRegion`
+checks it first and reuses `interactiveShot(window: false, includeShadow: false)`
+without activating BetterShot, so open menus and popovers remain available for
+capture. It does not update the remembered rectangle; Capture Previous Region keeps
+the last area chosen with BetterShot's selector. Scrolling and recording area
+selection still use BetterShot's selector because they need the rectangle.
 `AppPreferences.captureRegionOnRelease`, exposed as Capture as soon as I let go
 in Settings > Capture > Region, chooses immediate capture on release or adjustment
-before confirmation. Both paths preserve the remembered rectangle.
+before confirmation in BetterShot's selector, which preserves the remembered
+rectangle on both paths. Native selection always captures on release, so the
+control is disabled there.
+`AppPreferences.freezeScreenDuringRegionCapture`, exposed as Freeze the screen
+while selecting, snapshots every display with `FrozenScreenCapture` before the
+selector appears. `RegionSelectionOverlay` shows each frame behind its selection
+view, and `FrozenScreenFrame` crops the confirmed area from that frame at native
+pixel size; never take a second shot after confirmation. It defaults off and
+applies only to region screenshots using BetterShot's selector: the countdown runs
+first, and native-selector, window, OCR, previous-region, scrolling, and recording
+captures stay live. The setting is disabled while native selection is on, and
+native mode must never snapshot displays.
+`Tests/FrozenScreenFrameCheck.swift` covers crop origins, scales, and PNG pixels.
 Window screenshots use `/usr/sbin/screencapture -i -w`, retaining cancellation,
 shadow options, native pixel dimensions, and private PNG staging.
 OCR and color results copy through `CaptureOrchestrator.completeTextCapture`;
@@ -205,6 +235,12 @@ focus while the panel is key; hover/focus callbacks must not cancel its task.
 Image-editor Save commits to history and creates or atomically replaces the
 associated export, even for an untouched image. Copy and Share do not update
 that export. Export opens a save panel for a new destination.
+
+A recording package's `exportPath` metadata names its save-folder file.
+`RecordingDeliverable.save` replaces that file in its own format while it exists,
+and otherwise writes a new file and records it. Video-editor Save re-renders it;
+video-editor Export always writes a new file. `checkStudioSaveUpdatesSavedVideo`
+in `Tests/ExportIntegration.swift` covers this against the production editor.
 
 [ScreenshotFileNaming](Sources/BetterShot/ScreenshotFileNaming.swift) is the shared,
 Foundation-only deliverable name renderer. Preserve sanitization and keep
@@ -262,11 +298,22 @@ resolution when recording exports move or disappear, native table sorting,
 single-click selection, double-click opening, and deletion confirmations.
 Gallery and Settings use resizable native navigation columns.
 
+`ShortcutRecorderField` uses a native search-field bezel, focus ring, and inline
+clear button. Recording suspends global shortcuts through the existing
+`ShortcutService` recording guard, commits through `validationError`, and cancels
+on focus/window loss. With `clearsOnDelete`, set for global-scope rows, unmodified
+Delete clears; editor-scope rows record it (`imageDelete` and `videoDelete` default
+to it), and modified Delete is always recordable.
+
 [ShortcutCatalog.swift](Sources/Services/ShortcutCatalog.swift) defines action IDs,
 groups, scopes, and defaults. Do not renumber persisted IDs. New actions start
 unassigned; customized and disabled bindings must survive migration. Active
 editor bindings take priority over matching global bindings without intercepting
 normal text-field behavior.
+`KeyLabel` owns layout-aware shortcut labels, special-key glyphs, VoiceOver names,
+and the recording overlay's existing special-key style. Input-source changes
+refresh labels without changing stored key codes. Number-row labels stay digits,
+and printable keypad keys still pass through the recording modifier guard.
 
 [CaptureURLAction.swift](Sources/App/CaptureURLAction.swift) parses the supported
 `bettershot://` routes. The app delegate dispatches them. Preserve malformed-URL
@@ -395,7 +442,10 @@ This builds unsigned Debug in `.build/tests` with testability enabled, runs
 [scripts/run-checks.sh](scripts/run-checks.sh), then
 [Tests/run-exports.sh](Tests/run-exports.sh). The runners set
 `BETTERSHOT_TESTING=1` so tests use isolated storage and do not access real R2
-Keychain credentials. The separate test build directory keeps unsigned tests from replacing
+Keychain credentials. `Tests/run-exports.sh` names each run's program
+`ExportIntegration-<pid>`, which gives its `UserDefaults.standard` a private
+domain that the runner deletes afterwards, so overlapping runs in other worktrees
+cannot rewrite its save folder or dismiss delay. The separate test build directory keeps unsigned tests from replacing
 a running signed dev app and invalidating its Screen Recording permission. Quit the dev
 app before rebuilding its `.build` bundle. Always use the runners; never substitute production
 credentials to make a test pass.
@@ -404,7 +454,9 @@ For a logic regression, add a small check against production code. Standalone
 checks are `Tests/*Check.swift`; an optional matching `.sources` file lists the
 production files to compile. For example, [FileNamingCheck.sources](Tests/FileNamingCheck.sources)
 points directly to the production filename renderer. Run the standalone suite
-with `bash scripts/run-checks.sh`.
+with `bash scripts/run-checks.sh`. It compiles each check for the `minimumOS` in
+`version.json` and runs `scripts/check-sf-symbols.py`, which fails on any SF
+Symbol name that is missing or newer than that minimum.
 
 ### Focused integration checks
 
@@ -418,6 +470,7 @@ with `make test` when production code changes.
 | Screenshot Copy/Save and private storage | `BETTERSHOT_CHECK_SCREENSHOT_SAVING=1 bash Tests/run-exports.sh` |
 | Video compositing and encoded exports | `BETTERSHOT_CHECK_VIDEO_EXPORTS=1 bash Tests/run-exports.sh` |
 | Agent edits and renderer cache freshness | `BETTERSHOT_CHECK_AGENT_EDITING=1 bash Tests/run-exports.sh` |
+| Studio Save updates the saved video and waits before closing | `BETTERSHOT_CHECK_RECORDING_SAVE=1 bash Tests/run-exports.sh` |
 | Local MCP endpoint, auth, client workflow, and Agent Access snapshots | `BETTERSHOT_CHECK_AGENT_ACCESS=1 bash Tests/run-exports.sh` |
 | Displayed Gallery and Settings windows | `BETTERSHOT_CHECK_LIBRARY_WINDOWS=1 bash Tests/run-exports.sh` |
 | Editor focus, full screen, and tray handoff | `BETTERSHOT_CHECK_EDITOR_WINDOWS=1 bash Tests/run-exports.sh` |
@@ -514,14 +567,22 @@ explicit maintainer request.
 
 Contributions are licensed under the project's [BSD 3-Clause License](LICENSE).
 
-### Tour and release notes
+### Onboarding and release notes
 
-TourKit is a local Swift package in `Vendor/TourKit`, pinned to the upstream
-revision and MIT license listed in `BETTERSHOT.md`. Its slideshow is hosted in the
-existing native onboarding window; keep local appearance/accessibility patches
-when updating it. The permission/restart flow and optional video demos remain
-owned by BetterShot. Run `BETTERSHOT_TESTING=1 swift test --package-path Vendor/TourKit`
-for the upstream package checks, and `make test` for app integration.
+`OnboardingView` is a four-step native flow: Welcome, Permissions, Saving, and
+Practice. Each `OnboardingStep` page has a hero, a large title, and its content above
+one bottom bar with Skip or Back, progress dots, and Continue or Done. Permissions
+asks only for screen capture and Accessibility through `OnboardingPermissionRow`
+and `OnboardingPermissions`, the model behind Settings' `SettingsPermissionRow`;
+recordings request the microphone and camera when they need them. Saving edits the
+same folder and automatic-saving preferences as Settings › General. Practice watches
+`CaptureOrchestrator.lastCaptureURL` and shows the first capture taken after it
+appears. Every step change is saved through `OnboardingState.save(step:)`, so a
+permission restart reopens setup on that step. Skip and Done finish through
+`OnboardingWindowController.finish`, and closing the window also marks onboarding
+seen. Pages change with a 0.2-second ease-out move, or a fade with Reduce Motion.
+Settings › About › Take the Tour reopens the same flow. Run `make test` for the
+onboarding checks.
 
 `CHANGELOG.md` is bundled directly. Every `version.json` version must have a
 `## [x.y.z]` entry. `ReleaseNotes` parses these entries and tracks dismissed versions
@@ -533,7 +594,7 @@ versions; Settings → About can reopen the notes or tour.
 3D insertion hover and click share `Recording3DTimeline.insertionRange`. Keep the
 ghost non-interactive and avoid project mutations/render-cache invalidation while
 skimming. Tests cover placement boundaries, undo/persistence, and compact light/dark
-snapshots of the ghost, tour pages, and release notes.
+snapshots of the ghost, onboarding steps, and release notes.
 
 For window screenshot changes, also select a window and cancel with Escape in the
 signed dev app. Standalone test executables use their terminal’s capture identity

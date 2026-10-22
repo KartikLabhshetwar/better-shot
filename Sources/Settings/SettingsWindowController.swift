@@ -6,26 +6,23 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     static let shared = SettingsWindowController()
 
     private var window: NSWindow?
+    private let navigation = SettingsNavigation()
 
     var hasOpenWindow: Bool { window != nil }
 
     private override init() { super.init() }
 
     func open(on screen: NSScreen? = nil, section: SettingsSection? = nil) {
-        if let existing = window, existing.isVisible {
-            if let section {
-                existing.contentViewController = NSHostingController(rootView: PreferencesView(selection: section) { [weak existing] in
-                    existing?.title = $0.title
-                })
-                existing.title = section.title
-            }
-            existing.orderFrontRegardless()
+        if let window {
+            if let section { navigation.page = section }
+            if window.isMiniaturized { window.deminiaturize(nil) }
             NSApp.activate(ignoringOtherApps: true)
-            existing.makeKeyAndOrderFront(nil)
+            window.makeKeyAndOrderFront(nil)
             return
         }
 
-        let controller = NSHostingController(rootView: PreferencesView(selection: section ?? .general) { [weak self] in
+        navigation.page = section ?? .home
+        let controller = NSHostingController(rootView: PreferencesView(navigation: navigation) { [weak self] in
             self?.window?.title = $0.title
         })
 
@@ -35,7 +32,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         win.minSize = NSSize(width: 780, height: 620)
         win.titlebarAppearsTransparent = true
         win.toolbarStyle = .unified
-        win.title = (section ?? .general).title
+        win.title = navigation.page.title
         win.isReleasedWhenClosed = false
         win.delegate = self
         win.collectionBehavior = [.transient, .moveToActiveSpace]
@@ -54,6 +51,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
+        guard notification.object as? NSWindow === window else { return }
         window = nil
         AppActivationPolicy.leave()
     }

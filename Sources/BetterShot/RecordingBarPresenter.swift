@@ -304,7 +304,7 @@ private final class RecordingBarPanel: NSPanel {
     }
 }
 
-private final class RecordingBarHostingView<Content: View>: NSHostingView<Content> {
+private final class RecordingBarHostingView: NSHostingView<RecordingBarView> {
     override var isOpaque: Bool {
         false
     }

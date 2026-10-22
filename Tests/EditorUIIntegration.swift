@@ -2,7 +2,6 @@ import AppKit
 import AVFoundation
 import Carbon
 import SwiftUI
-import TourKit
 @testable import BetterShot
 
 /// Offscreen snapshots and model checks, plus a brief native transfer-toast lifecycle check.
@@ -355,17 +354,6 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
             preconditionFailure("An unwritable destination must report failure")
         } catch {}
     }
-    for demo in OnboardingDemo.allCases {
-        let posterURL = demo.url(extension: "png", in: appBundle)!
-        let poster = NSImage(contentsOf: posterURL)!
-        precondition(poster.size.width / poster.size.height == 16 / 9, "Demo posters must match the player aspect ratio")
-        let movie = AVURLAsset(url: demo.url(extension: "mp4", in: appBundle)!)
-        let playable = try await movie.load(.isPlayable)
-        let duration = try await movie.load(.duration).seconds
-        let audio = try await movie.loadTracks(withMediaType: .audio)
-        precondition(playable && abs(duration - 6) < 0.1 && audio.isEmpty,
-                     "Onboarding demos must be playable, six seconds, and silent")
-    }
     precondition(OnboardingPermissionStatus.media(.authorized) == .allowed)
     precondition(OnboardingPermissionStatus.media(.notDetermined) == .notEnabled)
     precondition(OnboardingPermissionStatus.media(.denied) == .denied)
@@ -391,30 +379,18 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     let releaseVersion = appBundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as! String
     let currentNotes = releaseNotes.filter { $0.version == releaseVersion }
     precondition(currentNotes.count == 1 && !currentNotes[0].body.isEmpty, "Every shipped version needs bundled release notes")
-    let tourPages = OnboardingView.tourPages(in: appBundle)
-    precondition(tourPages.count == 3)
-    for page in tourPages {
-        precondition(appBundle.url(forResource: page.imageName, withExtension: nil) != nil, "Tour artwork must ship in the app")
-    }
     for scheme in [ColorScheme.light, .dark] {
         for width: CGFloat in [420, 640] {
             try snapshot(ReleaseNotesView(version: releaseVersion, notes: currentNotes, onClose: {}),
                 scheme: scheme, width: width,
                 to: output.appendingPathComponent("release-notes-\(scheme)-\(Int(width)).png"), height: 660)
         }
-        for index in tourPages.indices {
-            try snapshot(TourSlideshowView(pages: tourPages, width: 472, initialPageIndex: index,
-                finishButtonTitle: "Set Up Permissions", onFinish: {}, onClose: {})
-                .transaction { $0.disablesAnimations = true },
-                scheme: scheme, width: 472,
-                to: output.appendingPathComponent("tour-page-\(index)-\(scheme).png"), height: 510)
-        }
         try snapshot(ZStack(alignment: .topLeading) {
             Color.secondary.opacity(0.1)
             Recording3DInsertionGhost(range: 1...4, pointsPerSecond: 100)
         }.frame(height: 36).padding(12), scheme: scheme, width: 600,
             to: output.appendingPathComponent("3d-insertion-ghost-\(scheme).png"), height: 60)
-        for step in OnboardingView.Step.allCases {
+        for step in OnboardingStep.allCases {
             for width: CGFloat in [520, 760] {
                 try snapshot(OnboardingView(step: step, resourceBundle: appBundle, isPermissionPreview: false),
                     scheme: scheme, width: width,
@@ -422,12 +398,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
                     height: width == 520 ? 560 : 680)
             }
         }
-        for width: CGFloat in [520, 760] {
-            try snapshot(OnboardingDemoView(demo: .recording, resourceBundle: appBundle).padding(32),
-                scheme: scheme, width: width,
-                to: output.appendingPathComponent("onboarding-recording-demo-\(scheme)-\(Int(width)).png"), height: 460)
-        }
-        try snapshot(VStack(spacing: 12) {
+        let recoveryRows = Group {
             OnboardingPermissionRow(permission: .screen, status: .notEnabled, attempted: true,
                 request: {}, openSettings: {})
             OnboardingPermissionRow(permission: .camera, status: .denied, request: {}, openSettings: {})
@@ -438,10 +409,17 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
             OnboardingPermissionRow(permission: .screen, status: .notEnabled, attempted: true,
                 errorMessage: "Couldn’t open settings. Try again, or open System Settings manually.",
                 request: {}, openSettings: {})
-        }.padding(16), scheme: scheme, width: 520,
-            to: output.appendingPathComponent("onboarding-permission-recovery-\(scheme).png"), height: 900)
+        }
+        for width: CGFloat in [520, 760] {
+            try snapshot(Form { Section { recoveryRows } }
+                .formStyle(.grouped).scrollContentBackground(.hidden)
+                .frame(maxWidth: 520).padding(.horizontal, 40)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top),
+                scheme: scheme, width: width,
+                to: output.appendingPathComponent("onboarding-permission-recovery-\(scheme)-\(Int(width)).png"), height: 760)
+        }
     }
-    print("PASS onboarding artwork copies, permission status mapping/testing guard, recovery states, bundled silent demos, and all three steps in compact/light/dark snapshots")
+    print("PASS onboarding artwork copies, permission status mapping/testing guard, recovery states, and all four steps in compact/light/dark snapshots")
     try snapshot(LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 5), spacing: 12) {
         ForEach(GradientPreset.presets) { preset in
             VStack {
@@ -466,6 +444,8 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
         }
         try snapshot(PreferencesView(selection: .sharing), scheme: scheme, width: 780,
                      to: output.appendingPathComponent("sharing-buttons-\(name).png"), height: 720)
+        try snapshot(PreferencesView(selection: .home), scheme: scheme, width: 780,
+                     to: output.appendingPathComponent("settings-home-\(name).png"), height: 900)
         try snapshot(VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
                 Button("Test Connection") {}
@@ -1091,9 +1071,22 @@ func checkRecordingAgentOperations(movieURL: URL) async throws {
         _ = try agent.setSpeed(handle: handle, expectedRevision: split.revision,
                                clipID: split.clips[0].id, speed: .infinity)
     }
-    let sped = try agent.setSpeed(handle: handle, expectedRevision: split.revision,
+    var sped = try agent.setSpeed(handle: handle, expectedRevision: split.revision,
                                   clipID: split.clips[0].id, speed: 2)
     precondition(sped.revision == split.revision + 1 && sped.clips[0].speed == 2)
+
+    let trimmed = try agent.trim(handle: handle, expectedRevision: sped.revision,
+                                 clipID: sped.clips[0].id, sourceStart: 0.2,
+                                 sourceEnd: sped.clips[0].sourceEnd)
+    precondition(trimmed.clips[0].sourceStart == 0.2 && trimmed.revision == sped.revision + 1)
+    let deleted = try agent.deleteClip(handle: handle, expectedRevision: trimmed.revision,
+                                       clipID: trimmed.clips[1].id)
+    precondition(deleted.clips.count == 1 && deleted.revision == trimmed.revision + 1)
+    let undone = try agent.undo(handle: handle, expectedRevision: deleted.revision)
+    precondition(undone.clips != deleted.clips, "Undo must restore the preceding native edit group")
+    let redone = try agent.redo(handle: handle, expectedRevision: undone.revision)
+    precondition(redone.clips == deleted.clips, "Redo must restore the same edited timeline")
+    sped = redone
 
     let secondModel = RecordingStudioModel(url: session.directoryURL)
     await secondModel.load()
@@ -1153,7 +1146,20 @@ func checkRecordingAgentOperations(movieURL: URL) async throws {
     let retainedJob = try agent.exportJob(id: firstJob.id)
     precondition(retainedJob.state == .failed,
                  "A newer export must not replace an earlier job outcome")
-    print("PASS agent edit bounds, revision rejection, shared timeline, save, duplicate-window guard, and export job retention")
+    let cancelledJob = try agent.startExport(handle: handle, expectedRevision: saved.revision,
+                                               requestID: UUID())
+    let cancelled = try agent.cancelExportJob(id: cancelledJob.id)
+    precondition(cancelled.state == .cancelled, "Cancelling must retain a cancelled agent job")
+    await model.waitForExport()
+
+    let savedClips = model.clipTimeline.segments
+    model.teardown()
+    let reopened = RecordingStudioModel(url: session.directoryURL)
+    await reopened.load()
+    defer { reopened.teardown() }
+    precondition(reopened.isLoaded && reopened.clipTimeline.segments == savedClips,
+                 "Reopening must preserve agent trims, cuts, clip IDs, and speeds")
+    print("PASS agent split/trim/delete/speed, undo/redo, revision rejection, save/reopen, duplicate-window guard, and export job retention")
 }
 
 /// Exercises real native dialogs without starting a capture or accessing microphone/camera.
@@ -1208,6 +1214,24 @@ private func checkRecordingConfirmations() {
 /// Static layout checks need no camera/microphone access or encoded video fixture.
 @MainActor
 func checkCaptureControlsUI() throws {
+    let defaults = UserDefaults.standard
+    let selectorKey = AppPreferences.nativeRegionSelectorKey
+    let storedSelector = defaults.object(forKey: selectorKey)
+    defer { defaults.set(storedSelector, forKey: selectorKey) }
+    defaults.removeObject(forKey: selectorKey)
+    precondition(!AppPreferences.nativeRegionSelector, "Unset preferences keep the adjustable selector")
+    defaults.set(true, forKey: selectorKey)
+    precondition(AppPreferences.nativeRegionSelector, "Native selection must follow the persisted toggle")
+    defaults.set(false, forKey: selectorKey)
+    precondition(!AppPreferences.nativeRegionSelector, "Disabling native selection restores the adjustable selector")
+    let preselectKey = AppPreferences.preselectPreviousRegionKey
+    let storedPreselect = defaults.object(forKey: preselectKey)
+    defer { defaults.set(storedPreselect, forKey: preselectKey) }
+    defaults.removeObject(forKey: preselectKey)
+    precondition(AppPreferences.preselectPreviousRegion, "Unset preferences keep opening with the last area selected")
+    defaults.set(false, forKey: preselectKey)
+    precondition(!AppPreferences.preselectPreviousRegion, "Turning preselection off must persist")
+    defaults.removeObject(forKey: preselectKey)
     try checkScrollCaptureStitching()
     let sources = RecordingSourceCatalog.shared
     precondition(!sources.containsSelection(.fullscreen, displayID: nil, windowID: nil))
@@ -1218,8 +1242,11 @@ func checkCaptureControlsUI() throws {
     try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
     for scheme in [ColorScheme.light, .dark] {
         let name = scheme == .light ? "light" : "dark"
-        try snapshot(PreferencesView(selection: .capture), scheme: scheme, width: 780,
-                     to: output.appendingPathComponent("capture-settings-\(name).png"), height: 740)
+        for native in [false, true] {
+            defaults.set(native, forKey: selectorKey)
+            try snapshot(PreferencesView(selection: .capture), scheme: scheme, width: 780,
+                         to: output.appendingPathComponent("capture-settings-\(native ? "native" : "adjustable")-\(name).png"), height: 740)
+        }
         if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_CAPTURE_UI"] == "1" {
             try snapshot(MenuBarContentView(dismissPopover: {}), scheme: scheme, width: 296,
                          to: output.appendingPathComponent("capture-menu-\(name).png"), height: 540)
@@ -1564,7 +1591,7 @@ private func checkLibraryWindowToolbars(items: [MediaGalleryItem]) async throws 
             ] {
                 let window = NSWindow(contentViewController: NSHostingController(rootView: root.environment(\.colorScheme, scheme)))
                 window.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
-                window.title = name == "settings" ? SettingsSection.general.title : MediaGalleryCategory.all.title
+                window.title = name == "settings" ? SettingsSection.home.title : MediaGalleryCategory.all.title
                 window.styleMask = [.titled, .closable, .resizable, .fullSizeContentView]
                 window.toolbarStyle = .unified
                 window.titlebarAppearsTransparent = true
@@ -1576,6 +1603,8 @@ private func checkLibraryWindowToolbars(items: [MediaGalleryItem]) async throws 
                 try await Task.sleep(for: .milliseconds(100))
                 precondition(window.toolbar?.items.contains(where: { $0.label == "Toggle Sidebar" }) == true,
                              "Gallery and Settings must provide the native sidebar toggle")
+                precondition(window.toolbar?.items.filter({ $0.label.localizedCaseInsensitiveContains("sidebar") || $0.itemIdentifier == .toggleSidebar }).count == 1,
+                             "Gallery and Settings must show exactly one sidebar toggle: \(window.toolbar?.items.map(\.label) ?? [])")
                 // cacheDisplay cannot capture macOS's compositor-backed sidebar/search surfaces.
                 // Check the real window rather than mistaking white offscreen placeholders for UI.
                 if live {
@@ -1628,7 +1657,16 @@ private func checkLibraryWindowToolbars(items: [MediaGalleryItem]) async throws 
             }
         }
     }
-    print("PASS native gallery/Settings sidebar toolbars in both appearances" + (live ? ", displayed compact/wide snapshots and dark material rendering" : ""))
+    let settings = SettingsWindowController.shared
+    settings.open(section: .sharing)
+    settings.open(section: .about)
+    try await Task.sleep(for: .milliseconds(200))
+    let settingsWindows = NSApp.windows.filter { $0.delegate === settings }
+    precondition(settingsWindows.count == 1, "Reopening Settings must reuse its window")
+    precondition(settingsWindows[0].title == SettingsSection.about.title, "Reopening Settings on a section must switch pages")
+    settings.close()
+    precondition(!settings.hasOpenWindow, "Closing Settings must release its window")
+    print("PASS native gallery/Settings sidebar toolbars in both appearances, single reused Settings window" + (live ? ", displayed compact/wide snapshots and dark material rendering" : ""))
 }
 
 @MainActor
@@ -1857,6 +1895,11 @@ private func checkShortcutCustomization(defaults: UserDefaults) {
     let service = ShortcutService(defaults: defaults)
     service.restoreDefaults()
     let actions = ShortcutService.Action.allCases
+    let home = ShortcutService.Shortcut(keyCode: UInt32(kVK_Home), modifiers: UInt32(cmdKey), enabled: true)
+    precondition(home.displayString == "⌘↖")
+    precondition(home.accessibilityDescription == "Command Home")
+    let function = ShortcutService.Shortcut(keyCode: UInt32(kVK_F20), modifiers: UInt32(optionKey), enabled: true)
+    precondition(function.displayString == "⌥F20")
     precondition(Set(actions.map(\.rawValue)).count == actions.count)
     precondition(Set(actions.compactMap(\.annotationTool)) == Set(AnnotationTool.allCases))
     for action in actions where action.defaultShortcut == nil {
@@ -1952,6 +1995,15 @@ private final class ShortcutTestWindow: NSWindow {
     override var isKeyWindow: Bool { simulatesKeyWindow }
 }
 
+/// Returns the visible-frame corner farthest from the live pointer so hover cannot pause dismissal.
+@MainActor
+func overlayOriginAwayFromPointer(for panel: NSWindow) -> NSPoint {
+    let screen = (panel.screen ?? NSScreen.main)!.visibleFrame
+    let mouse = NSEvent.mouseLocation
+    return NSPoint(x: mouse.x < screen.midX ? screen.maxX - panel.frame.width : screen.minX,
+                   y: mouse.y < screen.midY ? screen.maxY - panel.frame.height : screen.minY)
+}
+
 @MainActor
 private func checkPreviewOverlay(imageURL: URL) async throws {
     let defaults = UserDefaults.standard
@@ -2016,9 +2068,11 @@ private func checkPreviewOverlay(imageURL: URL) async throws {
     overlay.show(url: imageURL)
     let livePanel = NSApp.windows.first { $0.identifier?.rawValue == "BetterShot.CaptureOverlay" && $0.isVisible }! as! NSPanel
     precondition(livePanel.becomesKeyOnlyIfNeeded, "Presenting a preview must not pull focus into it")
-    let mouse = NSEvent.mouseLocation
-    livePanel.setFrameOrigin(NSPoint(x: mouse.x - livePanel.frame.width / 2, y: mouse.y - livePanel.frame.height / 2))
-    try await Task.sleep(for: .milliseconds(350))
+    for _ in 0..<35 {
+        let mouse = NSEvent.mouseLocation
+        livePanel.setFrameOrigin(NSPoint(x: mouse.x - livePanel.frame.width / 2, y: mouse.y - livePanel.frame.height / 2))
+        try await Task.sleep(for: .milliseconds(10))
+    }
     precondition(overlay.items.contains(imageURL), "Live pointer over the panel pauses dismissal")
     let activationPolicy = NSApp.activationPolicy()
     defer { NSApp.setActivationPolicy(activationPolicy) }
@@ -2027,7 +2081,7 @@ private func checkPreviewOverlay(imageURL: URL) async throws {
     livePanel.makeKey()
     try await Task.sleep(for: .milliseconds(150))
     precondition(livePanel.isKeyWindow, "Focus test requires a key preview panel")
-    livePanel.setFrameOrigin(NSPoint(x: mouse.x + 40, y: mouse.y + 40))
+    livePanel.setFrameOrigin(overlayOriginAwayFromPointer(for: livePanel))
     overlay.setActionFocused(true, for: imageURL)
     try await Task.sleep(for: .milliseconds(350))
     precondition(overlay.items.contains(imageURL), "A focused tool keeps its card available")

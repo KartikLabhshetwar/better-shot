@@ -48,7 +48,7 @@ export async function ProductPage({ kind }: { kind: ProductKind }) {
         <h1 className="hero-title">{page.title}</h1>
         <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-zinc-600">{page.description}</p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-6"><DownloadDropdown release={release} source="hero" /><a href="#workflow" className="text-sm font-medium text-zinc-600 hover:text-brand">See the workflow ↓</a></div>
-        <p className="mt-5 text-xs text-zinc-500">Free and open source · No watermark · macOS 26.0+</p>
+        <p className="mt-5 text-xs text-zinc-500">Free and open source · No watermark · macOS 14.0+</p>
       </header>
       <div className="mx-auto max-w-[1360px] px-6"><DemoGallery kind={kind} /></div>
       <EditorToolsBanner kind={kind} />

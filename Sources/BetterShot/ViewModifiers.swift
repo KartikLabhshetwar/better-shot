@@ -225,7 +225,12 @@ extension View {
     }
 }
 
-// MARK: - macOS 26 Availability Helpers
+// MARK: - Availability Helpers
+
+enum HoverPointer {
+    case columnResize
+    case link
+}
 
 extension View {
     @ViewBuilder
@@ -245,6 +250,28 @@ extension View {
             safeAreaInset(edge: edge, content: content)
         }
     }
+
+    /// Declares the hover pointer on macOS 15 and later; earlier systems keep the arrow.
+    @ViewBuilder
+    func hoverPointer(_ pointer: HoverPointer?) -> some View {
+        if #available(macOS 15.0, *) {
+            pointerStyle(pointer.map { $0 == .link ? PointerStyle.link : .columnResize })
+        } else {
+            self
+        }
+    }
+
+    /// Adds toolbar items whose group drops the shared Liquid Glass background on macOS 26.
+    @ViewBuilder
+    func toolbarHidingSharedBackground<Content: ToolbarContent>(
+        @ToolbarContentBuilder _ content: () -> Content
+    ) -> some View {
+        if #available(macOS 26.0, *) {
+            toolbar { content().sharedBackgroundVisibility(.hidden) }
+        } else {
+            toolbar(content: content)
+        }
+    }
 }
 
 private struct EditorFullScreenModifier: ViewModifier {
@@ -252,7 +279,7 @@ private struct EditorFullScreenModifier: ViewModifier {
     @State private var pendingFullScreenWindow: Int?
 
     func body(content: Content) -> some View {
-        content.windowFullScreenBehavior(.enabled).onWindowChange { window in
+        content.windowFullScreenEnabled().onWindowChange { window in
             guard let window, !didConfigure else { return }
             didConfigure = true
             pendingFullScreenWindow = AppPreferences.editorOpensFullScreen ? window.windowNumber : nil
@@ -287,6 +314,15 @@ private struct EditorFullScreenModifier: ViewModifier {
 }
 
 extension View {
+    @ViewBuilder
+    fileprivate func windowFullScreenEnabled() -> some View {
+        if #available(macOS 15.0, *) {
+            windowFullScreenBehavior(.enabled)
+        } else {
+            self
+        }
+    }
+
     func editorFullScreenSupport() -> some View {
         modifier(EditorFullScreenModifier())
     }

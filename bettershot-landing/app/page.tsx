@@ -240,7 +240,7 @@ export default async function Home() {
               <CopyCommand command="brew install --cask bettershot" />
             </div>
             <p className="mt-4 text-[13px] text-zinc-400">
-              No account. No subscription. No uploads. macOS 26.0+.
+              No account. No subscription. No uploads. macOS 14.0+.
             </p>
           </div>
         </Reveal>

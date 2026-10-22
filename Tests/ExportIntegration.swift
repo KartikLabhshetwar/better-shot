@@ -2,6 +2,7 @@ import AVFoundation
 import AppKit
 import CoreImage
 import ImageIO
+import SwiftUI
 import UniformTypeIdentifiers
 
 @testable import BetterShot
@@ -49,6 +50,14 @@ struct ExportIntegration {
             try await checkRecordingAgentOperations(
                 movieURL: URL(fileURLWithPath: "Resources/Onboarding/recording-demo.mp4")
             )
+            return
+        }
+        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_RECORDING_SAVE"] == "1" {
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            try await checkStudioSaveUpdatesSavedVideo(
+                movie: URL(fileURLWithPath: "Resources/Onboarding/recording-demo.mp4"), directory: directory)
             return
         }
         if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_CAPTURE_UI"] == "1" {
@@ -320,6 +329,7 @@ struct ExportIntegration {
 
     @MainActor static func checkVideoExports(movie: URL, directory: URL) async throws {
         try await checkVideoFileSaving(movie: movie, directory: directory)
+        try await checkStudioSaveUpdatesSavedVideo(movie: movie, directory: directory)
         checkZoomCamera()
         let clips = RecordingClipTimeline.full(sourceDuration: 2)
         let viewport = ViewportTimeline.build(
@@ -873,6 +883,62 @@ private func checkVideoFileSaving(movie: URL, directory: URL) async throws {
 }
 
 @MainActor
+private func checkStudioSaveUpdatesSavedVideo(movie: URL, directory: URL) async throws {
+    let saveFolder = directory.appendingPathComponent("studio-save")
+    try FileManager.default.createDirectory(at: saveFolder, withIntermediateDirectories: true)
+    let oldDirectory = AppPreferences.saveDirectory
+    AppPreferences.saveDirectory = saveFolder.path
+    defer { AppPreferences.saveDirectory = oldDirectory }
+    func videoSize(_ url: URL) async throws -> CGSize {
+        try await AVURLAsset(url: url).loadTracks(withMediaType: .video)[0].load(.naturalSize)
+    }
+
+    let session = RecordingSession(directoryURL: directory.appendingPathComponent("StudioSave.bettershotrec"))
+    try FileManager.default.createDirectory(at: session.directoryURL, withIntermediateDirectories: true)
+    try FileManager.default.copyItem(at: movie, to: session.screenURL)
+    var manifest = CaptureManifest()
+    manifest.pointerSynthesized = true
+    try session.writeCaptureManifest(manifest)
+    try session.writePointerCapture(PointerCaptureFile(travel: [PointerTravelSample(time: 0, x: 0.5, y: 0.5)]))
+    let saved = try await RecordingDeliverable.saveToDefaultLocation(for: session.screenURL)
+    let before = try await videoSize(saved)
+    precondition(before.width != before.height, "The first save keeps the recording's wide frame")
+
+    let model = RecordingStudioModel(url: session.directoryURL)
+    await model.load()
+    defer { model.teardown() }
+    model.exportAspect = .square
+    model.saveProject()
+    precondition(model.exportState.isExporting, "Save re-renders the recording's saved file")
+    await model.waitForExport()
+    precondition(model.exportState == .finished(saved), "Save reports the file it updated, got \(model.exportState)")
+    let after = try await videoSize(saved)
+    precondition(after.width == after.height, "Studio Save must write its edits into the saved file, got \(after)")
+    let savedFiles = try FileManager.default.contentsOfDirectory(atPath: saveFolder.path).filter { !$0.hasPrefix(".") }
+    precondition(savedFiles == [saved.lastPathComponent], "Save replaces the saved file instead of adding a copy, got \(savedFiles)")
+    precondition(session.freshFinalURL(matching: session.effectiveEditDocument()) != nil,
+                 "Save leaves a render matching the saved edits in the package")
+
+    let window = NSWindow(contentViewController: NSHostingController(
+        rootView: RecordingStudioContent(model: model).onDisappear { model.teardown() }))
+    window.isReleasedWhenClosed = false
+    defer { window.contentViewController = nil }
+    window.makeKeyAndOrderFront(nil)
+    try await Task.sleep(for: .seconds(1))
+    model.exportAspect = .wide16x9
+    model.saveProject()
+    window.performClose(nil)
+    precondition(window.isVisible, "Closing right after Save keeps the editor open until the saved file is updated")
+    for _ in 0..<300 where window.isVisible {
+        try await Task.sleep(for: .milliseconds(100))
+    }
+    precondition(!window.isVisible, "The editor closes once Save has updated the saved file")
+    let closed = try await videoSize(saved)
+    precondition(closed.width > closed.height, "Closing after Save must not cancel the update, got \(closed)")
+    print("PASS Studio Save updates the recording's saved file in place, even when the editor closes right away")
+}
+
+@MainActor
 private func checkAnnotationExport(image: CGImage, source: URL, directory: URL) async throws {
     let history = HistoryStore(storageDirectory: directory.appendingPathComponent("annotation-history"))
     let record = history.importCapture(from: source, deleteSource: false)!
@@ -964,6 +1030,26 @@ private func checkCapturesKeepTheirName(
         PreviewOverlay.shared.clearAll()
         await Task.yield()
     }
+
+    let storedFormat = AppPreferences.exportFormat
+    AppPreferences.exportFormat = .jpeg
+    UserDefaults.standard.set("dragged", forKey: templateKey)
+    let jpeg = try await capture(.region)
+    AppPreferences.exportFormat = storedFormat
+    let dragged = DeckStaging.retain(jpeg)
+    let drag = try ScreenshotFileActions.dragItemProvider(for: dragged, of: jpeg)
+    let flavors = drag.registeredTypeIdentifiers
+    precondition(flavors.contains(UTType.fileURL.identifier) && !flavors.contains { UTType($0)?.conforms(to: .image) == true },
+                 "Any image-data flavor makes Finder drop a JPEG as name.jpg.jpeg, got \(flavors)")
+    let dropped: URL = try await withCheckedThrowingContinuation { continuation in
+        _ = drag.loadObject(ofClass: URL.self) { url, error in
+            continuation.resume(with: url.map(Result.success) ?? .failure(error ?? CocoaError(.fileReadUnknown)))
+        }
+    }
+    precondition(dropped.lastPathComponent == "dragged.jpg" && (try? Data(contentsOf: dropped)) == (try? Data(contentsOf: dragged)),
+                 "A JPEG card drags out as the capture's .jpg file, got \(dropped.lastPathComponent)")
+    PreviewOverlay.shared.clearAll()
+    await Task.yield()
 
     // A template without tokens names every capture the same. Library storage
     // numbers the files, but the capture's name stays the name it was given.
@@ -1185,7 +1271,7 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
         AppPreferences.overlayDismissDelay = 0.05
         let privateCapture = try await capture()
         let panel = NSApp.windows.first { $0.identifier?.rawValue == "BetterShot.CaptureOverlay" && $0.isVisible }!
-        panel.setFrameOrigin(NSPoint(x: NSEvent.mouseLocation.x + 40, y: NSEvent.mouseLocation.y + 40))
+        panel.setFrameOrigin(overlayOriginAwayFromPointer(for: panel))
         try await Task.sleep(for: .milliseconds(250))
         precondition(PreviewOverlay.shared.items.contains(privateCapture) == keep,
                      "Only staged captures with Keep enabled bypass Hide After")
@@ -1201,7 +1287,7 @@ private func checkScreenshotCopyAndSave(source: URL, directory: URL) async throw
         let automaticallySaved = try await capture()
         // Keep the native panel visible, with the live pointer outside it.
         let panel = NSApp.windows.first { $0.identifier?.rawValue == "BetterShot.CaptureOverlay" && $0.isVisible }!
-        panel.setFrameOrigin(NSPoint(x: NSEvent.mouseLocation.x + 40, y: NSEvent.mouseLocation.y + 40))
+        panel.setFrameOrigin(overlayOriginAwayFromPointer(for: panel))
         try await Task.sleep(for: .milliseconds(250))
         precondition(!PreviewOverlay.shared.items.contains(automaticallySaved),
                      "Saved previews must follow Hide After even when Keep is enabled")

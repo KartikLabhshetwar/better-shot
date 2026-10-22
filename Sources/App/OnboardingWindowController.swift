@@ -14,10 +14,12 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
             window.makeKeyAndOrderFront(nil)
             return
         }
-        let view = OnboardingView(step: OnboardingState.shouldResumePermissions() ? .permissions : .welcome)
-        let window = NSWindow(contentViewController: NSHostingController(rootView: view))
+        let step = replay ? .welcome : OnboardingStep(rawValue: OnboardingState.savedStep()) ?? .welcome
+        let window = NSWindow(contentViewController: NSHostingController(rootView: OnboardingView(step: step)))
         window.title = "Welcome to BetterShot"
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
         window.setContentSize(NSSize(width: 760, height: 680))
         window.contentMinSize = NSSize(width: 520, height: 560)
         window.isReleasedWhenClosed = false
@@ -28,10 +30,10 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
         window.makeKeyAndOrderFront(nil)
     }
 
-    func finish(openCaptureBar: Bool = false, recordingOptions: Bool = false) {
+    func finish(openCaptureBar: Bool = false) {
         OnboardingState.markSeen()
         window?.close()
-        if openCaptureBar { RecordingBarPresenter.shared.showPicker(recordingOptions: recordingOptions) }
+        if openCaptureBar { RecordingBarPresenter.shared.showPicker() }
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {

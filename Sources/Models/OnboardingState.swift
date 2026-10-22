@@ -4,7 +4,7 @@ import Foundation
 enum OnboardingState {
     static let currentVersion = 2
     static let seenVersionKey = "bs_onboardingSeenVersion"
-    static let resumePermissionsKey = "bs_onboardingResumePermissions"
+    static let stepKey = "bs_onboardingStep"
 
     /// Run before launch migrations create preferences. Returns true only for a new install,
     /// not a permission restart or an upgrade with unfinished setup.
@@ -18,21 +18,22 @@ enum OnboardingState {
         return !existingUser
     }
 
+    /// A saved step means setup was interrupted, such as by a permission restart.
     static func shouldPresent(defaults: UserDefaults = .standard) -> Bool {
-        shouldResumePermissions(defaults: defaults) || defaults.integer(forKey: seenVersionKey) == 0
+        defaults.object(forKey: stepKey) != nil || defaults.integer(forKey: seenVersionKey) == 0
     }
 
-    static func shouldResumePermissions(defaults: UserDefaults = .standard) -> Bool {
-        defaults.bool(forKey: resumePermissionsKey)
+    static func savedStep(defaults: UserDefaults = .standard) -> Int {
+        defaults.integer(forKey: stepKey)
     }
 
-    static func resumeAtPermissions(defaults: UserDefaults = .standard) {
-        defaults.set(true, forKey: resumePermissionsKey)
+    static func save(step: Int, defaults: UserDefaults = .standard) {
+        defaults.set(step, forKey: stepKey)
     }
 
     /// Closing and skipping count as seen, so an optional introduction never nags.
     static func markSeen(defaults: UserDefaults = .standard) {
         defaults.set(max(currentVersion, defaults.integer(forKey: seenVersionKey)), forKey: seenVersionKey)
-        defaults.removeObject(forKey: resumePermissionsKey)
+        defaults.removeObject(forKey: stepKey)
     }
 }

@@ -18,7 +18,7 @@ final class TeleprompterController {
 
     /// The session's live tracker. Read once when the recording wires its
     /// audio callback, so the sample-queue tee never touches the main actor.
-    private(set) var activeEngine: TeleprompterSpeechEngine?
+    private(set) var activeEngine: (any TeleprompterSpeechTracking)?
     private var hasPreflightedAssets = false
 
     private init() {}
@@ -26,7 +26,7 @@ final class TeleprompterController {
     /// Kicks off the on-device model download when the user enables the
     /// teleprompter, so pressing Record never waits on an install.
     func preflightAssets() {
-        guard !hasPreflightedAssets else { return }
+        guard #available(macOS 26.0, *), !hasPreflightedAssets else { return }
         hasPreflightedAssets = true
         Task.detached {
             await TeleprompterSpeechEngine.preflightAssets()
@@ -42,7 +42,7 @@ final class TeleprompterController {
 
         TeleprompterOverlayPresenter.shared.show(script: script, displayID: displayID)
 
-        guard microphoneActive else { return }
+        guard microphoneActive, #available(macOS 26.0, *) else { return }
         let matcher = TeleprompterScriptMatcher(script: script)
         guard !matcher.isEmpty else { return }
 

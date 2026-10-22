@@ -36,7 +36,7 @@ export const faqs = [
   },
   {
     q: "What are the system requirements?",
-    a: "macOS 26.0 or later, on Apple Silicon or Intel.",
+    a: "macOS 14 Sonoma or later, on Apple Silicon or Intel. Microphone narration needs macOS 15, and narration subtitles and teleprompter speech tracking need macOS 26.",
   },
   {
     q: "How do I install it?",

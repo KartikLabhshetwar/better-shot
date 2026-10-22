@@ -286,7 +286,7 @@ final class TeleprompterOverlayPresenter {
     }
 }
 
-private final class TeleprompterOverlayHostingView<Content: View>: NSHostingView<Content> {
+private final class TeleprompterOverlayHostingView: NSHostingView<TeleprompterOverlayView> {
     override var isOpaque: Bool {
         false
     }
