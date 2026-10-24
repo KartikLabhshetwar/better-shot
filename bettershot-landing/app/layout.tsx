@@ -127,6 +127,12 @@ export default function RootLayout({
           data-website-id="86300559-2d99-4d80-b25e-1d494de4f16b"
         />
         <script
+          defer
+          data-website-id="dc_w7dxfif1mevy5d"
+          data-domain="bettershot.site"
+          src="https://databull-analytics.kartik-labhshetwar.workers.dev/js/script.js"
+        />
+        <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
