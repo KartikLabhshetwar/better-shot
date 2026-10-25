@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import OSLog
 
 /// Coordinates the full capture pipeline: hide window -> capture -> sound -> preview/editor.
 @MainActor
@@ -15,11 +16,19 @@ final class CaptureOrchestrator {
     private init() {}
 
     func performCapture(_ action: ShortcutService.Action, on screen: NSScreen? = nil) async {
+        let started = ContinuousClock.now
         if action == .scrollCapture, ScrollCaptureSessionPresenter.shared.isActive {
             ScrollCaptureSessionPresenter.shared.stop()
             return
         }
+        let activity = ProcessInfo.processInfo.beginActivity(
+            options: .userInitiatedAllowingIdleSystemSleep, reason: "Screenshot capture in progress"
+        )
+        defer { ProcessInfo.processInfo.endActivity(activity) }
         guard action == .colorPicker || ScreenCapturePermission.isReadyToCapture() else { return }
+        Logger(subsystem: "com.bettershot.app", category: "CaptureStartup").info(
+            "Capture permission checked in \(String(describing: started.duration(to: .now)), privacy: .public)"
+        )
         if captureInProgress {
             pendingCaptures.append((action, screen))
             return
@@ -43,6 +52,10 @@ final class CaptureOrchestrator {
     func captureLastRegion(on screen: NSScreen? = nil) async {
         guard !captureInProgress, AppPreferences.lastRegionRect != nil,
               ScreenCapturePermission.isReadyToCapture() else { return }
+        let activity = ProcessInfo.processInfo.beginActivity(
+            options: .userInitiatedAllowingIdleSystemSleep, reason: "Screenshot capture in progress"
+        )
+        defer { ProcessInfo.processInfo.endActivity(activity) }
         captureInProgress = true
         captureScreen = screen
         await RecordingBarPresenter.shared.hidePickerForCapture()
@@ -90,9 +103,13 @@ final class CaptureOrchestrator {
     }
 
     private func executeCapture(_ action: ShortcutService.Action) async {
+        let started = ContinuousClock.now
         if action != .recording {
             await RecordingBarPresenter.shared.hidePickerForCapture()
         }
+        Logger(subsystem: "com.bettershot.app", category: "CaptureStartup").info(
+            "Capture picker cleared in \(String(describing: started.duration(to: .now)), privacy: .public)"
+        )
         switch action {
         case .region, .timedRegion, .regionCopy, .regionSave, .regionEdit, .regionPin:
             await captureAndProcess(action: action) { try await ScreenCapture.shared.captureRegion() }

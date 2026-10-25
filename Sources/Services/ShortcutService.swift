@@ -2,6 +2,7 @@ import Carbon
 import AppKit
 import CoreGraphics
 import Observation
+import OSLog
 
 @MainActor
 @Observable
@@ -17,7 +18,49 @@ final class ShortcutService {
         set { shortcutLock.withLock { _cachedShortcuts = newValue } }
     }
 
-    var isRegistered: Bool { eventTap != nil }
+    var isRegistered: Bool {
+        guard let eventTap, CFMachPortIsValid(eventTap) else { return false }
+        return CGEvent.tapIsEnabled(tap: eventTap)
+    }
+
+    @ObservationIgnored nonisolated(unsafe) private var registrationRecoveryTimer: Timer?
+
+    /// Grants made after login and taps disabled after sleep must recover while
+    /// the app stays in the menu bar, without waiting for Settings to activate it.
+    func startMonitoringRegistration() {
+        guard registrationRecoveryTimer == nil,
+              ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] != "1" else { return }
+        let timer = Timer(timeInterval: 5, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.recoverRegistration() }
+        }
+        timer.tolerance = 1
+        RunLoop.main.add(timer, forMode: .common)
+        registrationRecoveryTimer = timer
+        recoverRegistration()
+    }
+
+    func stopMonitoringRegistration() {
+        registrationRecoveryTimer?.invalidate()
+        registrationRecoveryTimer = nil
+        unregisterAll()
+    }
+
+    func recoverRegistration() {
+        guard !isRecordingShortcut,
+              ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] != "1" else { return }
+        guard !isRegistered else { return }
+        guard Self.hasAccessibilityPermission else {
+            if eventTap != nil { unregisterAll() }
+            return
+        }
+        if let eventTap, CFMachPortIsValid(eventTap) {
+            if !CGEvent.tapIsEnabled(tap: eventTap) {
+                CGEvent.tapEnable(tap: eventTap, enable: true)
+            }
+            return
+        }
+        registerAll()
+    }
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored nonisolated(unsafe) private var inputSourceObserver: NSObjectProtocol?
@@ -49,6 +92,7 @@ final class ShortcutService {
     }
 
     deinit {
+        registrationRecoveryTimer?.invalidate()
         if let inputSourceObserver {
             DistributedNotificationCenter.default().removeObserver(inputSourceObserver)
         }
@@ -205,7 +249,7 @@ final class ShortcutService {
     private static let eventTapCallback: CGEventTapCallBack = { _, type, event, _ in
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             // Re-enable the tap if macOS disables it
-            Task { @MainActor in
+            MainActor.assumeIsolated {
                 if let tap = ShortcutService.shared.eventTap {
                     CGEvent.tapEnable(tap: tap, enable: true)
                 }
@@ -241,7 +285,13 @@ final class ShortcutService {
         for (action, shortcut) in cachedShortcuts {
             if keyCode == shortcut.keyCode && carbonMods == shortcut.modifiers {
                 if event.getIntegerValueField(.keyboardEventAutorepeat) == 0 {
-                    Task { @MainActor in await ShortcutService.shared.performGlobal(action) }
+                    let received = ContinuousClock.now
+                    Task { @MainActor in
+                        Logger(subsystem: "com.bettershot.app", category: "CaptureStartup").info(
+                            "Shortcut dispatched in \(String(describing: received.duration(to: .now)), privacy: .public)"
+                        )
+                        await ShortcutService.shared.performGlobal(action)
+                    }
                 }
                 return nil
             }

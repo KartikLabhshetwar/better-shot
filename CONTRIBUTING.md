@@ -203,6 +203,12 @@ first, and native-selector, window, OCR, previous-region, scrolling, and recordi
 captures stay live. The setting is disabled while native selection is on, and
 native mode must never snapshot displays.
 `Tests/FrozenScreenFrameCheck.swift` covers crop origins, scales, and PNG pixels.
+The selector composites its dimming, guides, border, and handles as solid layers;
+only the small size label uses bitmap drawing. Frozen selector windows are opaque
+and use the captured image directly. Keep the untouched frame as the export source.
+`Tests/RegionSelectionOverlayCheck.swift` checks frozen/live opacity, selection
+pixels, and mouse/keyboard behavior against the production selector in a desktop
+session, using synthetic frame pixels and in-memory preferences.
 Window screenshots use `/usr/sbin/screencapture -i -w`, retaining cancellation,
 shadow options, native pixel dimensions, and private PNG staging.
 OCR and color results copy through `CaptureOrchestrator.completeTextCapture`;

@@ -41,12 +41,9 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
             await AppUpdater.shared.checkForUpdatesQuietly()
         }
 
-        if ShortcutService.hasAccessibilityPermission {
-            ShortcutService.shared.registerAll()
-
-            if !ShortcutService.shared.isRegistered {
-                Self.promptRestart()
-            }
+        ShortcutService.shared.startMonitoringRegistration()
+        if ShortcutService.hasAccessibilityPermission, !ShortcutService.shared.isRegistered {
+            Self.promptRestart()
         }
         didFinishLaunching = true
         performPendingURLActions()
@@ -88,7 +85,7 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        ShortcutService.shared.unregisterAll()
+        ShortcutService.shared.stopMonitoringRegistration()
     }
 
     /// Quitting mid-recording finishes and saves the recording first, and
@@ -129,11 +126,7 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidBecomeActive(_ notification: Notification) {
         guard ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] != "1" else { return }
-        if ShortcutService.hasAccessibilityPermission {
-            if !ShortcutService.shared.isRegistered { ShortcutService.shared.registerAll() }
-        } else {
-            ShortcutService.shared.unregisterAll()
-        }
+        ShortcutService.shared.recoverRegistration()
     }
 
     private static func promptRestart() {
