@@ -81,6 +81,16 @@ nonisolated final class RecordingAudioExporter: @unchecked Sendable {
         /// the edited timeline's length.
         let replacementURL: URL?
         let format: RecordingAudioFormat
+        let sources: [RecordingStudioSourceConfiguration]
+
+        init(screenURL: URL, clipTimeline: RecordingClipTimeline, replacementURL: URL?,
+             format: RecordingAudioFormat, sources: [RecordingStudioSourceConfiguration] = []) {
+            self.screenURL = screenURL
+            self.clipTimeline = clipTimeline
+            self.replacementURL = replacementURL
+            self.format = format
+            self.sources = sources
+        }
     }
 
     enum ExportError: LocalizedError {
@@ -101,22 +111,29 @@ nonisolated final class RecordingAudioExporter: @unchecked Sendable {
         _ configuration: Configuration,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> URL {
-        let sourceAsset = AVURLAsset(url: configuration.screenURL)
-        let sourceDuration = try await sourceAsset.load(.duration).seconds
-        let timeline = configuration.clipTimeline.normalized(to: sourceDuration)
+        let timeline: RecordingClipTimeline
+        let audioAsset: AVAsset
+        if configuration.sources.isEmpty {
+            guard configuration.clipTimeline.segments.allSatisfy({ $0.sourceID == nil }) else {
+                throw RecordingStudioSourceResolver.ResolutionError.invalidSources
+            }
+            let sourceAsset = AVURLAsset(url: configuration.screenURL)
+            let sourceDuration = try await sourceAsset.load(.duration).seconds
+            timeline = configuration.clipTimeline.normalized(to: sourceDuration)
+            if let replacementURL = configuration.replacementURL {
+                audioAsset = AVURLAsset(url: replacementURL)
+            } else {
+                audioAsset = try RecordingCompositionBuilder.makeAsset(
+                    from: sourceAsset, timeline: timeline, sourceDuration: sourceDuration)
+            }
+        } else {
+            timeline = configuration.clipTimeline
+            audioAsset = try await RecordingCompositionBuilder.makeAsset(
+                sources: configuration.sources, timeline: timeline)
+        }
         let duration = timeline.duration
         guard duration >= RecordingClipSegment.minimumDuration else {
             throw VideoTrimExportError.invalidRange
-        }
-
-        let audioAsset: AVAsset = if let replacementURL = configuration.replacementURL {
-            AVURLAsset(url: replacementURL)
-        } else {
-            try RecordingCompositionBuilder.makeAsset(
-                from: sourceAsset,
-                timeline: timeline,
-                sourceDuration: sourceDuration
-            )
         }
 
         let tracks = try await audioAsset.loadTracks(withMediaType: .audio)
@@ -178,6 +195,9 @@ nonisolated final class RecordingAudioExporter: @unchecked Sendable {
         }
 
         input.markAsFinished()
+        if !configuration.sources.isEmpty {
+            writer.endSession(atSourceTime: CMTime(seconds: duration, preferredTimescale: 600))
+        }
         await withCheckedContinuation { continuation in
             writer.finishWriting {
                 continuation.resume()

@@ -499,6 +499,18 @@ private struct StudioCanvas: View {
                 let cropCenter = RecordingVideoCrop.point(CGPoint(x: 0.5, y: 0.5), in: crop)
 
                 ZStack {
+                    if model.isMultiSource {
+                        RecordingMultiSourcePreview(model: model, time: model.displayTime, revision: model.previewRenderRevision)
+                            .frame(width: canvasSize.width, height: canvasSize.height)
+                        if let error = model.preview3DError {
+                            VStack(spacing: 8) {
+                                Text(error).font(.callout).multilineTextAlignment(.center)
+                                Button("Retry Preview") { model.retry3DPreview() }.buttonStyle(EditorButtonStyle())
+                            }
+                            .padding(16).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                            .frame(maxWidth: 340)
+                        }
+                    } else {
                     if !model.previewTimeline3D.shots.isEmpty && !model.isCroppingVideo && !model.isEditingMasks {
                         Recording3DPreview(model: model, time: model.displayTime, revision: model.previewRenderRevision, timeline: model.previewTimeline3D)
                             .frame(width: canvasSize.width, height: canvasSize.height)
@@ -644,6 +656,7 @@ private struct StudioCanvas: View {
                                 }
                             )
                         }
+                    }
                     }
                 }
                 .frame(width: canvasSize.width, height: canvasSize.height)

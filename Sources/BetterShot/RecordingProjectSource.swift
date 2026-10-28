@@ -48,12 +48,12 @@ nonisolated struct RecordingProjectSource: Codable, Equatable, Identifiable, Sen
 
     /// Returns a private, unreferenced copy. Callers write their authored snapshot before installing it.
     /// Cancelling or losing the revision check must remove this stage, never touch the original.
-    func stageCopy(from sourceDirectory: URL, in projectDirectory: URL) throws -> URL {
+    func stageCopy(from sourceDirectory: URL, in projectDirectory: URL, authoredDocument: Data? = nil) throws -> URL {
         guard duration.isFinite, duration >= RecordingClipSegment.minimumDuration else {
             throw RecordingProjectSourceError.invalidSource
         }
         try Self.requireDirectory(sourceDirectory)
-        let files = try Self.sourceFiles(in: sourceDirectory)
+        let files = try Self.sourceFiles(in: sourceDirectory, authoredDocument: authoredDocument)
         let sources = try Self.prepareSourcesDirectory(in: projectDirectory)
         let stage = sources.appendingPathComponent(".stage-" + UUID().uuidString + ".bettershotrec", isDirectory: true)
         do {
@@ -107,7 +107,7 @@ nonisolated struct RecordingProjectSource: Codable, Equatable, Identifiable, Sen
         }
     }
 
-    private static func sourceFiles(in directory: URL) throws -> (names: [String], document: Data?) {
+    private static func sourceFiles(in directory: URL, authoredDocument: Data? = nil) throws -> (names: [String], document: Data?) {
         var names = ["screen.mov"]
         for name in ["camera.mov", "input.json", "capture.json"]
             where FileManager.default.fileExists(atPath: directory.appendingPathComponent(name).path) {
@@ -117,12 +117,13 @@ nonisolated struct RecordingProjectSource: Codable, Equatable, Identifiable, Sen
         let committed = directory.appendingPathComponent("edit.json")
         let documentURL = FileManager.default.fileExists(atPath: draft.path) ? draft : committed
         var document: Data?
-        if FileManager.default.fileExists(atPath: documentURL.path) {
-            try requireRegularFile(documentURL)
-            let data = try Data(contentsOf: documentURL)
+        if authoredDocument != nil || FileManager.default.fileExists(atPath: documentURL.path) {
+            if authoredDocument == nil { try requireRegularFile(documentURL) }
+            let data = try authoredDocument ?? Data(contentsOf: documentURL)
             document = data
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  json["sources"] == nil || json["sources"] is NSNull else {
+                  (json["sources"] == nil || json["sources"] is NSNull),
+                  (json["sourceDocuments"] == nil || json["sourceDocuments"] is NSNull) else {
                 throw RecordingProjectSourceError.invalidSource
             }
             if let audio = json["replacementAudioFileName"], !(audio is NSNull) {

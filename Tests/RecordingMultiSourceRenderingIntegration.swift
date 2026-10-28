@@ -95,7 +95,7 @@ func checkRecordingSourceConfigurations(movieURL: URL) async throws {
     rootDocument.clips = timeline.segments
     do {
         _ = try await RecordingSessionRenderer.configuration(for: firstSession, document: rootDocument)
-        preconditionFailure("Unimplemented multi-source rendering must not silently export the primary recording")
+        preconditionFailure("Missing managed source packages must not silently export the primary recording")
     } catch {}
     rootDocument.sources = nil
     do {

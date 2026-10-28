@@ -49,6 +49,39 @@ enum RecordingClipEditOutcome: Equatable {
     case failed(String)
 }
 
+/// Installed packages stay unreferenced until a revision-checked synchronous commit.
+@MainActor
+final class PreparedRecordingAppend {
+    let projectURL: URL
+    let revision: UInt64
+    let document: RecordingEditDocument
+    let configurations: [RecordingStudioSourceConfiguration]
+    let playbackSources: [RecordingCompositionBuilder.PreparedSource]
+    private var unreferencedDirectories: [URL]
+
+    init(projectURL: URL, revision: UInt64, document: RecordingEditDocument,
+         configurations: [RecordingStudioSourceConfiguration],
+         playbackSources: [RecordingCompositionBuilder.PreparedSource], directories: [URL]) {
+        self.projectURL = projectURL
+        self.revision = revision
+        self.document = document
+        self.configurations = configurations
+        self.playbackSources = playbackSources
+        unreferencedDirectories = directories
+    }
+
+    func discard() {
+        for directory in unreferencedDirectories { try? FileManager.default.removeItem(at: directory) }
+        unreferencedDirectories.removeAll()
+    }
+
+    func adopt() { unreferencedDirectories.removeAll() }
+
+    deinit {
+        for directory in unreferencedDirectories { try? FileManager.default.removeItem(at: directory) }
+    }
+}
+
 /// Share-to-cloud pipeline: render the current edits, upload, copy link.
 enum RecordingStudioShareState: Equatable {
     case idle
@@ -81,6 +114,18 @@ final class RecordingStudioModel {
     private(set) var cameraOffset: TimeInterval = 0
     private(set) var isLoaded = false
     private(set) var loadError: String?
+    private(set) var projectSources: [RecordingProjectSource]?
+    private(set) var sourceDocuments: [UUID: RecordingEditDocument]?
+    private(set) var sourceConfigurations: [RecordingStudioSourceConfiguration] = []
+    private var playbackSources: [RecordingCompositionBuilder.PreparedSource] = []
+    var isMultiSource: Bool { projectSources != nil }
+    private let isEmbeddedSource: Bool
+    private let embeddedDocument: RecordingEditDocument?
+    private var embeddedImportedFiles: [URL] = []
+    var isSourceEditor: Bool { isEmbeddedSource }
+
+    /// Apply keeps new private media; Cancel/teardown removes only this editor's imports.
+    func retainEmbeddedSourceFiles() { embeddedImportedFiles.removeAll() }
 
     let screenPlayer = AVPlayer()
     let cameraPlayer = AVPlayer()
@@ -257,8 +302,10 @@ final class RecordingStudioModel {
 
     /// Accepts either a recording session folder or a bare video file (so
     /// history items and old recordings still open, just without events).
-    init(url: URL) {
+    init(url: URL, embeddedDocument: RecordingEditDocument? = nil, isEmbeddedSource: Bool = false) {
         sessionURL = url
+        self.embeddedDocument = embeddedDocument
+        self.isEmbeddedSource = isEmbeddedSource
         if RecordingSession.isSessionDirectory(url) {
             session = RecordingSession(directoryURL: url)
         } else {
@@ -273,6 +320,200 @@ final class RecordingStudioModel {
     /// False for a bare movie opened from disk: there is no project package
     /// behind it, so there is nothing to save into.
     var isProject: Bool { session != nil }
+
+    private static func installSourceCopy(_ source: RecordingProjectSource, from sourceURL: URL,
+                                          in projectURL: URL, document: Data) async throws -> URL {
+        try await Task.detached(priority: .userInitiated) {
+            let stage = try source.stageCopy(from: sourceURL, in: projectURL, authoredDocument: document)
+            do {
+                try source.installStagedCopy(stage, in: projectURL)
+                return source.sessionDirectory(in: projectURL)
+            } catch {
+                try? FileManager.default.removeItem(at: stage)
+                throw error
+            }
+        }.value
+    }
+
+    /// Preparation owns only new private packages; the root remains unchanged across awaits.
+    func prepareAppendRecording(from url: URL, document: RecordingEditDocument? = nil) async throws -> PreparedRecordingAppend {
+        guard isLoaded, let session, !isEmbeddedSource, !isCroppingVideo, !isEditingMasks,
+              RecordingSession.isSessionDirectory(url), url.standardizedFileURL != sessionURL.standardizedFileURL else {
+            throw RecordingStudioSourceResolver.ResolutionError.invalidSources
+        }
+        let revision = editRevision
+        var next = currentDocument()
+        var installed: [URL] = []
+        do {
+            var incomingDocument = document
+            if incomingDocument == nil {
+                let incomingSession = RecordingSession(directoryURL: url)
+                for documentURL in [incomingSession.draftDocumentURL, incomingSession.editDocumentURL]
+                    where FileManager.default.fileExists(atPath: documentURL.path) {
+                    do {
+                        let attributes = try documentURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+                        guard attributes.isRegularFile == true, attributes.isSymbolicLink != true else {
+                            throw RecordingStudioSourceResolver.ResolutionError.invalidDocument
+                        }
+                        incomingDocument = try JSONDecoder().decode(RecordingEditDocument.self,
+                            from: Data(contentsOf: documentURL))
+                    } catch { throw RecordingStudioSourceResolver.ResolutionError.invalidDocument }
+                    break
+                }
+            }
+            if next.sources == nil {
+                let original = next
+                let originalTimeline = RecordingClipTimeline(segments: original.clips ?? [])
+                let source = RecordingProjectSource(displayName: projectDisplayName, duration: originalTimeline.duration)
+                let copiedURL = try await Self.installSourceCopy(source, from: session.directoryURL,
+                    in: session.directoryURL, document: JSONEncoder().encode(original))
+                installed.append(copiedURL)
+                try Task.checkCancellation()
+                next.sources = [source]
+                next.sourceDocuments = [source.id: original]
+                next.clips = originalTimeline.segments.compactMap { clip in
+                    guard let range = originalTimeline.editorRange(for: clip.id) else { return nil }
+                    return RecordingClipSegment(id: clip.id, sourceID: source.id,
+                        sourceStart: range.lowerBound, sourceEnd: range.upperBound)
+                }
+            }
+
+            // Native defaults are materialized once, so later preference changes cannot alter an appended source.
+            let snapshotModel = RecordingStudioModel(url: url, embeddedDocument: incomingDocument, isEmbeddedSource: true)
+            await snapshotModel.load()
+            guard snapshotModel.isLoaded else {
+                snapshotModel.teardown()
+                throw RecordingStudioSourceResolver.ResolutionError.invalidDocument
+            }
+            let authored = snapshotModel.currentDocument()
+            let source = RecordingProjectSource(displayName: snapshotModel.projectDisplayName, duration: snapshotModel.duration)
+            snapshotModel.teardown()
+            try authored.validateSourceDocuments()
+            guard authored.sources == nil else { throw RecordingStudioSourceResolver.ResolutionError.nestedProject }
+            try Task.checkCancellation()
+            let copiedURL = try await Self.installSourceCopy(source, from: url, in: session.directoryURL,
+                document: JSONEncoder().encode(authored))
+            installed.append(copiedURL)
+            try Task.checkCancellation()
+            next.sources?.append(source)
+            next.sourceDocuments = next.sourceDocuments ?? [:]
+            next.sourceDocuments?[source.id] = authored
+            next.clips?.append(RecordingClipSegment(sourceID: source.id, sourceStart: 0, sourceEnd: source.duration))
+            try next.validateSourceDocuments()
+            let configurations = try await RecordingStudioSourceResolver.configurations(
+                for: next.sources ?? [], in: session, documents: next.sourceDocuments)
+            let prepared = try await RecordingCompositionBuilder.prepareSources(configurations)
+            try Task.checkCancellation()
+            return PreparedRecordingAppend(projectURL: sessionURL, revision: revision, document: next,
+                configurations: configurations, playbackSources: prepared, directories: installed)
+        } catch {
+            for directory in installed { try? FileManager.default.removeItem(at: directory) }
+            throw error
+        }
+    }
+
+    /// The caller checks its request lease immediately before this non-suspending mutation.
+    @discardableResult
+    func commitAppendRecording(_ prepared: PreparedRecordingAppend, expectedRevision: UInt64) -> RecordingClipEditOutcome {
+        guard prepared.projectURL == sessionURL, prepared.revision == expectedRevision,
+              editRevision == expectedRevision, isLoaded, !isCroppingVideo, !isEditingMasks else {
+            prepared.discard()
+            return .failed("The project changed while preparing the recording. Inspect it and retry.")
+        }
+        let result = applySourceProjectDocument(prepared.document,
+            configurations: prepared.configurations, preparedSources: prepared.playbackSources,
+            selectedID: prepared.document.clips?.last?.id, playheadTime: currentTime, actionName: "Append Recording")
+        if result == .changed { prepared.adopt() } else { prepared.discard() }
+        return result
+    }
+
+    @discardableResult
+    func reorderClips(ids: [UUID]) -> RecordingClipEditOutcome {
+        guard isMultiSource else { return .failed("Append a recording before arranging clips from multiple recordings.") }
+        do {
+            return applyClipTimeline(try clipTimeline.reordered(clipIDs: ids), selectedID: selectedClipID,
+                playheadTime: currentTime, actionName: "Reorder Clips")
+        } catch {
+            return .failed("Clip order must contain each current clip exactly once.")
+        }
+    }
+
+    /// Source effects share one root undo/save; the authored cut clock stays fixed.
+    func applySourceDocument(_ authored: RecordingEditDocument, sourceID: UUID, expectedRevision: UInt64) async -> RecordingClipEditOutcome {
+        guard isMultiSource, let session, let source = projectSources?.first(where: { $0.id == sourceID }),
+              editRevision == expectedRevision, authored.sources == nil, authored.sourceDocuments == nil,
+              authored.clips?.contains(where: { $0.sourceID != nil }) != true else {
+            return .failed("The recording changed. Reopen its controls and retry.")
+        }
+        let original = sourceDocuments?[sourceID]
+            ?? RecordingSession(directoryURL: source.sessionDirectory(in: session.directoryURL)).loadEditDocument()
+        guard let original, authored.clips == original.clips,
+              authored.trimStart == original.trimStart, authored.trimEnd == original.trimEnd else {
+            return .failed("Trim and change clip speed on the project's main timeline.")
+        }
+        var document = currentDocument()
+        document.sourceDocuments = document.sourceDocuments ?? [:]
+        document.sourceDocuments?[sourceID] = authored
+        guard document != currentDocument() else { return .unchanged }
+        do {
+            try document.validateSourceDocuments()
+            let configurations = try await RecordingStudioSourceResolver.configurations(
+                for: document.sources ?? [], in: session, documents: document.sourceDocuments)
+            let prepared = try await RecordingCompositionBuilder.prepareSources(configurations)
+            try Task.checkCancellation()
+            guard editRevision == expectedRevision, isLoaded else {
+                return .failed("The project changed while preparing the recording. Reopen its controls and retry.")
+            }
+            return applySourceProjectDocument(document, configurations: configurations, preparedSources: prepared,
+                selectedID: selectedClipID, playheadTime: currentTime, actionName: "Edit Recording")
+        } catch { return .failed(error.localizedDescription) }
+    }
+
+    private func applySourceProjectDocument(
+        _ document: RecordingEditDocument,
+        configurations: [RecordingStudioSourceConfiguration],
+        preparedSources: [RecordingCompositionBuilder.PreparedSource],
+        selectedID: UUID?, playheadTime: TimeInterval, actionName: String
+    ) -> RecordingClipEditOutcome {
+        let timeline: RecordingClipTimeline
+        let playback: AVAsset?
+        do {
+            try document.validateSourceDocuments()
+            timeline = RecordingClipTimeline(segments: document.clips ?? [])
+            if document.sources != nil {
+                playback = try RecordingCompositionBuilder.makeAsset(sources: preparedSources, timeline: timeline)
+            } else {
+                playback = try makeLegacyScreenPlaybackAsset(for: timeline, replacementAudio: replacementAudio)
+            }
+        } catch { return .failed(error.localizedDescription) }
+        let previous = currentDocument()
+        let previousConfigurations = sourceConfigurations
+        let previousSources = playbackSources
+        let previousSelection = selectedClipID
+        let previousTime = currentTime
+        registerUndo(actionName) { target in
+            _ = target.applySourceProjectDocument(previous, configurations: previousConfigurations,
+                preparedSources: previousSources, selectedID: previousSelection,
+                playheadTime: previousTime, actionName: actionName)
+        }
+        pause()
+        hoverPreviewTime = nil
+        timelineHoverTime = nil
+        sourceConfigurations = configurations
+        playbackSources = preparedSources
+        applyDocumentSettings(document)
+        clipTimeline = timeline
+        duration = timeline.duration
+        selectedClipID = selectedID
+        selectedCueID = nil
+        selected3DShotID = nil
+        rebuild3DTimeline()
+        rebuildPointerTimeline()
+        rebuildViewportTimeline()
+        if let playback { installScreenPlayerItem(playback, preserving: playheadTime) }
+        scheduleProjectSave()
+        return .changed
+    }
 
     /// What the window title, share sheet, and Projects browser call this
     /// project. A bare movie falls back to its file name.
@@ -338,15 +579,22 @@ final class RecordingStudioModel {
             style.camera.isVisible = false
         }
 
-        lastSavedDocument = session?.loadEditDocument()
+        lastSavedDocument = isEmbeddedSource ? embeddedDocument : session?.loadEditDocument()
         // A draft that outlived its editor means the last session ended
         // without a save - a crash, a force quit, or a Studio window that is
         // still open elsewhere. Reopen on the draft so nothing is lost; the
         // project simply opens dirty.
-        let document = session?.effectiveEditDocument()
-        guard document?.sources == nil,
-              document?.clips?.contains(where: { $0.sourceID != nil }) != true else {
-            loadError = "This multi-recording project needs a BetterShot build with multi-source playback support. Its original recordings are unchanged."
+        let document = isEmbeddedSource ? embeddedDocument : session?.effectiveEditDocument()
+        do {
+            try document?.validateSourceDocuments()
+            if let sources = document?.sources, let session {
+                guard !isEmbeddedSource else { throw RecordingStudioSourceResolver.ResolutionError.nestedProject }
+                sourceConfigurations = try await RecordingStudioSourceResolver.configurations(
+                    for: sources, in: session, documents: document?.sourceDocuments)
+                playbackSources = try await RecordingCompositionBuilder.prepareSources(sourceConfigurations)
+            }
+        } catch {
+            loadError = "Could not load the recording sources: \(error.localizedDescription)"
             return
         }
         // Sessions recorded before the toggle moved into Studio stored the
@@ -367,7 +615,15 @@ final class RecordingStudioModel {
             }
         }
 
-        if let storedClips = document?.clips, !storedClips.isEmpty {
+        if let sources = document?.sources, let storedClips = document?.clips {
+            do {
+                clipTimeline = try RecordingClipTimeline(segments: storedClips).validated(
+                    sourceDurations: Dictionary(uniqueKeysWithValues: sources.map { ($0.id, $0.duration) }))
+            } catch {
+                loadError = error.localizedDescription
+                return
+            }
+        } else if let storedClips = document?.clips, !storedClips.isEmpty {
             clipTimeline = RecordingClipTimeline(segments: storedClips)
                 .normalized(to: sourceDuration)
         } else {
@@ -423,9 +679,9 @@ final class RecordingStudioModel {
                 // the real duration) would otherwise read as edits.
                 lastSavedDocument = currentDocument()
             }
-            session.updateProjectMetadata { $0.lastOpenedAt = Date() }
+            if !isEmbeddedSource { session.updateProjectMetadata { $0.lastOpenedAt = Date() } }
         }
-        StudioProjectRegistry.shared.register(self)
+        if !isEmbeddedSource { StudioProjectRegistry.shared.register(self) }
     }
 
     /// Copies a stored project onto the model. Shared by the initial load and
@@ -434,6 +690,8 @@ final class RecordingStudioModel {
         isApplyingDocument = true
         defer { isApplyingDocument = false }
 
+        projectSources = document.sources
+        sourceDocuments = document.sourceDocuments
         style = document.style.value
         zoomEnabled = document.zoomEnabled
         zoomCues = document.zoomCues
@@ -461,16 +719,20 @@ final class RecordingStudioModel {
 
     func teardown() {
         cancel3DScenePreview()
-        StudioProjectRegistry.shared.unregister(self)
+        if !isEmbeddedSource { StudioProjectRegistry.shared.unregister(self) }
         exportTask?.cancel()
         audioExportTask?.cancel()
         replacementAudioTask?.cancel()
+        if isEmbeddedSource {
+            for url in embeddedImportedFiles { try? FileManager.default.removeItem(at: url) }
+            embeddedImportedFiles.removeAll()
+        }
         shareTask?.cancel()
         transcriptionTask?.cancel()
         projectSaveTask?.cancel()
         previewMaskTask?.cancel()
         timelineThumbnails.cancel()
-        writeDraftNow()
+        if !isEmbeddedSource { writeDraftNow() }
         pause()
         if let timeObserver {
             screenPlayer.removeTimeObserver(timeObserver)
@@ -542,7 +804,7 @@ final class RecordingStudioModel {
         let sourceTime = clipTimeline.sourceTime(at: editorTime)
         let target = CMTime(seconds: editorTime, preferredTimescale: 600)
         screenPlayer.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
-        if hasCameraVideo {
+        if hasCameraVideo && !isMultiSource {
             if sourceTime >= cameraOffset {
                 let cameraTime = CMTime(seconds: max(0, sourceTime - cameraOffset), preferredTimescale: 600)
                 cameraPlayer.seek(to: cameraTime, toleranceBefore: .zero, toleranceAfter: .zero)
@@ -669,6 +931,7 @@ final class RecordingStudioModel {
 
     @discardableResult
     func splitClip(at editorTime: TimeInterval) -> RecordingClipEditOutcome {
+        guard !isEmbeddedSource else { return .unchanged }
         guard let result = clipTimeline.split(at: editorTime) else { return .unchanged }
         return applyClipTimeline(
             result.timeline,
@@ -685,6 +948,7 @@ final class RecordingStudioModel {
 
     @discardableResult
     func deleteSelectedClip() -> RecordingClipEditOutcome {
+        guard !isEmbeddedSource else { return .unchanged }
         guard let selectedClipID,
               let deletedRange = clipTimeline.editorRange(for: selectedClipID),
               let next = clipTimeline.deleting(segmentID: selectedClipID) else {
@@ -703,6 +967,7 @@ final class RecordingStudioModel {
 
     @discardableResult
     func trimClip(_ replacement: RecordingClipSegment) -> RecordingClipEditOutcome {
+        guard !isEmbeddedSource else { return .unchanged }
         let next = clipTimeline.replacing(replacement)
         guard next != clipTimeline else { return .unchanged }
         let editorTime = next.editorRange(for: replacement.id)?.lowerBound ?? currentTime
@@ -717,6 +982,7 @@ final class RecordingStudioModel {
 
     @discardableResult
     func setClipSpeed(_ speed: Double, forClipID id: UUID) -> RecordingClipEditOutcome {
+        guard !isEmbeddedSource else { return .unchanged }
         guard let segment = clipTimeline.segments.first(where: { $0.id == id }) else { return .unchanged }
         let clamped = min(max(speed, RecordingClipSegment.minimumSpeed), RecordingClipSegment.maximumSpeed)
         guard clipSpeedDraft.propose(clamped, forClipID: id) else { return .unchanged }
@@ -740,6 +1006,7 @@ final class RecordingStudioModel {
     }
 
     func resetClips() {
+        guard !isMultiSource, !isEmbeddedSource else { return }
         let full = RecordingClipTimeline.full(sourceDuration: sourceDuration)
         guard full != clipTimeline else { return }
         applyClipTimeline(
@@ -758,7 +1025,15 @@ final class RecordingStudioModel {
         actionName: String,
         hoverTime: TimeInterval? = nil
     ) -> RecordingClipEditOutcome {
-        let next = requestedTimeline.normalized(to: sourceDuration)
+        let next: RecordingClipTimeline
+        do {
+            if let sources = projectSources {
+                next = try requestedTimeline.validated(sourceDurations:
+                    Dictionary(uniqueKeysWithValues: sources.map { ($0.id, $0.duration) }))
+            } else {
+                next = requestedTimeline.normalized(to: sourceDuration)
+            }
+        } catch { return .failed(error.localizedDescription) }
         guard !next.segments.isEmpty, next != clipTimeline else { return .unchanged }
 
         let playbackAsset: AVAsset?
@@ -823,6 +1098,16 @@ final class RecordingStudioModel {
     }
 
     private func makeScreenPlaybackAsset(
+        for timeline: RecordingClipTimeline,
+        replacementAudio: RecordingReplacementAudio?
+    ) throws -> AVAsset? {
+        if isMultiSource {
+            return try RecordingCompositionBuilder.makeAsset(sources: playbackSources, timeline: timeline)
+        }
+        return try makeLegacyScreenPlaybackAsset(for: timeline, replacementAudio: replacementAudio)
+    }
+
+    private func makeLegacyScreenPlaybackAsset(
         for timeline: RecordingClipTimeline,
         replacementAudio: RecordingReplacementAudio?
     ) throws -> AVAsset? {
@@ -920,7 +1205,7 @@ final class RecordingStudioModel {
     }
 
     private func syncCameraPlayback() {
-        guard hasCameraVideo else { return }
+        guard hasCameraVideo, !isMultiSource else { return }
         let sourceTime = clipTimeline.sourceTime(at: currentTime)
         guard sourceTime >= cameraOffset else {
             cameraPlayer.pause()
@@ -1023,6 +1308,7 @@ final class RecordingStudioModel {
     }
 
     private func rebuild3DTimeline() {
+        guard !isMultiSource else { timeline3D = .empty; return }
         cancel3DScenePreview()
         timeline3D = Recording3DTimeline(shots: shots3D, duration: duration)
         if !timeline3D.shots.contains(where: { $0.id == selected3DShotID }) { selected3DShotID = nil }
@@ -1344,7 +1630,7 @@ final class RecordingStudioModel {
     private func rebuildPointerTimeline() {
         reframeFocusTimeline = nil
         reframeFocusResolved = false
-        guard pointerIsSynthesized, sourceDuration > 0 else {
+        guard !isMultiSource, pointerIsSynthesized, sourceDuration > 0 else {
             pointerTimeline = .empty
             return
         }
@@ -1360,7 +1646,7 @@ final class RecordingStudioModel {
     }
 
     private func rebuildViewportTimeline() {
-        guard sourceDuration > 0 else {
+        guard !isMultiSource, sourceDuration > 0 else {
             viewportTimeline = .identity
             return
         }
@@ -1378,6 +1664,7 @@ final class RecordingStudioModel {
         if renderChanged { previewRenderRevision &+= 1 }
         guard isLoaded, !isApplyingDocument else { return }
         editRevision &+= 1
+        guard !isEmbeddedSource else { return }
         guard session != nil else { return }
         hasUnsavedChanges = true
         projectSaveTask?.cancel()
@@ -1395,6 +1682,8 @@ final class RecordingStudioModel {
             zoomEnabled: zoomEnabled,
             zoomCues: zoomCues.filter { !$0.isImplicit },
             clipTimeline: clipTimeline,
+            sources: projectSources,
+            sourceDocuments: sourceDocuments,
             exportSettings: exportSettings,
             showsClickEffects: showsClickEffects,
             showsKeystrokes: showsKeystrokes,
@@ -1430,6 +1719,7 @@ final class RecordingStudioModel {
     /// committed `edit.json`, so a crash costs nothing and Save still means
     /// something.
     private func writeDraftNow() {
+        guard !isEmbeddedSource else { return }
         guard isLoaded, let session else { return }
         let document = currentDocument()
         if document == lastSavedDocument {
@@ -1467,6 +1757,7 @@ final class RecordingStudioModel {
     /// ⌘S. Commits the working copy to `edit.json`, clears the draft, and updates its saved video.
     @discardableResult
     func saveProject() -> RecordingProjectSaveOutcome {
+        guard !isEmbeddedSource else { return .unavailable }
         guard isLoaded, let session else { return .unavailable }
         projectSaveTask?.cancel()
         let document = currentDocument()
@@ -1536,6 +1827,43 @@ final class RecordingStudioModel {
         expectedRevision: UInt64
     ) async -> Bool {
         guard let session else { return false }
+        if isMultiSource || document.sources != nil {
+            do {
+                try document.validateSourceDocuments()
+                let configurations: [RecordingStudioSourceConfiguration]
+                if let sources = document.sources {
+                    configurations = try await RecordingStudioSourceResolver.configurations(
+                        for: sources, in: session, documents: document.sourceDocuments)
+                } else {
+                    configurations = []
+                }
+                let prepared = configurations.isEmpty ? [] : try await RecordingCompositionBuilder.prepareSources(configurations)
+                try Task.checkCancellation()
+                guard editRevision == expectedRevision else {
+                    discardErrorMessage = "The project changed while restoring. The draft was kept."
+                    return false
+                }
+                let restoredTimeline = RecordingClipTimeline(segments: document.clips ?? [])
+                if document.sources != nil {
+                    _ = try RecordingCompositionBuilder.makeAsset(sources: prepared, timeline: restoredTimeline)
+                } else {
+                    _ = try makeLegacyScreenPlaybackAsset(for: restoredTimeline, replacementAudio: replacementAudio)
+                }
+                try removeDraftDocument(session)
+                let outcome = applySourceProjectDocument(document, configurations: configurations,
+                    preparedSources: prepared, selectedID: document.clips?.first?.id,
+                    playheadTime: currentTime, actionName: "Discard Changes")
+                guard outcome == .changed else { throw RecordingClipTimelineError.invalidTimeline }
+                projectSaveTask?.cancel()
+                editUndoManager.removeAllActions()
+                undoRevision &+= 1
+                discardErrorMessage = nil
+                return true
+            } catch {
+                discardErrorMessage = "Could not restore the saved recordings: \(error.localizedDescription)"
+                return false
+            }
+        }
         let nextTimeline: RecordingClipTimeline
         if let storedClips = document.clips, !storedClips.isEmpty {
             nextTimeline = RecordingClipTimeline(segments: storedClips)
@@ -1997,9 +2325,9 @@ final class RecordingStudioModel {
             karaokeTimeline: showsSubtitles && hasSubtitles && !karaokeTimeline.isEmpty
                 ? karaokeTimeline
                 : nil,
-            canvasSize: exportAspect == .original
-                ? exportVideoSize
-                : exportAspect.canvasSize(for: exportVideoSize),
+            canvasSize: isMultiSource
+                ? multiSourceCanvasSize
+                : (exportAspect == .original ? exportVideoSize : exportAspect.canvasSize(for: exportVideoSize)),
             clipTimeline: clipTimeline,
             exportSettings: exportSettings,
             audioReplacementURL: replacementAudio?.url,
@@ -2007,7 +2335,8 @@ final class RecordingStudioModel {
             fitContentAspect: fitContentAspect,
             crop: cropRect,
             masks: maskSegments,
-            timeline3D: timeline3D
+            timeline3D: timeline3D,
+            sources: sourceConfigurations
         )
     }
 
@@ -2053,6 +2382,7 @@ final class RecordingStudioModel {
 
     private func rebuildPreviewReframe() {
         guard isLoaded else { return }
+        guard !isMultiSource else { previewReframe = nil; return }
         previewReframe = makeReframeTrack(crop: effectivePreviewCrop)
     }
 
@@ -2075,7 +2405,7 @@ final class RecordingStudioModel {
     }
 
     func beginVideoCrop() {
-        guard isLoaded, isScreenVisible else { return }
+        guard isLoaded, isScreenVisible, !isMultiSource else { return }
         if isCroppingVideo {
             cropDraft = cropRect
             cancelVideoCrop()
@@ -2188,6 +2518,7 @@ final class RecordingStudioModel {
     }
 
     func beginMaskEditing() {
+        guard !isMultiSource else { return }
         guard isLoaded, isScreenVisible, !isEditingMasks, !isCroppingVideo else { return }
         pause()
         maskEditSnapshot = maskSegments
@@ -2351,6 +2682,7 @@ final class RecordingStudioModel {
     }
 
     private func updatePreviewMaskComposition() {
+        guard !isMultiSource else { return }
         previewMaskState.update(maskSegments)
         previewMaskTask?.cancel()
         previewMaskTask = nil
@@ -2405,7 +2737,13 @@ final class RecordingStudioModel {
     /// What the Studio canvas shows: the target-aspect canvas when a
     /// non-original aspect is selected, the source canvas otherwise.
     var previewCanvasSize: CGSize {
-        exportAspect == .original ? previewVideoSize : exportAspect.canvasSize(for: previewVideoSize)
+        if isMultiSource { return multiSourceCanvasSize }
+        return exportAspect == .original ? previewVideoSize : exportAspect.canvasSize(for: previewVideoSize)
+    }
+
+    private var multiSourceCanvasSize: CGSize {
+        let firstCanvas = sourceConfigurations.first?.configuration.canvasSize ?? croppedVideoSize
+        return exportAspect == .original ? firstCanvas : exportAspect.canvasSize(for: firstCanvas)
     }
 
     /// Source aspect for laying out the card on a target-aspect canvas;
@@ -2494,6 +2832,7 @@ final class RecordingStudioModel {
 
     @discardableResult
     private func export(replacingExport: Bool) -> UUID? {
+        guard !isEmbeddedSource else { return nil }
         // One render at a time: the share pipeline uses the same exporter,
         // so a second encode would just fight it for the media engine.
         guard !exportState.isExporting, !shareState.isBusy, isLoaded else { return nil }
@@ -2609,7 +2948,7 @@ final class RecordingStudioModel {
     /// True once there is a soundtrack to export or swap - the recording's
     /// own audio, or one already imported over it.
     var hasAudio: Bool {
-        hasRecordedAudio || replacementAudio != nil
+        isMultiSource ? playbackSources.contains(where: { !$0.audio.isEmpty }) : (hasRecordedAudio || replacementAudio != nil)
     }
 
     /// How far the imported soundtrack falls short of (or overruns) the
@@ -2628,7 +2967,7 @@ final class RecordingStudioModel {
     /// Writes the edited soundtrack on its own, for cleanup in a tool that
     /// has no API - the outbound half of the replace-audio round trip.
     func exportAudio() {
-        guard !audioExportState.isExporting, isLoaded, hasAudio else { return }
+        guard !isEmbeddedSource, !audioExportState.isExporting, isLoaded, hasAudio else { return }
         pause()
 
         audioExportState = .exporting(progress: 0)
@@ -2636,8 +2975,9 @@ final class RecordingStudioModel {
         let configuration = RecordingAudioExporter.Configuration(
             screenURL: screenURL,
             clipTimeline: clipTimeline,
-            replacementURL: replacementAudio?.url,
-            format: audioExportFormat
+            replacementURL: isMultiSource ? nil : replacementAudio?.url,
+            format: audioExportFormat,
+            sources: sourceConfigurations
         )
         let suggestedFileName = makeAudioExportFileName()
         let dockProgressID = DockExportProgressCoordinator.shared.start()
@@ -2685,7 +3025,7 @@ final class RecordingStudioModel {
     /// playing after the original is moved, and playback switches to it
     /// immediately rather than only revealing itself at export.
     func replaceAudio(with pickedURL: URL) {
-        guard isLoaded else { return }
+        guard isLoaded, !isMultiSource else { return }
         pause()
         replacementAudioTask?.cancel()
 
@@ -2694,16 +3034,19 @@ final class RecordingStudioModel {
         let storedURL: URL
         if let session {
             let destination = session.directoryURL
-                .appendingPathComponent(RecordingSession.replacementAudioBaseName)
+                .appendingPathComponent(isEmbeddedSource
+                    ? RecordingSession.replacementAudioBaseName + "-" + UUID().uuidString
+                    : RecordingSession.replacementAudioBaseName)
                 .appendingPathExtension(pickedURL.pathExtension.isEmpty ? "m4a" : pickedURL.pathExtension)
             do {
                 // Clear every previous import, whatever extension it had,
                 // so the session never accumulates orphaned soundtracks.
-                removeStoredReplacementAudio(in: session)
+                if !isEmbeddedSource { removeStoredReplacementAudio(in: session) }
                 try FileManager.default.copyItem(at: pickedURL, to: destination)
+                if isEmbeddedSource { embeddedImportedFiles.append(destination) }
             } catch {
                 replacementAudioError = "Could not import that file: \(error.localizedDescription)"
-                clearReplacementAudio()
+                if !isEmbeddedSource { clearReplacementAudio() }
                 return
             }
             storedURL = destination
@@ -2721,10 +3064,14 @@ final class RecordingStudioModel {
             guard let self, !Task.isCancelled else { return }
             guard let resolved else {
                 if let session = self.session {
-                    self.removeStoredReplacementAudio(in: session)
+                    if self.isEmbeddedSource {
+                        try? FileManager.default.removeItem(at: storedURL)
+                    } else {
+                        self.removeStoredReplacementAudio(in: session)
+                    }
                 }
                 self.replacementAudioError = "That file has no audio track."
-                self.clearReplacementAudio()
+                if !self.isEmbeddedSource { self.clearReplacementAudio() }
                 return
             }
             self.replacementAudio = resolved
@@ -2733,11 +3080,12 @@ final class RecordingStudioModel {
     }
 
     func removeReplacementAudio() {
+        guard !isMultiSource else { return }
         guard replacementAudio != nil else { return }
         replacementAudioTask?.cancel()
         replacementAudioTask = nil
         pause()
-        if let session {
+        if let session, !isEmbeddedSource {
             removeStoredReplacementAudio(in: session)
         }
         replacementAudioError = nil
@@ -2783,6 +3131,7 @@ final class RecordingStudioModel {
     /// session's flattened deliverable, upload it, and copy the share
     /// link - without leaving the Studio or touching a save panel.
     func shareToCloud(options: CloudUploadOptions) {
+        guard !isEmbeddedSource else { return }
         guard !shareState.isBusy, !exportState.isExporting, isLoaded,
               canShareToCloud else {
             return

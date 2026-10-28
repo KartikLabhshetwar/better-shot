@@ -47,7 +47,7 @@ if [[ "${BETTERSHOT_CHECK_EDITOR_SCENES:-0}" == "1" ]]; then
     exit 0
 fi
 swiftc -parse-as-library -module-name ExportIntegration -module-cache-path .build/ExportCheckModules \
-    -I "$derived/Build/Products/$configuration" "${module_flags[@]}" Tests/ExportIntegration.swift Tests/EditorUIIntegration.swift Tests/RecordingAgentAccessIntegration.swift Tests/RecordingMultiSourceRenderingIntegration.swift Tests/ImageTransformIntegration.swift Tests/Recording3DIntegration.swift \
+    -I "$derived/Build/Products/$configuration" "${module_flags[@]}" Tests/ExportIntegration.swift Tests/EditorUIIntegration.swift Tests/RecordingAgentAccessIntegration.swift Tests/RecordingMultiSourceRenderingIntegration.swift Tests/RecordingMultiSourceCompositorIntegration.swift Tests/RecordingMultiSourceModelIntegration.swift Tests/ImageTransformIntegration.swift Tests/Recording3DIntegration.swift \
     "${objects[@]}" "${package_objects[@]}" \
     -o "$out/$program"
 # The snapshots instantiate sharing UI; do not read the real R2 Keychain from this test binary.

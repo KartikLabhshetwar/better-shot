@@ -72,6 +72,8 @@ struct RecordingEditDocument: Codable, Equatable {
     var clips: [RecordingClipSegment]?
     /// Immutable managed recording snapshots used by source-tagged clips. Nil is a legacy project.
     var sources: [RecordingProjectSource]?
+    /// Editable leaf documents live in the root so draft/save/undo commit one snapshot.
+    var sourceDocuments: [UUID: RecordingEditDocument]?
     var trimStart: TimeInterval?
     var trimEnd: TimeInterval?
     var exportSettings: VideoCompressionSettings?
@@ -113,6 +115,7 @@ struct RecordingEditDocument: Codable, Equatable {
         case zoomCues
         case clips
         case sources
+        case sourceDocuments
         case trimStart
         case trimEnd
         case exportSettings
@@ -141,6 +144,7 @@ struct RecordingEditDocument: Codable, Equatable {
         zoomCues: [ZoomCue],
         clipTimeline: RecordingClipTimeline? = nil,
         sources: [RecordingProjectSource]? = nil,
+        sourceDocuments: [UUID: RecordingEditDocument]? = nil,
         trimSelection: VideoTrimSelection? = nil,
         exportSettings: VideoCompressionSettings? = nil,
         showsClickEffects: Bool? = nil,
@@ -165,6 +169,7 @@ struct RecordingEditDocument: Codable, Equatable {
         self.zoomCues = zoomCues
         clips = clipTimeline?.segments
         self.sources = sources
+        self.sourceDocuments = sourceDocuments
         if let clip = clipTimeline?.segments.only {
             // Keep the legacy envelope populated for older BetterShot builds.
             trimStart = clip.sourceStart
@@ -198,6 +203,30 @@ struct RecordingEditDocument: Codable, Equatable {
 
     var audioExportFormatValue: RecordingAudioFormat {
         audioExportFormat.flatMap(RecordingAudioFormat.init(rawValue:)) ?? .m4a
+    }
+
+    /// Root snapshots cannot introduce nested projects or change the source clock.
+    func validateSourceDocuments() throws {
+        guard let sources else {
+            guard sourceDocuments == nil,
+                  clips?.contains(where: { $0.sourceID != nil }) != true else {
+                throw RecordingClipTimelineError.invalidTimeline
+            }
+            return
+        }
+        let ids = Set(sources.map(\.id))
+        guard !sources.isEmpty, ids.count == sources.count,
+              Set(sourceDocuments?.keys.map { $0 } ?? []).isSubset(of: ids) else {
+            throw RecordingClipTimelineError.invalidTimeline
+        }
+        _ = try RecordingClipTimeline(segments: clips ?? []).validated(
+            sourceDurations: Dictionary(uniqueKeysWithValues: sources.map { ($0.id, $0.duration) }))
+        for document in (sourceDocuments ?? [:]).values {
+            guard document.sources == nil, document.sourceDocuments == nil,
+                  document.clips?.contains(where: { $0.sourceID != nil }) != true else {
+                throw RecordingClipTimelineError.invalidTimeline
+            }
+        }
     }
 
     var cropValue: CGRect {
@@ -239,6 +268,7 @@ struct RecordingEditDocument: Codable, Equatable {
         zoomCues = try container.decodeIfPresent([ZoomCue].self, forKey: .zoomCues) ?? []
         clips = try container.decodeIfPresent([RecordingClipSegment].self, forKey: .clips)
         sources = try container.decodeIfPresent([RecordingProjectSource].self, forKey: .sources)
+        sourceDocuments = try container.decodeIfPresent([UUID: RecordingEditDocument].self, forKey: .sourceDocuments)
         trimStart = try container.decodeIfPresent(TimeInterval.self, forKey: .trimStart)
         trimEnd = try container.decodeIfPresent(TimeInterval.self, forKey: .trimEnd)
         exportSettings = try container.decodeIfPresent(
@@ -290,6 +320,7 @@ struct RecordingEditDocument: Codable, Equatable {
         try container.encode(zoomCues, forKey: .zoomCues)
         try container.encodeIfPresent(clips, forKey: .clips)
         try container.encodeIfPresent(sources, forKey: .sources)
+        try container.encodeIfPresent(sourceDocuments, forKey: .sourceDocuments)
         try container.encodeIfPresent(trimStart, forKey: .trimStart)
         try container.encodeIfPresent(trimEnd, forKey: .trimEnd)
         try container.encodeIfPresent(exportSettings, forKey: .exportSettings)

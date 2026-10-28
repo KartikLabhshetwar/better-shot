@@ -37,7 +37,7 @@ Real-library opening and external client setup remained unverified.
   current revision checks. Async append rechecks its request lease and revision
   before committing and deduplicates concurrent retry IDs.
 
-## First package implemented and verified
+## First package implemented and verified (`dcb6adc`)
 
 - Format-9 optional source catalog and optional clip source IDs; strict ordered
   validation, source-aware splitting, exact-permutation reorder, legacy decoding.
@@ -57,7 +57,7 @@ resolved by rebuilding the final sources, not by weakening the assertion.
 
 ## Next packages
 
-1. Authored crop/replacement-audio parity is implemented and verified. The native
+1. Authored crop/replacement-audio parity is implemented and verified (`7c957a5`). The native
    parity test exposed an existing audio lifetime bug: `AVAssetTrack` retained
    no owning asset, so later composition failed with AVFoundation -11800 and
    OSStatus -12780. `RecordingReplacementAudio` now retains its `AVURLAsset`.
@@ -96,3 +96,41 @@ models must suppress registry, metadata, draft/save/export/share side effects.
 Root `sourceDocuments` snapshots are authoritative and reject nested catalogs,
 nested snapshots and tagged leaf clips. The resolver prefers them over the
 immutable source package's initial edit document.
+
+## Engine/model/preview package verified
+
+Implemented and verified: shared multi-source still/video/audio
+rendering, resettable per-source GPU frame feeds, Metal native preview worker,
+root snapshot/promotion/append/reorder/source-effect transactions, embedded child
+model side-effect isolation, and production integration tests. Parent wired
+`BETTERSHOT_CHECK_MULTI_SOURCE` for configuration + compositor + model checks and
+`BETTERSHOT_CHECK_MULTI_SOURCE_MODEL` for independent transaction checks.
+
+The combined app build and 38 standalone checks pass. The model-only integration
+passed promotion timing/identity, stale cleanup, undo/redo, save/reopen, reorder,
+discard, source effect snapshots, and unchanged originals. Strict incoming saved
+edit/priority-draft corruption checks also pass; malformed documents never fall
+back to defaults during append.
+
+Final compositor checks pass: exact preview-worker pixel parity across source
+switches/backward seeks, independently oriented rotated-media reference, encoded
+pixel parity, per-source framing, source snapshot overrides, and video/audio-only
+soundtrack timing. Audio probes now use individual sample timing rather than a
+whole buffer's starting timestamp. Multi-source writers end at the exact outer
+duration to prevent trailing sample/AAC padding from extending the result. All
+assertions removed temporarily during diagnostics were restored for the final
+successful `BETTERSHOT_TESTING=1 BETTERSHOT_CHECK_MULTI_SOURCE=1 make test` run.
+
+Do not edit a test file while another runner is compiling the shared test list.
+Existing Agent Access/Editing checks also passed against the final built objects.
+Native append/source editing UI, source-aware filmstrip/trim interactions, and MCP
+append/reorder operations remain later packages; do not report them implemented.
+
+Next: build the native library-based Add Recording flow, an explicit transactional
+Edit Recording sheet, source-aware thumbnail/time/trim/cut-badge interactions, and
+then the typed MCP append/reorder workflow. Keep root controls from silently
+editing properties ignored by per-source rendering. Consider evicting inactive
+decoder/frame caches for large source catalogs before exposing the workflow.
+Live MTKView/AVPlayer interaction and macOS 14 runtime still need manual checks;
+the current preview test exercises the actual actor render worker, not a displayed
+window. No release or push is authorized.

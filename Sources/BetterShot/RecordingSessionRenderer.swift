@@ -17,7 +17,6 @@ enum RecordingSessionRenderer {
         case missingCameraTrack
         case projectChanged
         case ambiguousProject
-        case multiSourceRenderingUnavailable
         case invalidReplacementAudio
 
         var errorDescription: String? {
@@ -30,8 +29,6 @@ enum RecordingSessionRenderer {
                 "This recording is open in more than one editor. Close the other editor window and try again."
             case .invalidReplacementAudio:
                 "The project's imported soundtrack is missing or unreadable. Restore it or choose another audio file in Studio."
-            case .multiSourceRenderingUnavailable:
-                "This project contains multiple recordings. Multi-recording playback and export are not available in this development build yet."
             }
         }
     }
@@ -83,8 +80,27 @@ enum RecordingSessionRenderer {
         for session: RecordingSession,
         document: RecordingEditDocument?
     ) async throws -> RecordingStudioExporter.Configuration {
-        guard document?.sources == nil, document?.clips?.contains(where: { $0.sourceID != nil }) != true else {
-            throw RenderError.multiSourceRenderingUnavailable
+        if let document, let catalog = document.sources {
+            let sources = try await RecordingStudioSourceResolver.configurations(
+                for: catalog, in: session, documents: document.sourceDocuments)
+            guard let first = sources.first?.configuration, let clips = document.clips else {
+                throw RecordingStudioSourceResolver.ResolutionError.invalidSources
+            }
+            let timeline = try RecordingClipTimeline(segments: clips).validated(sourceDurations:
+                Dictionary(uniqueKeysWithValues: sources.map { ($0.id, $0.configuration.clipTimeline.duration) }))
+            let aspect = document.exportAspect.flatMap(ExportAspectPreset.init(rawValue:)) ?? .original
+            return RecordingStudioExporter.Configuration(
+                screenURL: first.screenURL, cameraURL: nil, cameraOffset: 0,
+                style: first.style, viewportTimeline: .identity, pointerTimeline: nil,
+                showsPressEffects: false, keystrokeTimeline: nil,
+                keystrokePlacement: .bottomCenter, subtitleTimeline: nil, subtitleStyle: SubtitleBarStyle(),
+                canvasSize: aspect == .original ? first.canvasSize : aspect.canvasSize(for: first.canvasSize),
+                clipTimeline: timeline, exportSettings: document.exportSettings ?? first.exportSettings,
+                sources: sources)
+        }
+        guard document?.sourceDocuments == nil,
+              document?.clips?.contains(where: { $0.sourceID != nil }) != true else {
+            throw RecordingStudioSourceResolver.ResolutionError.invalidSources
         }
         let manifest = session.loadCaptureManifest()
         let pointerSynthesized = manifest?.pointerSynthesized == true

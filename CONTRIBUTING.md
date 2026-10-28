@@ -327,9 +327,11 @@ UUID-named managed packages without changing the original. Outer clip ranges use
 the source's authored editor clock; `RecordingStudioSourceResolver` maps that
 clock through the native edit timeline to raw movie time. Source-aware validation
 preserves clip order and repeated footage; legacy normalization is unchanged.
-Playback/export integration is still in development, so the editor and renderer
-reject multi-source documents until that integration is complete. Track remaining
-work in [agent-editing-progress.md](docs/agent-editing-progress.md).
+Multi-source playback and exports use the shared compositor with per-source
+authored snapshots, clocks, and resettable media readers. `sourceDocuments` holds
+editable leaf snapshots; nested catalogs/snapshots are rejected. The native
+creation/source-control UI and multi-source MCP tools are still in development.
+Track remaining work in [agent-editing-progress.md](docs/agent-editing-progress.md).
 
 `RecordingAgentAccessController` owns the off-by-default Settings toggle and
 Keychain token. `RecordingAgentHTTPListener` binds only `127.0.0.1:39615`,

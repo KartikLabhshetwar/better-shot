@@ -200,6 +200,7 @@
 		CE1AC7D23DD3C75A916B3BFF /* EditorChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79187CE18696A103378D33E6 /* EditorChrome.swift */; };
 		CF4D2BCA924BB91C3A3D5FA9 /* Recording3DAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E04FC14B34231EAA0AD9985 /* Recording3DAnimation.swift */; };
 		CFE6DCC81F16975D9C5571D1 /* AnnotationBackgroundInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 061AE6D677E2E3AB437A6738 /* AnnotationBackgroundInspector.swift */; };
+		D0247F945139751351FF7085 /* RecordingMultiSourcePreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92A061C9382668167B93B19A /* RecordingMultiSourcePreview.swift */; };
 		D1027BECFA02E786BF762444 /* ArrowTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 674519179B33EE7750D1D543 /* ArrowTypes.swift */; };
 		D13CEB060F8ABA7079099049 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C129FF88ACF72C0544AC0D9 /* OnboardingView.swift */; };
 		D27CCDE7BAF033771F9277B4 /* ArrowShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 458342AE76A103B886AA98AC /* ArrowShared.swift */; };
@@ -381,6 +382,7 @@
 		906C08839BE0C699C2D98CD6 /* ReleaseNotes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseNotes.swift; sourceTree = "<group>"; };
 		90CA54A40E5A6984C83C5A48 /* RecordingPointerCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingPointerCapture.swift; sourceTree = "<group>"; };
 		90E774656DB29A1792294977 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
+		92A061C9382668167B93B19A /* RecordingMultiSourcePreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingMultiSourcePreview.swift; sourceTree = "<group>"; };
 		92E878939547822AC5792A1E /* RecordingMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingMotion.swift; sourceTree = "<group>"; };
 		92F59F62D19FF9B83F50E2D1 /* CloudUploadOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudUploadOptions.swift; sourceTree = "<group>"; };
 		94D707990F014D8BE452023A /* BundledBackgrounds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundledBackgrounds.swift; sourceTree = "<group>"; };
@@ -700,6 +702,7 @@
 				2A151485F935146E94D5705F /* RecordingInputAuthorization.swift */,
 				8944EFA56AE64C38C83ED9E1 /* RecordingKeystrokeCapture.swift */,
 				62D7B4E7C441E328018B7A02 /* RecordingMotionSpring.swift */,
+				92A061C9382668167B93B19A /* RecordingMultiSourcePreview.swift */,
 				FF44DA79DA0F8C173F4D8299 /* RecordingOverlayEffects.swift */,
 				125F852C8EA0B144BB2364E1 /* RecordingPickerBar.swift */,
 				124A8C7DAD7A2014754CF196 /* RecordingPointerArtworkCapture.swift */,
@@ -1069,6 +1072,7 @@
 				BC6170740B05997D27830D0B /* RecordingKeystrokeCapture.swift in Sources */,
 				CAD3D607DBDB99077A4FB695 /* RecordingMotion.swift in Sources */,
 				C5691D63FCE00852A86F8824 /* RecordingMotionSpring.swift in Sources */,
+				D0247F945139751351FF7085 /* RecordingMultiSourcePreview.swift in Sources */,
 				428051CE7498067FA05216D9 /* RecordingOverlayEffects.swift in Sources */,
 				176B0704A0C3C5955DA33B88 /* RecordingPickerBar.swift in Sources */,
 				DC27DBF1E81ABBFDCB8FB1FE /* RecordingPointerArtworkCapture.swift in Sources */,

@@ -49,12 +49,27 @@ nonisolated enum RecordingStudioSourceResolver {
                         sourceEditorTime: outer.sourceTime, rawSourceTime: inner.sourceTime)
     }
 
+    static func validatedTimeline(_ configuration: RecordingStudioExporter.Configuration) throws -> RecordingClipTimeline {
+        let sources = configuration.sources
+        guard !sources.isEmpty, Set(sources.map(\.id)).count == sources.count,
+              sources.allSatisfy({ $0.configuration.sources.isEmpty &&
+                  $0.configuration.clipTimeline.segments.allSatisfy({ $0.sourceID == nil }) }) else {
+            throw ResolutionError.invalidSources
+        }
+        return try configuration.clipTimeline.validated(sourceDurations: Dictionary(uniqueKeysWithValues:
+            sources.map { ($0.id, $0.configuration.clipTimeline.duration) }))
+    }
+
     @MainActor
     static func configurations(
         for sources: [RecordingProjectSource],
-        in project: RecordingSession
+        in project: RecordingSession,
+        documents: [UUID: RecordingEditDocument]? = nil
     ) async throws -> [RecordingStudioSourceConfiguration] {
         guard !sources.isEmpty, Set(sources.map(\.id)).count == sources.count else {
+            throw ResolutionError.invalidSources
+        }
+        guard documents?.keys.allSatisfy({ id in sources.contains(where: { $0.id == id }) }) != false else {
             throw ResolutionError.invalidSources
         }
         var result: [RecordingStudioSourceConfiguration] = []
@@ -67,7 +82,9 @@ nonisolated enum RecordingStudioSourceResolver {
             }
             let session = RecordingSession(directoryURL: directory)
             let document: RecordingEditDocument?
-            if FileManager.default.fileExists(atPath: session.editDocumentURL.path) {
+            if let snapshot = documents?[source.id] {
+                document = snapshot
+            } else if FileManager.default.fileExists(atPath: session.editDocumentURL.path) {
                 do {
                     document = try JSONDecoder().decode(RecordingEditDocument.self,
                                                        from: Data(contentsOf: session.editDocumentURL))
@@ -75,7 +92,10 @@ nonisolated enum RecordingStudioSourceResolver {
             } else {
                 document = nil
             }
-            guard document?.sources == nil else { throw ResolutionError.nestedProject }
+            guard document?.sources == nil, document?.sourceDocuments == nil,
+                  document?.clips?.contains(where: { $0.sourceID != nil }) != true else {
+                throw ResolutionError.nestedProject
+            }
             let configuration = try await RecordingSessionRenderer.configuration(for: session, document: document)
             guard source.duration.isFinite, source.duration > 0,
                   abs(configuration.clipTimeline.duration - source.duration) < 0.001 else {
