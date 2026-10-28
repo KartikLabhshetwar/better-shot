@@ -17,6 +17,7 @@ enum RecordingSessionRenderer {
         case missingCameraTrack
         case projectChanged
         case ambiguousProject
+        case multiSourceRenderingUnavailable
 
         var errorDescription: String? {
             switch self {
@@ -26,6 +27,8 @@ enum RecordingSessionRenderer {
                 "The project changed while the video was rendering. Try again."
             case .ambiguousProject:
                 "This recording is open in more than one editor. Close the other editor window and try again."
+            case .multiSourceRenderingUnavailable:
+                "This project contains multiple recordings. Multi-recording playback and export are not available in this development build yet."
             }
         }
     }
@@ -53,6 +56,35 @@ enum RecordingSessionRenderer {
         }
         if let existing = session.freshFinalURL(matching: editDocument) { return existing }
 
+        let configuration = try await configuration(for: session, document: editDocument)
+
+        let temporaryURL = try await RecordingStudioExporter().export(configuration) { progress in
+            onProgress?(progress)
+        }
+        do {
+            guard canInstallRender(for: session, snapshot: openedSnapshot, renderedDocument: editDocument) else {
+                throw RenderError.projectChanged
+            }
+            return try session.installFinalVideo(
+                movingFrom: temporaryURL,
+                renderedFrom: editDocument
+            )
+        } catch {
+            try? FileManager.default.removeItem(at: temporaryURL)
+            throw error
+        }
+    }
+
+    /// Shared authored-source configuration for project playback, previews, and exports.
+    static func configuration(
+        for session: RecordingSession,
+        document: RecordingEditDocument?
+    ) async throws -> RecordingStudioExporter.Configuration {
+        guard document?.sources == nil, document?.clips?.contains(where: { $0.sourceID != nil }) != true else {
+            throw RenderError.multiSourceRenderingUnavailable
+        }
+        let manifest = session.loadCaptureManifest()
+        let pointerSynthesized = manifest?.pointerSynthesized == true
         let asset = AVURLAsset(url: session.screenURL)
         let duration = try await asset.load(.duration).seconds
         guard duration.isFinite, duration > 0 else {
@@ -78,7 +110,6 @@ enum RecordingSessionRenderer {
                 recordingSizeInPoints: recordingPointSize
             )
         ).sanitizedCapture
-        let document = editDocument
         var style = document?.style.value ?? RecordingStudioDefaults.style
         // Selecting a camera means the default delivered recording includes
         // it; a saved Studio project that explicitly hid the bubble wins.
@@ -140,7 +171,7 @@ enum RecordingSessionRenderer {
                 ? canvasSize.width / canvasSize.height
                 : nil
 
-        let configuration = RecordingStudioExporter.Configuration(
+        return RecordingStudioExporter.Configuration(
             screenURL: session.screenURL,
             cameraURL: session.hasCamera ? session.cameraURL : nil,
             cameraOffset: manifest?.cameraLeadIn ?? 0,
@@ -170,21 +201,6 @@ enum RecordingSessionRenderer {
             timeline3D: Recording3DTimeline(shots: document?.shots3D ?? [], duration: clipTimeline.duration)
         )
 
-        let temporaryURL = try await RecordingStudioExporter().export(configuration) { progress in
-            onProgress?(progress)
-        }
-        do {
-            guard canInstallRender(for: session, snapshot: openedSnapshot, renderedDocument: editDocument) else {
-                throw RenderError.projectChanged
-            }
-            return try session.installFinalVideo(
-                movingFrom: temporaryURL,
-                renderedFrom: editDocument
-            )
-        } catch {
-            try? FileManager.default.removeItem(at: temporaryURL)
-            throw error
-        }
     }
 
     /// A render may outlive its editor or an edit to the working document.

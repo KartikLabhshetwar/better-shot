@@ -12,10 +12,11 @@ func checkRecordingAgentAccess(movieURL: URL) async throws {
     precondition(cancelledRequest.isValid)
     cancelledRequest.invalidate()
     precondition(!cancelledRequest.isValid, "Revoked requests cannot start another tool")
-    let session = RecordingSession(directoryURL: FileManager.default.temporaryDirectory
-        .appendingPathComponent(UUID().uuidString + ".bettershotrec"))
-    try FileManager.default.createDirectory(at: session.directoryURL, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: session.directoryURL) }
+    let libraryDirectory = RecordingSessionStore.recordingsDirectory
+    precondition(libraryDirectory.path.hasPrefix(FileManager.default.temporaryDirectory.path),
+                 "Agent checks must never read the user's recording library")
+    let session = try RecordingSessionStore.createSession()
+    defer { try? FileManager.default.removeItem(at: libraryDirectory) }
     try FileManager.default.copyItem(at: movieURL, to: session.screenURL)
     let model = RecordingStudioModel(url: session.directoryURL)
     await model.load()
@@ -132,8 +133,26 @@ func checkRecordingAgentAccess(movieURL: URL) async throws {
     let inspected = try await client.callTool(name: "inspect_timeline",
         arguments: ["handle": .string(projectSnapshot.handle.uuidString)])
     precondition(inspected.isError != true)
+    let listing: RequestContext<CallTool.Result> = try await client.callTool(name: "list_projects")
+    let listed = try await listing.value
+    precondition(listed.isError != true)
+    guard case let .array(projects)? = listed.structuredContent,
+          let project = projects.compactMap({ value -> [String: Value]? in
+              guard case let .object(project) = value else { return nil }
+              return project
+          }).first(where: { $0["name"]?.stringValue == session.displayName }),
+          let projectID = project["id"]?.stringValue else {
+        preconditionFailure("The isolated recording must be discoverable through the library")
+    }
+    precondition(project["isOpen"] == .bool(true))
+    let opened = try await client.callTool(name: "open_project",
+        arguments: ["projectId": .string(projectID)])
+    precondition(opened.isError != true)
+    let unknown = try await client.callTool(name: "open_project",
+        arguments: ["projectId": .string(UUID().uuidString)])
+    precondition(unknown.isError == true, "Clients cannot open a project outside the issued library IDs")
     await client.disconnect()
-    print("Agent endpoint: SDK client initialized, listed, and called")
+    print("Agent endpoint: SDK client initialized, discovered/opened a library project, and rejected an unknown ID")
 
     var repeated = URLRequest(url: endpoint)
     repeated.httpMethod = "POST"

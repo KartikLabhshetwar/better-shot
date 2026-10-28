@@ -344,6 +344,11 @@ final class RecordingStudioModel {
         // still open elsewhere. Reopen on the draft so nothing is lost; the
         // project simply opens dirty.
         let document = session?.effectiveEditDocument()
+        guard document?.sources == nil,
+              document?.clips?.contains(where: { $0.sourceID != nil }) != true else {
+            loadError = "This multi-recording project needs a BetterShot build with multi-source playback support. Its original recordings are unchanged."
+            return
+        }
         // Sessions recorded before the toggle moved into Studio stored the
         // choice in the manifest; honor it as the default.
         showsClickEffects = manifest?.pressEffectsEnabled ?? true

@@ -321,6 +321,16 @@ rejection and the guard against starting a second recording session.
 
 ### Local Agent Access
 
+Multi-recording foundations use optional format-9 source catalogs and source-tagged
+clips. `RecordingProjectSource` stages explicit media and authored edits into
+UUID-named managed packages without changing the original. Outer clip ranges use
+the source's authored editor clock; `RecordingStudioSourceResolver` maps that
+clock through the native edit timeline to raw movie time. Source-aware validation
+preserves clip order and repeated footage; legacy normalization is unchanged.
+Playback/export integration is still in development, so the editor and renderer
+reject multi-source documents until that integration is complete. Track remaining
+work in [agent-editing-progress.md](docs/agent-editing-progress.md).
+
 `RecordingAgentAccessController` owns the off-by-default Settings toggle and
 Keychain token. `RecordingAgentHTTPListener` binds only `127.0.0.1:39615`,
 checks the bearer token, Host, Origin, and request size before passing a POST to
@@ -470,6 +480,7 @@ with `make test` when production code changes.
 | Screenshot Copy/Save and private storage | `BETTERSHOT_CHECK_SCREENSHOT_SAVING=1 bash Tests/run-exports.sh` |
 | Video compositing and encoded exports | `BETTERSHOT_CHECK_VIDEO_EXPORTS=1 bash Tests/run-exports.sh` |
 | Agent edits and renderer cache freshness | `BETTERSHOT_CHECK_AGENT_EDITING=1 bash Tests/run-exports.sh` |
+| Multi-recording source validation and authored time mapping | `BETTERSHOT_CHECK_MULTI_SOURCE=1 bash Tests/run-exports.sh` |
 | Studio Save updates the saved video and waits before closing | `BETTERSHOT_CHECK_RECORDING_SAVE=1 bash Tests/run-exports.sh` |
 | Local MCP endpoint, auth, client workflow, and Agent Access snapshots | `BETTERSHOT_CHECK_AGENT_ACCESS=1 bash Tests/run-exports.sh` |
 | Displayed Gallery and Settings windows | `BETTERSHOT_CHECK_LIBRARY_WINDOWS=1 bash Tests/run-exports.sh` |

@@ -63,6 +63,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         let crop: CGRect
         let masks: [RecordingMaskSegment]
         let timeline3D: Recording3DTimeline
+        let sources: [RecordingStudioSourceConfiguration]
 
         init(
             screenURL: URL,
@@ -85,7 +86,8 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             fitContentAspect: CGFloat? = nil,
             crop: CGRect = RecordingVideoCrop.unit,
             masks: [RecordingMaskSegment] = [],
-            timeline3D: Recording3DTimeline = .empty
+            timeline3D: Recording3DTimeline = .empty,
+            sources: [RecordingStudioSourceConfiguration] = []
         ) {
             self.screenURL = screenURL
             self.cameraURL = cameraURL
@@ -108,6 +110,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             self.crop = crop
             self.masks = masks
             self.timeline3D = timeline3D
+            self.sources = sources
         }
     }
 
