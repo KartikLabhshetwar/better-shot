@@ -18,6 +18,7 @@ enum RecordingSessionRenderer {
         case projectChanged
         case ambiguousProject
         case multiSourceRenderingUnavailable
+        case invalidReplacementAudio
 
         var errorDescription: String? {
             switch self {
@@ -27,6 +28,8 @@ enum RecordingSessionRenderer {
                 "The project changed while the video was rendering. Try again."
             case .ambiguousProject:
                 "This recording is open in more than one editor. Close the other editor window and try again."
+            case .invalidReplacementAudio:
+                "The project's imported soundtrack is missing or unreadable. Restore it or choose another audio file in Studio."
             case .multiSourceRenderingUnavailable:
                 "This project contains multiple recordings. Multi-recording playback and export are not available in this development build yet."
             }
@@ -154,21 +157,40 @@ enum RecordingSessionRenderer {
         let cues = document?.subtitleCues ?? []
         let words = document?.subtitleWords ?? []
 
+        var audioReplacementURL: URL?
+        if let name = document?.replacementAudioFileName {
+            guard !name.isEmpty, name != ".", name != "..", !name.contains("/"), !name.contains("\\"),
+                  URL(fileURLWithPath: name).lastPathComponent == name else {
+                throw RenderError.invalidReplacementAudio
+            }
+            let url = session.directoryURL.appendingPathComponent(name)
+            guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+                  values.isRegularFile == true, values.isSymbolicLink != true,
+                  await RecordingReplacementAudio.load(url: url, displayName: name) != nil else {
+                throw RenderError.invalidReplacementAudio
+            }
+            audioReplacementURL = url
+        }
+        let crop = document?.cropValue ?? RecordingVideoCrop.unit
+        let croppedSize = RecordingVideoCrop.croppedSize(canvasSize, crop: crop)
+        let croppedViewport = viewportTimeline.cropped(to: crop)
         let aspect = document?.exportAspectPreset ?? .original
         let aspectMode = document?.exportAspectContentMode ?? .fill
         let reframe: ReframeTrack? = aspectMode == .fill
             ? ReframeTrack.build(
                 preset: aspect,
-                sourceSize: canvasSize,
-                viewportTimeline: viewportTimeline,
+                sourceSize: croppedSize,
+                viewportTimeline: croppedViewport,
                 duration: clipTimeline.duration
             ) { editorTime in
-                pointerTimeline?.location(at: editorTime)
+                guard let location = pointerTimeline?.location(at: editorTime) else { return nil }
+                let point = RecordingVideoCrop.point(location, in: crop)
+                return CGPoint(x: min(max(point.x, 0), 1), y: min(max(point.y, 0), 1))
             }
             : nil
         let fitContentAspect: CGFloat? =
-            aspect != .original && aspectMode == .fit && canvasSize.height > 0
-                ? canvasSize.width / canvasSize.height
+            aspect != .original && aspectMode == .fit && croppedSize.height > 0
+                ? croppedSize.width / croppedSize.height
                 : nil
 
         return RecordingStudioExporter.Configuration(
@@ -176,7 +198,7 @@ enum RecordingSessionRenderer {
             cameraURL: session.hasCamera ? session.cameraURL : nil,
             cameraOffset: manifest?.cameraLeadIn ?? 0,
             style: style,
-            viewportTimeline: viewportTimeline,
+            viewportTimeline: croppedViewport,
             pointerTimeline: pointerSynthesized ? pointerTimeline : nil,
             showsPressEffects: showsPressEffects,
             keystrokeTimeline: showsKeystrokes
@@ -191,12 +213,14 @@ enum RecordingSessionRenderer {
                 ? KaraokeTimeline(cues: cues, words: words)
                 : nil,
             canvasSize: aspect == .original
-                ? canvasSize
-                : aspect.canvasSize(for: canvasSize),
+                ? croppedSize
+                : aspect.canvasSize(for: croppedSize),
             clipTimeline: clipTimeline,
             exportSettings: document?.exportSettings ?? VideoCompressionSettings(),
+            audioReplacementURL: audioReplacementURL,
             reframe: reframe,
             fitContentAspect: fitContentAspect,
+            crop: crop,
             masks: document?.masks ?? [],
             timeline3D: Recording3DTimeline(shots: document?.shots3D ?? [], duration: clipTimeline.duration)
         )

@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 
 @testable import BetterShot
@@ -42,6 +43,53 @@ func checkRecordingSourceConfigurations(movieURL: URL) async throws {
 
     let firstSession = RecordingSession(directoryURL: first.sessionDirectory(in: directory))
     var authoredDocument = firstSession.loadEditDocument()!
+    let audioURL = firstSession.directoryURL.appendingPathComponent("audio-replacement.caf")
+    let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
+    let audio = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 96_000)!
+    audio.frameLength = 96_000
+    audio.floatChannelData![0].initialize(repeating: 0, count: 96_000)
+    do {
+        try AVAudioFile(forWriting: audioURL, settings: format.settings).write(from: audio)
+    }
+    let replacement = await RecordingReplacementAudio.load(url: audioURL, displayName: "Fixture")
+    precondition(replacement?.track.asset != nil, "Imported audio must retain its asset for later playback rebuilds")
+    authoredDocument.crop = [0.1, 0.1, 0.6, 0.7]
+    authoredDocument.replacementAudioFileName = audioURL.lastPathComponent
+    let aspects: [(ExportAspectPreset, ExportAspectContentMode)] = [(.original, .fill), (.square, .fill), (.square, .fit)]
+    for (aspect, mode) in aspects {
+        authoredDocument.exportAspect = aspect.rawValue
+        authoredDocument.exportAspectMode = mode.rawValue
+        if FileManager.default.fileExists(atPath: firstSession.draftDocumentURL.path) {
+            try FileManager.default.removeItem(at: firstSession.draftDocumentURL)
+        }
+        try firstSession.writeEditDocument(authoredDocument)
+        let shared = try await RecordingSessionRenderer.configuration(for: firstSession, document: authoredDocument)
+        let model = RecordingStudioModel(url: firstSession.directoryURL)
+        await model.load()
+        let native = model.makeExportConfiguration()
+        precondition(model.isLoaded && shared.crop == native.crop && shared.canvasSize == native.canvasSize,
+                     "Source parity \(aspect)/\(mode): loaded=\(model.isLoaded), error=\(String(describing: model.loadError)), " +
+                     "crop=\(shared.crop)/\(native.crop), canvas=\(shared.canvasSize)/\(native.canvasSize)")
+        precondition(shared.viewportTimeline.frame(at: 0.5) == native.viewportTimeline.frame(at: 0.5))
+        precondition(shared.fitContentAspect == native.fitContentAspect)
+        precondition(shared.reframe?.sourceAspect == native.reframe?.sourceAspect)
+        precondition(shared.audioReplacementURL == audioURL && shared.audioReplacementURL == native.audioReplacementURL)
+        model.teardown()
+    }
+    for name in ["../outside.caf", "missing.caf", "linked.caf"] {
+        if name == "linked.caf" {
+            try FileManager.default.createSymbolicLink(
+                at: firstSession.directoryURL.appendingPathComponent(name), withDestinationURL: audioURL)
+        }
+        var invalidAudio = authoredDocument
+        invalidAudio.replacementAudioFileName = name
+        do {
+            _ = try await RecordingSessionRenderer.configuration(for: firstSession, document: invalidAudio)
+            preconditionFailure("Unsafe or missing replacement audio must not fall back to recorded audio")
+        } catch {}
+    }
+    try FileManager.default.removeItem(at: firstSession.directoryURL.appendingPathComponent("linked.caf"))
+    print("PASS shared crop and replacement-audio configuration matches Studio; unsafe/missing audio rejected")
     var rootDocument = authoredDocument
     rootDocument.sources = [first, second]
     rootDocument.clips = timeline.segments

@@ -57,10 +57,12 @@ resolved by rebuilding the final sources, not by weakening the assertion.
 
 ## Next packages
 
-1. Preserve authored crop and replacement audio in the extracted native config
-   builder. Compare it against `RecordingStudioModel.makeExportConfiguration()`
-   in production-path tests. These fields were omitted by the pre-existing
-   session renderer; extraction intentionally kept that behavior initially.
+1. Authored crop/replacement-audio parity is implemented and verified. The native
+   parity test exposed an existing audio lifetime bug: `AVAssetTrack` retained
+   no owning asset, so later composition failed with AVFoundation -11800 and
+   OSStatus -12780. `RecordingReplacementAudio` now retains its `AVURLAsset`.
+   The full focused `make test` gate passes with trimmed/retimed source clips,
+   original/square-fill/square-fit canvas, and unsafe/missing soundtrack checks.
 2. Integrate multi-source preview/export/playback using the shared compositor and
    source resolver. Handle mixed dimensions, missing camera/audio, speed and
    repeated/backward clips without stale decoder frames. Never render to a movie
@@ -77,3 +79,20 @@ resolved by rebuilding the final sources, not by weakening the assertion.
    native compact/light/dark checks, and user documentation.
 
 Do not report Steps 2/3 complete until the integration packages are verified.
+
+## Active implementation after the first allowance reset
+
+The multi-source rendering agent owns exporter/source resolver/composition helper
+and a new compositor integration test. Its proposed frame renderer uses serial,
+resettable native readers and the existing compositor; authored source canvases
+fit into the common output canvas without stretching.
+
+The Studio agent owns document snapshots and root model transactions. Chosen UX:
+an explicit transactional **Edit Recording** mode reuses the source inspector;
+Apply creates one root undo step, Cancel discards local changes, and changes
+affect all outer clips referencing that source. Source clip topology/duration
+stays fixed; trim/speed/cuts/reorder live on the outer timeline. Embedded child
+models must suppress registry, metadata, draft/save/export/share side effects.
+Root `sourceDocuments` snapshots are authoritative and reject nested catalogs,
+nested snapshots and tagged leaf clips. The resolver prefers them over the
+immutable source package's initial edit document.

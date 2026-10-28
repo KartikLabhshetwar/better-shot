@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Rendering a saved recording outside Studio now preserves its crop and imported soundtrack. Imported audio stays available for later playback and timeline changes.
 - Recording edits, undo/redo, saves, and export cache checks share the current document revision, so stale agent edits are rejected and failed saves keep their recovery draft.
 
 ## [0.5.9] - 2026-10-11

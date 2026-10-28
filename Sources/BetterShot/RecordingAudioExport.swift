@@ -207,6 +207,8 @@ nonisolated final class RecordingAudioExporter: @unchecked Sendable {
 /// synchronously while the user drags a trim handle.
 nonisolated struct RecordingReplacementAudio {
     let url: URL
+    // AVAssetTrack holds its asset weakly; keep it alive for later composition rebuilds.
+    let asset: AVURLAsset
     /// The file's name as the user chose it, for the inspector.
     let displayName: String
     let track: AVAssetTrack
@@ -222,6 +224,7 @@ nonisolated struct RecordingReplacementAudio {
         }
         return RecordingReplacementAudio(
             url: url,
+            asset: asset,
             displayName: displayName,
             track: track,
             duration: duration
