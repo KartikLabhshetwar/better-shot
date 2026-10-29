@@ -134,3 +134,89 @@ decoder/frame caches for large source catalogs before exposing the workflow.
 Live MTKView/AVPlayer interaction and macOS 14 runtime still need manual checks;
 the current preview test exercises the actual actor render worker, not a displayed
 window. No release or push is authorized.
+
+## Native UI and MCP package under final validation (2026-10-29)
+
+HEAD remains `cfd2d73`; the following package is uncommitted. Earlier "later
+packages" notes above describe the previous committed checkpoint, not the current
+working tree. All subagents have frozen their edits; no active edits remain.
+
+Implemented in the working tree:
+- Add Recording library sheet, transactional Edit Recording embedded Studio,
+  source-aware thumbnails/trim bounds/cut badges, move-earlier/later context
+  actions and Control–Option arrows. Original individual recordings are copied;
+  nested multi-recording append is deliberately rejected.
+- MCP append/reorder schemas and inspection source IDs; revision/library/editor
+  checks before and after preparation, shared retry tasks, 16 completed receipts,
+  and a global four-pending-preparation cap that releases slots after cleanup.
+- Source/audio/transcription busy guards, strict corrupt fallback rejection,
+  independent outer undo transactions, and inactive renderer cache eviction.
+- README, CONTRIBUTING and Unreleased changelog describe the actual workflow.
+
+Validation already passed against this package before the last two small fixes:
+`BETTERSHOT_CHECK_MULTI_SOURCE_UI=1 make test` (app + 39 standalone + offscreen
+light/dark controls/source effects/audio cleanup); then
+`BETTERSHOT_CHECK_AGENT_MULTI_SOURCE=1 make test` (same build/standalone checks,
+real SDK initialize/list/call, append/retry/concurrent retry, bounded pending
+preparations, cancellation/lease expiry/disable cleanup, stale target/source
+revisions, reorder/trim/undo/redo/composed preview/export/save/reopen).
+Existing AGENT_ACCESS, AGENT_EDITING and RECORDING_SAVE focused runners passed.
+Unsigned `make release` passed. Tests ran with BETTERSHOT_TESTING=1 and isolated
+library/preferences/token state, not real credentials.
+
+Final MULTI_SOURCE rerun found intermittent audio-only output padding:
+3.3246875s instead of 3.25s. Existing assertion remains unchanged. Minimal fix
+moves multi-source writer.endSession before input.markAsFinished in
+RecordingAudioExport.swift, since encoder finalization could race the endpoint.
+The prior passing MP4 sibling had exact audio/video duration. Also added native
+and shared append guards for uncommitted clip-speed drafts (documents/revisions
+omit draft values until committed), with production-model UI regression checks.
+
+Final verification currently running in exec session 74583, sequentially:
+1. MULTI_SOURCE make test -> /tmp/bettershot-audio-endpoint-final.log
+2. MULTI_SOURCE_UI runner -> /tmp/bettershot-speed-ui-final.log
+3. repeated MULTI_SOURCE runner -> /tmp/bettershot-audio-endpoint-repeat.log
+Inspect results, never assume an unfinished runner passed. Rebuild Release after
+these last changes if practical. If core duration still fails, diagnose the
+production audio writer rather than loosening duration tolerance. No commit until
+satisfactory final validation/review. Stage explicit intended files only, including
+new Sources/BetterShot/RecordingStudioSources.swift and the three new test programs
+plus RecordingSourceTimelineInteractionCheck.sources; preserve handoff/Graphify.
+
+Offscreen snapshots reviewed: compact recording inspector light/dark, populated
+Add Recording library light, and source editing sheet dark. They show layout and
+controls; black offscreen video does not establish live playback. Manual live
+MTKView/AVPlayer, parent-window sheet close handling, external client setup and
+macOS 14 runtime remain unverified. Generic suite's pre-existing makeMovie stall
+remains a limitation; focused runners were used. No push/release/version change.
+
+Final runner outcome: session 74583 stopped with exit2 on the first gate.
+Audio-only duration STILL fails after reordering finalization:
+3.3253541666666666s vs3.25s at compositor test169. UI speed-draft and repeated
+core runners did not run due to && short-circuit. The endSession ordering is
+therefore an unproven change, not a verified fix. Next reset must investigate
+sample timing/encoder padding or exact writer range handling, preserve strict
+assertions, then rerun core/UI/MCP as appropriate. Do not commit this WIP package.
+
+## Audio endpoint correction verified after reset
+
+Root cause: AVAssetReader's retimed mix can emit a final PCM buffer beyond its
+requested timeRange (3969 samples at3.2426667s, ending3.3253542s for a3.25s cut).
+The encoder endpoint alone does not reliably remove the extra decoded samples.
+Multi-source audio-only export now requests interleaved48kHz stereo PCM and trims
+the actual last sample buffer to the remaining sample clock before encoding.
+Legacy audio reading stays unchanged; the strict duration assertion is unchanged.
+The full `BETTERSHOT_TESTING=1 BETTERSHOT_CHECK_MULTI_SOURCE=1 make test` passed
+against final production sources: app build,39 standalone checks, authored source
+configuration, preview/video parity including rotated/backward/camera footage,
+five M4A exports plus WAV with timing/tone/silence checks, and model transactions.
+Log: /tmp/bettershot-pcm-core-final.log.
+
+Independent read-only review also found and verified fixes for ignored root
+Zoom/3D edits (controls now belong only in leaf editors), missing native composed
+Export Audio access (restored), and Quit silently discarding embedded source
+edits (registry transaction guard now blocks quit until Apply/Cancel).
+Final UI/MCP/access/edit/save runner sequence is active in session59240, with logs
+/tmp/bettershot-verified-<GATE>.log; final unsigned Release build session68428.
+These later results are pending, not established by this core pass. No live
+macOS14, native quit-alert or displayed video claim follows from these tests.

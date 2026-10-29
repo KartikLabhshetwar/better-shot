@@ -148,7 +148,15 @@ nonisolated final class RecordingAudioExporter: @unchecked Sendable {
             start: .zero,
             duration: CMTime(seconds: duration, preferredTimescale: 600)
         )
-        let output = AVAssetReaderAudioMixOutput(audioTracks: tracks, audioSettings: nil)
+        let audioSettings: [String: Any]? = configuration.sources.isEmpty ? nil : [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: 48_000,
+            AVNumberOfChannelsKey: 2,
+            AVLinearPCMIsFloatKey: true,
+            AVLinearPCMBitDepthKey: 32,
+            AVLinearPCMIsNonInterleaved: false
+        ]
+        let output = AVAssetReaderAudioMixOutput(audioTracks: tracks, audioSettings: audioSettings)
         output.alwaysCopiesSampleData = false
         reader.add(output)
 
@@ -170,8 +178,24 @@ nonisolated final class RecordingAudioExporter: @unchecked Sendable {
         writer.startSession(atSourceTime: .zero)
 
         do {
-            while let sampleBuffer = output.copyNextSampleBuffer() {
+            while var sampleBuffer = output.copyNextSampleBuffer() {
                 try Task.checkCancellation()
+                if !configuration.sources.isEmpty {
+                    // Retimed audio can outlast the reader range; bound actual PCM before encoding.
+                    let remaining = CMTime(seconds: duration, preferredTimescale: 600)
+                        - CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+                    let frames = CMTimeConvertScale(remaining, timescale: 48_000, method: .roundTowardZero)
+                    guard frames.isNumeric else { throw ExportError.writerFailed(nil) }
+                    if frames.value <= 0 { break }
+                    if frames.value < CMSampleBufferGetNumSamples(sampleBuffer) {
+                        var bounded: CMSampleBuffer?
+                        let status = CMSampleBufferCopySampleBufferForRange(
+                            allocator: kCFAllocatorDefault, sampleBuffer: sampleBuffer,
+                            sampleRange: CFRange(location: 0, length: Int(frames.value)), sampleBufferOut: &bounded)
+                        guard status == noErr, let bounded else { throw ExportError.writerFailed(nil) }
+                        sampleBuffer = bounded
+                    }
+                }
                 while !input.isReadyForMoreMediaData {
                     try Task.checkCancellation()
                     try await Task.sleep(nanoseconds: 2_000_000)
@@ -194,10 +218,10 @@ nonisolated final class RecordingAudioExporter: @unchecked Sendable {
             throw error
         }
 
-        input.markAsFinished()
         if !configuration.sources.isEmpty {
             writer.endSession(atSourceTime: CMTime(seconds: duration, preferredTimescale: 600))
         }
+        input.markAsFinished()
         await withCheckedContinuation { continuation in
             writer.finishWriting {
                 continuation.resume()

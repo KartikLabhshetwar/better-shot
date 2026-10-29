@@ -161,15 +161,17 @@ func checkRecordingMultiSourceCompositing(movieURL: URL) async throws {
             .reduce(0.0) { $0 + abs(Double($1.element.0) - Double($1.element.1)) } / Double(320 * 180 * 3 * 255)
         precondition(error < 0.08, "Encoded export must match composed preview across switches and repeated source times")
     }
-    let audioOnlyURL = try await RecordingAudioExporter().export(.init(screenURL: base.screenURL,
-        clipTimeline: timeline, replacementURL: nil, format: .m4a, sources: sources)) { _ in }
-    defer { try? FileManager.default.removeItem(at: audioOnlyURL) }
-    let audioOnlyAsset = AVURLAsset(url: audioOnlyURL)
-    let audioOnlyDuration = try await audioOnlyAsset.load(.duration).seconds
-    precondition(abs(audioOnlyDuration - timeline.duration) < 0.05,
-                 "Audio-only duration \(audioOnlyDuration) must match ordered timeline \(timeline.duration)")
     try await checkAudio(asset)
-    try await checkAudio(audioOnlyAsset)
+    for format in [RecordingAudioFormat.m4a, .m4a, .m4a, .m4a, .m4a, .wav] {
+        let audioOnlyURL = try await RecordingAudioExporter().export(.init(screenURL: base.screenURL,
+            clipTimeline: timeline, replacementURL: nil, format: format, sources: sources)) { _ in }
+        defer { try? FileManager.default.removeItem(at: audioOnlyURL) }
+        let audioOnlyAsset = AVURLAsset(url: audioOnlyURL)
+        let audioOnlyDuration = try await audioOnlyAsset.load(.duration).seconds
+        precondition(abs(audioOnlyDuration - timeline.duration) < 0.05,
+                     "Audio-only \(format) duration \(audioOnlyDuration) must match ordered timeline \(timeline.duration)")
+        try await checkAudio(audioOnlyAsset)
+    }
     print("PASS composed multi-source preview/export, authored aspect/audio/snapshot, nested speed and backward/repeated screen/camera frames")
 }
 
