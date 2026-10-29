@@ -258,6 +258,10 @@ final class StudioProjectRegistry {
             .compactMap(snapshot(for:))
     }
 
+    var hasActiveSourceTransactions: Bool {
+        models.values.compactMap(\.model).contains(where: \.isSourceTransactionActive)
+    }
+
     var unsavedProjectCount: Int {
         models.values.compactMap(\.model).filter(\.hasUnsavedChanges).count
     }

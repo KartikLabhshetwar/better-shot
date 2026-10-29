@@ -97,6 +97,16 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
     /// Studio's debounced autosave is flushed so no edit is lost.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         StudioProjectRegistry.shared.flushDrafts()
+        if StudioProjectRegistry.shared.hasActiveSourceTransactions {
+            NSApp.activate(ignoringOtherApps: true)
+            let alert = NSAlert()
+            alert.alertStyle = .informational
+            alert.messageText = "Finish adding or editing recordings before quitting"
+            alert.informativeText = "Return to Studio and choose Add Recording, Apply, or Cancel. Your pending recording changes are still open."
+            alert.addButton(withTitle: "Return to Studio")
+            alert.runModal()
+            return .terminateCancel
+        }
         guard ScreenRecordingManager.shared.isActive else { return .terminateNow }
 
         NSApp.activate(ignoringOtherApps: true)

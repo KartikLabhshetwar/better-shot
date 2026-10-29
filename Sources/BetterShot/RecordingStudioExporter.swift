@@ -737,12 +737,14 @@ nonisolated final class RecordingStudioMultiSourceRenderer: @unchecked Sendable 
         let configuration: RecordingStudioExporter.Configuration
         let screen: SourceFrameFeed
         let camera: SourceFrameFeed?
-        let compositor: StudioFrameCompositor
+        let size: CGSize
         let origin: CGPoint
     }
     private let configuration: RecordingStudioExporter.Configuration
     private let canvasSize: CGSize
     private var sources: [UUID: Source] = [:]
+    private var activeSourceID: UUID?
+    private var activeCompositor: StudioFrameCompositor?
     private let context = CIContext(options: [.cacheIntermediates: false])
     private let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
 
@@ -771,7 +773,7 @@ nonisolated final class RecordingStudioMultiSourceRenderer: @unchecked Sendable 
             let scale = min(canvasSize.width / leaf.canvasSize.width, canvasSize.height / leaf.canvasSize.height)
             let size = CGSize(width: leaf.canvasSize.width * scale, height: leaf.canvasSize.height * scale)
             sources[source.id] = Source(configuration: leaf, screen: screen, camera: camera,
-                compositor: StudioFrameCompositor(configuration: leaf, canvasSize: size, includeBubble: camera != nil),
+                size: size,
                 origin: CGPoint(x: (canvasSize.width - size.width) / 2, y: (canvasSize.height - size.height) / 2))
         }
     }
@@ -782,9 +784,23 @@ nonisolated final class RecordingStudioMultiSourceRenderer: @unchecked Sendable 
               let source = sources[location.sourceID] else {
             throw VideoTrimExportError.invalidRange
         }
+        let compositor: StudioFrameCompositor
+        if activeSourceID == location.sourceID, let activeCompositor {
+            compositor = activeCompositor
+        } else {
+            if let activeSourceID, let previous = sources[activeSourceID] {
+                previous.screen.reset()
+                previous.camera?.reset()
+            }
+            activeCompositor = nil
+            compositor = StudioFrameCompositor(configuration: source.configuration,
+                canvasSize: source.size, includeBubble: source.camera != nil)
+            activeCompositor = compositor
+            activeSourceID = location.sourceID
+        }
         let screen = try source.screen.frame(at: location.rawSourceTime)
         let camera = try source.camera?.frame(at: max(0, location.rawSourceTime - source.configuration.cameraOffset))
-        let image = try source.compositor.composedImage(screenFrame: screen, cameraFrame: camera,
+        let image = try compositor.composedImage(screenFrame: screen, cameraFrame: camera,
             editorTime: location.sourceEditorTime, sourceTime: location.rawSourceTime)
         let canvas = CGRect(origin: .zero, size: canvasSize)
         return image.transformed(by: CGAffineTransform(translationX: source.origin.x, y: source.origin.y))
@@ -804,7 +820,7 @@ nonisolated private final class SourceFrameFeed {
     private let asset: AVURLAsset
     private let track: AVAssetTrack
     private let transform: CGAffineTransform
-    private let context = CIContext(options: [.cacheIntermediates: false])
+    private var context: CIContext?
     private var reader: AVAssetReader?
     private var output: AVAssetReaderTrackOutput?
     private var current: CVPixelBuffer?
@@ -824,9 +840,21 @@ nonisolated private final class SourceFrameFeed {
 
     deinit { reader?.cancelReading() }
 
+    func reset() {
+        reader?.cancelReading()
+        reader = nil
+        output = nil
+        current = nil
+        transformedCurrent = nil
+        pending = nil
+        context = nil
+        lastTime = -Double.infinity
+        finished = false
+    }
+
     func frame(at time: TimeInterval) throws -> CVPixelBuffer {
         if reader == nil || time < lastTime {
-            reader?.cancelReading()
+            reset()
             let reader = try AVAssetReader(asset: asset)
             let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
                 kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
@@ -839,10 +867,6 @@ nonisolated private final class SourceFrameFeed {
             }
             self.reader = reader
             self.output = output
-            current = nil
-            transformedCurrent = nil
-            pending = nil
-            finished = false
         }
         lastTime = time
         while !finished {
@@ -878,6 +902,8 @@ nonisolated private final class SourceFrameFeed {
               let transformed else {
             throw RecordingStudioExporter.ExportError.writerFailed(nil)
         }
+        let context = self.context ?? CIContext(options: [.cacheIntermediates: false])
+        self.context = context
         context.render(image.transformed(by: CGAffineTransform(translationX: -extent.minX, y: -extent.minY)),
             to: transformed, bounds: CGRect(origin: .zero, size: extent.size),
             colorSpace: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB())

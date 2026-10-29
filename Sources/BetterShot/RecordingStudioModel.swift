@@ -123,6 +123,18 @@ final class RecordingStudioModel {
     private let embeddedDocument: RecordingEditDocument?
     private var embeddedImportedFiles: [URL] = []
     var isSourceEditor: Bool { isEmbeddedSource }
+    var isAddingRecording = false
+    var isEditingSource = false
+    var isSourceTransactionActive: Bool { isAddingRecording || isEditingSource }
+    private(set) var isReplacingAudio = false
+    private var replacementAudioGeneration = UUID()
+    var sourceEditsInFlight: Bool { isReplacingAudio || transcriptionState.isTranscribing }
+
+    /// Imported audio and transcription must settle before snapshotting source edits.
+    func waitForSourceEdits() async {
+        await replacementAudioTask?.value
+        await transcriptionTask?.value
+    }
 
     /// Apply keeps new private media; Cancel/teardown removes only this editor's imports.
     func retainEmbeddedSourceFiles() { embeddedImportedFiles.removeAll() }
@@ -338,7 +350,7 @@ final class RecordingStudioModel {
     /// Preparation owns only new private packages; the root remains unchanged across awaits.
     func prepareAppendRecording(from url: URL, document: RecordingEditDocument? = nil) async throws -> PreparedRecordingAppend {
         guard isLoaded, let session, !isEmbeddedSource, !isCroppingVideo, !isEditingMasks,
-              RecordingSession.isSessionDirectory(url), url.standardizedFileURL != sessionURL.standardizedFileURL else {
+              !clipSpeedDraft.hasActiveEdit, RecordingSession.isSessionDirectory(url), url.standardizedFileURL != sessionURL.standardizedFileURL else {
             throw RecordingStudioSourceResolver.ResolutionError.invalidSources
         }
         let revision = editRevision
@@ -416,7 +428,8 @@ final class RecordingStudioModel {
     @discardableResult
     func commitAppendRecording(_ prepared: PreparedRecordingAppend, expectedRevision: UInt64) -> RecordingClipEditOutcome {
         guard prepared.projectURL == sessionURL, prepared.revision == expectedRevision,
-              editRevision == expectedRevision, isLoaded, !isCroppingVideo, !isEditingMasks else {
+              editRevision == expectedRevision, isLoaded, !isCroppingVideo, !isEditingMasks,
+              !clipSpeedDraft.hasActiveEdit else {
             prepared.discard()
             return .failed("The project changed while preparing the recording. Inspect it and retry.")
         }
@@ -438,16 +451,32 @@ final class RecordingStudioModel {
         }
     }
 
+    /// Root snapshots win; a legacy catalog may keep its authored edits only in the managed leaf.
+    func sourceDocumentForEditing(sourceID: UUID) throws -> RecordingEditDocument {
+        guard let source = projectSources?.first(where: { $0.id == sourceID }) else {
+            throw RecordingStudioSourceResolver.ResolutionError.missingSource
+        }
+        if let document = sourceDocuments?[sourceID] { return document }
+        do {
+            try source.validatePackage(in: sessionURL)
+            let leaf = RecordingSession(directoryURL: source.sessionDirectory(in: sessionURL))
+            return try JSONDecoder().decode(RecordingEditDocument.self, from: Data(contentsOf: leaf.editDocumentURL))
+        } catch let error as RecordingProjectSourceError {
+            throw error
+        } catch { throw RecordingStudioSourceResolver.ResolutionError.invalidDocument }
+    }
+
     /// Source effects share one root undo/save; the authored cut clock stays fixed.
     func applySourceDocument(_ authored: RecordingEditDocument, sourceID: UUID, expectedRevision: UInt64) async -> RecordingClipEditOutcome {
-        guard isMultiSource, let session, let source = projectSources?.first(where: { $0.id == sourceID }),
+        guard isMultiSource, let session, projectSources?.contains(where: { $0.id == sourceID }) == true,
               editRevision == expectedRevision, authored.sources == nil, authored.sourceDocuments == nil,
               authored.clips?.contains(where: { $0.sourceID != nil }) != true else {
             return .failed("The recording changed. Reopen its controls and retry.")
         }
-        let original = sourceDocuments?[sourceID]
-            ?? RecordingSession(directoryURL: source.sessionDirectory(in: session.directoryURL)).loadEditDocument()
-        guard let original, authored.clips == original.clips,
+        let original: RecordingEditDocument
+        do { original = try sourceDocumentForEditing(sourceID: sourceID) }
+        catch { return .failed(error.localizedDescription) }
+        guard authored.clips == original.clips,
               authored.trimStart == original.trimStart, authored.trimEnd == original.trimEnd else {
             return .failed("Trim and change clip speed on the project's main timeline.")
         }
@@ -491,7 +520,7 @@ final class RecordingStudioModel {
         let previousSources = playbackSources
         let previousSelection = selectedClipID
         let previousTime = currentTime
-        registerUndo(actionName) { target in
+        registerUndo(actionName, independently: true) { target in
             _ = target.applySourceProjectDocument(previous, configurations: previousConfigurations,
                 preparedSources: previousSources, selectedID: previousSelection,
                 playheadTime: previousTime, actionName: actionName)
@@ -501,6 +530,7 @@ final class RecordingStudioModel {
         timelineHoverTime = nil
         sourceConfigurations = configurations
         playbackSources = preparedSources
+        loadTimelineThumbnails()
         applyDocumentSettings(document)
         clipTimeline = timeline
         duration = timeline.duration
@@ -722,6 +752,8 @@ final class RecordingStudioModel {
         if !isEmbeddedSource { StudioProjectRegistry.shared.unregister(self) }
         exportTask?.cancel()
         audioExportTask?.cancel()
+        replacementAudioGeneration = UUID()
+        isReplacingAudio = false
         replacementAudioTask?.cancel()
         if isEmbeddedSource {
             for url in embeddedImportedFiles { try? FileManager.default.removeItem(at: url) }
@@ -1050,7 +1082,7 @@ final class RecordingStudioModel {
         let previousTimeline = clipTimeline
         let previousSelection = selectedClipID
         let previousTime = currentTime
-        registerUndo(actionName) { target in
+        registerUndo(actionName, independently: isMultiSource) { target in
             target.applyClipTimeline(
                 previousTimeline,
                 selectedID: previousSelection,
@@ -1184,8 +1216,23 @@ final class RecordingStudioModel {
 
     private func registerUndo(
         _ actionName: String,
+        independently: Bool = false,
         operation: @escaping @MainActor (RecordingStudioModel) -> Void
     ) {
+        let separateGroup = independently && !editUndoManager.isUndoing && !editUndoManager.isRedoing
+        let groupsByEvent = editUndoManager.groupsByEvent
+        if separateGroup {
+            // Explicit source transactions stay separate even when requests share one run-loop event.
+            if editUndoManager.groupingLevel > 0 { editUndoManager.endUndoGrouping() }
+            editUndoManager.groupsByEvent = false
+            editUndoManager.beginUndoGrouping()
+        }
+        defer {
+            if separateGroup {
+                editUndoManager.endUndoGrouping()
+                editUndoManager.groupsByEvent = groupsByEvent
+            }
+        }
         editUndoManager.registerUndo(withTarget: self) { target in
             operation(target)
         }
@@ -1194,7 +1241,11 @@ final class RecordingStudioModel {
     }
 
     private func loadTimelineThumbnails() {
-        timelineThumbnails.prepare(url: screenURL, duration: sourceDuration)
+        if sourceConfigurations.isEmpty {
+            timelineThumbnails.prepare(url: screenURL, duration: sourceDuration)
+        } else {
+            timelineThumbnails.prepare(sources: sourceConfigurations)
+        }
     }
 
     /// Speed of whichever clip covers this editor time; 1 when nothing
@@ -1274,6 +1325,7 @@ final class RecordingStudioModel {
     }
 
     func previewAuto3DScene(count: Int) {
+        guard !isMultiSource else { return }
         let shots = suggested3DShots(count: count)
         guard !shots.isEmpty else { return }
         if before3DScenePreview == nil { before3DScenePreview = currentTime }
@@ -1294,6 +1346,7 @@ final class RecordingStudioModel {
     }
 
     func applyAuto3DScene(count: Int) {
+        guard !isMultiSource else { return }
         let shots = suggested3DShots(count: count)
         guard !shots.isEmpty else { return }
         cancel3DScenePreview()
@@ -1326,7 +1379,7 @@ final class RecordingStudioModel {
     }
 
     private func set3DShots(_ shots: [Recording3DShot], actionName: String) {
-        guard shots != shots3D else { return }
+        guard !isMultiSource, shots != shots3D else { return }
         let previous = shots3D
         registerUndo(actionName) { $0.set3DShots(previous, actionName: actionName) }
         shots3D = shots
@@ -1348,6 +1401,7 @@ final class RecordingStudioModel {
     }
 
     func add3DShot(at time: Double) {
+        guard !isMultiSource else { return }
         if let shot = timeline3D.shots.first(where: { $0.start <= time && time < $0.end }) {
             select3DShot(id: shot.id)
             return
@@ -1393,7 +1447,7 @@ final class RecordingStudioModel {
     /// A scene replaces only the selected range; Auto scene explicitly replaces the whole track.
     func apply3DScene(_ presets: [Recording3DPreset], wholeMovie: Bool = false,
                       weights: [Double]? = nil, showcaseFinish: Bool = false) {
-        guard duration > 0 else { return }
+        guard !isMultiSource, duration > 0 else { return }
         let replacesAll = wholeMovie || selected3DShot == nil
         let range = replacesAll ? 0...duration : selected3DShot.map { $0.start...$0.end } ?? 0...duration
         let shots = Recording3DTimeline.scene(presets, in: range, weights: weights, showcaseFinish: showcaseFinish, clipCuts: sceneClipCuts)
@@ -1417,12 +1471,14 @@ final class RecordingStudioModel {
     }
 
     private func replaceZoomCues(_ cues: [ZoomCue]) {
+        guard !isMultiSource else { return }
         zoomCues = cues.sorted { $0.start < $1.start }
         rebuildViewportTimeline()
         scheduleProjectSave()
     }
 
     private func applyZoomCues(_ cues: [ZoomCue], actionName: String, enabled: Bool? = nil) {
+        guard !isMultiSource else { return }
         let sorted = cues.sorted { $0.start < $1.start }
         let nextEnabled = enabled ?? zoomEnabled
         guard sorted != zoomCues || nextEnabled != zoomEnabled else { return }
@@ -1458,6 +1514,7 @@ final class RecordingStudioModel {
     }
 
     func addZoomCue(at time: TimeInterval) {
+        guard !isMultiSource else { return }
         if let block = zoomTimelineBlocks.first(where: { $0.editorStart <= time && time < $0.editorEnd }) {
             selectZoomCue(id: block.cue.id)
             return
@@ -1510,6 +1567,7 @@ final class RecordingStudioModel {
     /// Creates a zoom cue spanning a dragged range in the zoom lane. Times
     /// are editor time and need not be ordered.
     func addZoomCue(fromEditorTime editorStart: TimeInterval, toEditorTime editorEnd: TimeInterval) {
+        guard !isMultiSource else { return }
         let lowSource = clipTimeline.sourceTime(at: min(editorStart, editorEnd))
         let highSource = clipTimeline.sourceTime(at: max(editorStart, editorEnd))
         let start = min(max(0, lowSource), max(0, sourceDuration - 0.5))
@@ -2545,7 +2603,7 @@ final class RecordingStudioModel {
     }
 
     var showsMaskLane: Bool {
-        isEditingMasks || !maskSegments.isEmpty
+        !isMultiSource && (isEditingMasks || !maskSegments.isEmpty)
     }
 
     func addMask() {
@@ -3027,6 +3085,9 @@ final class RecordingStudioModel {
     func replaceAudio(with pickedURL: URL) {
         guard isLoaded, !isMultiSource else { return }
         pause()
+        replacementAudioGeneration = UUID()
+        let generation = replacementAudioGeneration
+        isReplacingAudio = false
         replacementAudioTask?.cancel()
 
         replacementAudioError = nil
@@ -3056,7 +3117,11 @@ final class RecordingStudioModel {
             storedURL = pickedURL
         }
 
+        isReplacingAudio = true
         replacementAudioTask = Task { [weak self] in
+            defer {
+                if self?.replacementAudioGeneration == generation { self?.isReplacingAudio = false }
+            }
             let resolved = await RecordingReplacementAudio.load(
                 url: storedURL,
                 displayName: displayName
@@ -3082,6 +3147,8 @@ final class RecordingStudioModel {
     func removeReplacementAudio() {
         guard !isMultiSource else { return }
         guard replacementAudio != nil else { return }
+        replacementAudioGeneration = UUID()
+        isReplacingAudio = false
         replacementAudioTask?.cancel()
         replacementAudioTask = nil
         pause()

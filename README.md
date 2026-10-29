@@ -50,7 +50,8 @@ subtitles and teleprompter speech tracking need macOS 26.
 - **Image editor:** arrows, shapes, text, numbered markers, highlights, blur, and pixelate.
   Crop, rotate, flip, and frame captures with backgrounds, padding, corners, and shadow.
 - **Recording:** a display, window, or area, with system audio, microphone, camera, and a teleprompter.
-- **Video editor:** cuts, speed, zooms, captions, masks, camera layouts, cursor styles, and 3D shots.
+- **Video editor:** combine library recordings, then cut, arrange, or change clip speed.
+  Edit each recording's zooms, captions, masks, camera layout, cursor, and 3D shots.
   Export MP4 or MOV at 30 or 60 fps.
 - **Sharing:** copy, save, pin, or drag from the floating preview, browse everything in the
   Media Gallery, and share links through your own Cloudflare R2 bucket.
@@ -100,6 +101,25 @@ If capture or shortcuts still fail after granting access, quit and reopen Better
 When BetterShot opens at login before macOS applies Screen Recording access, it
 offers to restart itself the first time you capture.
 
+## Combine recordings
+
+Open a recording in Studio and choose **Add Recording** to append another recording
+from your BetterShot library. BetterShot copies its editable source into the
+project and preserves the original. Choose individual recordings; adding a project
+that already combines several recordings is not supported.
+
+The left inspector lists the project's recordings. **Edit Recording** opens its
+existing background, cursor, camera, and effect controls. **Apply** updates every
+clip using that recording in one undo step; **Cancel** discards the local changes.
+Trim, cut, and change speed on the main timeline. Right-click a clip for **Move Clip
+Earlier** or **Move Clip Later**, or select it in the filmstrip and press
+**Control–Option–Left Arrow** or **Control–Option–Right Arrow**. Each recording keeps
+its authored effects and proportions, fitted into the common output canvas.
+
+For a combined project with audio, **Export Audio** in the left inspector exports
+the composed soundtrack in the selected format. Before quitting, finish an open
+Add/Edit Recording sheet with **Add Recording**, **Apply**, or **Cancel**.
+
 ## Agent Access
 
 Agent Access is off by default. Turn it on under **Settings > Agent Access**, then
@@ -109,14 +129,24 @@ Mac. **Rotate Token** invalidates old copies, and switching Agent Access off
 closes the local endpoint and revokes its token.
 
 An agent can list recordings in BetterShot's library, open one in Studio,
-inspect its timeline, request a composed PNG preview, split, trim, delete, or
-change the speed of clips, undo or redo, save the project, and start or check an
-export. Saving a project that already has an exported video also starts updating
+inspect its timeline and recording sources, request a composed PNG preview,
+append another library recording, reorder clips, split, trim, delete, or change
+clip speed, undo or redo, save the project, and start or check an export. Saving a project that already has an exported video also starts updating
 that file, with progress shown in Studio. Exports use your configured save folder. Each edit requires the current
 project revision, so an agent must inspect again if you edit the same project
 in the UI. Export status remains available for the 16 most recent agent jobs
 while their project stays open. The endpoint listens only on this Mac at
 `127.0.0.1:39615`; it does not provide arbitrary file access or cloud-upload tools.
+
+For MCP clients, `append_recording` takes a library `projectId`, target `handle`,
+`expectedRevision`, and UUID `requestId`. Reuse the same ID and arguments to retry
+the same append safely, including concurrent retries. A failed ID retains its
+failure; use a new ID for a fresh attempt. At most four distinct appends can be
+preparing at once. `reorder_clips` takes every current clip ID exactly once in the
+desired order. For clips with a `sourceId`, trim bounds use that recording's
+authored editor time; the outer clip speed multiplies its authored speed.
+Native Add/Edit Recording transactions and pending audio/caption preparation block
+agent edits until they finish.
 
 ## Cloud sharing
 

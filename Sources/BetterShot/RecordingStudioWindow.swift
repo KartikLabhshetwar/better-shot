@@ -43,13 +43,36 @@ struct RecordingStudioContent: View {
     @State private var isInspectorPresented = true
     @State private var confirms3DShotRemoval = false
     @State private var closeGuard = EditorCloseGuard()
+    @State private var showsRecordingLibrary = false
+    @State private var sourceToEdit: RecordingProjectSource?
+
+    private var canManageSources: Bool {
+        model.isProject && model.isLoaded && !model.isSourceEditor && !model.isSourceTransactionActive
+            && !model.isCroppingVideo && !model.isEditingMasks && !model.clipSpeedDraft.hasActiveEdit
+            && !model.exportState.isExporting && !model.shareState.isBusy && !model.sourceEditsInFlight
+    }
 
     var body: some View {
         VStack(spacing: 0) {
+            if model.isSourceEditor {
+                HStack(spacing: 12) {
+                    if model.isCroppingVideo { cropActions }
+                    else if model.isEditingMasks { maskActions }
+                    else {
+                        Button("Undo", systemImage: "arrow.uturn.backward") { model.undo() }.disabled(!model.canUndo || model.isSourceTransactionActive)
+                        Button("Redo", systemImage: "arrow.uturn.forward") { model.redo() }.disabled(!model.canRedo)
+                        Spacer()
+                        Text("Finish crop or mask editing before applying.").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .padding(12)
+                Divider()
+            }
             HStack(spacing: 0) {
                 if isInspectorPresented {
-                    StudioInspector(model: model)
+                    StudioInspector(model: model, onAddRecording: addRecording, onEditRecording: editRecording)
                         .frame(width: 360)
+                        .disabled(model.isSourceTransactionActive)
                     Divider()
                 }
                 Group {
@@ -69,6 +92,7 @@ struct RecordingStudioContent: View {
 
             if model.loadError == nil {
                 StudioTimelineEditor(model: model)
+                    .disabled(model.isSourceTransactionActive)
             }
         }
         .background(EditorChrome.workspace)
@@ -77,16 +101,17 @@ struct RecordingStudioContent: View {
         .scrollIndicators(.hidden)
         .tint(EditorChrome.accent)
         .accentColor(EditorChrome.accent)
-        .frame(minWidth: 1100, minHeight: 720)
+        .frame(minWidth: model.isSourceEditor ? 900 : 1100, minHeight: model.isSourceEditor ? 560 : 720)
         .toolbarBackground(.visible, for: .windowToolbar)
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
+                if !model.isSourceEditor {
                 Button {
                     model.undo()
                 } label: {
                     Label("Undo", systemImage: "arrow.uturn.backward")
                 }
-                .disabled(!model.canUndo)
+                .disabled(!model.canUndo || model.isSourceTransactionActive)
                 .help(ShortcutService.shared.help("Undo", for: .videoUndo))
 
                 Button {
@@ -94,26 +119,32 @@ struct RecordingStudioContent: View {
                 } label: {
                     Label("Redo", systemImage: "arrow.uturn.forward")
                 }
-                .disabled(!model.canRedo)
+                .disabled(!model.canRedo || model.isSourceTransactionActive)
                 .help(ShortcutService.shared.help("Redo", for: .videoRedo))
+                }
             }
         }
         .toolbarHidingSharedBackground {
             ToolbarItemGroup(placement: .primaryAction) {
-                if model.isCroppingVideo {
+                if model.isSourceEditor { EmptyView() }
+                else if model.isCroppingVideo {
                     cropActions
                 } else if model.isEditingMasks {
                     maskActions
                 } else {
                     if model.isProject {
-                        saveStatus
+                        Button(action: addRecording) {
+                            Label("Add Recording", systemImage: "plus.rectangle.on.rectangle")
+                        }
+                        .disabled(!canManageSources)
+                        saveStatus.disabled(model.isSourceTransactionActive)
                     }
 
                     if model.canShareToCloud {
-                        shareStatus
+                        shareStatus.disabled(model.isSourceTransactionActive)
                     }
 
-                    exportStatus
+                    exportStatus.disabled(model.isSourceTransactionActive)
 
                     Button {
                         isInspectorPresented.toggle()
@@ -131,29 +162,53 @@ struct RecordingStudioContent: View {
                 if let id = model.selected3DShotID { model.remove3DShot(id: id) }
             }
         }
+        .sheet(isPresented: $showsRecordingLibrary, onDismiss: { model.isAddingRecording = false }) {
+            StudioAddRecordingSheet(model: model)
+        }
+        .sheet(item: $sourceToEdit, onDismiss: { model.isEditingSource = false }) { source in
+            StudioEditRecordingSheet(root: model, source: source)
+        }
         .editorFullScreenSupport()
         .navigationTitle(windowTitle)
         .onWindowChange { window in
+            guard !model.isSourceEditor else { return }
             configureCloseGuard()
             closeGuard.attach(to: window)
             closeGuard.refreshDocumentEdited()
         }
         .onChange(of: model.hasUnsavedChanges) {
+            guard !model.isSourceEditor else { return }
             configureCloseGuard()
             closeGuard.refreshDocumentEdited()
         }
         .background(EditorShortcutHandler(scope: .video, perform: performShortcut))
         .onAppear {
-            AppActivationPolicy.enter(hidePreview: true)
+            if !model.isSourceEditor { AppActivationPolicy.enter(hidePreview: true) }
         }
         .onDisappear {
             closeGuard.detach()
-            AppActivationPolicy.leave(restorePreview: true)
+            if !model.isSourceEditor { AppActivationPolicy.leave(restorePreview: true) }
         }
+    }
+
+    private func addRecording() {
+        guard canManageSources else { return }
+        model.pause()
+        model.isAddingRecording = true
+        showsRecordingLibrary = true
+    }
+
+    private func editRecording(_ source: RecordingProjectSource) {
+        guard canManageSources else { return }
+        model.pause()
+        model.isEditingSource = true
+        sourceToEdit = source
     }
 
     private func performShortcut(_ action: ShortcutService.Action) -> Bool {
         guard model.isLoaded else { return false }
+        guard !model.isSourceTransactionActive else { return true }
+        if model.isMultiSource, [.videoCrop, .videoBlur, .videoPixelate].contains(action) { return true }
         switch action {
         case .videoCrop: model.beginVideoCrop()
         case .videoBlur: model.toggleMaskTool(.blur)
@@ -168,7 +223,7 @@ struct RecordingStudioContent: View {
         default:
             guard !model.isCroppingVideo, !model.isEditingMasks else { return true }
             switch action {
-            case .videoSave: if model.isProject { model.saveProject() }
+            case .videoSave: if model.isProject && !model.isSourceEditor { model.saveProject() }
             case .videoUndo: model.undo()
             case .videoRedo: model.redo()
             case .videoInspector: isInspectorPresented.toggle()
@@ -475,7 +530,7 @@ private enum StudioCanvasCoordinateSpace {
     static let name = "StudioCanvasSpace"
 }
 
-private struct StudioCanvas: View {
+struct StudioCanvas: View {
     @Bindable var model: RecordingStudioModel
 
     var body: some View {
@@ -1407,8 +1462,10 @@ private struct StudioTimelineEditor: View {
         case .videoPlay: model.togglePlayback()
         case .videoStart: model.pause(); model.seek(to: 0)
         case .videoEnd: model.pause(); model.seek(to: model.duration)
-        case .videoSplitTool: isSplitting.toggle()
+        case .videoSplitTool:
+            if !model.isSourceEditor { isSplitting.toggle() }
         case .videoCut:
+            guard !model.isSourceEditor else { return true }
             if NSApp.keyWindow?.firstResponder is RecordingClipTimelineControl { return false }
             model.splitClip(at: model.timelineHoverTime ?? model.currentTime)
         case .videoZoomIn: updateZoom(viewport.visibleSeconds / 1.6, origin: buttonZoomAnchor)
@@ -1421,6 +1478,7 @@ private struct StudioTimelineEditor: View {
     }
 
     private func addZoomAtPlayhead() {
+        guard !model.isMultiSource else { return }
         if let range = RecordingTimelineViewport.newZoomRange(at: model.currentTime,
             secondsPerPoint: scale.secondsPerPoint, duration: model.duration,
             occupied: model.zoomTimelineBlocks.map { $0.editorStart...$0.editorEnd }) {
@@ -1429,16 +1487,21 @@ private struct StudioTimelineEditor: View {
     }
 
     private var cutMarkers: [RecordingClipTimeline.CutMarker] {
-        model.clipTimeline.cutMarkers(sourceDuration: model.sourceDuration)
+        if model.isMultiSource {
+            return model.clipTimeline.cutMarkers(sourceDurations: Dictionary(uniqueKeysWithValues:
+                model.sourceConfigurations.map { ($0.id, $0.configuration.clipTimeline.duration) }))
+        }
+        return model.clipTimeline.cutMarkers(sourceDuration: model.sourceDuration)
     }
 
     private var cutMarkerLane: some View {
         GeometryReader { proxy in
-            ForEach(cutMarkers, id: \.sourceStart) { marker in
+            ForEach(cutMarkers, id: \.self) { marker in
                 let x = scale.x(for: marker.editorTime) - scrollX
                 let width: CGFloat = marker.removedDuration > 0 ? 64 : 28
                 if x >= 0, x <= proxy.size.width {
-                    StudioTimelineCutBadge(marker: marker, sourceURL: model.screenURL) {
+                    StudioTimelineCutBadge(marker: marker, sourceURL: model.screenURL,
+                        configuration: model.sourceConfigurations.first(where: { $0.id == marker.sourceID })?.configuration) {
                         model.pause()
                         model.seek(to: marker.editorTime)
                     }
@@ -1517,7 +1580,7 @@ private struct StudioTimelineEditor: View {
                            origin: scale.time(forX: x + scrollX))
             }
         ))
-        .frame(height: StudioTimelineMetrics.lanesHeight(showsMaskLane: model.showsMaskLane, showsCutLane: !cutMarkers.isEmpty, shows3DLane: !model.previewTimeline3D.shots.isEmpty))
+        .frame(height: StudioTimelineMetrics.lanesHeight(showsMaskLane: model.showsMaskLane, showsCutLane: !cutMarkers.isEmpty, shows3DLane: !model.isMultiSource && !model.previewTimeline3D.shots.isEmpty, showsZoomLane: !model.isMultiSource))
         .onChange(of: model.duration, initial: true) { old, duration in
             if old == 0 || old == duration { viewport.fit(duration: duration) }
             else {
@@ -1537,8 +1600,10 @@ private struct StudioTimelineEditor: View {
     private func scrollingLanes(scale: StudioTimelineScale) -> some View {
         ZStack(alignment: .topLeading) {
             VStack(spacing: StudioTimelineMetrics.rowSpacing) {
-                StudioZoomLaneBackground()
-                    .frame(height: StudioTimelineMetrics.zoomLaneHeight)
+                if !model.isMultiSource {
+                    StudioZoomLaneBackground()
+                        .frame(height: StudioTimelineMetrics.zoomLaneHeight)
+                }
                 Color.clear
                     .frame(height: StudioTimelineMetrics.clipLaneHeight)
                 if !cutMarkers.isEmpty {
@@ -1548,7 +1613,7 @@ private struct StudioTimelineEditor: View {
                     StudioZoomLaneBackground()
                         .frame(height: StudioTimelineMetrics.maskLaneHeight)
                 }
-                if !model.previewTimeline3D.shots.isEmpty {
+                if !model.isMultiSource && !model.previewTimeline3D.shots.isEmpty {
                     StudioZoomLaneBackground().frame(height: StudioTimelineMetrics.shotLaneHeight)
                 }
                 Color.clear
@@ -1557,6 +1622,7 @@ private struct StudioTimelineEditor: View {
 
             timelineScrollView(scale: scale) {
                 VStack(spacing: StudioTimelineMetrics.rowSpacing) {
+                    if !model.isMultiSource {
                     StudioZoomLane(
                         model: model,
                         scale: scale,
@@ -1566,6 +1632,7 @@ private struct StudioTimelineEditor: View {
                         width: scale.contentWidth,
                         height: StudioTimelineMetrics.zoomLaneHeight
                     )
+                    }
 
                     clipLane
                         .frame(
@@ -1589,7 +1656,7 @@ private struct StudioTimelineEditor: View {
                         )
                     }
 
-                    if !model.previewTimeline3D.shots.isEmpty {
+                    if !model.isMultiSource && !model.previewTimeline3D.shots.isEmpty {
                         Recording3DLane(model: model, pointsPerSecond: scale.pointsPerSecond,
                                         visibleRange: scale.visibleRange(scrollX: scrollX))
                             .frame(width: scale.contentWidth, height: StudioTimelineMetrics.shotLaneHeight)
@@ -1601,13 +1668,13 @@ private struct StudioTimelineEditor: View {
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize)
         }
-        .frame(height: StudioTimelineMetrics.scrollingLanesHeight(showsMaskLane: model.showsMaskLane, showsCutLane: !cutMarkers.isEmpty, shows3DLane: !model.previewTimeline3D.shots.isEmpty))
+        .frame(height: StudioTimelineMetrics.scrollingLanesHeight(showsMaskLane: model.showsMaskLane, showsCutLane: !cutMarkers.isEmpty, shows3DLane: !model.isMultiSource && !model.previewTimeline3D.shots.isEmpty, showsZoomLane: !model.isMultiSource))
         .mask(edgeFadeMask(scale: scale))
         .overlay(alignment: .top) {
             if !cutMarkers.isEmpty {
                 cutMarkerLane
-                    .padding(.top, StudioTimelineMetrics.zoomLaneHeight + StudioTimelineMetrics.clipLaneHeight
-                             + StudioTimelineMetrics.rowSpacing * 2)
+                    .padding(.top, StudioTimelineMetrics.clipLaneHeight + StudioTimelineMetrics.rowSpacing
+                             + (model.isMultiSource ? 0 : StudioTimelineMetrics.zoomLaneHeight + StudioTimelineMetrics.rowSpacing))
             }
         }
     }
@@ -1660,6 +1727,17 @@ private struct StudioTimelineEditor: View {
             onZoom: { factor, anchorTime in
                 updateZoom(viewport.visibleSeconds / factor, origin: anchorTime)
             },
+            sourceDurations: Dictionary(uniqueKeysWithValues:
+                model.sourceConfigurations.map { ($0.id, $0.configuration.clipTimeline.duration) }),
+            sourceNames: Dictionary(uniqueKeysWithValues: (model.projectSources ?? []).map { ($0.id, $0.displayName) }),
+            onMoveClip: { id, delta in
+                var ids = model.clipTimeline.segments.map(\.id)
+                if let index = ids.firstIndex(of: id), ids.indices.contains(index + delta) {
+                    ids.swapAt(index, index + delta)
+                    model.reorderClips(ids: ids)
+                }
+            },
+            allowsClipEditing: !model.isSourceEditor,
             isSplitting: isSplitting,
             onToggleSplit: { isSplitting.toggle() }
         )
@@ -1768,6 +1846,7 @@ private struct StudioTimelineEditor: View {
 
     private var transport: some View {
         HStack(spacing: 12) {
+            if !model.isMultiSource {
             Menu {
                 Button { addZoomAtPlayhead() } label: {
                     Label("Zoom", systemImage: "plus.magnifyingglass")
@@ -1787,6 +1866,7 @@ private struct StudioTimelineEditor: View {
             .accessibilityLabel("Add timeline effect")
             .help("Add a Zoom or 3D Shot at the playhead")
             .disabled(!model.isLoaded || model.isCroppingVideo || model.isEditingMasks)
+            }
             Toggle(isOn: $isSplitting) {
                 Label("Split", systemImage: "scissors").labelStyle(.iconOnly)
             }
@@ -1794,6 +1874,7 @@ private struct StudioTimelineEditor: View {
             .buttonStyle(EditorButtonStyle(selected: isSplitting))
             .help(ShortcutService.shared.help("Split tool — click again to select or trim clips", for: .videoSplitTool))
             .accessibilityLabel("Split tool")
+            .disabled(model.isSourceEditor)
             Divider().frame(height: 24)
             Text("\(studioTimecode(model.displayTime)) / \(studioTimecode(model.duration))")
                 .font(.system(size: 12).monospacedDigit())
@@ -1849,7 +1930,7 @@ private struct StudioTimelineEditor: View {
                 Button("Reset Clips") {
                     model.resetClips()
                 }
-                .disabled(!model.hasClipEdits)
+                .disabled(model.isSourceEditor || model.isMultiSource || !model.hasClipEdits)
 
             } label: {
                 Image(systemName: "ellipsis")
@@ -1862,7 +1943,7 @@ private struct StudioTimelineEditor: View {
     }
 
     private var canDeleteSelection: Bool {
-        model.selected3DShotID != nil || model.selectedCueID != nil || model.canDeleteSelectedClip
+        model.selected3DShotID != nil || model.selectedCueID != nil || (!model.isSourceEditor && model.canDeleteSelectedClip)
     }
 
     private func deleteSelection() {
@@ -1908,6 +1989,7 @@ private struct TransportIconButtonStyle: ButtonStyle {
 private struct StudioTimelineCutBadge: View {
     let marker: RecordingClipTimeline.CutMarker
     let sourceURL: URL
+    var configuration: RecordingStudioExporter.Configuration? = nil
     let onSeek: () -> Void
     @State private var showsPreview = false
 
@@ -1946,7 +2028,7 @@ private struct StudioTimelineCutBadge: View {
         .accessibilityHint("Show cut preview and go to this cut")
         .onHover { showsPreview = $0 }
         .popover(isPresented: $showsPreview, arrowEdge: .top) {
-            StudioTimelineCutPreview(marker: marker, sourceURL: sourceURL)
+            StudioTimelineCutPreview(marker: marker, sourceURL: sourceURL, configuration: configuration)
         }
     }
 }
@@ -1954,6 +2036,7 @@ private struct StudioTimelineCutBadge: View {
 struct StudioTimelineCutPreview: View {
     let marker: RecordingClipTimeline.CutMarker
     let sourceURL: URL
+    var configuration: RecordingStudioExporter.Configuration? = nil
     @State private var preview: CGImage?
     @State private var failed = false
 
@@ -1972,7 +2055,7 @@ struct StudioTimelineCutPreview: View {
             .frame(width: 240, height: 135)
             .background(Color.black.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
             .clipShape(RoundedRectangle(cornerRadius: 6))
-            Text("Original: \(marker.sourceStart.formatted(.number.precision(.fractionLength(0...2))))s"
+            Text("\(configuration == nil ? "Original" : "Recording"): \(marker.sourceStart.formatted(.number.precision(.fractionLength(0...2))))s"
                  + (marker.removedDuration > 0 ? "–\(marker.sourceEnd.formatted(.number.precision(.fractionLength(0...2))))s" : ""))
                 .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
         }
@@ -1981,7 +2064,18 @@ struct StudioTimelineCutPreview: View {
             preview = nil
             failed = false
             do {
-                let frame = try await Self.frame(sourceURL: sourceURL, marker: marker)
+                let frame: CGImage
+                if let configuration {
+                    let result = try await RecordingStudioExporter.previewPNG(configuration: configuration,
+                        editorTime: marker.sourceStart + marker.removedDuration / 2, maximumDimension: 480)
+                    guard let decoded = NSImage(data: result.data)?.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                        throw RecordingStudioExporter.ExportError.noVideoTrack
+                    }
+                    frame = decoded
+                } else {
+                    guard marker.sourceID == nil else { throw RecordingStudioSourceResolver.ResolutionError.missingSource }
+                    frame = try await Self.frame(sourceURL: sourceURL, marker: marker)
+                }
                 try Task.checkCancellation()
                 preview = frame
             } catch {
@@ -2021,16 +2115,20 @@ nonisolated enum StudioTimelineMetrics {
 
     static let shotLaneHeight: CGFloat = 36
 
-    static func scrollingLanesHeight(showsMaskLane: Bool, showsCutLane: Bool, shows3DLane: Bool) -> CGFloat {
-        clipLaneHeight + zoomLaneHeight + scrollerGutter + rowSpacing * 2
+    static func scrollingLanesHeight(showsMaskLane: Bool, showsCutLane: Bool, shows3DLane: Bool,
+                                     showsZoomLane: Bool = true) -> CGFloat {
+        clipLaneHeight + scrollerGutter + rowSpacing
+            + (showsZoomLane ? zoomLaneHeight + rowSpacing : 0)
             + (showsCutLane ? cutLaneHeight + rowSpacing : 0)
             + (showsMaskLane ? maskLaneHeight + rowSpacing : 0)
             + (shows3DLane ? shotLaneHeight + rowSpacing : 0)
     }
 
-    static func lanesHeight(showsMaskLane: Bool, showsCutLane: Bool, shows3DLane: Bool) -> CGFloat {
+    static func lanesHeight(showsMaskLane: Bool, showsCutLane: Bool, shows3DLane: Bool,
+                            showsZoomLane: Bool = true) -> CGFloat {
         playheadLaneHeight + rulerHeight
-            + scrollingLanesHeight(showsMaskLane: showsMaskLane, showsCutLane: showsCutLane, shows3DLane: shows3DLane)
+            + scrollingLanesHeight(showsMaskLane: showsMaskLane, showsCutLane: showsCutLane,
+                                   shows3DLane: shows3DLane, showsZoomLane: showsZoomLane)
             + minimapHeight + rowSpacing * 3
     }
 }
@@ -2921,12 +3019,36 @@ struct StudioInspector: View {
 
     private let swatchColumns = [GridItem(.adaptive(minimum: 30, maximum: 44), spacing: 6)]
 
-    init(model: RecordingStudioModel, initialTab: StudioInspectorTab = .background) {
+    var onAddRecording: () -> Void
+    var onEditRecording: (RecordingProjectSource) -> Void
+
+    init(model: RecordingStudioModel, initialTab: StudioInspectorTab = .background,
+         onAddRecording: @escaping () -> Void = {},
+         onEditRecording: @escaping (RecordingProjectSource) -> Void = { _ in }) {
         self.model = model
+        self.onAddRecording = onAddRecording
+        self.onEditRecording = onEditRecording
         _selectedTab = State(initialValue: initialTab)
     }
 
     var body: some View {
+        Group {
+            if model.isMultiSource {
+                StudioSourcesInspector(model: model, onAddRecording: onAddRecording, onEditRecording: onEditRecording) {
+                    if let clip = model.selectedClip {
+                        InspectorSection("Selected Clip") { selectedClipControls(for: clip) }.studioEffectCard()
+                    }
+                    if model.hasAudio {
+                        InspectorSection("Export Audio") { audioControls }.studioEffectCard()
+                    }
+                }
+            } else {
+                sourceInspector
+            }
+        }
+    }
+
+    private var sourceInspector: some View {
         HStack(spacing: 0) {
             StudioInspectorTabs(selection: $selectedTab, isAvailable: isAvailable)
             Divider()
@@ -3029,7 +3151,7 @@ struct StudioInspector: View {
                                     .id(selected.id)
                             }
                             .studioEffectCard()
-                        } else if let selectedClip = model.selectedClip {
+                        } else if !model.isSourceEditor, let selectedClip = model.selectedClip {
                             InspectorSection("Selected Clip") {
                                 selectedClipControls(for: selectedClip)
                                     .id(selectedClip.id)
@@ -3955,7 +4077,7 @@ struct StudioInspector: View {
         VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
             // A silent recording has nothing to send out, but it can still
             // be given a soundtrack - so only the export half is withheld.
-            if model.hasAudio {
+            if model.hasAudio && !model.isSourceEditor {
                 InspectorSegmented(
                     options: RecordingAudioFormat.allCases,
                     isSelected: { $0 == model.audioExportFormat },
@@ -3965,10 +4087,11 @@ struct StudioInspector: View {
             }
 
             HStack(spacing: 6) {
-                if model.hasAudio {
+                if model.hasAudio && !model.isSourceEditor {
                     audioExportButton
                 }
 
+                if !model.isMultiSource {
                 inspectorAction(
                     model.hasRecordedAudio ? "Replace" : "Add",
                     systemImage: "waveform.badge.plus"
@@ -3980,13 +4103,14 @@ struct StudioInspector: View {
                         ? "Swap in an audio file, aligned to the start of the edited timeline"
                         : "Lay an audio file over this silent recording"
                 )
+                }
             }
 
-            if let replacement = model.replacementAudio {
+            if !model.isMultiSource, let replacement = model.replacementAudio {
                 replacementChip(for: replacement)
             }
 
-            if let message = model.replacementAudioError {
+            if !model.isMultiSource, let message = model.replacementAudioError {
                 Text(message)
                     .font(.inspectorLabel)
                     .foregroundStyle(.orange)

@@ -63,6 +63,8 @@ final class RecordingTimelineThumbnailStore {
     /// redraw itself without pushing a SwiftUI update per batch.
     var onChange: (() -> Void)?
 
+    private var sources: [UUID: RecordingTimelineThumbnailStore] = [:]
+    private var authoredTimeline: RecordingClipTimeline?
     private var url: URL?
     private var duration: TimeInterval = 0
     private var images: [Key: NSImage] = [:]
@@ -74,8 +76,23 @@ final class RecordingTimelineThumbnailStore {
     private var frozenLevel: Int?
     private var thawTask: Task<Void, Never>?
 
+    /// Each source owns a cache on its authored clock; decoding maps through its cuts and speeds.
+    func prepare(sources configurations: [RecordingStudioSourceConfiguration]) {
+        cancel()
+        sources.removeAll()
+        for source in configurations {
+            let store = RecordingTimelineThumbnailStore()
+            store.onChange = { [weak self] in self?.onChange?() }
+            store.authoredTimeline = source.configuration.clipTimeline
+            store.prepare(url: source.configuration.screenURL,
+                          duration: source.configuration.clipTimeline.duration)
+            sources[source.id] = store
+        }
+    }
+
     func prepare(url: URL, duration: TimeInterval) {
         cancel()
+        sources.removeAll()
         self.url = url
         self.duration = max(0, duration.isFinite ? duration : 0)
         images.removeAll()
@@ -92,6 +109,7 @@ final class RecordingTimelineThumbnailStore {
     }
 
     func cancel() {
+        for store in sources.values { store.cancel() }
         task?.cancel()
         task = nil
         thawTask?.cancel()
@@ -101,7 +119,10 @@ final class RecordingTimelineThumbnailStore {
 
     /// Tile grid for tiles that should each cover at least `targetSpan` of
     /// source time - normally "one thumbnail's width of the lane".
-    func grid(forTargetSpan targetSpan: TimeInterval) -> Grid {
+    func grid(forTargetSpan targetSpan: TimeInterval, sourceID: UUID? = nil) -> Grid {
+        if let sourceID {
+            return sources[sourceID]?.grid(forTargetSpan: targetSpan) ?? Grid(level: 0, spacing: 0)
+        }
         guard duration > 0, targetSpan > 0, baseSpacing > 0 else {
             return Grid(level: 0, spacing: max(baseSpacing, 0))
         }
@@ -122,7 +143,8 @@ final class RecordingTimelineThumbnailStore {
     /// Best available image for one tile of `grid`. When the tile hasn't been
     /// sampled yet it is queued and the coarser frame covering the same moment
     /// stands in, so the strip never shows holes.
-    func image(in grid: Grid, tileIndex: Int) -> NSImage? {
+    func image(in grid: Grid, tileIndex: Int, sourceID: UUID? = nil) -> NSImage? {
+        if let sourceID { return sources[sourceID]?.image(in: grid, tileIndex: tileIndex) }
         guard duration > 0, grid.spacing > 0 else { return nil }
         let center = (Double(tileIndex) + 0.5) * grid.spacing
         let index = index(forSourceTime: center, level: grid.level)
@@ -152,6 +174,7 @@ final class RecordingTimelineThumbnailStore {
     /// resamples once it settles. Without this the strip re-tiles on every
     /// gesture frame and thrashes the decoder for frames nobody sees.
     func deferSampling(for interval: TimeInterval = 0.22) {
+        for store in sources.values { store.deferSampling(for: interval) }
         frozenLevel = frozenLevel ?? settledLevel
         thawTask?.cancel()
         thawTask = Task { [weak self] in
@@ -202,10 +225,11 @@ final class RecordingTimelineThumbnailStore {
         let center = (Double(key.index) + 0.5) * spacing
         return Request(
             key: key,
-            sourceTime: min(max(center, 0), max(0, duration - 0.05)),
+            sourceTime: authoredTimeline?.sourceTime(at: min(max(center, 0), max(0, duration - 0.05)))
+                ?? min(max(center, 0), max(0, duration - 0.05)),
             // Sampling has to stay inside the tile or two neighbors can settle
             // on the same frame and the strip looks duplicated again.
-            tolerance: min(0.25, spacing / 3)
+            tolerance: authoredTimeline == nil ? min(0.25, spacing / 3) : 0
         )
     }
 

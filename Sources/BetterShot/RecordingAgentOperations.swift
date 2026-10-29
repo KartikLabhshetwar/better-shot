@@ -11,11 +11,18 @@ struct RecordingAgentProject: Codable, Equatable, Identifiable {
 
 struct RecordingAgentClip: Codable, Equatable, Identifiable {
     let id: UUID
+    let sourceId: UUID?
     let sourceStart: TimeInterval
     let sourceEnd: TimeInterval
     let speed: Double
     let editorStart: TimeInterval
     let editorEnd: TimeInterval
+}
+
+struct RecordingAgentSource: Codable, Equatable, Identifiable {
+    let id: UUID
+    let name: String
+    let duration: TimeInterval
 }
 
 struct RecordingAgentTimeline: Codable, Equatable {
@@ -25,6 +32,7 @@ struct RecordingAgentTimeline: Codable, Equatable {
     let sourceDuration: TimeInterval
     let duration: TimeInterval
     let clips: [RecordingAgentClip]
+    let sources: [RecordingAgentSource]
 }
 
 struct RecordingAgentPreview: Codable, Equatable {
@@ -119,6 +127,24 @@ final class RecordingAgentOperations {
         let jobID: UUID
     }
 
+    private struct AppendArguments: Equatable {
+        let handle: UUID
+        let revision: UInt64
+        let projectID: UUID
+    }
+
+    private struct AppendRequest {
+        let arguments: AppendArguments
+        let task: Task<RecordingAgentTimeline, Error>
+    }
+
+    #if DEBUG
+    var appendPreparedForTesting: ((PreparedRecordingAppend) async -> Void)?
+    #endif
+
+    private var appendRequests: [UUID: AppendRequest] = [:]
+    private var pendingAppendRequests = Set<UUID>()
+    private var completedAppendOrder: [UUID] = []
     private var knownProjects: [UUID: URL] = [:]
     private var projectIDsByURL: [URL: UUID] = [:]
     private var exportJobs: [UUID: ExportJobRecord] = [:]
@@ -194,6 +220,7 @@ final class RecordingAgentOperations {
             guard let range = model.clipTimeline.editorRange(for: segment.id) else { return nil }
             return RecordingAgentClip(
                 id: segment.id,
+                sourceId: segment.sourceID,
                 sourceStart: segment.sourceStart,
                 sourceEnd: segment.sourceEnd,
                 speed: segment.speed,
@@ -207,7 +234,10 @@ final class RecordingAgentOperations {
             projectName: model.projectDisplayName,
             sourceDuration: model.sourceDuration,
             duration: model.clipTimeline.duration,
-            clips: clips
+            clips: clips,
+            sources: (model.projectSources ?? []).map {
+                RecordingAgentSource(id: $0.id, name: $0.displayName, duration: $0.duration)
+            }
         )
     }
 
@@ -258,6 +288,129 @@ final class RecordingAgentOperations {
         )
     }
 
+    /// Failed request IDs replay their failure; use a new ID for a fresh attempt.
+    func appendRecording(handle: UUID, expectedRevision: UInt64, projectID: UUID,
+                         requestID: UUID, lease: RecordingAgentRequestLease) async throws -> RecordingAgentTimeline {
+        try Task.checkCancellation()
+        guard lease.isValid else { throw CancellationError() }
+        pruneAppendRequests()
+        let arguments = AppendArguments(handle: handle, revision: expectedRevision, projectID: projectID)
+        let task: Task<RecordingAgentTimeline, Error>
+        if let prior = appendRequests[requestID] {
+            guard prior.arguments == arguments else {
+                throw RecordingAgentOperationError.invalidArgument("This request ID was already used for a different append request.")
+            }
+            task = prior.task
+        } else {
+            guard pendingAppendRequests.count < 4 else {
+                throw RecordingAgentOperationError.unavailable("BetterShot is preparing four recordings. Wait for an append to finish before retrying.")
+            }
+            pendingAppendRequests.insert(requestID)
+            // Reserve before the first suspension so simultaneous retries share preparation and its result.
+            task = Task { @MainActor in
+                defer {
+                    pendingAppendRequests.remove(requestID)
+                    completedAppendOrder.append(requestID)
+                    pruneAppendRequests()
+                }
+                try Task.checkCancellation()
+                guard lease.isValid else { throw CancellationError() }
+                let model = try checkedModel(handle: handle, revision: expectedRevision)
+                let sourceURL = try libraryURL(projectID)
+                guard sourceURL != model.sessionURL.standardizedFileURL else {
+                    throw RecordingAgentOperationError.invalidArgument("A recording cannot append itself.")
+                }
+                let snapshots = StudioProjectRegistry.shared.snapshots(for: sourceURL)
+                guard snapshots.count <= 1 else { throw RecordingAgentOperationError.ambiguousProject }
+                if let source = snapshots.first {
+                    _ = try checkedModel(handle: source.handle, revision: source.revision)
+                    guard source.document.sources == nil else {
+                        throw RecordingAgentOperationError.invalidArgument("Append individual recordings. A project containing multiple recording sources cannot be appended.")
+                    }
+                }
+                let prepared: PreparedRecordingAppend
+                do {
+                    prepared = try await model.prepareAppendRecording(from: sourceURL, document: snapshots.first?.document)
+                } catch is CancellationError { throw CancellationError() }
+                catch RecordingStudioSourceResolver.ResolutionError.nestedProject {
+                    throw RecordingAgentOperationError.invalidArgument("Append individual recordings. A project containing multiple recording sources cannot be appended.")
+                }
+                catch {
+                    throw RecordingAgentOperationError.unavailable("BetterShot could not prepare this recording. Check its source project and retry with a new request ID.")
+                }
+                defer { prepared.discard() }
+                #if DEBUG
+                if ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] == "1" {
+                    await appendPreparedForTesting?(prepared)
+                }
+                #endif
+                try Task.checkCancellation()
+                guard lease.isValid else { throw CancellationError() }
+                guard try libraryURL(projectID) == sourceURL else {
+                    throw RecordingAgentOperationError.unknownProject
+                }
+                let currentSources = StudioProjectRegistry.shared.snapshots(for: sourceURL)
+                guard currentSources.count <= 1 else { throw RecordingAgentOperationError.ambiguousProject }
+                if let capturedSource = snapshots.first {
+                    guard currentSources.first?.handle == capturedSource.handle else {
+                        throw RecordingAgentOperationError.unavailable("The source recording editor changed while preparing the append. Retry with a new request ID.")
+                    }
+                    _ = try checkedModel(handle: capturedSource.handle, revision: capturedSource.revision)
+                } else if !currentSources.isEmpty {
+                    throw RecordingAgentOperationError.unavailable("The source recording opened while preparing the append. Retry with a new request ID.")
+                }
+                let current = try checkedModel(handle: handle, revision: expectedRevision)
+                guard current === model else { throw RecordingAgentOperationError.projectNotOpen }
+                try requireChanged(model.commitAppendRecording(prepared, expectedRevision: expectedRevision))
+                return try inspect(handle: handle)
+            }
+            appendRequests[requestID] = AppendRequest(arguments: arguments, task: task)
+        }
+        let result = try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
+        try Task.checkCancellation()
+        guard lease.isValid else { throw CancellationError() }
+        return result
+    }
+
+    @discardableResult
+    func reorderClips(handle: UUID, expectedRevision: UInt64, clipIDs: [UUID]) throws -> RecordingAgentTimeline {
+        let model = try checkedModel(handle: handle, revision: expectedRevision)
+        let current = model.clipTimeline.segments.map(\.id)
+        guard clipIDs.count == current.count, Set(clipIDs).count == clipIDs.count,
+              Set(clipIDs) == Set(current) else {
+            throw RecordingAgentOperationError.invalidArgument("Clip order must contain each current clip exactly once.")
+        }
+        if clipIDs != current { try requireChanged(model.reorderClips(ids: clipIDs)) }
+        return try inspect(handle: handle)
+    }
+
+    private func libraryURL(_ id: UUID) throws -> URL {
+        guard let url = knownProjects[id], RecordingSession.isSessionDirectory(url),
+              RecordingSessionStore.allSessions().contains(where: { $0.directoryURL.standardizedFileURL == url }) else {
+            throw RecordingAgentOperationError.unknownProject
+        }
+        return url
+    }
+
+    private func pruneAppendRequests() {
+        // Pending tasks are never evicted; completed receipts survive retries while the editor is open.
+        completedAppendOrder.removeAll { id in
+            guard let record = appendRequests[id] else { return true }
+            if StudioProjectRegistry.shared.model(for: record.arguments.handle) == nil {
+                appendRequests.removeValue(forKey: id)
+                return true
+            }
+            return false
+        }
+        while completedAppendOrder.count > 16 {
+            appendRequests.removeValue(forKey: completedAppendOrder.removeFirst())
+        }
+    }
+
     @discardableResult
     func split(handle: UUID, expectedRevision: UInt64, at editorTime: TimeInterval) throws -> RecordingAgentTimeline {
         guard editorTime.isFinite, editorTime >= 0 else {
@@ -283,16 +436,19 @@ final class RecordingAgentOperations {
         guard let index = model.clipTimeline.segments.firstIndex(where: { $0.id == clipID }) else {
             throw RecordingAgentOperationError.clipNotFound
         }
+        let sourceDuration = model.isMultiSource
+            ? model.projectSources?.first(where: { $0.id == model.clipTimeline.segments[index].sourceID })?.duration ?? 0
+            : model.sourceDuration
         guard sourceStart.isFinite, sourceEnd.isFinite,
               sourceEnd - sourceStart >= RecordingClipSegment.minimumDuration,
-              sourceStart >= 0, sourceEnd <= model.sourceDuration else {
+              sourceStart >= 0, sourceEnd <= sourceDuration else {
             throw RecordingAgentOperationError.invalidArgument("The trim must be a valid source range at least 0.12 seconds long.")
         }
         let segments = model.clipTimeline.segments
         let lowerLimit = index == segments.startIndex ? 0 : segments[segments.index(before: index)].sourceEnd
         let upperLimit = index == segments.index(before: segments.endIndex)
             ? model.sourceDuration : segments[segments.index(after: index)].sourceStart
-        guard sourceStart >= lowerLimit, sourceEnd <= upperLimit else {
+        guard model.isMultiSource || (sourceStart >= lowerLimit && sourceEnd <= upperLimit) else {
             throw RecordingAgentOperationError.invalidArgument("The trim cannot overlap a neighboring clip.")
         }
         var replacement = segments[index]
@@ -460,8 +616,9 @@ final class RecordingAgentOperations {
         guard snapshot.revision == revision else {
             throw RecordingAgentOperationError.staleRevision(expected: revision, current: snapshot.revision)
         }
-        guard !model.isCroppingVideo, !model.isEditingMasks else {
-            throw RecordingAgentOperationError.unavailable("Finish or cancel the current crop or mask edit before using timeline operations.")
+        guard !model.isCroppingVideo, !model.isEditingMasks, !model.clipSpeedDraft.hasActiveEdit,
+              !model.isSourceTransactionActive, !model.sourceEditsInFlight else {
+            throw RecordingAgentOperationError.unavailable("Finish or cancel the current crop, mask, speed, audio import, transcription, or recording source edit before using timeline operations.")
         }
         return model
     }

@@ -7,6 +7,8 @@ program="ExportIntegration-$$"
 trap 'rm -rf "$out"; defaults delete "$program" >/dev/null 2>&1 || true; rm -f "$HOME/Library/Preferences/$program.plist"' EXIT
 arch="$(uname -m)"
 configuration="${BETTERSHOT_BUILD_CONFIGURATION:-Debug}"
+test_compile_flags=()
+if [[ "$configuration" == "Debug" ]]; then test_compile_flags+=(-DDEBUG); fi
 derived="${BETTERSHOT_DERIVED_DATA:-.build/tests}"
 objects=()
 for object in "$derived"/Build/Intermediates.noindex/BetterShot.build/"$configuration"/BetterShot.build/Objects-normal/"$arch"/*.o; do
@@ -46,8 +48,8 @@ if [[ "${BETTERSHOT_CHECK_EDITOR_SCENES:-0}" == "1" ]]; then
     done
     exit 0
 fi
-swiftc -parse-as-library -module-name ExportIntegration -module-cache-path .build/ExportCheckModules \
-    -I "$derived/Build/Products/$configuration" "${module_flags[@]}" Tests/ExportIntegration.swift Tests/EditorUIIntegration.swift Tests/RecordingAgentAccessIntegration.swift Tests/RecordingMultiSourceRenderingIntegration.swift Tests/RecordingMultiSourceCompositorIntegration.swift Tests/RecordingMultiSourceModelIntegration.swift Tests/ImageTransformIntegration.swift Tests/Recording3DIntegration.swift \
+swiftc -parse-as-library -module-name ExportIntegration "${test_compile_flags[@]+"${test_compile_flags[@]}"}" -module-cache-path .build/ExportCheckModules \
+    -I "$derived/Build/Products/$configuration" "${module_flags[@]}" Tests/ExportIntegration.swift Tests/EditorUIIntegration.swift Tests/RecordingAgentAccessIntegration.swift Tests/RecordingMultiSourceRenderingIntegration.swift Tests/RecordingMultiSourceCompositorIntegration.swift Tests/RecordingMultiSourceModelIntegration.swift Tests/RecordingMultiSourceUIIntegration.swift Tests/RecordingAgentMultiSourceIntegration.swift Tests/ImageTransformIntegration.swift Tests/Recording3DIntegration.swift \
     "${objects[@]}" "${package_objects[@]}" \
     -o "$out/$program"
 # The snapshots instantiate sharing UI; do not read the real R2 Keychain from this test binary.

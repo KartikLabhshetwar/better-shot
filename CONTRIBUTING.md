@@ -321,17 +321,51 @@ rejection and the guard against starting a second recording session.
 
 ### Local Agent Access
 
-Multi-recording foundations use optional format-9 source catalogs and source-tagged
-clips. `RecordingProjectSource` stages explicit media and authored edits into
-UUID-named managed packages without changing the original. Outer clip ranges use
-the source's authored editor clock; `RecordingStudioSourceResolver` maps that
-clock through the native edit timeline to raw movie time. Source-aware validation
-preserves clip order and repeated footage; legacy normalization is unchanged.
-Multi-source playback and exports use the shared compositor with per-source
-authored snapshots, clocks, and resettable media readers. `sourceDocuments` holds
-editable leaf snapshots; nested catalogs/snapshots are rejected. The native
-creation/source-control UI and multi-source MCP tools are still in development.
-Track remaining work in [agent-editing-progress.md](docs/agent-editing-progress.md).
+Multi-recording projects use optional format-9 source catalogs and source-tagged
+clips. **Add Recording** selects an individual recording from
+`RecordingSessionStore` and stages its explicit media and authored edits into a
+UUID-named managed package through `RecordingProjectSource`. Original recordings
+remain untouched. Nested multi-recording projects are rejected; there is no
+arbitrary file-import path. Open source editors are captured at their current
+revision, and preparation rechecks library membership, editor identity, source
+revision, and pending edits before committing. Cancellation or stale revisions
+remove the unreferenced copies.
+
+Outer clip ranges use the source's authored editor clock, including its cuts and
+speed changes. `RecordingStudioSourceResolver` maps that clock through the leaf's
+native timeline to raw movie time; outer clip speed compounds authored speed.
+Source-aware validation preserves explicit clip order and repeated footage;
+legacy normalization stays unchanged. The outer filmstrip uses source-specific
+thumbnails, trim bounds, cut markers, and hover previews. Its **Move Clip Earlier**
+and **Move Clip Later** context actions and Control–Option–Left/Right Arrow
+shortcuts call the shared exact-permutation reorder operation.
+
+The root inspector lists recordings and outer clip controls, plus the existing
+format/export controls for composed **Export Audio** when audio is available.
+Replacement audio remains a leaf edit. Root effect lanes and the Add effect menu
+are hidden because effects belong to the leaf inspector. **Edit Recording**
+opens an embedded Studio model with the existing inspector, canvas, and effect
+lanes. Apply creates one root undo step and affects every clip referencing that
+source; Cancel tears down the child and discards its unretained media imports.
+Trimming, splitting, deleting, speed changes, and reordering belong to the outer
+timeline. Embedded source editors cannot save, export, share, register another
+project editor, or write source drafts/metadata. `sourceDocuments` holds editable
+leaf snapshots, with strict fallback to the managed leaf's saved edits for older
+catalogs. Nested catalogs/snapshots and corrupt fallback documents are rejected.
+Native Add/Edit transactions and audio/caption preparation block conflicting agent
+operations. Source transactions and outer timeline changes each undo separately,
+including requests that arrive in one run-loop event.
+`StudioProjectRegistry.hasActiveSourceTransactions` prevents application
+termination while native Add/Edit Recording is open. The native quit alert asks
+the user to finish Add Recording, Apply, or Cancel in Studio; embedded models stay
+outside the registry and never write a recovery draft of unapplied changes.
+
+Multi-source preview and export use the shared compositor with per-source authored
+snapshots, clocks, and resettable media readers. Authored source canvases fit into
+the common output canvas without stretching. Tests of the rendering worker and
+offscreen controls do not establish displayed playback or macOS 14 runtime behavior.
+Track validation and remaining work in
+[agent-editing-progress.md](docs/agent-editing-progress.md).
 
 `RecordingAgentAccessController` owns the off-by-default Settings toggle and
 Keychain token. `RecordingAgentHTTPListener` binds only `127.0.0.1:39615`,
@@ -344,6 +378,17 @@ to library projects and revision-checked Studio edits. The composed preview
 uses `RecordingStudioExporter`'s frame compositor, not an AVPlayer screenshot.
 Never log or return the token, package paths, or arbitrary file contents from
 tools. Keep editor save/export behavior and revision checks shared with the UI.
+`append_recording(handle, expectedRevision, projectId, requestId)` accepts only
+library-issued recording IDs and deduplicates identical pending/completed retry
+IDs. Reusing an ID with different arguments fails; failed IDs replay their failure
+and require a new ID for fresh preparation. Up to four distinct appends prepare
+concurrently. After awaits, append rechecks cancellation, access lease, source and
+target revisions, editor identity, and library membership before its synchronous
+commit. `reorder_clips(handle, expectedRevision, clipIds)` requires every current
+clip exactly once. Inspection includes source IDs and durations; source-tagged
+trim bounds use the leaf's authored editor clock, while editor times use the outer
+project clock. Keep these clock meanings in tool descriptions and regression tests.
+
 The MCP SDK and SwiftNIO license texts, including SwiftNIO's NOTICE, are
 bundled in `Resources/Licenses/` from the resolved package revisions.
 
@@ -482,7 +527,9 @@ with `make test` when production code changes.
 | Screenshot Copy/Save and private storage | `BETTERSHOT_CHECK_SCREENSHOT_SAVING=1 bash Tests/run-exports.sh` |
 | Video compositing and encoded exports | `BETTERSHOT_CHECK_VIDEO_EXPORTS=1 bash Tests/run-exports.sh` |
 | Agent edits and renderer cache freshness | `BETTERSHOT_CHECK_AGENT_EDITING=1 bash Tests/run-exports.sh` |
-| Multi-recording source validation and authored time mapping | `BETTERSHOT_CHECK_MULTI_SOURCE=1 bash Tests/run-exports.sh` |
+| Multi-recording source validation, authored timing, compositor, and model transactions | `BETTERSHOT_CHECK_MULTI_SOURCE=1 bash Tests/run-exports.sh` |
+| Multi-recording native controls, source editing, audio-import cleanup, and offscreen light/dark snapshots | `BETTERSHOT_CHECK_MULTI_SOURCE_UI=1 bash Tests/run-exports.sh` |
+| MCP append/retry, reorder, source timing, undo/redo, and save/reopen | `BETTERSHOT_CHECK_AGENT_MULTI_SOURCE=1 bash Tests/run-exports.sh` |
 | Studio Save updates the saved video and waits before closing | `BETTERSHOT_CHECK_RECORDING_SAVE=1 bash Tests/run-exports.sh` |
 | Local MCP endpoint, auth, client workflow, and Agent Access snapshots | `BETTERSHOT_CHECK_AGENT_ACCESS=1 bash Tests/run-exports.sh` |
 | Displayed Gallery and Settings windows | `BETTERSHOT_CHECK_LIBRARY_WINDOWS=1 bash Tests/run-exports.sh` |

@@ -9,10 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Combine individual library recordings with **Add Recording** in Studio. The project keeps editable copies and preserves the originals; each authored recording fits into the common output canvas. **Edit Recording** reuses the native effect controls, with Apply updating every referencing clip in one undo step and Cancel discarding local changes. Trim and change speed on the source-aware outer timeline, and arrange clips with **Move Clip Earlier/Later** or Control–Option–Left/Right Arrow. Nested multi-recording projects cannot be appended.
+- Agent Access adds library-based `append_recording` and exact-order `reorder_clips`, plus source IDs and authored durations in timeline inspection. Append retries share a request ID and result; failed IDs require a new ID for a fresh attempt. Up to four distinct appends can prepare at once, with revision and source checks before commit.
 - Optional Agent Access in Settings lets a local MCP client inspect and edit BetterShot recording projects, request a composed preview, save, and track exports. Access is off by default, bound to loopback, protected by a rotatable Keychain token, and limited to the recording library and revision-checked Studio tools.
 
 ### Fixed
 
+- Combined projects keep **Export Audio** in the root inspector, exporting the composed soundtrack in the chosen format. Recording effects are edited in each source's inspector.
+- Quitting while Add/Edit Recording is open keeps Studio open and asks you to finish with Add Recording, Apply, or Cancel, preserving unapplied source changes.
 - Rendering a saved recording outside Studio now preserves its crop and imported soundtrack. Imported audio stays available for later playback and timeline changes.
 - Recording edits, undo/redo, saves, and export cache checks share the current document revision, so stale agent edits are rejected and failed saves keep their recovery draft.
 

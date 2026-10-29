@@ -8,7 +8,7 @@ enum RecordingAgentMCPTools {
         let server = MCP.Server(
             name: "bettershot",
             version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "development",
-            instructions: "Edit only recordings in BetterShot’s recording library. Use the opaque project handle and current revision returned by inspect_timeline for every edit. Preview images show the composed Studio output.",
+            instructions: "Edit only recordings in BetterShot’s recording library. Use the opaque project handle and current revision returned by inspect_timeline for every edit. Preview images show the composed Studio output. For clips with sourceId, sourceStart/sourceEnd use the leaf recording’s authored editor clock, and sources[].duration uses that same clock. editorTime/editorStart/editorEnd use the outer project clock. Clip speed compounds the leaf’s authored speed. Append individual recordings; nested multi-source projects cannot be appended.",
             capabilities: .init(tools: .init())
         )
         await server.withMethodHandler(ListTools.self) { _ in
@@ -25,8 +25,10 @@ enum RecordingAgentMCPTools {
         tool("open_project", "Open a known recording in BetterShot and return its handle and timeline.", ["projectId": "string"]),
         tool("inspect_timeline", "Read the current timeline and revision for an open project.", ["handle": "string"], readOnly: true),
         tool("get_preview", "Render a bounded composed PNG preview at an editor timeline time.", ["handle": "string", "expectedRevision": "integer", "editorTime": "number"], readOnly: true),
+        tool("append_recording", "Append an individual library recording once for this requestId; nested multi-source projects are unsupported. Concurrent retries share the result; failed IDs replay the failure, so use a new ID to retry preparation.", ["handle": "string", "expectedRevision": "integer", "projectId": "string", "requestId": "string"]),
+        tool("reorder_clips", "Arrange every current clip exactly once in the supplied order.", ["handle": "string", "expectedRevision": "integer", "clipIds": "array"]),
         tool("split_clip", "Split the clip at an editor timeline time.", ["handle": "string", "expectedRevision": "integer", "editorTime": "number"]),
-        tool("trim_clip", "Set a clip’s source-time range.", ["handle": "string", "expectedRevision": "integer", "clipId": "string", "sourceStart": "number", "sourceEnd": "number"]),
+        tool("trim_clip", "Set a clip’s range. For sourceId clips, bounds use that source’s authored editor time and sources[].duration; legacy clips use raw source time.", ["handle": "string", "expectedRevision": "integer", "clipId": "string", "sourceStart": "number", "sourceEnd": "number"]),
         tool("delete_clip", "Remove a clip while retaining at least one playable clip.", ["handle": "string", "expectedRevision": "integer", "clipId": "string"]),
         tool("set_clip_speed", "Set a clip speed between 0.25× and 8×.", ["handle": "string", "expectedRevision": "integer", "clipId": "string", "speed": "number"]),
         tool("undo", "Undo the latest project edit.", ["handle": "string", "expectedRevision": "integer"]),
@@ -44,7 +46,9 @@ enum RecordingAgentMCPTools {
         readOnly: Bool = false
     ) -> Tool {
         let fields = properties.mapValues { type in
-            Value.object(["type": .string(type)])
+            Value.object(type == "array"
+                ? ["type": .string(type), "items": .object(["type": .string("string")])]
+                : ["type": .string(type)])
         }
         return Tool(
             name: name,
@@ -81,6 +85,14 @@ enum RecordingAgentMCPTools {
                 )
                 let metadata = try Value(preview.metadata)
                 return .init(content: [.image(data: preview.png.base64EncodedString(), mimeType: "image/png")], structuredContent: Optional.some(metadata))
+            case "append_recording":
+                return try await result(operations.appendRecording(
+                    handle: uuid(args, "handle"), expectedRevision: revision(args),
+                    projectID: uuid(args, "projectId"), requestID: uuid(args, "requestId"), lease: lease
+                ))
+            case "reorder_clips":
+                return try result(operations.reorderClips(handle: uuid(args, "handle"),
+                    expectedRevision: revision(args), clipIDs: uuids(args, "clipIds")))
             case "split_clip":
                 return try result(operations.split(handle: uuid(args, "handle"), expectedRevision: revision(args), at: number(args, "editorTime")))
             case "trim_clip":
@@ -132,6 +144,13 @@ enum RecordingAgentMCPTools {
             throw RecordingAgentOperationError.invalidArgument("\(key) must be a UUID string.")
         }
         return value
+    }
+
+    private static func uuids(_ args: [String: Value], _ key: String) throws -> [UUID] {
+        guard case let .array(values)? = args[key] else {
+            throw RecordingAgentOperationError.invalidArgument("\(key) must be an array of UUID strings.")
+        }
+        return try values.map { value in try uuid([key: value], key) }
     }
 
     private static func revision(_ args: [String: Value]) throws -> UInt64 {

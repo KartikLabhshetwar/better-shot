@@ -153,6 +153,7 @@ nonisolated struct RecordingClipTimeline: Codable, Equatable, Sendable {
     }
 
     struct CutMarker: Hashable {
+        var sourceID: UUID? = nil
         var sourceStart: TimeInterval
         var sourceEnd: TimeInterval
         var editorTime: TimeInterval
@@ -178,6 +179,45 @@ nonisolated struct RecordingClipTimeline: Codable, Equatable, Sendable {
                                        editorTime: editorTime))
         }
         return ranges
+    }
+
+    /// Cross-recording and backwards joins are cuts, never a duration of removed footage.
+    func cutMarkers(sourceDurations: [UUID: TimeInterval]) -> [CutMarker] {
+        var markers: [CutMarker] = []
+        var editorTime: TimeInterval = 0
+        for (index, clip) in segments.enumerated() {
+            let previous = index > 0 ? segments[index - 1] : nil
+            if let previous {
+                let forwardGap = previous.sourceID == clip.sourceID && previous.sourceEnd <= clip.sourceStart
+                markers.append(CutMarker(sourceID: clip.sourceID,
+                    sourceStart: forwardGap ? previous.sourceEnd : clip.sourceStart,
+                    sourceEnd: clip.sourceStart, editorTime: editorTime))
+            } else if clip.sourceStart > 0 {
+                markers.append(CutMarker(sourceID: clip.sourceID, sourceStart: 0,
+                    sourceEnd: clip.sourceStart, editorTime: 0))
+            }
+            editorTime += clip.editorDuration
+        }
+        if let last = segments.last, let id = last.sourceID,
+           let end = sourceDurations[id], end > last.sourceEnd {
+            markers.append(CutMarker(sourceID: id, sourceStart: last.sourceEnd,
+                sourceEnd: end, editorTime: editorTime))
+        }
+        return markers
+    }
+
+    func trimBounds(for clipID: UUID, sourceDuration: TimeInterval,
+                    sourceDurations: [UUID: TimeInterval]) -> ClosedRange<TimeInterval>? {
+        guard let index = segments.firstIndex(where: { $0.id == clipID }) else { return nil }
+        let clip = segments[index]
+        if let sourceID = clip.sourceID {
+            guard let duration = sourceDurations[sourceID], duration.isFinite, duration > 0 else { return nil }
+            return 0...duration
+        }
+        let start = index > 0 ? segments[index - 1].sourceEnd : 0
+        let end = index + 1 < segments.count ? segments[index + 1].sourceStart : sourceDuration
+        guard start <= end else { return nil }
+        return start...end
     }
 
     func normalized(to sourceDuration: TimeInterval) -> RecordingClipTimeline {
