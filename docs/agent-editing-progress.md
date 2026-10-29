@@ -15,6 +15,8 @@ Reviewed local packages:
 - `cfd2d73`: source snapshots, native preview worker, shared multi-source rendering,
   playback assets, model transactions, undo/drafts/save/reopen.
 - `c110686`: bounded multi-source audio-only exports to actual timeline samples.
+- `5efc254`: native Add/Edit Recording, source-aware timeline, MCP append/reorder
+  and final automated workflow checks.
 
 ## Final behavior and implementation contract
 
@@ -95,11 +97,12 @@ libraries/media/output, isolated preferences and in-memory Agent Access state.
 
 ## Deliberate limits and manual checks still outstanding
 
-Offscreen controls and render-worker parity do not establish live MTKView/AVPlayer
-playback, pointer dragging, native toolbar behavior, source-sheet parent-window
-close/quit-alert interaction, external client configuration, real-library use or
-macOS 14 runtime behavior. These remain manual smoke checks. Compilation targets
-macOS 14; no compiler/platform settings were changed.
+The displayed follow-up below verifies native playback and selected controls on
+macOS 27.0.1. Manual pointer dragging, parent-window close and production Quit
+alerts, external client configuration, real-library use and macOS 14 runtime
+remain unchecked. Compilation targets macOS 14; compiler/platform settings are
+unchanged. The fixture had no existing Screen Recording permission, so no live
+window PNGs were captured and no permission prompt was opened.
 
 A pre-existing generic makeMovie AVAssetWriter fixture stall prevented claiming
 an unfiltered generic suite pass; the focused production runners above passed.
@@ -112,3 +115,52 @@ resume-multi-recording-agent-editing-after-usage-reset was deleted after success
 validation and the local feature commit. Both authorized features and necessary
 automated checks/docs are complete. No reset credits were used; do not push these
 local commits without new authorization.
+
+
+## Follow-up after the user requested continued verification
+
+Added optional BETTERSHOT_CHECK_MULTI_SOURCE_WINDOWS=1 to the provided runner.
+It displays the actual Studio content, waits for ready AVPlayer and completed
+Metal frames, crosses a recording boundary, seeks backwards and applies source
+effects with revision/redraw assertions in light and dark appearances. The
+optional BETTERSHOT_MULTI_SOURCE_INTERACTIVE=1 holds each isolated window up to
+180 seconds for native UI checks. Only this optional runner uses a temporary
+app bundle, permitting native UI-tool selection; direct execution preserves
+BETTERSHOT_TESTING=1, unique preferences and cleanup. No installed app is replaced.
+
+Native interaction found that embedded source changes never set
+hasUnsavedChanges: scheduleProjectSave returned before setting the flag, so
+Cancel silently discarded a changed background. Fixed the shared model by taking
+a normalized clean in-memory baseline on embedded load and computing dirty state
+against it before the persistence-suppressing return. Draft/metadata/registry
+suppression stays intact. Regression assertions cover background edits/restoring
+the baseline, Undo/Redo dirty transitions and flushDraft creating no leaf draft.
+
+Verification of the follow-up:
+- BETTERSHOT_CHECK_MULTI_SOURCE_UI=1 make test passed the app build,39 standalone
+  checks and expanded UI/source regressions. /tmp/bettershot-source-dirty-fix.log.
+- The clean bundled displayed runner passed both appearances on macOS27.0.1,
+  with34 and30 completed Metal frames respectively. Playback crossed sources,
+  backward seeks completed and source changes redrew at new revisions without
+  AVPlayer/preview errors. /tmp/bettershot-dirty-fixed-live.log. No live PNG
+  capture was attempted because preflight reported no existing permission.
+- Native UI tools opened source Background controls, reproduced the original
+  missing confirmation, then verified the rebuilt Cancel dialog. Keep Editing
+  retained the changed Color selection; Discard Changes dismissed to the root.
+  Applying a background and reopening retained its selection in the earlier
+  displayed run. The rebuilt Add Recording chooser appended a test recording,
+  changing duration4s to6s; native Undo restored4s and Redo restored6s. Actual
+  root toolbar controls were present and used. Temporary fixtures were cleaned.
+- Final MULTI_SOURCE_MODEL and AGENT_MULTI_SOURCE runners passed after the fix:
+  /tmp/bettershot-dirty-MULTI_SOURCE_MODEL.log and
+  /tmp/bettershot-dirty-AGENT_MULTI_SOURCE.log. Independent read-only review found
+  no actionable issue in dirty tracking or fixture/runner isolation.
+- The first unbundled exploratory run completed its displayed assertions but its
+  shell wrapper failed after being edited mid-run; it is not a passing gate.
+  Clean bundled runs completed exit0. Do not edit runners while they are active.
+
+Production changes in this follow-up only affect embedded dirty tracking. The
+previous Release build passed before this follow-up; its Debug build and focused
+checks above passed after it. No push, publication, preferences, Keychain or
+permission changes occurred. Source-sheet parent close and the actual production
+Quit delegate remain unverified by the test application's interactive window.

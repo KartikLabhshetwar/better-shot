@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Cancelling **Edit Recording** asks before discarding unapplied changes. Undoing back to the opened source clears its dirty state without writing source drafts.
 - Combined projects keep **Export Audio** in the root inspector, exporting the composed soundtrack in the chosen format. Recording effects are edited in each source's inspector.
 - Quitting while Add/Edit Recording is open keeps Studio open and asks you to finish with Add Recording, Apply, or Cancel, preserving unapplied source changes.
 - Rendering a saved recording outside Studio now preserves its crop and imported soundtrack. Imported audio stays available for later playback and timeline changes.

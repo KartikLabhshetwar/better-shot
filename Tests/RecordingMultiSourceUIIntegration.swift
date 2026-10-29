@@ -126,6 +126,23 @@ func checkRecordingMultiSourceUI(movieURL: URL) async throws {
     precondition(model.selectedClip != nil && child.isSourceEditor)
     precondition(model.hasAudio && child.replacementAudio != nil,
         "Root snapshots must exercise composed Export Audio using an authored leaf soundtrack")
+    precondition(!child.hasUnsavedChanges, "Embedded source load must start from a normalized clean baseline")
+    let initialBackground = child.style.background
+    child.style.background = .solid(.red)
+    precondition(child.hasUnsavedChanges, "Background edits must enable the source Cancel discard confirmation")
+    child.style.background = initialBackground
+    precondition(!child.hasUnsavedChanges, "Restoring the embedded baseline must clear dirty state without saving")
+    child.addZoomCue(fromEditorTime: 0.2, toEditorTime: 1.2)
+    precondition(child.hasUnsavedChanges)
+    child.undo()
+    precondition(!child.hasUnsavedChanges, "Undo to the embedded baseline must clear dirty state")
+    child.redo()
+    precondition(child.hasUnsavedChanges, "Redo must mark unapplied source changes dirty again")
+    child.undo()
+    precondition(!child.hasUnsavedChanges)
+    child.flushDraft()
+    precondition(!RecordingSession(directoryURL: child.sessionURL).hasUnsavedDraft,
+        "Embedded dirty tracking must never write a leaf draft")
     child.addZoomCue(fromEditorTime: 0.2, toEditorTime: 1.2)
     child.add3DShot(at: 0.5)
     precondition(!child.zoomCues.isEmpty && !child.shots3D.isEmpty,
@@ -180,5 +197,127 @@ func checkRecordingMultiSourceUI(movieURL: URL) async throws {
     let retainedAudio = try Data(contentsOf: leaf.directoryURL.appendingPathComponent("replacement.caf"))
     let originalAudio = try Data(contentsOf: importedAudioURL)
     precondition(retainedAudio == originalAudio, "Source teardown must retain the authored soundtrack")
+    if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_MULTI_SOURCE_WINDOWS"] == "1" {
+        try await checkRecordingMultiSourceWindows(model: model, output: snapshots)
+    }
     print("PASS compact light/dark recording source controls, library/sheet snapshots, source effect undo, and audio import cleanup")
+}
+
+
+@MainActor
+private func checkRecordingMultiSourceWindows(model: RecordingStudioModel, output: URL) async throws {
+    precondition(ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] == "1")
+    precondition(model.sessionURL.path.hasPrefix(FileManager.default.temporaryDirectory.path))
+    guard case .saved = model.saveProject() else {
+        preconditionFailure("Displayed fixtures need a saved multi-recording baseline for native close/discard")
+    }
+    let canCaptureWindows = CGPreflightScreenCaptureAccess()
+    if !canCaptureWindows {
+        print("INFO displayed multi-recording screenshots unavailable: existing Screen Recording access is absent; no permission requested")
+    }
+    let interactive = ProcessInfo.processInfo.environment["BETTERSHOT_MULTI_SOURCE_INTERACTIVE"] == "1"
+    let policy = NSApp.activationPolicy()
+    NSApp.setActivationPolicy(.regular)
+    defer { NSApp.setActivationPolicy(policy) }
+
+    func metalPreview(in view: NSView) -> RecordingMultiSourceMetalView? {
+        if let preview = view as? RecordingMultiSourceMetalView { return preview }
+        return view.subviews.lazy.compactMap { metalPreview(in: $0) }.first
+    }
+    func waitFor(_ message: String, until condition: () -> Bool) async throws {
+        let deadline = Date().addingTimeInterval(8)
+        while !condition(), Date() < deadline {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        precondition(condition(), message + " (preview error: " + (model.preview3DError ?? "none") + ")")
+    }
+
+    for scheme in [ColorScheme.light, .dark] {
+        let name = scheme == .light ? "light" : "dark"
+        let root = RecordingStudioContent(model: model).environment(\.colorScheme, scheme)
+        let window = NSWindow(contentViewController: NSHostingController(rootView: root))
+        window.appearance = NSAppearance(named: scheme == .light ? .aqua : .darkAqua)
+        window.title = "BetterShot — multi-recording test fixture (\(name))"
+        window.styleMask = [.titled, .closable, .resizable]
+        window.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+        window.level = .floating
+        window.setContentSize(CGSize(width: 1100, height: 800))
+        window.isReleasedWhenClosed = false
+        defer {
+            model.pause()
+            window.contentViewController = nil
+            window.close()
+        }
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        model.screenPlayer.isMuted = true
+        try await waitFor("Displayed multi-recording window must complete its first Metal frame") {
+            (metalPreview(in: window.contentView!)?.renderedFrameCount ?? 0) > 0
+        }
+        let preview = metalPreview(in: window.contentView!)!
+        try await waitFor("Composed AVPlayer must be ready") {
+            model.screenPlayer.currentItem?.status == .readyToPlay
+        }
+        let firstClip = model.clipTimeline.segments[0]
+        let boundary = model.clipTimeline.editorRange(for: firstClip.id)!.upperBound
+        precondition(firstClip.sourceID != model.clipTimeline.segments[1].sourceID && boundary + 0.3 < model.duration)
+        model.pause()
+        model.seek(to: boundary - 0.25)
+        try await waitFor("AVPlayer must finish its pre-boundary seek") {
+            abs(model.screenPlayer.currentTime().seconds - (boundary - 0.25)) < 0.08
+        }
+        let beforePlayback = preview.renderedFrameCount
+        model.play()
+        try await waitFor("Playback must cross the recording boundary with completed Metal frames") {
+            model.currentTime > boundary + 0.2 && model.screenPlayer.currentTime().seconds > boundary + 0.2
+                && preview.renderedFrameCount > beforePlayback + 1
+        }
+        model.pause()
+        precondition(model.preview3DError == nil && model.screenPlayer.currentItem?.error == nil)
+        let beforeBackwardSeek = preview.renderedFrameCount
+        model.seek(to: 0.35)
+        try await waitFor("Backward source seek must finish and present another decoded frame") {
+            abs(model.screenPlayer.currentTime().seconds - 0.35) < 0.08
+                && preview.renderedFrameCount > beforeBackwardSeek
+        }
+        precondition(model.preview3DError == nil)
+
+        let sourceID = firstClip.sourceID!
+        var authored = try model.sourceDocumentForEditing(sourceID: sourceID)
+        var style = authored.style.value
+        style.padding += 0.01
+        authored.style = StoredRecordingStudioStyle(style)
+        let revision = model.editRevision, renderRevision = model.previewRenderRevision
+        let result = await model.applySourceDocument(authored, sourceID: sourceID, expectedRevision: revision)
+        precondition(result == .changed && model.editRevision > revision && model.previewRenderRevision > renderRevision)
+        precondition(model.sourceDocuments?[sourceID] == authored)
+        let beforeEffectFrame = preview.renderedFrameCount
+        model.seek(to: 0.45)
+        try await waitFor("Applied source effects must redraw the displayed preview at the new revision") {
+            model.screenPlayer.currentItem?.status == .readyToPlay
+                && abs(model.screenPlayer.currentTime().seconds - 0.45) < 0.08
+                && preview.renderedFrameCount > beforeEffectFrame
+        }
+        precondition(model.preview3DError == nil && model.screenPlayer.currentItem?.error == nil)
+        if canCaptureWindows {
+            let capture = Process()
+            capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+            capture.arguments = ["-x", "-o", "-l", String(window.windowNumber),
+                output.appendingPathComponent("multi-recording-live-\(name).png").path]
+            try capture.run()
+            capture.waitUntilExit()
+            precondition(capture.terminationStatus == 0, "Displayed window capture failed despite existing Screen Recording access")
+        }
+        print("PASS displayed multi-recording \(name): ready AVPlayer, playback across sources, backward seek, source-effect revision/redraw (\(preview.renderedFrameCount) completed Metal frames)")
+        if interactive {
+            print("INTERACTIVE multi-recording fixture windowNumber=\(window.windowNumber) title=\(window.title); close this fixture window to advance (up to 180 seconds)")
+            let deadline = Date().addingTimeInterval(180)
+            while window.isVisible, Date() < deadline {
+                try await Task.sleep(for: .milliseconds(100))
+            }
+            print("INFO multi-recording \(name) interactive hold ended")
+        }
+    }
+    if canCaptureWindows { print("PASS displayed multi-recording light/dark window screenshots") }
 }

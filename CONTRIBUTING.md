@@ -529,12 +529,31 @@ with `make test` when production code changes.
 | Agent edits and renderer cache freshness | `BETTERSHOT_CHECK_AGENT_EDITING=1 bash Tests/run-exports.sh` |
 | Multi-recording source validation, authored timing, compositor, and model transactions | `BETTERSHOT_CHECK_MULTI_SOURCE=1 bash Tests/run-exports.sh` |
 | Multi-recording native controls, source editing, audio-import cleanup, and offscreen light/dark snapshots | `BETTERSHOT_CHECK_MULTI_SOURCE_UI=1 bash Tests/run-exports.sh` |
+| Displayed multi-recording playback, backward source seeks, and source-effect redraws in both appearances | `BETTERSHOT_CHECK_MULTI_SOURCE_WINDOWS=1 bash Tests/run-exports.sh` |
 | MCP append/retry, reorder, source timing, undo/redo, and save/reopen | `BETTERSHOT_CHECK_AGENT_MULTI_SOURCE=1 bash Tests/run-exports.sh` |
 | Studio Save updates the saved video and waits before closing | `BETTERSHOT_CHECK_RECORDING_SAVE=1 bash Tests/run-exports.sh` |
 | Local MCP endpoint, auth, client workflow, and Agent Access snapshots | `BETTERSHOT_CHECK_AGENT_ACCESS=1 bash Tests/run-exports.sh` |
 | Displayed Gallery and Settings windows | `BETTERSHOT_CHECK_LIBRARY_WINDOWS=1 bash Tests/run-exports.sh` |
 | Editor focus, full screen, and tray handoff | `BETTERSHOT_CHECK_EDITOR_WINDOWS=1 bash Tests/run-exports.sh` |
 | Actual SwiftUI editor scenes, automatic/manual full screen | `BETTERSHOT_CHECK_EDITOR_SCENES=1 bash Tests/run-exports.sh` |
+
+The optional multi-recording window check opens actual Studio windows using an
+isolated temporary recording library. It checks completed Metal frames, AVPlayer
+readiness and playback across recording boundaries, backward seeks, and redraws
+after applying source effects in both appearances. It captures window PNGs only
+when `CGPreflightScreenCaptureAccess()` reports existing Screen Recording access;
+otherwise it reports screenshots unavailable and still runs the displayed draw
+checks. It never requests permission. These checks establish behavior on the host
+macOS version, not macOS 14 compatibility or manual control behavior.
+
+Add `BETTERSHOT_MULTI_SOURCE_INTERACTIVE=1` to that command to keep each appearance's
+fixture window open for up to 180 seconds after the assertions. The runner prints
+its title and window number; closing the fixture advances to the next appearance.
+This optional hold supports manual Add/Edit Recording, toolbar, and window-close
+checks. It does not exercise the production app's Quit delegate or automate modal
+alerts. The default UI check only creates offscreen snapshots.
+The displayed runner uses a temporary app bundle so native UI tools can select
+it; the bundle and its isolated preferences are removed when the runner exits.
 
 The screenshot check uses the production post-capture path with fixture media;
 it does not request capture permission. Video checks cover decoded colors,

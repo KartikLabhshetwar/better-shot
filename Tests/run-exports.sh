@@ -52,5 +52,26 @@ swiftc -parse-as-library -module-name ExportIntegration "${test_compile_flags[@]
     -I "$derived/Build/Products/$configuration" "${module_flags[@]}" Tests/ExportIntegration.swift Tests/EditorUIIntegration.swift Tests/RecordingAgentAccessIntegration.swift Tests/RecordingMultiSourceRenderingIntegration.swift Tests/RecordingMultiSourceCompositorIntegration.swift Tests/RecordingMultiSourceModelIntegration.swift Tests/RecordingMultiSourceUIIntegration.swift Tests/RecordingAgentMultiSourceIntegration.swift Tests/ImageTransformIntegration.swift Tests/Recording3DIntegration.swift \
     "${objects[@]}" "${package_objects[@]}" \
     -o "$out/$program"
+executable="$out/$program"
+if [[ "${BETTERSHOT_CHECK_MULTI_SOURCE_WINDOWS:-0}" == "1" ]]; then
+    bundle="$out/$program.app"
+    mkdir -p "$bundle/Contents/MacOS"
+    mv "$executable" "$bundle/Contents/MacOS/$program"
+    cat > "$bundle/Contents/Info.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key><string>$program</string>
+    <key>CFBundleIdentifier</key><string>$program</string>
+    <key>CFBundleName</key><string>$program</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>NSHighResolutionCapable</key><true/>
+</dict>
+</plist>
+EOF
+    executable="$bundle/Contents/MacOS/$program"
+    printf 'INFO displayed fixture app=%s bundleId=%s\n' "$bundle" "$program"
+fi
 # The snapshots instantiate sharing UI; do not read the real R2 Keychain from this test binary.
-BETTERSHOT_TESTING=1 "$out/$program"
+BETTERSHOT_TESTING=1 "$executable"

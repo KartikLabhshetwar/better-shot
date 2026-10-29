@@ -692,7 +692,10 @@ final class RecordingStudioModel {
         rebuildPreviewReframe()
         loadTimelineThumbnails()
 
-        if let session {
+        if isEmbeddedSource {
+            lastSavedDocument = currentDocument()
+            hasUnsavedChanges = false
+        } else if let session {
             if session.hasUnsavedDraft {
                 // Reopened on a draft that outlived its editor.
                 hasUnsavedChanges = true
@@ -1722,7 +1725,10 @@ final class RecordingStudioModel {
         if renderChanged { previewRenderRevision &+= 1 }
         guard isLoaded, !isApplyingDocument else { return }
         editRevision &+= 1
-        guard !isEmbeddedSource else { return }
+        if isEmbeddedSource {
+            hasUnsavedChanges = currentDocument() != lastSavedDocument
+            return
+        }
         guard session != nil else { return }
         hasUnsavedChanges = true
         projectSaveTask?.cancel()
