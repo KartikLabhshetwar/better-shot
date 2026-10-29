@@ -22,11 +22,15 @@ nonisolated struct RecordingProjectSource: Codable, Equatable, Identifiable, Sen
     let id: UUID
     var displayName: String
     var duration: TimeInterval
+    /// Imported project canvases, from the innermost container to the outermost.
+    var presentationAspectRatios: [Double]?
 
-    init(id: UUID = UUID(), displayName: String, duration: TimeInterval) {
+    init(id: UUID = UUID(), displayName: String, duration: TimeInterval,
+         presentationAspectRatios: [Double]? = nil) {
         self.id = id
         self.displayName = displayName
         self.duration = duration
+        self.presentationAspectRatios = presentationAspectRatios
     }
 
     func sessionDirectory(in projectDirectory: URL) -> URL {
@@ -34,7 +38,15 @@ nonisolated struct RecordingProjectSource: Codable, Equatable, Identifiable, Sen
             .appendingPathComponent(id.uuidString + ".bettershotrec", isDirectory: true)
     }
 
+    static func validatePresentationAspectRatios(_ aspects: [Double]) throws {
+        // Bound imported layout ancestry without retaining recursive package references.
+        guard aspects.count <= 16, aspects.allSatisfy({ $0.isFinite && $0 > 0 }) else {
+            throw RecordingProjectSourceError.invalidSource
+        }
+    }
+
     func validatePackage(in projectDirectory: URL) throws {
+        try Self.validatePresentationAspectRatios(presentationAspectRatios ?? [])
         guard duration.isFinite, duration >= RecordingClipSegment.minimumDuration else {
             throw RecordingProjectSourceError.invalidSource
         }
@@ -49,6 +61,7 @@ nonisolated struct RecordingProjectSource: Codable, Equatable, Identifiable, Sen
     /// Returns a private, unreferenced copy. Callers write their authored snapshot before installing it.
     /// Cancelling or losing the revision check must remove this stage, never touch the original.
     func stageCopy(from sourceDirectory: URL, in projectDirectory: URL, authoredDocument: Data? = nil) throws -> URL {
+        try Self.validatePresentationAspectRatios(presentationAspectRatios ?? [])
         guard duration.isFinite, duration >= RecordingClipSegment.minimumDuration else {
             throw RecordingProjectSourceError.invalidSource
         }
@@ -75,6 +88,7 @@ nonisolated struct RecordingProjectSource: Codable, Equatable, Identifiable, Sen
 
     /// The stage and final package share a directory, so the install is one atomic rename.
     func installStagedCopy(_ stage: URL, in projectDirectory: URL) throws {
+        try Self.validatePresentationAspectRatios(presentationAspectRatios ?? [])
         let sources = try Self.prepareSourcesDirectory(in: projectDirectory)
         guard stage.deletingLastPathComponent().standardizedFileURL == sources.standardizedFileURL,
               stage.lastPathComponent.hasPrefix(".stage-"), stage.pathExtension == "bettershotrec" else {

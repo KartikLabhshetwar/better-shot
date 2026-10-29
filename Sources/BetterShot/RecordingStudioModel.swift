@@ -347,6 +347,29 @@ final class RecordingStudioModel {
         }.value
     }
 
+    private func normalizedAppendSource(at url: URL, document: RecordingEditDocument?) async throws
+        -> (document: RecordingEditDocument, duration: TimeInterval, name: String) {
+        var authored = document
+        let leaf = RecordingSession(directoryURL: url)
+        if authored == nil, FileManager.default.fileExists(atPath: leaf.editDocumentURL.path) {
+            do {
+                let attributes = try leaf.editDocumentURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+                guard attributes.isRegularFile == true, attributes.isSymbolicLink != true else {
+                    throw RecordingStudioSourceResolver.ResolutionError.invalidDocument
+                }
+                authored = try JSONDecoder().decode(RecordingEditDocument.self, from: Data(contentsOf: leaf.editDocumentURL))
+            } catch { throw RecordingStudioSourceResolver.ResolutionError.invalidDocument }
+        }
+        try authored?.validateSourceDocuments()
+        guard authored?.sources == nil else { throw RecordingStudioSourceResolver.ResolutionError.nestedProject }
+        let snapshot = RecordingStudioModel(url: url, embeddedDocument: authored, isEmbeddedSource: true)
+        defer { snapshot.teardown() }
+        await snapshot.load()
+        try Task.checkCancellation()
+        guard snapshot.isLoaded else { throw RecordingStudioSourceResolver.ResolutionError.invalidDocument }
+        return (snapshot.currentDocument(), snapshot.duration, snapshot.projectDisplayName)
+    }
+
     /// Preparation owns only new private packages; the root remains unchanged across awaits.
     func prepareAppendRecording(from url: URL, document: RecordingEditDocument? = nil) async throws -> PreparedRecordingAppend {
         guard isLoaded, let session, !isEmbeddedSource, !isCroppingVideo, !isEditingMasks,
@@ -390,27 +413,49 @@ final class RecordingStudioModel {
                 }
             }
 
-            // Native defaults are materialized once, so later preference changes cannot alter an appended source.
-            let snapshotModel = RecordingStudioModel(url: url, embeddedDocument: incomingDocument, isEmbeddedSource: true)
-            await snapshotModel.load()
-            guard snapshotModel.isLoaded else {
-                snapshotModel.teardown()
-                throw RecordingStudioSourceResolver.ResolutionError.invalidDocument
-            }
-            let authored = snapshotModel.currentDocument()
-            let source = RecordingProjectSource(displayName: snapshotModel.projectDisplayName, duration: snapshotModel.duration)
-            snapshotModel.teardown()
-            try authored.validateSourceDocuments()
-            guard authored.sources == nil else { throw RecordingStudioSourceResolver.ResolutionError.nestedProject }
-            try Task.checkCancellation()
-            let copiedURL = try await Self.installSourceCopy(source, from: url, in: session.directoryURL,
-                document: JSONEncoder().encode(authored))
-            installed.append(copiedURL)
-            try Task.checkCancellation()
-            next.sources?.append(source)
             next.sourceDocuments = next.sourceDocuments ?? [:]
-            next.sourceDocuments?[source.id] = authored
-            next.clips?.append(RecordingClipSegment(sourceID: source.id, sourceStart: 0, sourceEnd: source.duration))
+            if let incomingDocument, let catalog = incomingDocument.sources {
+                try incomingDocument.validateSourceDocuments()
+                let imported = try await RecordingSessionRenderer.configuration(
+                    for: RecordingSession(directoryURL: url), document: incomingDocument)
+                let aspect = Double(imported.canvasSize.width / imported.canvasSize.height)
+                let referenced = Set(imported.clipTimeline.segments.compactMap(\.sourceID))
+                var remapped: [UUID: UUID] = [:]
+                for leaf in catalog where referenced.contains(leaf.id) {
+                    try Task.checkCancellation()
+                    let normalized = try await normalizedAppendSource(at: leaf.sessionDirectory(in: url),
+                        document: incomingDocument.sourceDocuments?[leaf.id])
+                    let aspects = (leaf.presentationAspectRatios ?? []) + [aspect]
+                    try RecordingProjectSource.validatePresentationAspectRatios(aspects)
+                    let source = RecordingProjectSource(displayName: leaf.displayName, duration: normalized.duration,
+                        presentationAspectRatios: aspects)
+                    let copiedURL = try await Self.installSourceCopy(source, from: leaf.sessionDirectory(in: url),
+                        in: session.directoryURL, document: JSONEncoder().encode(normalized.document))
+                    installed.append(copiedURL)
+                    try Task.checkCancellation()
+                    next.sources?.append(source)
+                    next.sourceDocuments?[source.id] = normalized.document
+                    remapped[leaf.id] = source.id
+                }
+                for clip in imported.clipTimeline.segments {
+                    guard let originalID = clip.sourceID, let sourceID = remapped[originalID] else {
+                        throw RecordingStudioSourceResolver.ResolutionError.missingSource
+                    }
+                    next.clips?.append(RecordingClipSegment(sourceID: sourceID,
+                        sourceStart: clip.sourceStart, sourceEnd: clip.sourceEnd, speed: clip.speed))
+                }
+            } else {
+                // Materialize native defaults before copying, so later preference changes cannot alter the source.
+                let normalized = try await normalizedAppendSource(at: url, document: incomingDocument)
+                let source = RecordingProjectSource(displayName: normalized.name, duration: normalized.duration)
+                let copiedURL = try await Self.installSourceCopy(source, from: url, in: session.directoryURL,
+                    document: JSONEncoder().encode(normalized.document))
+                installed.append(copiedURL)
+                try Task.checkCancellation()
+                next.sources?.append(source)
+                next.sourceDocuments?[source.id] = normalized.document
+                next.clips?.append(RecordingClipSegment(sourceID: source.id, sourceStart: 0, sourceEnd: source.duration))
+            }
             try next.validateSourceDocuments()
             let configurations = try await RecordingStudioSourceResolver.configurations(
                 for: next.sources ?? [], in: session, documents: next.sourceDocuments)

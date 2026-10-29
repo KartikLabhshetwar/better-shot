@@ -8,7 +8,7 @@ enum RecordingAgentMCPTools {
         let server = MCP.Server(
             name: "bettershot",
             version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "development",
-            instructions: "Edit only recordings in BetterShot’s recording library. Use the opaque project handle and current revision returned by inspect_timeline for every edit. Preview images show the composed Studio output. For clips with sourceId, sourceStart/sourceEnd use the leaf recording’s authored editor clock, and sources[].duration uses that same clock. editorTime/editorStart/editorEnd use the outer project clock. Clip speed compounds the leaf’s authored speed. Append individual recordings; nested multi-source projects cannot be appended.",
+            instructions: "Edit only recordings in BetterShot’s recording library. Use the opaque project handle and current revision returned by inspect_timeline for every edit. Preview images show the composed Studio output. For clips with sourceId, sourceStart/sourceEnd use the leaf recording’s authored editor clock, and sources[].duration uses that same clock. editorTime/editorStart/editorEnd use the outer project clock. Clip speed compounds the leaf’s authored speed. Append individual recordings or combined projects; imports copy editable sources and preserve their arrangement and canvas fitting.",
             capabilities: .init(tools: .init())
         )
         await server.withMethodHandler(ListTools.self) { _ in
@@ -25,7 +25,7 @@ enum RecordingAgentMCPTools {
         tool("open_project", "Open a known recording in BetterShot and return its handle and timeline.", ["projectId": "string"]),
         tool("inspect_timeline", "Read the current timeline and revision for an open project.", ["handle": "string"], readOnly: true),
         tool("get_preview", "Render a bounded composed PNG preview at an editor timeline time.", ["handle": "string", "expectedRevision": "integer", "editorTime": "number"], readOnly: true),
-        tool("append_recording", "Append an individual library recording once for this requestId; nested multi-source projects are unsupported. Concurrent retries share the result; failed IDs replay the failure, so use a new ID to retry preparation.", ["handle": "string", "expectedRevision": "integer", "projectId": "string", "requestId": "string"]),
+        tool("append_recording", "Append a library recording or combined project once for this requestId, retaining editable sources and their arrangement. Concurrent retries share the result; failed IDs replay the failure, so use a new ID to retry preparation.", ["handle": "string", "expectedRevision": "integer", "projectId": "string", "requestId": "string"]),
         tool("reorder_clips", "Arrange every current clip exactly once in the supplied order.", ["handle": "string", "expectedRevision": "integer", "clipIds": "array"]),
         tool("split_clip", "Split the clip at an editor timeline time.", ["handle": "string", "expectedRevision": "integer", "editorTime": "number"]),
         tool("trim_clip", "Set a clip’s range. For sourceId clips, bounds use that source’s authored editor time and sources[].duration; legacy clips use raw source time.", ["handle": "string", "expectedRevision": "integer", "clipId": "string", "sourceStart": "number", "sourceEnd": "number"]),

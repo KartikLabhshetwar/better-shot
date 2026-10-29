@@ -324,16 +324,13 @@ final class RecordingAgentOperations {
                 guard snapshots.count <= 1 else { throw RecordingAgentOperationError.ambiguousProject }
                 if let source = snapshots.first {
                     _ = try checkedModel(handle: source.handle, revision: source.revision)
-                    guard source.document.sources == nil else {
-                        throw RecordingAgentOperationError.invalidArgument("Append individual recordings. A project containing multiple recording sources cannot be appended.")
-                    }
                 }
                 let prepared: PreparedRecordingAppend
                 do {
                     prepared = try await model.prepareAppendRecording(from: sourceURL, document: snapshots.first?.document)
                 } catch is CancellationError { throw CancellationError() }
                 catch RecordingStudioSourceResolver.ResolutionError.nestedProject {
-                    throw RecordingAgentOperationError.invalidArgument("Append individual recordings. A project containing multiple recording sources cannot be appended.")
+                    throw RecordingAgentOperationError.invalidArgument("The recording contains unsupported recursive source documents.")
                 }
                 catch {
                     throw RecordingAgentOperationError.unavailable("BetterShot could not prepare this recording. Check its source project and retry with a new request ID.")

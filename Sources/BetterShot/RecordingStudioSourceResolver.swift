@@ -1,8 +1,32 @@
+import CoreGraphics
 import Foundation
 
 nonisolated struct RecordingStudioSourceConfiguration: Sendable {
     let id: UUID
     let configuration: RecordingStudioExporter.Configuration
+    let presentationAspectRatios: [Double]
+
+    init(id: UUID, configuration: RecordingStudioExporter.Configuration,
+         presentationAspectRatios: [Double] = []) {
+        self.id = id
+        self.configuration = configuration
+        self.presentationAspectRatios = presentationAspectRatios
+    }
+
+    func fittedCanvasRect(in canvasSize: CGSize) -> CGRect {
+        var available = CGRect(origin: .zero, size: canvasSize)
+        for aspect in presentationAspectRatios.reversed() {
+            let height = min(available.height, available.width / aspect)
+            let size = CGSize(width: height * aspect, height: height)
+            available = CGRect(x: available.midX - size.width / 2, y: available.midY - size.height / 2,
+                               width: size.width, height: size.height)
+        }
+        let leaf = configuration.canvasSize
+        let scale = min(available.width / leaf.width, available.height / leaf.height)
+        let size = CGSize(width: leaf.width * scale, height: leaf.height * scale)
+        return CGRect(x: available.midX - size.width / 2, y: available.midY - size.height / 2,
+                      width: size.width, height: size.height)
+    }
 }
 
 /// Resolves project time through an authored source timeline, then into its raw movie.
@@ -56,6 +80,9 @@ nonisolated enum RecordingStudioSourceResolver {
                   $0.configuration.clipTimeline.segments.allSatisfy({ $0.sourceID == nil }) }) else {
             throw ResolutionError.invalidSources
         }
+        for source in sources {
+            try RecordingProjectSource.validatePresentationAspectRatios(source.presentationAspectRatios)
+        }
         return try configuration.clipTimeline.validated(sourceDurations: Dictionary(uniqueKeysWithValues:
             sources.map { ($0.id, $0.configuration.clipTimeline.duration) }))
     }
@@ -101,7 +128,8 @@ nonisolated enum RecordingStudioSourceResolver {
                   abs(configuration.clipTimeline.duration - source.duration) < 0.001 else {
                 throw ResolutionError.durationChanged
             }
-            result.append(RecordingStudioSourceConfiguration(id: source.id, configuration: configuration))
+            result.append(RecordingStudioSourceConfiguration(id: source.id, configuration: configuration,
+                presentationAspectRatios: source.presentationAspectRatios ?? []))
         }
         return result
     }

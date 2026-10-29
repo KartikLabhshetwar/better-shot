@@ -97,8 +97,21 @@ func checkRecordingMultiSourceCompositing(movieURL: URL) async throws {
     for time in [0.2, 1.2, 2.1, 0.2] {
         let previewImage = try await previewWorker.image(configuration: configuration,
             size: configuration.canvasSize, revision: 0, time: time)
-        let expected = pixels(try renderer.composedImage(at: time))
+        let expectedImage = try renderer.composedImage(at: time)
+        let expected = pixels(expectedImage)
         let actual = pixels(previewImage)
+        if actual != expected {
+            let errors = zip(actual, expected).map { abs(Int($0) - Int($1)) }
+            print("WORKER parity time=\(time), components=\(errors.filter { $0 != 0 }.count), max=\(errors.max()!), normalizedMean=\(Double(errors.reduce(0, +)) / Double(errors.count * 255))")
+            print("WORKER location \(RecordingStudioSourceResolver.location(at: time, timeline: timeline, sources: sources)!)")
+            let snapshots = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent(".build/editor-snapshots")
+            try FileManager.default.createDirectory(at: snapshots, withIntermediateDirectories: true)
+            for (name, image) in [("actual", previewImage), ("expected", expectedImage)] {
+                let raster = context.createCGImage(image, from: CGRect(x: 0, y: 0, width: 320, height: 180))!
+                try NSBitmapImageRep(cgImage: raster).representation(using: .png, properties: [:])!
+                    .write(to: snapshots.appendingPathComponent("multi-source-worker-\(name).png"))
+            }
+        }
         precondition(actual == expected,
                      "Native preview worker must match the shared compositor through switches and backwards seeks")
     }

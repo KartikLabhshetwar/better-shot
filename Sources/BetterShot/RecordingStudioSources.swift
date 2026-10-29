@@ -55,7 +55,7 @@ struct StudioAddRecordingSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Add Recording").font(.title2.weight(.semibold))
-            Text("Choose a recording from your BetterShot library. Its editable source is copied into this project.")
+            Text("Choose a recording or combined project from your BetterShot library. Its editable sources are copied into this project.")
                 .foregroundStyle(.secondary)
             if recordings.isEmpty {
                 ContentUnavailableView("No other recordings", systemImage: "film.stack",

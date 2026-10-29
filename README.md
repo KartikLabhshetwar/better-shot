@@ -105,8 +105,9 @@ offers to restart itself the first time you capture.
 
 Open a recording in Studio and choose **Add Recording** to append another recording
 from your BetterShot library. BetterShot copies its editable source into the
-project and preserves the original. Choose individual recordings; adding a project
-that already combines several recordings is not supported.
+project and preserves the original. You can also choose an already combined
+project: its clips retain their arrangement, effects, and canvas fitting while
+remaining individually editable. The destination keeps its export settings.
 
 The left inspector lists the project's recordings. **Edit Recording** opens its
 existing background, cursor, camera, and effect controls. **Apply** updates every

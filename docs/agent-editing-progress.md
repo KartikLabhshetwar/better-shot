@@ -164,3 +164,150 @@ previous Release build passed before this follow-up; its Debug build and focused
 checks above passed after it. No push, publication, preferences, Keychain or
 permission changes occurred. Source-sheet parent close and the actual production
 Quit delegate remain unverified by the test application's interactive window.
+
+## Newly authorized extensions — 2026-10-29
+
+User now requests implementing the previously excluded nested-project imports
+and agent-controlled visual effects. They will verify the combined feature set
+manually later. Existing no-push, isolated-test, quota/reset and preservation rules
+still apply. Starting HEAD37afbd4; initial quota46% five-hour/68% weekly.
+
+Design agreed:
+- Nested Add Recording/MCP append normalizes a combined project's referenced
+  leaves into fresh managed source UUIDs and fresh imported clip IDs. Keep
+  catalogs/leaf snapshots physically flat; no movie flattening or recursive
+  package references. Ordered clip ranges/speeds keep the leaf authored clock.
+- Optional per-source presentationAspectRatios preserves intermediate project
+  canvases and centered letterboxing (bounded positive finite chain, maximum16).
+  Rendering fits the chain from outside in, then the leaf's authored canvas.
+  Destination retains its root encoding settings; imported root format, quality,
+  frame rate and encoder mute are not projected onto copied leaf snapshots.
+- MCP inspect_effects/set_effects will expose strictly typed, path-free effect
+  settings. Legacy targets omit sourceId; multi roots require an explicit leaf
+  sourceId. Approved background/framing/cursor/camera/zoom/crop/mask/preset3D and
+  existing overlay settings reuse shared native document transactions. Reject
+  unknown keys, unsafe values/arrays and unsupported capabilities. Effect arrays
+  need bounded paginated inspection. Revalidate lease/unique handle/native busy
+  and revision after asynchronous preparation before any mutation.
+
+Active agents (shared checkout, no commits/builds until frozen):
+- nested_import_design: source metadata/resolver/renderer, model prepareAppend
+  helpers, small live-multi rejection removal in AgentOperations, and new
+  Tests/RecordingNestedImportIntegration.swift.
+- visual_tools_design: new RecordingAgentEffects.swift DTO/strict patch parsing/
+  inspection and new effects tests first. It must not edit model/Ops/Tools until
+  nested agent releases ownership; coordinate remaining atomic model/MCP wiring.
+Parent reviews, wires provided runners, builds/tests, stages explicit files and
+makes small local commits. No manual UI validation is needed this extension run.
+Hourly continuation automation: continue-nested-imports-and-agent-visual-effects.
+It was created successfully for this chat; delete it on completion or weekly
+allowance exhaustion. Do not recreate a duplicate.
+
+Extension checkpoint before allowance reset:
+- Nested implementation is FROZEN and UNVERIFIED in five production files:
+  RecordingProjectSource.swift, RecordingStudioSourceResolver.swift,
+  RecordingStudioExporter.swift, RecordingStudioModel.swift (append helpers only),
+  and RecordingAgentOperations.swift (narrow live-multi rejection removal).
+  It copies referenced canonical leaves/snapshots to fresh UUIDs, remaps clip
+  identities, preserves ranges/speeds and intermediate canvas aspect chains.
+  Swift parse/diff checks passed, but there has been NO typecheck, app build,
+  integration check or commit for these changes. Do not report them finished.
+- Next nested work: implement Tests/RecordingNestedImportIntegration.swift;
+  wire the provided runner/entry gate; update existing combined-import rejection
+  assertions while retaining malicious nested-leaf rejection; validate preview/
+  export geometry, audio/camera, compound speeds, undo/save/reopen, cleanup and
+  unchanged originals. Update native/MCP wording and docs only after validation.
+- Effects agent must freeze its new file under /tmp/bettershot-effects-work;
+  no effects model/Ops/Tools wiring has been started. Both agents must remain
+  idle after this checkpoint until allowance permits another safe package.
+- Effects is also FROZEN. Durable working copies (outside XcodeGen Sources) are
+  .build/agent-work/effects/RecordingAgentEffects.swift and STATUS.md; originals
+  also exist under /tmp/bettershot-effects-work/. Reuse these, do not regenerate.
+  Implemented strict patch-on-copy parsing for approved backgrounds/framing/
+  cursor/camera/zooms/crop/scoped masks/preset3D/overlays, capabilities, finite
+  native bounds/enums/UUIDs, max64 replacement arrays, path-free paginated
+  inspection and catalogs. Swift parse passed ONLY. Still missing patchSchema,
+  typecheck, tests, model atomic transaction and MCP Ops/Tools integration.
+  Most important remaining safety work is post-await lease/unique editor/native
+  busy/revision validation immediately before effect mutation.
+- Neither extension has been committed; HEAD remains37afbd4. The previous
+  completed features remain in history. Manual verification is deferred by the
+  user's request. Resume automatically after allowance reset; no reset credits.
+
+## Extension validation checkpoint after next allowance window
+
+Nested production and integration test are frozen; no extension commit yet.
+App build +39 standalone checks passed after adding the required CoreGraphics
+import. The new native test fixture type was corrected to AnnotationBackgroundColor.
+The focused nested runner then exposed two separate comparison issues:
+- The independent full-B-render reference adds sampling at its fractional viewport
+  edges. PIL proved the initial114pixel differences occupied ONLY the two edge
+  columns. Tests now require exact fitted geometry/clocks (1e-9), exact pixels
+  elsewhere and normalized frame error<.0005. An independent known-dimension
+  fitting assertion proves the inner ancestor cannot be omitted.
+- At Btime4.1, non-edge pixels differed because mathematically equivalent nested
+  raw clocks were0.699999999999998623 vs0.700000000000000400, while an actual
+  recorded frame has PTS0.7. Strict decoder comparison selected adjacent frames.
+  SourceFrameFeed now allows1ns rounding when consuming pending frames. The test
+  keeps4.1 and strict interior assertions; no time jitter or broad tolerance masks
+  the issue. This final production fix has parse/diff checks only so far.
+
+The parent has launched a sequential final check command (record its returned
+session ID from recent chat): NESTED_IMPORT make test logs to
+/tmp/bettershot-nested-clock-final.log, then MULTI_SOURCE and AGENT_MULTI_SOURCE
+runners log to /tmp/bettershot-nested-clock-<GATE>.log. Check ALL results before
+claiming success; &&/exit short-circuits after a failed gate. Do not edit production
+or shared test/runner files until it finishes. These checks may finish while the
+model waits for allowance reset. After success review and make the nested local
+commit, preserving untracked handoff and Graphify directories; no push.
+
+Effects helper/schema and initial parser/inspection tests now TYPECHECK CLEAN
+against actual Debug app module, pinnedMCP and compiler settings. No runtime
+parser tests or model/MCP integration have executed. Current work is durable in
+.build/agent-work/effects/ and additionally docs/agent-editing-wip/ as *.swift.txt
+(outside XcodeGen Sources, safe from make clean). Reuse it; do not regenerate.
+Scratch STATUS.md has exact interfaces/remaining work. No operations/tool/model
+wiring yet. Next after nested commit: move helper/test to actual sources, wire
+parser gate, implement atomic model effect transaction + Ops/MCP tools with the
+post-await lease/unique editor/native-busy/revision validation, add transaction/
+render/undo/save/revocation tests, then docs and final reviewed local commit.
+All agents are frozen/idle. Hourly automation remains active. Manual validation
+is deferred by the user. Do not use reset credits or claim either extension done.
+Final nested validation command session ID:16443. Production/test sources are
+frozen while it runs. Native/MCP descriptions and README/CONTRIBUTING/CHANGELOG
+have been updated in the same uncommitted nested package. Parent's independent
+read-only nested review found no other actionable defect before the clock fix.
+
+Validation result recorded by next heartbeat (allowance97%, no new package):
+/tmp/bettershot-nested-clock-final.log passed app/standalone and the entire new
+nested-import gate including C→B→A preview/encoded/audio/state checks. The next
+MULTI_SOURCE runner FAILED at RecordingMultiSourceCompositorIntegration.swift:102:
+"Native preview worker must match the shared compositor through switches and
+backwards seeks". Its log is /tmp/bettershot-nested-clock-MULTI_SOURCE.log. The
+AGENT_MULTI_SOURCE gate did not run because the command short-circuited. No nested
+commit is safe yet. After reset diagnose this existing-preview parity regression
+against the 1ns decoder change/caching and preserve strict assertions. Effects
+scratch remains typechecked but not integrated. All sources frozen; pause for
+five-hour allowance reset, automation remains useful and active.
+
+## Nested import package verified and reviewed
+
+The nested package is now ready for its local commit: app build and39 standalone
+checks passed; NESTED_IMPORT passed full C→B→A geometry/clock/encoded/audio/state/
+cleanup/original-preservation coverage (/tmp/bettershot-nested-clock-final.log).
+The previous strict preview-worker parity failure did not reproduce in a clean
+diagnostic run or THREE additional cold MULTI_SOURCE runs. All retained exact
+assertions passed, as did video,5×M4A+WAV audio and model regressions. Logs:
+/tmp/bettershot-worker-parity-diagnostics.log and
+/tmp/bettershot-worker-parity-{1,2,3}.log. No new production change was invented
+for that single unreproduced failure; diagnostic PNG/stat capture stays in the
+test for any recurrence. Final AGENT_MULTI_SOURCE passed append/retry/reorder,
+revision/lease/cancellation, preview/export/save/reopen:
+/tmp/bettershot-nested-agent-final.log. No user UI checks were run.
+
+Effects scratch schema/parser parity review and typecheck are complete. Fixed
+mask scope/timing schema alternatives and inspection of customized gradients/3D
+presets; added explicit leaf-only guards. Source/tests/schema backups are synced
+under docs/agent-editing-wip and .build/agent-work/effects. Still not installed in
+Sources or executed in a runtime runner. Next package is atomic model transaction
+and MCP inspect_effects/set_effects wiring with post-await commit validation.

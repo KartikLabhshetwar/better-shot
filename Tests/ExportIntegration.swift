@@ -34,6 +34,11 @@ struct ExportIntegration {
         precondition(!AppPreferences.saveDirectory.hasPrefix(NSHomeDirectory() + "/Desktop"),
                      "Tests must never default to the real Desktop")
         precondition(R2CredentialStore.shared.keychainAccess == .empty)
+        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_NESTED_IMPORT"] == "1" {
+            try await checkRecordingNestedImports(
+                movieURL: URL(fileURLWithPath: "Resources/Onboarding/recording-demo.mp4"))
+            return
+        }
         if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_MULTI_SOURCE_UI"] == "1"
             || ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_MULTI_SOURCE_WINDOWS"] == "1" {
             try await checkRecordingMultiSourceUI(

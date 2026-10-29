@@ -322,11 +322,16 @@ rejection and the guard against starting a second recording session.
 ### Local Agent Access
 
 Multi-recording projects use optional format-9 source catalogs and source-tagged
-clips. **Add Recording** selects an individual recording from
+clips. **Add Recording** selects a recording or combined project from
 `RecordingSessionStore` and stages its explicit media and authored edits into a
 UUID-named managed package through `RecordingProjectSource`. Original recordings
-remain untouched. Nested multi-recording projects are rejected; there is no
-arbitrary file-import path. Open source editors are captured at their current
+remain untouched. Combined imports normalize their referenced leaves into fresh
+source UUIDs and remap clip IDs, retaining ordered authored ranges and speeds.
+Catalogs and stored leaf documents remain flat; recursive leaf documents are
+rejected, and there is no arbitrary file-import path. Optional per-source
+`presentationAspectRatios` preserves each imported project canvas and centered
+letterboxing, with at most 16 finite positive aspect ratios. The destination owns
+its root export settings; an imported root encoder mute is not inherited. Open source editors are captured at their current
 revision, and preparation rechecks library membership, editor identity, source
 revision, and pending edits before committing. Cancellation or stale revisions
 remove the unreferenced copies.
@@ -530,6 +535,7 @@ with `make test` when production code changes.
 | Multi-recording source validation, authored timing, compositor, and model transactions | `BETTERSHOT_CHECK_MULTI_SOURCE=1 bash Tests/run-exports.sh` |
 | Multi-recording native controls, source editing, audio-import cleanup, and offscreen light/dark snapshots | `BETTERSHOT_CHECK_MULTI_SOURCE_UI=1 bash Tests/run-exports.sh` |
 | Displayed multi-recording playback, backward source seeks, and source-effect redraws in both appearances | `BETTERSHOT_CHECK_MULTI_SOURCE_WINDOWS=1 bash Tests/run-exports.sh` |
+| Combined-project imports, nested canvas fitting, identity, undo and persistence | `BETTERSHOT_CHECK_NESTED_IMPORT=1 bash Tests/run-exports.sh` |
 | MCP append/retry, reorder, source timing, undo/redo, and save/reopen | `BETTERSHOT_CHECK_AGENT_MULTI_SOURCE=1 bash Tests/run-exports.sh` |
 | Studio Save updates the saved video and waits before closing | `BETTERSHOT_CHECK_RECORDING_SAVE=1 bash Tests/run-exports.sh` |
 | Local MCP endpoint, auth, client workflow, and Agent Access snapshots | `BETTERSHOT_CHECK_AGENT_ACCESS=1 bash Tests/run-exports.sh` |

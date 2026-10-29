@@ -770,11 +770,12 @@ nonisolated final class RecordingStudioMultiSourceRenderer: @unchecked Sendable 
             } else {
                 camera = nil
             }
-            let scale = min(canvasSize.width / leaf.canvasSize.width, canvasSize.height / leaf.canvasSize.height)
-            let size = CGSize(width: leaf.canvasSize.width * scale, height: leaf.canvasSize.height * scale)
+            let fitted = source.fittedCanvasRect(in: canvasSize)
+            guard fitted.width.isFinite, fitted.height.isFinite, fitted.width > 0, fitted.height > 0 else {
+                throw RecordingStudioExporter.ExportError.noVideoTrack
+            }
             sources[source.id] = Source(configuration: leaf, screen: screen, camera: camera,
-                size: size,
-                origin: CGPoint(x: (canvasSize.width - size.width) / 2, y: (canvasSize.height - size.height) / 2))
+                size: fitted.size, origin: fitted.origin)
         }
     }
 
@@ -872,7 +873,8 @@ nonisolated private final class SourceFrameFeed {
         while !finished {
             try Task.checkCancellation()
             if let pending {
-                guard pending.time <= time || current == nil else { break }
+                // Nested clip arithmetic can land a few ULPs below an exact source-frame timestamp.
+                guard pending.time <= time + 1e-9 || current == nil else { break }
                 current = pending.buffer
                 transformedCurrent = nil
                 self.pending = nil
