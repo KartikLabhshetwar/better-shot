@@ -1,4 +1,5 @@
 import Foundation
+import MCP
 
 struct RecordingAgentProject: Codable, Equatable, Identifiable {
     let id: UUID
@@ -41,6 +42,13 @@ struct RecordingAgentPreview: Codable, Equatable {
     let editorTime: TimeInterval
     let width: Int
     let height: Int
+}
+
+struct RecordingAgentEffectsResult: Codable {
+    let handle: UUID
+    let revision: UInt64
+    let sourceId: UUID?
+    let effects: RecordingAgentEffects.Snapshot
 }
 
 struct RecordingAgentSaveResult: Codable, Equatable {
@@ -140,6 +148,7 @@ final class RecordingAgentOperations {
 
     #if DEBUG
     var appendPreparedForTesting: ((PreparedRecordingAppend) async -> Void)?
+    var effectsPreparedForTesting: (() async -> Void)?
     #endif
 
     private var appendRequests: [UUID: AppendRequest] = [:]
@@ -239,6 +248,74 @@ final class RecordingAgentOperations {
                 RecordingAgentSource(id: $0.id, name: $0.displayName, duration: $0.duration)
             }
         )
+    }
+
+    func inspectEffects(handle: UUID, sourceID: UUID? = nil, offset: Int = 0, limit: Int = 32,
+                        lease: RecordingAgentRequestLease) async throws -> RecordingAgentEffectsResult {
+        guard let snapshot = StudioProjectRegistry.shared.snapshot(for: handle) else {
+            throw RecordingAgentOperationError.projectNotOpen
+        }
+        let model = try validatedEffectsModel(handle: handle, revision: snapshot.revision, lease: lease)
+        let target = try effectsTarget(model: model, sourceID: sourceID)
+        let child = RecordingStudioModel(url: target.url, embeddedDocument: target.document, isEmbeddedSource: true)
+        defer { child.teardown() }
+        await child.load()
+        _ = try validatedEffectsModel(handle: handle, revision: snapshot.revision, lease: lease)
+        guard child.isLoaded else { throw RecordingAgentOperationError.unavailable("BetterShot could not load this recording's visual settings.") }
+        return RecordingAgentEffectsResult(handle: handle, revision: snapshot.revision, sourceId: sourceID,
+            effects: try RecordingAgentEffects.inspect(document: target.document,
+                capabilities: .init(model: child), offset: offset, limit: limit))
+    }
+
+    func setEffects(handle: UUID, expectedRevision: UInt64, sourceID: UUID? = nil, patch: Value,
+                    lease: RecordingAgentRequestLease) async throws -> RecordingAgentEffectsResult {
+        let model = try validatedEffectsModel(handle: handle, revision: expectedRevision, lease: lease)
+        let target = try effectsTarget(model: model, sourceID: sourceID)
+        let child = RecordingStudioModel(url: target.url, embeddedDocument: target.document, isEmbeddedSource: true)
+        defer { child.teardown() }
+        await child.load()
+        _ = try validatedEffectsModel(handle: handle, revision: expectedRevision, lease: lease)
+        guard child.isLoaded else { throw RecordingAgentOperationError.unavailable("BetterShot could not load this recording's visual settings.") }
+        let capabilities = RecordingAgentEffects.Capabilities(model: child)
+        let authored = try RecordingAgentEffects.applying(patch, to: target.document, capabilities: capabilities)
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] == "1" {
+            await effectsPreparedForTesting?()
+            _ = try validatedEffectsModel(handle: handle, revision: expectedRevision, lease: lease)
+        }
+        #endif
+        let outcome = try await model.applyEffectsDocument(authored, sourceID: sourceID, expectedRevision: expectedRevision) {
+            _ = try self.validatedEffectsModel(handle: handle, revision: expectedRevision, lease: lease)
+        }
+        if case .failed = outcome {
+            throw RecordingAgentOperationError.unavailable("BetterShot could not apply these visual settings. Inspect the project and retry.")
+        }
+        let current = try effectsTarget(model: model, sourceID: sourceID).document
+        return RecordingAgentEffectsResult(handle: handle, revision: model.editRevision, sourceId: sourceID,
+            effects: try RecordingAgentEffects.inspect(document: current, capabilities: capabilities))
+    }
+
+    private func validatedEffectsModel(handle: UUID, revision: UInt64, lease: RecordingAgentRequestLease) throws -> RecordingStudioModel {
+        try Task.checkCancellation()
+        guard lease.isValid else { throw CancellationError() }
+        return try checkedModel(handle: handle, revision: revision)
+    }
+
+    private func effectsTarget(model: RecordingStudioModel, sourceID: UUID?) throws -> (document: RecordingEditDocument, url: URL) {
+        if model.isMultiSource {
+            guard let sourceID, let source = model.projectSources?.first(where: { $0.id == sourceID }) else {
+                throw RecordingAgentOperationError.invalidArgument("Select an existing sourceId from inspect_timeline to edit a combined project's visual settings.")
+            }
+            do {
+                return (try model.sourceDocumentForEditing(sourceID: sourceID), source.sessionDirectory(in: model.sessionURL))
+            } catch {
+                throw RecordingAgentOperationError.unavailable("BetterShot could not read this recording's visual settings.")
+            }
+        }
+        guard sourceID == nil else {
+            throw RecordingAgentOperationError.invalidArgument("Omit sourceId for a single-recording project.")
+        }
+        return (model.currentEditDocument, model.sessionURL)
     }
 
     func preview(handle: UUID, expectedRevision: UInt64, at editorTime: TimeInterval) async throws -> (metadata: RecordingAgentPreview, png: Data) {

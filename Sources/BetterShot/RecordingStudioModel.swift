@@ -513,34 +513,72 @@ final class RecordingStudioModel {
 
     /// Source effects share one root undo/save; the authored cut clock stays fixed.
     func applySourceDocument(_ authored: RecordingEditDocument, sourceID: UUID, expectedRevision: UInt64) async -> RecordingClipEditOutcome {
-        guard isMultiSource, let session, projectSources?.contains(where: { $0.id == sourceID }) == true,
-              editRevision == expectedRevision, authored.sources == nil, authored.sourceDocuments == nil,
-              authored.clips?.contains(where: { $0.sourceID != nil }) != true else {
+        do {
+            return try await applyEffectsDocument(authored, sourceID: sourceID, expectedRevision: expectedRevision,
+                validateCommit: {})
+        } catch { return .failed(error.localizedDescription) }
+    }
+
+    func applyEffectsDocument(
+        _ authored: RecordingEditDocument, sourceID: UUID?, expectedRevision: UInt64,
+        validateCommit: @MainActor () throws -> Void
+    ) async throws -> RecordingClipEditOutcome {
+        try Task.checkCancellation()
+        guard isLoaded, !isEmbeddedSource, let session, editRevision == expectedRevision else {
+            try validateCommit()
             return .failed("The recording changed. Reopen its controls and retry.")
         }
-        let original: RecordingEditDocument
-        do { original = try sourceDocumentForEditing(sourceID: sourceID) }
-        catch { return .failed(error.localizedDescription) }
-        guard authored.clips == original.clips,
-              authored.trimStart == original.trimStart, authored.trimEnd == original.trimEnd else {
-            return .failed("Trim and change clip speed on the project's main timeline.")
-        }
-        var document = currentDocument()
-        document.sourceDocuments = document.sourceDocuments ?? [:]
-        document.sourceDocuments?[sourceID] = authored
-        guard document != currentDocument() else { return .unchanged }
-        do {
-            try document.validateSourceDocuments()
-            let configurations = try await RecordingStudioSourceResolver.configurations(
-                for: document.sources ?? [], in: session, documents: document.sourceDocuments)
-            let prepared = try await RecordingCompositionBuilder.prepareSources(configurations)
-            try Task.checkCancellation()
-            guard editRevision == expectedRevision, isLoaded else {
-                return .failed("The project changed while preparing the recording. Reopen its controls and retry.")
+        let originalRoot = currentDocument()
+        var document = originalRoot
+        let changed: Bool
+        if let sourceID {
+            guard isMultiSource, projectSources?.contains(where: { $0.id == sourceID }) == true,
+                  authored.sources == nil, authored.sourceDocuments == nil,
+                  authored.clips?.contains(where: { $0.sourceID != nil }) != true else {
+                return .failed("Choose an existing recording source before editing its effects.")
             }
-            return applySourceProjectDocument(document, configurations: configurations, preparedSources: prepared,
-                selectedID: selectedClipID, playheadTime: currentTime, actionName: "Edit Recording")
-        } catch { return .failed(error.localizedDescription) }
+            let original = try sourceDocumentForEditing(sourceID: sourceID)
+            guard authored.clips == original.clips,
+                  authored.trimStart == original.trimStart, authored.trimEnd == original.trimEnd else {
+                return .failed("Trim and change clip speed on the project's main timeline.")
+            }
+            changed = authored != original
+            if changed {
+                document.sourceDocuments = document.sourceDocuments ?? [:]
+                document.sourceDocuments?[sourceID] = authored
+            }
+        } else {
+            guard !isMultiSource, authored.sources == originalRoot.sources,
+                  authored.sourceDocuments == originalRoot.sourceDocuments,
+                  authored.clips == originalRoot.clips,
+                  authored.trimStart == originalRoot.trimStart, authored.trimEnd == originalRoot.trimEnd,
+                  authored.replacementAudioFileName == originalRoot.replacementAudioFileName,
+                  authored.replacementAudioDisplayName == originalRoot.replacementAudioDisplayName else {
+                return .failed("Effects cannot replace recording sources, change clips, or import audio.")
+            }
+            document = authored
+            changed = authored != originalRoot
+        }
+        var configurations: [RecordingStudioSourceConfiguration] = []
+        var prepared: [RecordingCompositionBuilder.PreparedSource] = []
+        if changed {
+            try document.validateSourceDocuments()
+            if sourceID != nil {
+                configurations = try await RecordingStudioSourceResolver.configurations(
+                    for: document.sources ?? [], in: session, documents: document.sourceDocuments)
+                prepared = try await RecordingCompositionBuilder.prepareSources(configurations)
+            } else {
+                _ = try await RecordingSessionRenderer.configuration(for: session, document: document)
+            }
+        }
+        try Task.checkCancellation()
+        try validateCommit()
+        guard editRevision == expectedRevision, isLoaded else {
+            return .failed("The project changed while preparing the recording. Reopen its controls and retry.")
+        }
+        guard changed else { return .unchanged }
+        return applySourceProjectDocument(document, configurations: configurations, preparedSources: prepared,
+            selectedID: selectedClipID, playheadTime: currentTime, actionName: sourceID == nil ? "Edit Effects" : "Edit Recording")
     }
 
     private func applySourceProjectDocument(

@@ -149,6 +149,16 @@ authored editor time; the outer clip speed multiplies its authored speed.
 Native Add/Edit Recording transactions and pending audio/caption preparation block
 agent edits until they finish.
 
+`inspect_effects` returns visual settings, supported capabilities, and preset
+catalogs without file paths. `set_effects` edits backgrounds, framing, cursor,
+camera, zoom, crop, Blur/Pixelate masks, built-in 3D shots, and existing overlay
+settings in one undo step. For a combined project, supply a recording's `sourceId`
+from `inspect_timeline`; omit it for a single recording. Omitted settings stay
+unchanged. Supplied effect arrays replace the whole collection, with at most 64
+items; inspection supports pages of up to 64 items with total counts. See the
+[contributor guide](CONTRIBUTING.md#local-agent-access) for timing and a request
+example.
+
 ## Cloud sharing
 
 Optional. Sharing uploads to a Cloudflare R2 bucket you own.

@@ -100,9 +100,13 @@ func checkRecordingMultiSourceCompositing(movieURL: URL) async throws {
         let expectedImage = try renderer.composedImage(at: time)
         let expected = pixels(expectedImage)
         let actual = pixels(previewImage)
-        if actual != expected {
-            let errors = zip(actual, expected).map { abs(Int($0) - Int($1)) }
-            print("WORKER parity time=\(time), components=\(errors.filter { $0 != 0 }.count), max=\(errors.max()!), normalizedMean=\(Double(errors.reduce(0, +)) / Double(errors.count * 255))")
+        let errors = zip(actual, expected).map { abs(Int($0) - Int($1)) }
+        let maximumError = errors.max() ?? 0
+        let meanError = Double(errors.reduce(0, +)) / Double(errors.count * 255)
+        // Independent Core Image contexts may round rotated NV12→BGRA conversion by one 8-bit level.
+        let matches = maximumError <= 1 && meanError < 0.00001
+        if !matches {
+            print("WORKER parity time=\(time), components=\(errors.filter { $0 != 0 }.count), max=\(maximumError), normalizedMean=\(meanError)")
             print("WORKER location \(RecordingStudioSourceResolver.location(at: time, timeline: timeline, sources: sources)!)")
             let snapshots = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent(".build/editor-snapshots")
             try FileManager.default.createDirectory(at: snapshots, withIntermediateDirectories: true)
@@ -112,8 +116,8 @@ func checkRecordingMultiSourceCompositing(movieURL: URL) async throws {
                     .write(to: snapshots.appendingPathComponent("multi-source-worker-\(name).png"))
             }
         }
-        precondition(actual == expected,
-                     "Native preview worker must match the shared compositor through switches and backwards seeks")
+        precondition(matches,
+                     "Native preview worker must match the shared compositor within bounded 8-bit conversion rounding")
     }
     let beforeSwitch = pixels(try renderer.composedImage(at: 0.2))
     _ = try renderer.composedImage(at: 1.2)

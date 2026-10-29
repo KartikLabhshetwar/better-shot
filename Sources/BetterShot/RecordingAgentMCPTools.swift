@@ -8,7 +8,7 @@ enum RecordingAgentMCPTools {
         let server = MCP.Server(
             name: "bettershot",
             version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "development",
-            instructions: "Edit only recordings in BetterShot’s recording library. Use the opaque project handle and current revision returned by inspect_timeline for every edit. Preview images show the composed Studio output. For clips with sourceId, sourceStart/sourceEnd use the leaf recording’s authored editor clock, and sources[].duration uses that same clock. editorTime/editorStart/editorEnd use the outer project clock. Clip speed compounds the leaf’s authored speed. Append individual recordings or combined projects; imports copy editable sources and preserve their arrangement and canvas fitting.",
+            instructions: "Edit only recordings in BetterShot’s recording library. Use the opaque project handle and current revision returned by inspect_timeline for every edit. Preview images show the composed Studio output. For clips with sourceId, sourceStart/sourceEnd use the leaf recording’s authored editor clock, and sources[].duration uses that same clock. editorTime/editorStart/editorEnd use the outer project clock. Clip speed compounds the leaf’s authored speed. Append individual recordings or combined projects; imports copy editable sources and preserve their arrangement and canvas fitting. Use inspect_effects and set_effects for visual settings. For combined projects select a leaf sourceId; omit sourceId for a single recording. Visual zoom cue times use raw source time; mask and 3D shot times use the selected source’s authored editor time. Effects arrays replace their entire collection and accept at most 64 items.",
             capabilities: .init(tools: .init())
         )
         await server.withMethodHandler(ListTools.self) { _ in
@@ -24,6 +24,8 @@ enum RecordingAgentMCPTools {
         tool("list_projects", "List BetterShot recordings available to open.", readOnly: true),
         tool("open_project", "Open a known recording in BetterShot and return its handle and timeline.", ["projectId": "string"]),
         tool("inspect_timeline", "Read the current timeline and revision for an open project.", ["handle": "string"], readOnly: true),
+        effectsTool(readOnly: true),
+        effectsTool(readOnly: false),
         tool("get_preview", "Render a bounded composed PNG preview at an editor timeline time.", ["handle": "string", "expectedRevision": "integer", "editorTime": "number"], readOnly: true),
         tool("append_recording", "Append a library recording or combined project once for this requestId, retaining editable sources and their arrangement. Concurrent retries share the result; failed IDs replay the failure, so use a new ID to retry preparation.", ["handle": "string", "expectedRevision": "integer", "projectId": "string", "requestId": "string"]),
         tool("reorder_clips", "Arrange every current clip exactly once in the supplied order.", ["handle": "string", "expectedRevision": "integer", "clipIds": "array"]),
@@ -38,6 +40,30 @@ enum RecordingAgentMCPTools {
         tool("get_export_job", "Read the retained state of an export job.", ["jobId": "string"], readOnly: true),
         tool("cancel_export", "Cancel an active export job.", ["jobId": "string"]),
     ]
+
+    private static func effectsTool(readOnly: Bool) -> Tool {
+        var fields: [String: Value] = [
+            "handle": .object(["type": .string("string"), "format": .string("uuid")]),
+            "sourceId": .object(["type": .string("string"), "format": .string("uuid")])
+        ]
+        let required: [String]
+        if readOnly {
+            fields["offset"] = .object(["type": .string("integer"), "minimum": .int(0)])
+            fields["limit"] = .object(["type": .string("integer"), "minimum": .int(1), "maximum": .int(RecordingAgentEffects.maximumPageSize)])
+            required = ["handle"]
+        } else {
+            fields["expectedRevision"] = .object(["type": .string("integer"), "minimum": .int(0)])
+            fields["patch"] = RecordingAgentEffects.patchSchema
+            required = ["handle", "expectedRevision", "patch"]
+        }
+        return Tool(name: readOnly ? "inspect_effects" : "set_effects",
+            description: readOnly
+                ? "Read path-free visual settings, capabilities and preset catalogs. Select sourceId for a combined project; omit it for a single recording. offset/limit page all effect arrays independently, with total counts. Zoom times are raw source time; masks/3D use that source's authored editor time."
+                : "Atomically patch visual settings with one undo action. Select sourceId for a combined project; omit it for a single recording. Supplied arrays replace all cues/masks/3D shots (maximum 64 each); omitted sections remain unchanged. Zoom times are raw source time; masks/3D use that source's authored editor time. No wallpaper paths or arbitrary document data are accepted.",
+            inputSchema: .object(["type": .string("object"), "properties": .object(fields),
+                "required": .array(required.map(Value.string)), "additionalProperties": .bool(false)]),
+            annotations: .init(readOnlyHint: readOnly, destructiveHint: readOnly ? nil : true))
+    }
 
     private static func tool(
         _ name: String,
@@ -77,6 +103,16 @@ enum RecordingAgentMCPTools {
             case "list_projects": return try result(operations.listProjects())
             case "open_project": return try await result(operations.openProject(id: uuid(args, "projectId")))
             case "inspect_timeline": return try result(operations.inspect(handle: uuid(args, "handle")))
+            case "inspect_effects":
+                try effectsArguments(args, allowed: ["handle", "sourceId", "offset", "limit"])
+                return try await result(operations.inspectEffects(handle: uuid(args, "handle"),
+                    sourceID: optionalUUID(args, "sourceId"), offset: optionalInteger(args, "offset") ?? 0,
+                    limit: optionalInteger(args, "limit") ?? 32, lease: lease))
+            case "set_effects":
+                try effectsArguments(args, allowed: ["handle", "sourceId", "expectedRevision", "patch"])
+                guard let patch = args["patch"] else { throw RecordingAgentOperationError.invalidArgument("patch is required.") }
+                return try await result(operations.setEffects(handle: uuid(args, "handle"), expectedRevision: revision(args),
+                    sourceID: optionalUUID(args, "sourceId"), patch: patch, lease: lease))
             case "get_preview":
                 let preview = try await operations.preview(
                     handle: uuid(args, "handle"),
@@ -137,6 +173,22 @@ enum RecordingAgentMCPTools {
 
     private static func failure(_ code: String, _ message: String) -> CallTool.Result {
         error(code, message)
+    }
+
+    private static func effectsArguments(_ args: [String: Value], allowed: Set<String>) throws {
+        guard Set(args.keys).isSubset(of: allowed) else {
+            throw RecordingAgentOperationError.invalidArgument("The effects request contains unsupported arguments.")
+        }
+    }
+
+    private static func optionalUUID(_ args: [String: Value], _ key: String) throws -> UUID? {
+        try args[key].map { _ in try uuid(args, key) }
+    }
+
+    private static func optionalInteger(_ args: [String: Value], _ key: String) throws -> Int? {
+        guard let value = args[key] else { return nil }
+        guard case .int(let integer) = value else { throw RecordingAgentOperationError.invalidArgument("\(key) must be an integer.") }
+        return integer
     }
 
     private static func uuid(_ args: [String: Value], _ key: String) throws -> UUID {

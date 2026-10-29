@@ -394,6 +394,65 @@ clip exactly once. Inspection includes source IDs and durations; source-tagged
 trim bounds use the leaf's authored editor clock, while editor times use the outer
 project clock. Keep these clock meanings in tool descriptions and regression tests.
 
+`inspect_effects(handle, sourceId?, offset?, limit?)` returns the root revision,
+typed visual settings, capabilities, preset catalogs, and separate `zoomCues`,
+`masks`, and `shots3D` pages. Each page has `offset`, `limit`, `total`, and `items`;
+the same offset/limit applies independently to all three collections. Offset
+defaults to 0 and limit to 32, with a maximum of 64. Combined projects require an
+existing leaf `sourceId` from `inspect_timeline`; single-recording projects must
+omit it. Capabilities are read through an embedded model without replacing the
+authored document with the child's normalized snapshot.
+
+`set_effects(handle, expectedRevision, sourceId?, patch)` accepts these sections:
+
+| Section | Supported settings |
+| --- | --- |
+| `background` | None, RGBA solid color, or an approved built-in `gradientId` |
+| `framing` | Padding, corner radius, shadow, output aspect, and Fit/Fill mode |
+| `cursor` | Visibility, appearance, scale, smoothing, press/ripple effects, and idle hiding when the recording supports cursor restyling |
+| `camera` | Visibility, layout, position, size, roundness, and independent aspect when camera footage exists |
+| `zooms` | Enable/disable zoom and replace zoom cues |
+| `crop` | A normalized source rectangle, or `null` to reset |
+| `masks` | Blur/Pixelate masks with explicit `cropOnly` or `fullFrame` scope |
+| `shots3D` | Nonoverlapping shots using built-in presets |
+| `overlays` | Existing click, keystroke, and subtitle visibility, placement, and subtitle styling |
+
+Zoom cue start/end times use raw source time. Mask and 3D shot start/end times use
+the selected leaf's authored editor clock, after its cuts and speed changes.
+Masks may omit both times to cover the whole source. Supplied cue, mask, and 3D
+arrays replace their entire collection, require unique UUIDs, and accept at most
+64 items each; an empty array clears it. Omitted sections and scalar settings
+remain unchanged, including custom backgrounds and 3D shots when their sections
+are omitted. The schema and
+parser reject unknown keys, invalid types, nonfinite/out-of-range values, and
+unsupported capabilities. Use inspection's catalogs for enum and preset choices.
+
+For example, call `set_effects` with these arguments after replacing the example
+handle and revision with values from inspection. `soft-mint` is a built-in ID
+from `effects.catalogs.gradientIds`. Add `sourceId` for a combined project:
+
+```json
+{
+  "handle": "11111111-1111-4111-8111-111111111111",
+  "expectedRevision": 0,
+  "patch": {
+    "background": { "kind": "gradient", "gradientId": "soft-mint" },
+    "framing": { "padding": 0.06 }
+  }
+}
+```
+
+A changed patch commits one root revision and one undo action; a no-op leaves
+both unchanged. After asynchronous preparation, effects recheck cancellation,
+the access lease, unique editor handle, native busy state, and expected revision
+immediately before the synchronous shared document transaction. Native source
+Apply uses that transaction too, retaining its existing audio-import behavior.
+Agent effects cannot import audio, transcribe footage, accept wallpaper paths or
+raw edit documents, or author arbitrary 3D transforms/keyframes. Inspection
+redacts wallpaper paths and identifies custom gradients/3D shots without exposing
+their stored artwork or transform data. Keep preview, export, undo, and save
+checks against the production transaction and compositor.
+
 The MCP SDK and SwiftNIO license texts, including SwiftNIO's NOTICE, are
 bundled in `Resources/Licenses/` from the resolved package revisions.
 
@@ -536,6 +595,7 @@ with `make test` when production code changes.
 | Multi-recording native controls, source editing, audio-import cleanup, and offscreen light/dark snapshots | `BETTERSHOT_CHECK_MULTI_SOURCE_UI=1 bash Tests/run-exports.sh` |
 | Displayed multi-recording playback, backward source seeks, and source-effect redraws in both appearances | `BETTERSHOT_CHECK_MULTI_SOURCE_WINDOWS=1 bash Tests/run-exports.sh` |
 | Combined-project imports, nested canvas fitting, identity, undo and persistence | `BETTERSHOT_CHECK_NESTED_IMPORT=1 bash Tests/run-exports.sh` |
+| Typed MCP visual effects, validation, source targeting and atomic transactions | `BETTERSHOT_CHECK_AGENT_EFFECTS=1 bash Tests/run-exports.sh` |
 | MCP append/retry, reorder, source timing, undo/redo, and save/reopen | `BETTERSHOT_CHECK_AGENT_MULTI_SOURCE=1 bash Tests/run-exports.sh` |
 | Studio Save updates the saved video and waits before closing | `BETTERSHOT_CHECK_RECORDING_SAVE=1 bash Tests/run-exports.sh` |
 | Local MCP endpoint, auth, client workflow, and Agent Access snapshots | `BETTERSHOT_CHECK_AGENT_ACCESS=1 bash Tests/run-exports.sh` |
