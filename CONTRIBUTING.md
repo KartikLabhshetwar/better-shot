@@ -319,6 +319,143 @@ and printable keypad keys still pass through the recording modifier guard.
 `bettershot://` routes. The app delegate dispatches them. Preserve malformed-URL
 rejection and the guard against starting a second recording session.
 
+### Local Agent Access
+
+Multi-recording projects use optional format-9 source catalogs and source-tagged
+clips. **Add Recording** selects a recording or combined project from
+`RecordingSessionStore` and stages its explicit media and authored edits into a
+UUID-named managed package through `RecordingProjectSource`. Original recordings
+remain untouched. Combined imports normalize their referenced leaves into fresh
+source UUIDs and remap clip IDs, retaining ordered authored ranges and speeds.
+Catalogs and stored leaf documents remain flat; recursive leaf documents are
+rejected, and there is no arbitrary file-import path. Optional per-source
+`presentationAspectRatios` preserves each imported project canvas and centered
+letterboxing, with at most 16 finite positive aspect ratios. The destination owns
+its root export settings; an imported root encoder mute is not inherited. Open source editors are captured at their current
+revision, and preparation rechecks library membership, editor identity, source
+revision, and pending edits before committing. Cancellation or stale revisions
+remove the unreferenced copies.
+
+Outer clip ranges use the source's authored editor clock, including its cuts and
+speed changes. `RecordingStudioSourceResolver` maps that clock through the leaf's
+native timeline to raw movie time; outer clip speed compounds authored speed.
+Source-aware validation preserves explicit clip order and repeated footage;
+legacy normalization stays unchanged. The outer filmstrip uses source-specific
+thumbnails, trim bounds, cut markers, and hover previews. Its **Move Clip Earlier**
+and **Move Clip Later** context actions and Control–Option–Left/Right Arrow
+shortcuts call the shared exact-permutation reorder operation.
+
+The root inspector lists recordings and outer clip controls, plus the existing
+format/export controls for composed **Export Audio** when audio is available.
+Replacement audio remains a leaf edit. Root effect lanes and the Add effect menu
+are hidden because effects belong to the leaf inspector. **Edit Recording**
+opens an embedded Studio model with the existing inspector, canvas, and effect
+lanes. Apply creates one root undo step and affects every clip referencing that
+source; Cancel tears down the child and discards its unretained media imports.
+Trimming, splitting, deleting, speed changes, and reordering belong to the outer
+timeline. Embedded source editors cannot save, export, share, register another
+project editor, or write source drafts/metadata. `sourceDocuments` holds editable
+leaf snapshots, with strict fallback to the managed leaf's saved edits for older
+catalogs. Nested catalogs/snapshots and corrupt fallback documents are rejected.
+Native Add/Edit transactions and audio/caption preparation block conflicting agent
+operations. Source transactions and outer timeline changes each undo separately,
+including requests that arrive in one run-loop event.
+`StudioProjectRegistry.hasActiveSourceTransactions` prevents application
+termination while native Add/Edit Recording is open. The native quit alert asks
+the user to finish Add Recording, Apply, or Cancel in Studio; embedded models stay
+outside the registry and never write a recovery draft of unapplied changes.
+
+Multi-source preview and export use the shared compositor with per-source authored
+snapshots, clocks, and resettable media readers. Authored source canvases fit into
+the common output canvas without stretching. Tests of the rendering worker and
+offscreen controls do not establish displayed playback or macOS 14 runtime behavior.
+Track validation and remaining work in
+[agent-editing-progress.md](docs/agent-editing-progress.md).
+
+`RecordingAgentAccessController` owns the off-by-default Settings toggle and
+Keychain token. `RecordingAgentHTTPListener` binds only `127.0.0.1:39615`,
+checks the bearer token, Host, Origin, and request size before passing a POST to
+the pinned MCP SDK. Each HTTP request gets its own stateless SDK server/transport
+because that SDK release keys in-flight responses by JSON-RPC request ID;
+`RecordingAgentOperations.shared` preserves project handles and export jobs
+across those requests. `RecordingAgentMCPTools` limits the exposed operations
+to library projects and revision-checked Studio edits. The composed preview
+uses `RecordingStudioExporter`'s frame compositor, not an AVPlayer screenshot.
+Never log or return the token, package paths, or arbitrary file contents from
+tools. Keep editor save/export behavior and revision checks shared with the UI.
+`append_recording(handle, expectedRevision, projectId, requestId)` accepts only
+library-issued recording IDs and deduplicates identical pending/completed retry
+IDs. Reusing an ID with different arguments fails; failed IDs replay their failure
+and require a new ID for fresh preparation. Up to four distinct appends prepare
+concurrently. After awaits, append rechecks cancellation, access lease, source and
+target revisions, editor identity, and library membership before its synchronous
+commit. `reorder_clips(handle, expectedRevision, clipIds)` requires every current
+clip exactly once. Inspection includes source IDs and durations; source-tagged
+trim bounds use the leaf's authored editor clock, while editor times use the outer
+project clock. Keep these clock meanings in tool descriptions and regression tests.
+
+`inspect_effects(handle, sourceId?, offset?, limit?)` returns the root revision,
+typed visual settings, capabilities, preset catalogs, and separate `zoomCues`,
+`masks`, and `shots3D` pages. Each page has `offset`, `limit`, `total`, and `items`;
+the same offset/limit applies independently to all three collections. Offset
+defaults to 0 and limit to 32, with a maximum of 64. Combined projects require an
+existing leaf `sourceId` from `inspect_timeline`; single-recording projects must
+omit it. Capabilities are read through an embedded model without replacing the
+authored document with the child's normalized snapshot.
+
+`set_effects(handle, expectedRevision, sourceId?, patch)` accepts these sections:
+
+| Section | Supported settings |
+| --- | --- |
+| `background` | None, RGBA solid color, or an approved built-in `gradientId` |
+| `framing` | Padding, corner radius, shadow, output aspect, and Fit/Fill mode |
+| `cursor` | Visibility, appearance, scale, smoothing, press/ripple effects, and idle hiding when the recording supports cursor restyling |
+| `camera` | Visibility, layout, position, size, roundness, and independent aspect when camera footage exists |
+| `zooms` | Enable/disable zoom and replace zoom cues |
+| `crop` | A normalized source rectangle, or `null` to reset |
+| `masks` | Blur/Pixelate masks with explicit `cropOnly` or `fullFrame` scope |
+| `shots3D` | Nonoverlapping shots using built-in presets |
+| `overlays` | Existing click, keystroke, and subtitle visibility, placement, and subtitle styling |
+
+Zoom cue start/end times use raw source time. Mask and 3D shot start/end times use
+the selected leaf's authored editor clock, after its cuts and speed changes.
+Masks may omit both times to cover the whole source. Supplied cue, mask, and 3D
+arrays replace their entire collection, require unique UUIDs, and accept at most
+64 items each; an empty array clears it. Omitted sections and scalar settings
+remain unchanged, including custom backgrounds and 3D shots when their sections
+are omitted. The schema and
+parser reject unknown keys, invalid types, nonfinite/out-of-range values, and
+unsupported capabilities. Use inspection's catalogs for enum and preset choices.
+
+For example, call `set_effects` with these arguments after replacing the example
+handle and revision with values from inspection. `soft-mint` is a built-in ID
+from `effects.catalogs.gradientIds`. Add `sourceId` for a combined project:
+
+```json
+{
+  "handle": "11111111-1111-4111-8111-111111111111",
+  "expectedRevision": 0,
+  "patch": {
+    "background": { "kind": "gradient", "gradientId": "soft-mint" },
+    "framing": { "padding": 0.06 }
+  }
+}
+```
+
+A changed patch commits one root revision and one undo action; a no-op leaves
+both unchanged. After asynchronous preparation, effects recheck cancellation,
+the access lease, unique editor handle, native busy state, and expected revision
+immediately before the synchronous shared document transaction. Native source
+Apply uses that transaction too, retaining its existing audio-import behavior.
+Agent effects cannot import audio, transcribe footage, accept wallpaper paths or
+raw edit documents, or author arbitrary 3D transforms/keyframes. Inspection
+redacts wallpaper paths and identifies custom gradients/3D shots without exposing
+their stored artwork or transform data. Keep preview, export, undo, and save
+checks against the production transaction and compositor.
+
+The MCP SDK and SwiftNIO license texts, including SwiftNIO's NOTICE, are
+bundled in `Resources/Licenses/` from the resolved package revisions.
+
 ### 3D video shots
 
 `Recording3DShot.swift` owns pose limits, perspective projection, presets, and the
@@ -453,14 +590,46 @@ with `make test` when production code changes.
 | Interactive native window selection, pixels, staging, preview, and Escape (requires existing Screen Recording permission) | `BETTERSHOT_CHECK_WINDOW_CAPTURE=1 bash Tests/run-exports.sh` |
 | Screenshot Copy/Save and private storage | `BETTERSHOT_CHECK_SCREENSHOT_SAVING=1 bash Tests/run-exports.sh` |
 | Video compositing and encoded exports | `BETTERSHOT_CHECK_VIDEO_EXPORTS=1 bash Tests/run-exports.sh` |
+| Agent edits and renderer cache freshness | `BETTERSHOT_CHECK_AGENT_EDITING=1 bash Tests/run-exports.sh` |
+| Multi-recording source validation, authored timing, compositor, and model transactions | `BETTERSHOT_CHECK_MULTI_SOURCE=1 bash Tests/run-exports.sh` |
+| Multi-recording native controls, source editing, audio-import cleanup, and offscreen light/dark snapshots | `BETTERSHOT_CHECK_MULTI_SOURCE_UI=1 bash Tests/run-exports.sh` |
+| Displayed multi-recording playback, backward source seeks, and source-effect redraws in both appearances | `BETTERSHOT_CHECK_MULTI_SOURCE_WINDOWS=1 bash Tests/run-exports.sh` |
+| Combined-project imports, nested canvas fitting, identity, undo and persistence | `BETTERSHOT_CHECK_NESTED_IMPORT=1 bash Tests/run-exports.sh` |
+| Typed MCP visual effects, validation, source targeting and atomic transactions | `BETTERSHOT_CHECK_AGENT_EFFECTS=1 bash Tests/run-exports.sh` |
+| MCP append/retry, reorder, source timing, undo/redo, and save/reopen | `BETTERSHOT_CHECK_AGENT_MULTI_SOURCE=1 bash Tests/run-exports.sh` |
+| Studio Save updates the saved video and waits before closing | `BETTERSHOT_CHECK_RECORDING_SAVE=1 bash Tests/run-exports.sh` |
+| Local MCP endpoint, auth, client workflow, and Agent Access snapshots | `BETTERSHOT_CHECK_AGENT_ACCESS=1 bash Tests/run-exports.sh` |
 | Displayed Gallery and Settings windows | `BETTERSHOT_CHECK_LIBRARY_WINDOWS=1 bash Tests/run-exports.sh` |
 | Editor focus, full screen, and tray handoff | `BETTERSHOT_CHECK_EDITOR_WINDOWS=1 bash Tests/run-exports.sh` |
 | Actual SwiftUI editor scenes, automatic/manual full screen | `BETTERSHOT_CHECK_EDITOR_SCENES=1 bash Tests/run-exports.sh` |
+
+The optional multi-recording window check opens actual Studio windows using an
+isolated temporary recording library. It checks completed Metal frames, AVPlayer
+readiness and playback across recording boundaries, backward seeks, and redraws
+after applying source effects in both appearances. It captures window PNGs only
+when `CGPreflightScreenCaptureAccess()` reports existing Screen Recording access;
+otherwise it reports screenshots unavailable and still runs the displayed draw
+checks. It never requests permission. These checks establish behavior on the host
+macOS version, not macOS 14 compatibility or manual control behavior.
+
+Add `BETTERSHOT_MULTI_SOURCE_INTERACTIVE=1` to that command to keep each appearance's
+fixture window open for up to 180 seconds after the assertions. The runner prints
+its title and window number; closing the fixture advances to the next appearance.
+This optional hold supports manual Add/Edit Recording, toolbar, and window-close
+checks. It does not exercise the production app's Quit delegate or automate modal
+alerts. The default UI check only creates offscreen snapshots.
+The displayed runner uses a temporary app bundle so native UI tools can select
+it; the bundle and its isolated preferences are removed when the runner exits.
 
 The screenshot check uses the production post-capture path with fixture media;
 it does not request capture permission. Video checks cover decoded colors,
 masks, camera ratios, cached frames, 30/60 fps, audio, render invalidation, and
 cancellation with GPU work in flight.
+
+Run Agent Access integration checks with `BETTERSHOT_TESTING=1` through the
+provided runner. They use an in-memory token and preference state, bundled
+fixture footage, and a temporary export folder; they must never read the real
+Keychain or R2 credentials. Keep the listener off in normal tests.
 
 Editor snapshots are written to `.build/editor-snapshots/`. Review narrow and
 wide layouts in both appearances. Displayed-window checks need a logged-in

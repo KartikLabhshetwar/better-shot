@@ -473,6 +473,10 @@ extension PointerTravelSample {
 
 nonisolated enum RecordingSessionStore {
     static var recordingsDirectory: URL {
+        if ProcessInfo.processInfo.environment["BETTERSHOT_TESTING"] == "1" {
+            return FileManager.default.temporaryDirectory.appendingPathComponent(
+                "BetterShotRecordingTests-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+        }
         let baseURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support", isDirectory: true)
         return baseURL

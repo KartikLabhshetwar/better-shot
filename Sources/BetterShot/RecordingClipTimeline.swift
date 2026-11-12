@@ -15,6 +15,8 @@ nonisolated struct RecordingClipSegment: Identifiable, Codable, Equatable, Senda
     static let maximumSpeed: Double = 8
 
     var id: UUID
+    /// Nil for legacy single-recording clips; otherwise ranges use this source's authored editor clock.
+    var sourceID: UUID?
     var sourceStart: TimeInterval
     var sourceEnd: TimeInterval
     /// Playback speed multiplier applied only to this clip (0.25...8). Baked
@@ -24,11 +26,13 @@ nonisolated struct RecordingClipSegment: Identifiable, Codable, Equatable, Senda
 
     init(
         id: UUID = UUID(),
+        sourceID: UUID? = nil,
         sourceStart: TimeInterval,
         sourceEnd: TimeInterval,
         speed: Double = 1
     ) {
         self.id = id
+        self.sourceID = sourceID
         self.sourceStart = sourceStart
         self.sourceEnd = sourceEnd
         self.speed = speed
@@ -47,6 +51,7 @@ nonisolated struct RecordingClipSegment: Identifiable, Codable, Equatable, Senda
 
     private enum CodingKeys: String, CodingKey {
         case id
+        case sourceID
         case sourceStart
         case sourceEnd
         case speed
@@ -58,6 +63,7 @@ nonisolated struct RecordingClipSegment: Identifiable, Codable, Equatable, Senda
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        sourceID = try container.decodeIfPresent(UUID.self, forKey: .sourceID)
         sourceStart = try container.decodeIfPresent(TimeInterval.self, forKey: .sourceStart)
             ?? container.decode(TimeInterval.self, forKey: .start)
         sourceEnd = try container.decodeIfPresent(TimeInterval.self, forKey: .sourceEnd)
@@ -68,16 +74,22 @@ nonisolated struct RecordingClipSegment: Identifiable, Codable, Equatable, Senda
     func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
+        try container.encodeIfPresent(sourceID, forKey: .sourceID)
         try container.encode(sourceStart, forKey: .sourceStart)
         try container.encode(sourceEnd, forKey: .sourceEnd)
         try container.encode(speed, forKey: .speed)
     }
 }
 
+nonisolated enum RecordingClipTimelineError: Error {
+    case invalidTimeline
+}
+
 nonisolated struct RecordingClipTimeline: Codable, Equatable, Sendable {
     struct Location: Equatable, Sendable {
         var segmentIndex: Int
         var segmentID: UUID
+        var sourceID: UUID?
         var editorStart: TimeInterval
         var offset: TimeInterval
         var sourceTime: TimeInterval
@@ -141,6 +153,7 @@ nonisolated struct RecordingClipTimeline: Codable, Equatable, Sendable {
     }
 
     struct CutMarker: Hashable {
+        var sourceID: UUID? = nil
         var sourceStart: TimeInterval
         var sourceEnd: TimeInterval
         var editorTime: TimeInterval
@@ -166,6 +179,45 @@ nonisolated struct RecordingClipTimeline: Codable, Equatable, Sendable {
                                        editorTime: editorTime))
         }
         return ranges
+    }
+
+    /// Cross-recording and backwards joins are cuts, never a duration of removed footage.
+    func cutMarkers(sourceDurations: [UUID: TimeInterval]) -> [CutMarker] {
+        var markers: [CutMarker] = []
+        var editorTime: TimeInterval = 0
+        for (index, clip) in segments.enumerated() {
+            let previous = index > 0 ? segments[index - 1] : nil
+            if let previous {
+                let forwardGap = previous.sourceID == clip.sourceID && previous.sourceEnd <= clip.sourceStart
+                markers.append(CutMarker(sourceID: clip.sourceID,
+                    sourceStart: forwardGap ? previous.sourceEnd : clip.sourceStart,
+                    sourceEnd: clip.sourceStart, editorTime: editorTime))
+            } else if clip.sourceStart > 0 {
+                markers.append(CutMarker(sourceID: clip.sourceID, sourceStart: 0,
+                    sourceEnd: clip.sourceStart, editorTime: 0))
+            }
+            editorTime += clip.editorDuration
+        }
+        if let last = segments.last, let id = last.sourceID,
+           let end = sourceDurations[id], end > last.sourceEnd {
+            markers.append(CutMarker(sourceID: id, sourceStart: last.sourceEnd,
+                sourceEnd: end, editorTime: editorTime))
+        }
+        return markers
+    }
+
+    func trimBounds(for clipID: UUID, sourceDuration: TimeInterval,
+                    sourceDurations: [UUID: TimeInterval]) -> ClosedRange<TimeInterval>? {
+        guard let index = segments.firstIndex(where: { $0.id == clipID }) else { return nil }
+        let clip = segments[index]
+        if let sourceID = clip.sourceID {
+            guard let duration = sourceDurations[sourceID], duration.isFinite, duration > 0 else { return nil }
+            return 0...duration
+        }
+        let start = index > 0 ? segments[index - 1].sourceEnd : 0
+        let end = index + 1 < segments.count ? segments[index + 1].sourceStart : sourceDuration
+        guard start <= end else { return nil }
+        return start...end
     }
 
     func normalized(to sourceDuration: TimeInterval) -> RecordingClipTimeline {
@@ -206,6 +258,37 @@ nonisolated struct RecordingClipTimeline: Codable, Equatable, Sendable {
         return RecordingClipTimeline(segments: normalized)
     }
 
+    /// Multi-source clips keep their authored order, including repeated source ranges.
+    /// Unlike legacy normalization, invalid references fail rather than silently dropping footage.
+    func validated(sourceDurations: [UUID: TimeInterval]) throws -> RecordingClipTimeline {
+        guard !segments.isEmpty,
+              Set(segments.map(\.id)).count == segments.count,
+              sourceDurations.values.allSatisfy({ $0.isFinite && $0 > 0 }) else {
+            throw RecordingClipTimelineError.invalidTimeline
+        }
+        for segment in segments {
+            guard let sourceID = segment.sourceID, let duration = sourceDurations[sourceID],
+                  segment.sourceStart.isFinite, segment.sourceEnd.isFinite,
+                  segment.sourceStart >= 0, segment.sourceEnd <= duration,
+                  segment.duration >= RecordingClipSegment.minimumDuration,
+                  segment.speed.isFinite, segment.editorDuration.isFinite,
+                  (RecordingClipSegment.minimumSpeed...RecordingClipSegment.maximumSpeed).contains(segment.speed) else {
+                throw RecordingClipTimelineError.invalidTimeline
+            }
+        }
+        guard duration.isFinite else { throw RecordingClipTimelineError.invalidTimeline }
+        return self
+    }
+
+    func reordered(clipIDs: [UUID]) throws -> RecordingClipTimeline {
+        guard clipIDs.count == segments.count, Set(clipIDs).count == clipIDs.count,
+              Set(clipIDs) == Set(segments.map(\.id)) else {
+            throw RecordingClipTimelineError.invalidTimeline
+        }
+        let clipsByID = Dictionary(uniqueKeysWithValues: segments.map { ($0.id, $0) })
+        return RecordingClipTimeline(segments: clipIDs.compactMap { clipsByID[$0] })
+    }
+
     func location(at editorTime: TimeInterval) -> Location? {
         guard !segments.isEmpty, duration > 0 else { return nil }
         let clamped = min(max(editorTime, 0), duration)
@@ -222,6 +305,7 @@ nonisolated struct RecordingClipTimeline: Codable, Equatable, Sendable {
                 return Location(
                     segmentIndex: index,
                     segmentID: segment.id,
+                    sourceID: segment.sourceID,
                     editorStart: editorStart,
                     offset: offset,
                     sourceTime: segment.sourceStart + sourceOffset
@@ -273,12 +357,14 @@ nonisolated struct RecordingClipTimeline: Codable, Equatable, Sendable {
         let trailingID = UUID()
         let leading = RecordingClipSegment(
             id: segment.id,
+            sourceID: segment.sourceID,
             sourceStart: segment.sourceStart,
             sourceEnd: sourceTime,
             speed: segment.speed
         )
         let trailing = RecordingClipSegment(
             id: trailingID,
+            sourceID: segment.sourceID,
             sourceStart: sourceTime,
             sourceEnd: segment.sourceEnd,
             speed: segment.speed
@@ -337,6 +423,7 @@ nonisolated struct RecordingClipTimeline: Codable, Equatable, Sendable {
             for piece in pieces where piece.end - piece.start >= RecordingClipSegment.minimumDuration {
                 next.append(RecordingClipSegment(
                     id: keptSegmentID ? UUID() : segment.id,
+                    sourceID: segment.sourceID,
                     sourceStart: piece.start,
                     sourceEnd: piece.end,
                     speed: segment.speed
@@ -404,6 +491,8 @@ nonisolated struct RecordingClipSpeedDraft: Equatable, Sendable {
     private(set) var clipID: UUID?
     private(set) var speed: Double?
     private var isEditing = false
+
+    var hasActiveEdit: Bool { isEditing }
 
     mutating func begin() { isEditing = true }
 

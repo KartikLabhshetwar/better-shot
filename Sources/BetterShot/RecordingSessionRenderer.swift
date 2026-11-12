@@ -15,9 +15,21 @@ import CoreGraphics
 enum RecordingSessionRenderer {
     private enum RenderError: LocalizedError {
         case missingCameraTrack
+        case projectChanged
+        case ambiguousProject
+        case invalidReplacementAudio
 
         var errorDescription: String? {
-            "The camera recording does not contain a readable video track."
+            switch self {
+            case .missingCameraTrack:
+                "The camera recording does not contain a readable video track."
+            case .projectChanged:
+                "The project changed while the video was rendering. Try again."
+            case .ambiguousProject:
+                "This recording is open in more than one editor. Close the other editor window and try again."
+            case .invalidReplacementAudio:
+                "The project's imported soundtrack is missing or unreadable. Restore it or choose another audio file in Studio."
+            }
         }
     }
 
@@ -34,12 +46,64 @@ enum RecordingSessionRenderer {
         let pointerSynthesized = manifest?.pointerSynthesized == true
         // Draft edits count: a flatten made for an upload must show what the
         // user last saw in Studio, not the last state they pressed Save on.
-        let editDocument = session.effectiveEditDocument()
+        let openedSnapshot = StudioProjectRegistry.shared.snapshot(for: session.directoryURL)
+        guard openedSnapshot != nil || !StudioProjectRegistry.shared.hasOpenProject(for: session.directoryURL) else {
+            throw RenderError.ambiguousProject
+        }
+        let editDocument = openedSnapshot?.document ?? session.effectiveEditDocument()
         guard session.hasCamera || pointerSynthesized || editDocument != nil else {
             return session.screenURL
         }
         if let existing = session.freshFinalURL(matching: editDocument) { return existing }
 
+        let configuration = try await configuration(for: session, document: editDocument)
+
+        let temporaryURL = try await RecordingStudioExporter().export(configuration) { progress in
+            onProgress?(progress)
+        }
+        do {
+            guard canInstallRender(for: session, snapshot: openedSnapshot, renderedDocument: editDocument) else {
+                throw RenderError.projectChanged
+            }
+            return try session.installFinalVideo(
+                movingFrom: temporaryURL,
+                renderedFrom: editDocument
+            )
+        } catch {
+            try? FileManager.default.removeItem(at: temporaryURL)
+            throw error
+        }
+    }
+
+    /// Shared authored-source configuration for project playback, previews, and exports.
+    static func configuration(
+        for session: RecordingSession,
+        document: RecordingEditDocument?
+    ) async throws -> RecordingStudioExporter.Configuration {
+        if let document, let catalog = document.sources {
+            let sources = try await RecordingStudioSourceResolver.configurations(
+                for: catalog, in: session, documents: document.sourceDocuments)
+            guard let first = sources.first?.configuration, let clips = document.clips else {
+                throw RecordingStudioSourceResolver.ResolutionError.invalidSources
+            }
+            let timeline = try RecordingClipTimeline(segments: clips).validated(sourceDurations:
+                Dictionary(uniqueKeysWithValues: sources.map { ($0.id, $0.configuration.clipTimeline.duration) }))
+            let aspect = document.exportAspect.flatMap(ExportAspectPreset.init(rawValue:)) ?? .original
+            return RecordingStudioExporter.Configuration(
+                screenURL: first.screenURL, cameraURL: nil, cameraOffset: 0,
+                style: first.style, viewportTimeline: .identity, pointerTimeline: nil,
+                showsPressEffects: false, keystrokeTimeline: nil,
+                keystrokePlacement: .bottomCenter, subtitleTimeline: nil, subtitleStyle: SubtitleBarStyle(),
+                canvasSize: aspect == .original ? first.canvasSize : aspect.canvasSize(for: first.canvasSize),
+                clipTimeline: timeline, exportSettings: document.exportSettings ?? first.exportSettings,
+                sources: sources)
+        }
+        guard document?.sourceDocuments == nil,
+              document?.clips?.contains(where: { $0.sourceID != nil }) != true else {
+            throw RecordingStudioSourceResolver.ResolutionError.invalidSources
+        }
+        let manifest = session.loadCaptureManifest()
+        let pointerSynthesized = manifest?.pointerSynthesized == true
         let asset = AVURLAsset(url: session.screenURL)
         let duration = try await asset.load(.duration).seconds
         guard duration.isFinite, duration > 0 else {
@@ -65,7 +129,6 @@ enum RecordingSessionRenderer {
                 recordingSizeInPoints: recordingPointSize
             )
         ).sanitizedCapture
-        let document = editDocument
         var style = document?.style.value ?? RecordingStudioDefaults.style
         // Selecting a camera means the default delivered recording includes
         // it; a saved Studio project that explicitly hid the bubble wins.
@@ -110,29 +173,48 @@ enum RecordingSessionRenderer {
         let cues = document?.subtitleCues ?? []
         let words = document?.subtitleWords ?? []
 
+        var audioReplacementURL: URL?
+        if let name = document?.replacementAudioFileName {
+            guard !name.isEmpty, name != ".", name != "..", !name.contains("/"), !name.contains("\\"),
+                  URL(fileURLWithPath: name).lastPathComponent == name else {
+                throw RenderError.invalidReplacementAudio
+            }
+            let url = session.directoryURL.appendingPathComponent(name)
+            guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+                  values.isRegularFile == true, values.isSymbolicLink != true,
+                  await RecordingReplacementAudio.load(url: url, displayName: name) != nil else {
+                throw RenderError.invalidReplacementAudio
+            }
+            audioReplacementURL = url
+        }
+        let crop = document?.cropValue ?? RecordingVideoCrop.unit
+        let croppedSize = RecordingVideoCrop.croppedSize(canvasSize, crop: crop)
+        let croppedViewport = viewportTimeline.cropped(to: crop)
         let aspect = document?.exportAspectPreset ?? .original
         let aspectMode = document?.exportAspectContentMode ?? .fill
         let reframe: ReframeTrack? = aspectMode == .fill
             ? ReframeTrack.build(
                 preset: aspect,
-                sourceSize: canvasSize,
-                viewportTimeline: viewportTimeline,
+                sourceSize: croppedSize,
+                viewportTimeline: croppedViewport,
                 duration: clipTimeline.duration
             ) { editorTime in
-                pointerTimeline?.location(at: editorTime)
+                guard let location = pointerTimeline?.location(at: editorTime) else { return nil }
+                let point = RecordingVideoCrop.point(location, in: crop)
+                return CGPoint(x: min(max(point.x, 0), 1), y: min(max(point.y, 0), 1))
             }
             : nil
         let fitContentAspect: CGFloat? =
-            aspect != .original && aspectMode == .fit && canvasSize.height > 0
-                ? canvasSize.width / canvasSize.height
+            aspect != .original && aspectMode == .fit && croppedSize.height > 0
+                ? croppedSize.width / croppedSize.height
                 : nil
 
-        let configuration = RecordingStudioExporter.Configuration(
+        return RecordingStudioExporter.Configuration(
             screenURL: session.screenURL,
             cameraURL: session.hasCamera ? session.cameraURL : nil,
             cameraOffset: manifest?.cameraLeadIn ?? 0,
             style: style,
-            viewportTimeline: viewportTimeline,
+            viewportTimeline: croppedViewport,
             pointerTimeline: pointerSynthesized ? pointerTimeline : nil,
             showsPressEffects: showsPressEffects,
             keystrokeTimeline: showsKeystrokes
@@ -147,28 +229,34 @@ enum RecordingSessionRenderer {
                 ? KaraokeTimeline(cues: cues, words: words)
                 : nil,
             canvasSize: aspect == .original
-                ? canvasSize
-                : aspect.canvasSize(for: canvasSize),
+                ? croppedSize
+                : aspect.canvasSize(for: croppedSize),
             clipTimeline: clipTimeline,
             exportSettings: document?.exportSettings ?? VideoCompressionSettings(),
+            audioReplacementURL: audioReplacementURL,
             reframe: reframe,
             fitContentAspect: fitContentAspect,
+            crop: crop,
             masks: document?.masks ?? [],
             timeline3D: Recording3DTimeline(shots: document?.shots3D ?? [], duration: clipTimeline.duration)
         )
 
-        let temporaryURL = try await RecordingStudioExporter().export(configuration) { progress in
-            onProgress?(progress)
+    }
+
+    /// A render may outlive its editor or an edit to the working document.
+    /// Keep the package cache tied to the exact document used for its frames.
+    static func canInstallRender(
+        for session: RecordingSession,
+        snapshot: RecordingStudioDocumentSnapshot?,
+        renderedDocument: RecordingEditDocument?
+    ) -> Bool {
+        let current = StudioProjectRegistry.shared.snapshot(for: session.directoryURL)
+        if let snapshot {
+            return current == snapshot && renderedDocument == snapshot.document
         }
-        do {
-            return try session.installFinalVideo(
-                movingFrom: temporaryURL,
-                renderedFrom: editDocument
-            )
-        } catch {
-            try? FileManager.default.removeItem(at: temporaryURL)
-            throw error
-        }
+        return current == nil
+            && !StudioProjectRegistry.shared.hasOpenProject(for: session.directoryURL)
+            && session.effectiveEditDocument() == renderedDocument
     }
 
     static func presentFailure(_ error: Error) {

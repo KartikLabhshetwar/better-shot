@@ -20,6 +20,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     try await checkMediaGallery(imageURL: imageURL, movieURL: movieURL)
     checkTransferToastPresentation(movieURL: movieURL)
     try await checkGeneralEditorDefaults(movieURL: movieURL)
+    try await checkRecordingEditRevisionAndSave(movieURL: movieURL)
     try await checkCameraAspectRatios(movieURL: movieURL)
     for appearanceName in [NSAppearance.Name.aqua, .darkAqua] {
         NSAppearance(named: appearanceName)!.performAsCurrentDrawingAppearance {
@@ -884,6 +885,281 @@ private func checkGeneralEditorDefaults(movieURL: URL) async throws {
         reopened.teardown()
     }
     print("PASS General defaults for new recordings/imports, image look parity, reset, and saved project preservation")
+}
+
+@MainActor
+func checkRecordingEditRevisionAndSave(movieURL: URL) async throws {
+    let session = RecordingSession(directoryURL: FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString + ".bettershotrec"))
+    try FileManager.default.createDirectory(at: session.directoryURL, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: session.directoryURL) }
+    try FileManager.default.copyItem(at: movieURL, to: session.screenURL)
+
+    let model = RecordingStudioModel(url: session.directoryURL)
+    await model.load()
+    defer { model.teardown() }
+    precondition(model.isLoaded && model.editRevision == 0)
+    let initialRevision = model.editRevision
+    model.timelineHoverTime = model.duration / 2
+    model.selectClip(id: model.clipTimeline.segments[0].id)
+    precondition(model.editRevision == initialRevision, "Selection and hover must not invalidate agent edits")
+
+    let savedPadding = model.style.padding + 0.01
+    model.style.padding = savedPadding
+    precondition(model.editRevision == initialRevision + 1, "Bound inspector edits must advance the revision")
+
+    model.splitClip(at: model.duration / 2)
+    precondition(model.clipTimeline.segments.count == 2 && model.editRevision == initialRevision + 2)
+    model.undo()
+    precondition(model.clipTimeline.segments.count == 1 && model.editRevision == initialRevision + 3,
+                 "Undo must invalidate stale agent edits")
+    model.redo()
+    precondition(model.clipTimeline.segments.count == 2 && model.editRevision == initialRevision + 4,
+                 "Redo must invalidate stale agent edits")
+
+    guard case .saved(let savedRevision) = model.saveProject() else {
+        preconditionFailure("Saving a writable project must return a saved outcome")
+    }
+    precondition(savedRevision == model.editRevision && !model.hasUnsavedChanges
+                 && model.saveErrorMessage == nil)
+    let savedDocument = try Data(contentsOf: session.editDocumentURL)
+
+    model.style.padding = savedPadding + 0.01
+    let beforeFailure = model.editRevision
+    try FileManager.default.removeItem(at: session.editDocumentURL)
+    try FileManager.default.createDirectory(at: session.editDocumentURL, withIntermediateDirectories: false)
+    guard case .failed(let message) = model.saveProject() else {
+        preconditionFailure("An unwritable edit.json must return a failed outcome")
+    }
+    precondition(!message.isEmpty && model.saveErrorMessage == message
+                 && model.hasUnsavedChanges && model.editRevision == beforeFailure,
+                 "A failed save must retain the working edit and its revision")
+    precondition(session.loadDraftDocument()?.style.value.padding == savedPadding + 0.01,
+                 "A failed committed write must leave the latest edit in the recovery draft")
+    try FileManager.default.removeItem(at: session.editDocumentURL)
+    try savedDocument.write(to: session.editDocumentURL, options: .atomic)
+
+    let draft = try Data(contentsOf: session.draftDocumentURL)
+    try FileManager.default.removeItem(at: session.draftDocumentURL)
+    try FileManager.default.createDirectory(at: session.draftDocumentURL, withIntermediateDirectories: false)
+    let draftChild = session.draftDocumentURL.appendingPathComponent("cannot-remove")
+    try Data().write(to: draftChild)
+    try FileManager.default.setAttributes([.posixPermissions: 0o500],
+                                          ofItemAtPath: session.draftDocumentURL.path)
+    let revisionBeforeDiscardFailure = model.editRevision
+    let paddingBeforeDiscardFailure = model.style.padding
+    let discardFailed = await model.discardChanges()
+    precondition(!discardFailed && model.editRevision == revisionBeforeDiscardFailure
+                 && model.style.padding == paddingBeforeDiscardFailure
+                 && model.hasUnsavedChanges && model.discardErrorMessage != nil
+                 && FileManager.default.fileExists(atPath: draftChild.path),
+                 "A failed draft removal must leave the working document and recovery data untouched")
+    try FileManager.default.setAttributes([.posixPermissions: 0o700],
+                                          ofItemAtPath: session.draftDocumentURL.path)
+    try FileManager.default.removeItem(at: session.draftDocumentURL)
+    try draft.write(to: session.draftDocumentURL, options: .atomic)
+
+    let discardSucceeded = await model.discardChanges()
+    precondition(discardSucceeded)
+    precondition(model.style.padding == savedPadding && model.editRevision == beforeFailure + 1
+                 && !model.hasUnsavedChanges,
+                 "Discard must restore the saved document and invalidate stale agent edits once")
+    print("PASS recording edit revisions, save outcomes, failed-save recovery, and atomic discard")
+}
+
+@MainActor
+func checkRecordingRendererFreshness(movieURL: URL) async throws {
+    let session = RecordingSession(directoryURL: FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString + ".bettershotrec"))
+    try FileManager.default.createDirectory(at: session.directoryURL, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: session.directoryURL) }
+    try FileManager.default.copyItem(at: movieURL, to: session.screenURL)
+
+    let diskDocumentBeforeOpen = session.effectiveEditDocument()
+    let model = RecordingStudioModel(url: session.directoryURL)
+    await model.load()
+    guard let first = StudioProjectRegistry.shared.snapshot(for: session.directoryURL) else {
+        preconditionFailure("A loaded project must expose its document snapshot")
+    }
+    precondition(RecordingSessionRenderer.canInstallRender(
+        for: session, snapshot: first, renderedDocument: first.document))
+    precondition(!RecordingSessionRenderer.canInstallRender(
+        for: session, snapshot: nil, renderedDocument: diskDocumentBeforeOpen),
+        "Opening a project must invalidate a disk-only render")
+
+    let secondModel = RecordingStudioModel(url: session.directoryURL)
+    await secondModel.load()
+    precondition(StudioProjectRegistry.shared.snapshot(for: session.directoryURL) == nil
+                 && StudioProjectRegistry.shared.hasOpenProject(for: session.directoryURL)
+                 && !RecordingSessionRenderer.canInstallRender(
+                    for: session, snapshot: first, renderedDocument: first.document),
+                 "Two editors for one project must not select an arbitrary render snapshot")
+    secondModel.teardown()
+    precondition(StudioProjectRegistry.shared.snapshot(for: session.directoryURL)?.handle == first.handle)
+
+    model.style.padding += 0.01
+    guard let edited = StudioProjectRegistry.shared.snapshot(for: session.directoryURL) else {
+        preconditionFailure("Editing must keep the project handle open")
+    }
+    precondition(edited.handle == first.handle && edited.revision == first.revision + 1)
+    precondition(!RecordingSessionRenderer.canInstallRender(
+        for: session, snapshot: first, renderedDocument: first.document),
+        "An in-memory edit must invalidate a render before the draft is flushed")
+    precondition(RecordingSessionRenderer.canInstallRender(
+        for: session, snapshot: edited, renderedDocument: edited.document))
+
+    model.teardown()
+    precondition(!RecordingSessionRenderer.canInstallRender(
+        for: session, snapshot: edited, renderedDocument: edited.document),
+        "Closing an editor must invalidate its handle")
+    let diskDocumentAfterClose = session.effectiveEditDocument()
+    precondition(diskDocumentAfterClose == edited.document)
+    precondition(RecordingSessionRenderer.canInstallRender(
+        for: session, snapshot: nil, renderedDocument: diskDocumentAfterClose))
+    precondition(!RecordingSessionRenderer.canInstallRender(
+        for: session, snapshot: nil, renderedDocument: diskDocumentBeforeOpen),
+        "A changed draft must invalidate a disk-only render")
+    print("PASS recording renderer cache fence across edits and editor close")
+}
+
+@MainActor
+func checkRecordingAgentOperations(movieURL: URL) async throws {
+    let session = RecordingSession(directoryURL: FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString + ".bettershotrec"))
+    try FileManager.default.createDirectory(at: session.directoryURL, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: session.directoryURL) }
+    try FileManager.default.copyItem(at: movieURL, to: session.screenURL)
+
+    let model = RecordingStudioModel(url: session.directoryURL)
+    await model.load()
+    defer { model.teardown() }
+    let agent = RecordingAgentOperations.shared
+    guard let handle = StudioProjectRegistry.shared.snapshot(for: session.directoryURL)?.handle else {
+        preconditionFailure("A loaded recording must have an agent handle")
+    }
+
+    func expectError(_ code: String, _ action: () throws -> Void) {
+        do {
+            try action()
+            preconditionFailure("Expected \(code)")
+        } catch let error as RecordingAgentOperationError {
+            precondition(error.code == code, "Expected \(code), got \(error.code)")
+        } catch {
+            preconditionFailure("Expected \(code), got \(error)")
+        }
+    }
+
+    let initial = try agent.inspect(handle: handle)
+    precondition(initial.revision == 0 && initial.clips.count == 1)
+    expectError("invalid_argument") {
+        _ = try agent.split(handle: handle, expectedRevision: initial.revision, at: .nan)
+    }
+    expectError("invalid_argument") {
+        _ = try agent.split(handle: handle, expectedRevision: initial.revision, at: 0.01)
+    }
+    let afterInvalid = try agent.inspect(handle: handle)
+    precondition(afterInvalid.revision == initial.revision)
+
+    let split = try agent.split(handle: handle, expectedRevision: initial.revision,
+                                at: initial.duration / 2)
+    precondition(split.clips.count == 2 && split.revision == initial.revision + 1)
+    expectError("stale_revision") {
+        _ = try agent.deleteClip(handle: handle, expectedRevision: initial.revision,
+                                 clipID: split.clips[0].id)
+    }
+    expectError("invalid_argument") {
+        _ = try agent.setSpeed(handle: handle, expectedRevision: split.revision,
+                               clipID: split.clips[0].id, speed: .infinity)
+    }
+    var sped = try agent.setSpeed(handle: handle, expectedRevision: split.revision,
+                                  clipID: split.clips[0].id, speed: 2)
+    precondition(sped.revision == split.revision + 1 && sped.clips[0].speed == 2)
+
+    let trimmed = try agent.trim(handle: handle, expectedRevision: sped.revision,
+                                 clipID: sped.clips[0].id, sourceStart: 0.2,
+                                 sourceEnd: sped.clips[0].sourceEnd)
+    precondition(trimmed.clips[0].sourceStart == 0.2 && trimmed.revision == sped.revision + 1)
+    let deleted = try agent.deleteClip(handle: handle, expectedRevision: trimmed.revision,
+                                       clipID: trimmed.clips[1].id)
+    precondition(deleted.clips.count == 1 && deleted.revision == trimmed.revision + 1)
+    let undone = try agent.undo(handle: handle, expectedRevision: deleted.revision)
+    precondition(undone.clips != deleted.clips, "Undo must restore the preceding native edit group")
+    let redone = try agent.redo(handle: handle, expectedRevision: undone.revision)
+    precondition(redone.clips == deleted.clips, "Redo must restore the same edited timeline")
+    sped = redone
+
+    let secondModel = RecordingStudioModel(url: session.directoryURL)
+    await secondModel.load()
+    expectError("ambiguous_project") { _ = try agent.inspect(handle: handle) }
+    secondModel.teardown()
+    let afterDuplicate = try agent.inspect(handle: handle)
+    precondition(afterDuplicate.revision == sped.revision)
+
+    let saved = try agent.save(handle: handle, expectedRevision: sped.revision)
+    precondition(saved.saved && saved.revision == sped.revision)
+
+    model.shareState = .uploading
+    expectError("operation_unavailable") {
+        _ = try agent.startExport(handle: handle, expectedRevision: saved.revision, requestID: UUID())
+    }
+    model.shareState = .idle
+
+    let cachedMovie = session.directoryURL.appendingPathComponent("cached.mp4")
+    try FileManager.default.copyItem(at: movieURL, to: cachedMovie)
+    try session.installFinalVideo(movingFrom: cachedMovie, renderedFrom: model.currentEditDocument)
+    precondition(session.freshFinalURL(matching: model.currentEditDocument) != nil)
+
+    let blockedSaveDirectory = session.directoryURL.appendingPathComponent("not-a-directory")
+    try Data().write(to: blockedSaveDirectory)
+    let originalSaveDirectory = AppPreferences.saveDirectory
+    AppPreferences.saveDirectory = blockedSaveDirectory.path
+    defer { AppPreferences.saveDirectory = originalSaveDirectory }
+
+    let firstRequestID = UUID()
+    var firstJob = try agent.startExport(handle: handle, expectedRevision: saved.revision,
+                                         requestID: firstRequestID)
+    let retriedJob = try agent.startExport(handle: handle, expectedRevision: saved.revision,
+                                           requestID: firstRequestID)
+    precondition(retriedJob.id == firstJob.id,
+                 "A retried export request must not start a second job")
+    for _ in 0..<100 {
+        if firstJob.state != .running { break }
+        try await Task.sleep(for: .milliseconds(20))
+        firstJob = try agent.exportJob(id: firstJob.id)
+    }
+    precondition(firstJob.state == .failed && firstJob.error?.isEmpty == false,
+                 "An export to an unusable folder must reach a failed job outcome")
+    model.acknowledgeExportResult()
+    let acknowledgedJob = try agent.exportJob(id: firstJob.id)
+    precondition(acknowledgedJob.state == .failed,
+                 "Acknowledging the UI error must not erase the agent job result")
+
+    var secondJob = try agent.startExport(handle: handle, expectedRevision: saved.revision,
+                                          requestID: UUID())
+    _ = try agent.cancelExportJob(id: firstJob.id)
+    for _ in 0..<100 {
+        if secondJob.state != .running { break }
+        try await Task.sleep(for: .milliseconds(20))
+        secondJob = try agent.exportJob(id: secondJob.id)
+    }
+    precondition(secondJob.state == .failed && firstJob.id != secondJob.id)
+    let retainedJob = try agent.exportJob(id: firstJob.id)
+    precondition(retainedJob.state == .failed,
+                 "A newer export must not replace an earlier job outcome")
+    let cancelledJob = try agent.startExport(handle: handle, expectedRevision: saved.revision,
+                                               requestID: UUID())
+    let cancelled = try agent.cancelExportJob(id: cancelledJob.id)
+    precondition(cancelled.state == .cancelled, "Cancelling must retain a cancelled agent job")
+    await model.waitForExport()
+
+    let savedClips = model.clipTimeline.segments
+    model.teardown()
+    let reopened = RecordingStudioModel(url: session.directoryURL)
+    await reopened.load()
+    defer { reopened.teardown() }
+    precondition(reopened.isLoaded && reopened.clipTimeline.segments == savedClips,
+                 "Reopening must preserve agent trims, cuts, clip IDs, and speeds")
+    print("PASS agent split/trim/delete/speed, undo/redo, revision rejection, save/reopen, duplicate-window guard, and export job retention")
 }
 
 /// Exercises real native dialogs without starting a capture or accessing microphone/camera.

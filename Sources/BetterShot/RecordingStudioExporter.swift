@@ -63,6 +63,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         let crop: CGRect
         let masks: [RecordingMaskSegment]
         let timeline3D: Recording3DTimeline
+        let sources: [RecordingStudioSourceConfiguration]
 
         init(
             screenURL: URL,
@@ -85,7 +86,8 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             fitContentAspect: CGFloat? = nil,
             crop: CGRect = RecordingVideoCrop.unit,
             masks: [RecordingMaskSegment] = [],
-            timeline3D: Recording3DTimeline = .empty
+            timeline3D: Recording3DTimeline = .empty,
+            sources: [RecordingStudioSourceConfiguration] = []
         ) {
             self.screenURL = screenURL
             self.cameraURL = cameraURL
@@ -108,6 +110,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             self.crop = crop
             self.masks = masks
             self.timeline3D = timeline3D
+            self.sources = sources
         }
     }
 
@@ -153,6 +156,138 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         }
     }
 
+    /// Render one bounded still through the same compositor as export. This
+    /// is the agent's actual edited frame, including masks, cursor, camera,
+    /// subtitles, crop/reframe, and 3D motion—not a player-window capture.
+    static func previewPNG(
+        configuration: Configuration,
+        editorTime: TimeInterval,
+        maximumDimension: Int = 768
+    ) async throws -> (data: Data, size: CGSize) {
+        if !configuration.sources.isEmpty {
+            let size = previewSize(canvasSize: configuration.canvasSize, maximumDimension: maximumDimension)
+            let renderer = try await RecordingStudioMultiSourceRenderer(configuration: configuration, canvasSize: size)
+            return try encodePreview(renderer.composedImage(at: editorTime), size: size)
+        }
+        guard configuration.clipTimeline.segments.allSatisfy({ $0.sourceID == nil }) else {
+            throw RecordingStudioSourceResolver.ResolutionError.invalidSources
+        }
+        guard editorTime.isFinite,
+              let location = configuration.clipTimeline.location(at: editorTime) else {
+            throw VideoTrimExportError.invalidRange
+        }
+        try Task.checkCancellation()
+
+        let screenAsset = AVURLAsset(url: configuration.screenURL)
+        let screenGenerator = AVAssetImageGenerator(asset: screenAsset)
+        screenGenerator.appliesPreferredTrackTransform = true
+        screenGenerator.maximumSize = CGSize(width: 2048, height: 2048)
+        screenGenerator.requestedTimeToleranceBefore = .positiveInfinity
+        screenGenerator.requestedTimeToleranceAfter = .zero
+        let screenDuration = try await screenAsset.load(.duration).seconds
+        guard screenDuration.isFinite, screenDuration > 0 else {
+            throw RecordingStudioExporter.ExportError.noVideoTrack
+        }
+        let frameStep = 1.0 / 60.0
+        let screenSeconds = min(location.sourceTime, max(0, screenDuration - frameStep))
+        let sourceTime = CMTime(seconds: screenSeconds, preferredTimescale: 600)
+        let screenImage = try await screenGenerator.image(at: sourceTime).image
+        try Task.checkCancellation()
+
+        var cameraImage: CGImage?
+        if let cameraURL = configuration.cameraURL {
+            let cameraGenerator = AVAssetImageGenerator(asset: AVURLAsset(url: cameraURL))
+            cameraGenerator.appliesPreferredTrackTransform = true
+            cameraGenerator.maximumSize = CGSize(width: 1024, height: 1024)
+            cameraGenerator.requestedTimeToleranceBefore = .positiveInfinity
+            cameraGenerator.requestedTimeToleranceAfter = .zero
+            let cameraTime = max(0, location.sourceTime - configuration.cameraOffset)
+            let cameraDuration = try await AVURLAsset(url: cameraURL).load(.duration).seconds
+            guard cameraDuration.isFinite, cameraDuration > 0 else {
+                throw RecordingStudioExporter.ExportError.noVideoTrack
+            }
+            let validCameraTime = min(cameraTime, max(0, cameraDuration - frameStep))
+            cameraImage = try await cameraGenerator.image(
+                at: CMTime(seconds: validCameraTime, preferredTimescale: 600)
+            ).image
+            try Task.checkCancellation()
+        }
+
+        let sourceSize = configuration.canvasSize
+        let longestSide = max(sourceSize.width, sourceSize.height)
+        guard longestSide.isFinite, longestSide > 0 else {
+            throw RecordingStudioExporter.ExportError.noVideoTrack
+        }
+        let outputLimit = CGFloat(min(768, max(64, maximumDimension)))
+        let scale = min(1, outputLimit / longestSide)
+        let size = CGSize(
+            width: max(1, (sourceSize.width * scale).rounded()),
+            height: max(1, (sourceSize.height * scale).rounded())
+        )
+        let compositor = StudioFrameCompositor(
+            configuration: configuration,
+            canvasSize: size,
+            includeBubble: configuration.cameraURL != nil
+        )
+        let image = try compositor.composedImage(
+            screenFrame: pixelBuffer(from: screenImage),
+            cameraFrame: try cameraImage.map(pixelBuffer(from:)),
+            editorTime: editorTime,
+            sourceTime: location.sourceTime
+        )
+        return try encodePreview(image, size: size)
+    }
+
+    private static func previewSize(canvasSize: CGSize, maximumDimension: Int) -> CGSize {
+        let scale = min(1, CGFloat(min(768, max(64, maximumDimension))) / max(canvasSize.width, canvasSize.height))
+        return CGSize(width: max(1, (canvasSize.width * scale).rounded()),
+                      height: max(1, (canvasSize.height * scale).rounded()))
+    }
+
+    private static func encodePreview(_ image: CIImage, size: CGSize) throws -> (data: Data, size: CGSize) {
+        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        guard let rendered = CIContext(options: [.cacheIntermediates: false]).createCGImage(
+            image, from: CGRect(origin: .zero, size: size), format: .RGBA8, colorSpace: colorSpace
+        ) else {
+            throw RecordingStudioExporter.ExportError.writerFailed(nil)
+        }
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(data, "public.png" as CFString, 1, nil) else {
+            throw RecordingStudioExporter.ExportError.writerFailed(nil)
+        }
+        CGImageDestinationAddImage(destination, rendered, nil)
+        guard CGImageDestinationFinalize(destination) else {
+            throw RecordingStudioExporter.ExportError.writerFailed(nil)
+        }
+        try Task.checkCancellation()
+        return (data as Data, size)
+    }
+
+    private static func pixelBuffer(from image: CGImage) throws -> CVPixelBuffer {
+        var buffer: CVPixelBuffer?
+        let attributes: [String: Any] = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+            kCVPixelBufferWidthKey as String: image.width,
+            kCVPixelBufferHeightKey as String: image.height,
+            kCVPixelBufferCGImageCompatibilityKey as String: true,
+            kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
+        ]
+        guard CVPixelBufferCreate(
+            kCFAllocatorDefault, image.width, image.height, kCVPixelFormatType_32BGRA,
+            attributes as CFDictionary, &buffer
+        ) == kCVReturnSuccess, let buffer else {
+            throw RecordingStudioExporter.ExportError.writerFailed(nil)
+        }
+        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        CIContext(options: [.cacheIntermediates: false]).render(
+            CIImage(cgImage: image),
+            to: buffer,
+            bounds: CGRect(x: 0, y: 0, width: image.width, height: image.height),
+            colorSpace: colorSpace
+        )
+        return buffer
+    }
+
     @concurrent
     private func run(
         _ configuration: Configuration,
@@ -160,17 +295,25 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> URL {
         try Task.checkCancellation()
-        let sourceAsset = AVURLAsset(url: configuration.screenURL)
-        let sourceDuration = try await sourceAsset.load(.duration).seconds
-        let clipTimeline = configuration.clipTimeline.normalized(to: sourceDuration)
+        let clipTimeline: RecordingClipTimeline
+        let screenAsset: AVAsset
+        if configuration.sources.isEmpty {
+            guard configuration.clipTimeline.segments.allSatisfy({ $0.sourceID == nil }) else {
+                throw RecordingStudioSourceResolver.ResolutionError.invalidSources
+            }
+            let sourceAsset = AVURLAsset(url: configuration.screenURL)
+            let sourceDuration = try await sourceAsset.load(.duration).seconds
+            clipTimeline = configuration.clipTimeline.normalized(to: sourceDuration)
+            screenAsset = try RecordingCompositionBuilder.makeAsset(
+                from: sourceAsset, timeline: clipTimeline, sourceDuration: sourceDuration)
+        } else {
+            clipTimeline = try RecordingStudioSourceResolver.validatedTimeline(configuration)
+            screenAsset = try await RecordingCompositionBuilder.makeAsset(
+                sources: configuration.sources, timeline: clipTimeline)
+        }
         guard clipTimeline.duration >= RecordingClipSegment.minimumDuration else {
             throw VideoTrimExportError.invalidRange
         }
-        let screenAsset = try RecordingCompositionBuilder.makeAsset(
-            from: sourceAsset,
-            timeline: clipTimeline,
-            sourceDuration: sourceDuration
-        )
         guard let videoTrack = try await screenAsset.loadTracks(withMediaType: .video).first else {
             throw ExportError.noVideoTrack
         }
@@ -189,6 +332,12 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         let canvasHeight = max(2, Int(outputSize.height.rounded()) & ~1)
         let canvasSize = CGSize(width: canvasWidth, height: canvasHeight)
 
+        let multiSourceRenderer: RecordingStudioMultiSourceRenderer? = if configuration.sources.isEmpty {
+            nil
+        } else {
+            try await RecordingStudioMultiSourceRenderer(configuration: configuration, canvasSize: canvasSize)
+        }
+
         // Readers
         let screenReader = try AVAssetReader(asset: screenAsset)
         let videoOutput = AVAssetReaderTrackOutput(
@@ -199,7 +348,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             ]
         )
         videoOutput.alwaysCopiesSampleData = false
-        screenReader.add(videoOutput)
+        if configuration.sources.isEmpty { screenReader.add(videoOutput) }
         screenReader.timeRange = exportTimeRange
 
         // An imported soundtrack replaces the recorded one wholesale, and it
@@ -209,7 +358,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         var audioOutput: AVAssetReaderAudioMixOutput?
         var replacementReader: AVAssetReader?
         if !configuration.exportSettings.removeAudio {
-            if let replacementURL = configuration.audioReplacementURL {
+            if configuration.sources.isEmpty, let replacementURL = configuration.audioReplacementURL {
                 let replacementAsset = AVURLAsset(url: replacementURL)
                 let replacementTracks = try await replacementAsset.loadTracks(withMediaType: .audio)
                 if !replacementTracks.isEmpty {
@@ -238,7 +387,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         }
 
         let cameraFeed = try await CameraFrameFeed(
-            url: configuration.cameraURL,
+            url: configuration.sources.isEmpty ? configuration.cameraURL : nil,
             offset: configuration.cameraOffset
         )
 
@@ -302,7 +451,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             audioInput = input
         }
 
-        guard screenReader.startReading() else {
+        if (configuration.sources.isEmpty || audioOutput != nil), !screenReader.startReading() {
             throw screenReader.error ?? ExportError.writerFailed(nil)
         }
         if let replacementReader, !replacementReader.startReading() {
@@ -322,11 +471,12 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
 
         do {
             async let videoDone: Void = pumpVideo(
-                output: videoOutput,
+                output: configuration.sources.isEmpty ? videoOutput : nil,
                 input: videoInput,
                 adaptor: adaptor,
                 compositor: compositor,
                 cameraFeed: cameraFeed,
+                multiSourceRenderer: multiSourceRenderer,
                 clipTimeline: clipTimeline,
                 frameRate: Double(configuration.exportSettings.effectiveFrameRate.framesPerSecond),
                 writer: writer,
@@ -361,6 +511,9 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             throw ExportError.cancelled
         }
 
+        if !configuration.sources.isEmpty {
+            writer.endSession(atSourceTime: CMTime(seconds: clipTimeline.duration, preferredTimescale: 600))
+        }
         await withCheckedContinuation { continuation in
             writer.finishWriting {
                 continuation.resume()
@@ -375,11 +528,12 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
     }
 
     private func pumpVideo(
-        output: AVAssetReaderTrackOutput,
+        output: AVAssetReaderTrackOutput?,
         input: AVAssetWriterInput,
         adaptor: AVAssetWriterInputPixelBufferAdaptor,
         compositor: StudioFrameCompositor,
         cameraFeed: CameraFrameFeed?,
+        multiSourceRenderer: RecordingStudioMultiSourceRenderer?,
         clipTimeline: RecordingClipTimeline,
         frameRate: Double,
         writer: AVAssetWriter,
@@ -397,7 +551,7 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         let frameCount = max(1, Int((duration * frameRate).rounded()))
 
         func nextSourceFrame() -> (buffer: CVPixelBuffer, time: TimeInterval)? {
-            while let sampleBuffer = output.copyNextSampleBuffer() {
+            while let sampleBuffer = output?.copyNextSampleBuffer() {
                 guard let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { continue }
                 return (buffer, CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds)
             }
@@ -454,7 +608,8 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
             // Ticks before the first source frame show it early rather than
             // emitting black; a capture with no frames at all has nothing to
             // render.
-            guard let sourceBuffer = currentBuffer ?? pending?.buffer else { break }
+            let sourceBuffer = currentBuffer ?? pending?.buffer
+            if sourceBuffer == nil && multiSourceRenderer == nil { break }
 
             guard let pool = adaptor.pixelBufferPool else {
                 throw ExportError.writerFailed(nil)
@@ -471,14 +626,18 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
                 kCVImageBufferYCbCrMatrixKey: kCVImageBufferYCbCrMatrix_ITU_R_709_2
             ] as CFDictionary, .shouldPropagate)
             try autoreleasepool {
-                let cameraBuffer = cameraFeed?.latestFrame(at: sourceTime)
-                let render = try compositor.startRender(
-                    screenFrame: sourceBuffer,
-                    cameraFrame: cameraBuffer,
-                    editorTime: editorTime,
-                    sourceTime: sourceTime,
-                    into: destinationBuffer
-                )
+                let render: (task: CIRenderTask, image: CIImage)
+                if let multiSourceRenderer {
+                    render = try multiSourceRenderer.startRender(at: editorTime, into: destinationBuffer)
+                } else if let sourceBuffer {
+                    render = try compositor.startRender(
+                        screenFrame: sourceBuffer,
+                        cameraFrame: cameraFeed?.latestFrame(at: sourceTime),
+                        editorTime: editorTime, sourceTime: sourceTime,
+                        into: destinationBuffer)
+                } else {
+                    throw ExportError.noVideoTrack
+                }
 
                 let pts = CMTime(seconds: editorTime, preferredTimescale: 600)
                 pendingFrames.append((render.task, render.image, destinationBuffer, pts))
@@ -569,6 +728,189 @@ nonisolated final class RecordingStudioExporter: @unchecked Sendable {
         case .low: factor = 1.25
         }
         return max(2_500_000, Int(Double(width * height) * factor))
+    }
+}
+
+/// One serial render owner, shared by still previews and encoded multi-source frames.
+nonisolated final class RecordingStudioMultiSourceRenderer: @unchecked Sendable {
+    private struct Source {
+        let configuration: RecordingStudioExporter.Configuration
+        let screen: SourceFrameFeed
+        let camera: SourceFrameFeed?
+        let size: CGSize
+        let origin: CGPoint
+    }
+    private let configuration: RecordingStudioExporter.Configuration
+    private let canvasSize: CGSize
+    private var sources: [UUID: Source] = [:]
+    private var activeSourceID: UUID?
+    private var activeCompositor: StudioFrameCompositor?
+    private let context = CIContext(options: [.cacheIntermediates: false])
+    private let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+
+    init(configuration: RecordingStudioExporter.Configuration, canvasSize: CGSize) async throws {
+        _ = try RecordingStudioSourceResolver.validatedTimeline(configuration)
+        guard canvasSize.width.isFinite, canvasSize.height.isFinite,
+              canvasSize.width > 0, canvasSize.height > 0 else {
+            throw RecordingStudioExporter.ExportError.noVideoTrack
+        }
+        self.configuration = configuration
+        self.canvasSize = canvasSize
+        for source in configuration.sources {
+            try Task.checkCancellation()
+            let leaf = source.configuration
+            guard leaf.canvasSize.width.isFinite, leaf.canvasSize.height.isFinite,
+                  leaf.canvasSize.width > 0, leaf.canvasSize.height > 0 else {
+                throw RecordingStudioExporter.ExportError.noVideoTrack
+            }
+            let screen = try await SourceFrameFeed(url: leaf.screenURL)
+            let camera: SourceFrameFeed?
+            if let cameraURL = leaf.cameraURL {
+                camera = try await SourceFrameFeed(url: cameraURL)
+            } else {
+                camera = nil
+            }
+            let fitted = source.fittedCanvasRect(in: canvasSize)
+            guard fitted.width.isFinite, fitted.height.isFinite, fitted.width > 0, fitted.height > 0 else {
+                throw RecordingStudioExporter.ExportError.noVideoTrack
+            }
+            sources[source.id] = Source(configuration: leaf, screen: screen, camera: camera,
+                size: fitted.size, origin: fitted.origin)
+        }
+    }
+
+    func composedImage(at editorTime: TimeInterval) throws -> CIImage {
+        guard let location = RecordingStudioSourceResolver.location(at: editorTime,
+            timeline: configuration.clipTimeline, sources: configuration.sources),
+              let source = sources[location.sourceID] else {
+            throw VideoTrimExportError.invalidRange
+        }
+        let compositor: StudioFrameCompositor
+        if activeSourceID == location.sourceID, let activeCompositor {
+            compositor = activeCompositor
+        } else {
+            if let activeSourceID, let previous = sources[activeSourceID] {
+                previous.screen.reset()
+                previous.camera?.reset()
+            }
+            activeCompositor = nil
+            compositor = StudioFrameCompositor(configuration: source.configuration,
+                canvasSize: source.size, includeBubble: source.camera != nil)
+            activeCompositor = compositor
+            activeSourceID = location.sourceID
+        }
+        let screen = try source.screen.frame(at: location.rawSourceTime)
+        let camera = try source.camera?.frame(at: max(0, location.rawSourceTime - source.configuration.cameraOffset))
+        let image = try compositor.composedImage(screenFrame: screen, cameraFrame: camera,
+            editorTime: location.sourceEditorTime, sourceTime: location.rawSourceTime)
+        let canvas = CGRect(origin: .zero, size: canvasSize)
+        return image.transformed(by: CGAffineTransform(translationX: source.origin.x, y: source.origin.y))
+            .composited(over: CIImage(color: .black).cropped(to: canvas)).cropped(to: canvas)
+    }
+
+    func startRender(at editorTime: TimeInterval, into buffer: CVPixelBuffer) throws -> (task: CIRenderTask, image: CIImage) {
+        let image = try composedImage(at: editorTime)
+        let destination = CIRenderDestination(pixelBuffer: buffer)
+        destination.colorSpace = colorSpace
+        return (try context.startTask(toRender: image, to: destination), image)
+    }
+}
+
+/// Decodes forward once; replaying an earlier source range resets both cached frames.
+nonisolated private final class SourceFrameFeed {
+    private let asset: AVURLAsset
+    private let track: AVAssetTrack
+    private let transform: CGAffineTransform
+    private var context: CIContext?
+    private var reader: AVAssetReader?
+    private var output: AVAssetReaderTrackOutput?
+    private var current: CVPixelBuffer?
+    private var transformedCurrent: CVPixelBuffer?
+    private var pending: (buffer: CVPixelBuffer, time: TimeInterval)?
+    private var lastTime = -Double.infinity
+    private var finished = false
+
+    init(url: URL) async throws {
+        asset = AVURLAsset(url: url)
+        guard let track = try await asset.loadTracks(withMediaType: .video).first else {
+            throw RecordingStudioExporter.ExportError.noVideoTrack
+        }
+        self.track = track
+        transform = try await track.load(.preferredTransform)
+    }
+
+    deinit { reader?.cancelReading() }
+
+    func reset() {
+        reader?.cancelReading()
+        reader = nil
+        output = nil
+        current = nil
+        transformedCurrent = nil
+        pending = nil
+        context = nil
+        lastTime = -Double.infinity
+        finished = false
+    }
+
+    func frame(at time: TimeInterval) throws -> CVPixelBuffer {
+        if reader == nil || time < lastTime {
+            reset()
+            let reader = try AVAssetReader(asset: asset)
+            let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+                kCVPixelBufferIOSurfacePropertiesKey as String: [:]
+            ])
+            output.alwaysCopiesSampleData = false
+            reader.add(output)
+            guard reader.startReading() else {
+                throw reader.error ?? RecordingStudioExporter.ExportError.noVideoTrack
+            }
+            self.reader = reader
+            self.output = output
+        }
+        lastTime = time
+        while !finished {
+            try Task.checkCancellation()
+            if let pending {
+                // Nested clip arithmetic can land a few ULPs below an exact source-frame timestamp.
+                guard pending.time <= time + 1e-9 || current == nil else { break }
+                current = pending.buffer
+                transformedCurrent = nil
+                self.pending = nil
+            }
+            guard let sample = output?.copyNextSampleBuffer() else {
+                if reader?.status == .failed {
+                    throw reader?.error ?? RecordingStudioExporter.ExportError.noVideoTrack
+                }
+                finished = true
+                break
+            }
+            guard let buffer = CMSampleBufferGetImageBuffer(sample) else { continue }
+            pending = (buffer, CMSampleBufferGetPresentationTimeStamp(sample).seconds)
+        }
+        guard let current else { throw RecordingStudioExporter.ExportError.noVideoTrack }
+        guard transform != .identity else { return current }
+        if let transformedCurrent { return transformedCurrent }
+        let image = CIImage(cvPixelBuffer: current).transformed(by: transform)
+        let extent = image.extent.integral
+        var transformed: CVPixelBuffer?
+        let attributes: [String: Any] = [
+            kCVPixelBufferIOSurfacePropertiesKey as String: [:],
+            kCVPixelBufferMetalCompatibilityKey as String: true
+        ]
+        guard CVPixelBufferCreate(kCFAllocatorDefault, Int(extent.width), Int(extent.height),
+            kCVPixelFormatType_32BGRA, attributes as CFDictionary, &transformed) == kCVReturnSuccess,
+              let transformed else {
+            throw RecordingStudioExporter.ExportError.writerFailed(nil)
+        }
+        let context = self.context ?? CIContext(options: [.cacheIntermediates: false])
+        self.context = context
+        context.render(image.transformed(by: CGAffineTransform(translationX: -extent.minX, y: -extent.minY)),
+            to: transformed, bounds: CGRect(origin: .zero, size: extent.size),
+            colorSpace: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB())
+        transformedCurrent = transformed
+        return transformed
     }
 }
 

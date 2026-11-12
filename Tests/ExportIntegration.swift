@@ -34,6 +34,72 @@ struct ExportIntegration {
         precondition(!AppPreferences.saveDirectory.hasPrefix(NSHomeDirectory() + "/Desktop"),
                      "Tests must never default to the real Desktop")
         precondition(R2CredentialStore.shared.keychainAccess == .empty)
+        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_AGENT_EFFECTS"] == "1" {
+            try checkRecordingAgentEffectsParsing()
+            try await checkRecordingAgentEffects(
+                movieURL: URL(fileURLWithPath: "Resources/Onboarding/recording-demo.mp4"))
+            return
+        }
+        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_NESTED_IMPORT"] == "1" {
+            try await checkRecordingNestedImports(
+                movieURL: URL(fileURLWithPath: "Resources/Onboarding/recording-demo.mp4"))
+            return
+        }
+        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_MULTI_SOURCE_UI"] == "1"
+            || ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_MULTI_SOURCE_WINDOWS"] == "1" {
+            try await checkRecordingMultiSourceUI(
+                movieURL: URL(fileURLWithPath: "Resources/Onboarding/recording-demo.mp4"))
+            return
+        }
+        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_AGENT_MULTI_SOURCE"] == "1" {
+            try await checkRecordingAgentMultiSource(
+                movieURL: URL(fileURLWithPath: "Resources/Onboarding/recording-demo.mp4"))
+            return
+        }
+        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_MULTI_SOURCE_MODEL"] == "1" {
+            try await checkRecordingMultiSourceModel(
+                movieURL: URL(fileURLWithPath: "Resources/Onboarding/recording-demo.mp4")
+            )
+            return
+        }
+        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_MULTI_SOURCE"] == "1" {
+            try await checkRecordingSourceConfigurations(
+                movieURL: URL(fileURLWithPath: "Resources/Onboarding/recording-demo.mp4")
+            )
+            try await checkRecordingMultiSourceCompositing(
+                movieURL: URL(fileURLWithPath: "Resources/Onboarding/recording-demo.mp4")
+            )
+            try await checkRecordingMultiSourceModel(
+                movieURL: URL(fileURLWithPath: "Resources/Onboarding/recording-demo.mp4")
+            )
+            return
+        }
+        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_AGENT_ACCESS"] == "1" {
+            try await checkRecordingAgentAccess(
+                movieURL: URL(fileURLWithPath: "Resources/Onboarding/recording-demo.mp4")
+            )
+            return
+        }
+        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_AGENT_EDITING"] == "1" {
+            try await checkRecordingEditRevisionAndSave(
+                movieURL: URL(fileURLWithPath: "Resources/Onboarding/recording-demo.mp4")
+            )
+            try await checkRecordingRendererFreshness(
+                movieURL: URL(fileURLWithPath: "Resources/Onboarding/recording-demo.mp4")
+            )
+            try await checkRecordingAgentOperations(
+                movieURL: URL(fileURLWithPath: "Resources/Onboarding/recording-demo.mp4")
+            )
+            return
+        }
+        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_RECORDING_SAVE"] == "1" {
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            try await checkStudioSaveUpdatesSavedVideo(
+                movie: URL(fileURLWithPath: "Resources/Onboarding/recording-demo.mp4"), directory: directory)
+            return
+        }
         if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_CAPTURE_UI"] == "1" {
             try checkCaptureControlsUI()
             return

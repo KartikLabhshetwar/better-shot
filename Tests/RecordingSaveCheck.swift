@@ -1,5 +1,20 @@
 import Foundation
 
+// RecordingDeliverable's production implementation consults the live editor
+// registry, but this isolated save check only exercises disk-only sessions.
+typealias RecordingEditDocument = Int
+
+struct RecordingStudioDocumentSnapshot {
+    let document: Int
+}
+
+@MainActor
+final class StudioProjectRegistry {
+    static let shared = StudioProjectRegistry()
+    func snapshot(for sessionURL: URL) -> RecordingStudioDocumentSnapshot? { nil }
+    func hasOpenProject(for sessionURL: URL) -> Bool { false }
+}
+
 @MainActor
 struct RecordingSession {
     let directoryURL: URL

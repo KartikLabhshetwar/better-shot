@@ -81,6 +81,16 @@ nonisolated final class RecordingAudioExporter: @unchecked Sendable {
         /// the edited timeline's length.
         let replacementURL: URL?
         let format: RecordingAudioFormat
+        let sources: [RecordingStudioSourceConfiguration]
+
+        init(screenURL: URL, clipTimeline: RecordingClipTimeline, replacementURL: URL?,
+             format: RecordingAudioFormat, sources: [RecordingStudioSourceConfiguration] = []) {
+            self.screenURL = screenURL
+            self.clipTimeline = clipTimeline
+            self.replacementURL = replacementURL
+            self.format = format
+            self.sources = sources
+        }
     }
 
     enum ExportError: LocalizedError {
@@ -101,22 +111,29 @@ nonisolated final class RecordingAudioExporter: @unchecked Sendable {
         _ configuration: Configuration,
         progress: @escaping @Sendable (Double) -> Void
     ) async throws -> URL {
-        let sourceAsset = AVURLAsset(url: configuration.screenURL)
-        let sourceDuration = try await sourceAsset.load(.duration).seconds
-        let timeline = configuration.clipTimeline.normalized(to: sourceDuration)
+        let timeline: RecordingClipTimeline
+        let audioAsset: AVAsset
+        if configuration.sources.isEmpty {
+            guard configuration.clipTimeline.segments.allSatisfy({ $0.sourceID == nil }) else {
+                throw RecordingStudioSourceResolver.ResolutionError.invalidSources
+            }
+            let sourceAsset = AVURLAsset(url: configuration.screenURL)
+            let sourceDuration = try await sourceAsset.load(.duration).seconds
+            timeline = configuration.clipTimeline.normalized(to: sourceDuration)
+            if let replacementURL = configuration.replacementURL {
+                audioAsset = AVURLAsset(url: replacementURL)
+            } else {
+                audioAsset = try RecordingCompositionBuilder.makeAsset(
+                    from: sourceAsset, timeline: timeline, sourceDuration: sourceDuration)
+            }
+        } else {
+            timeline = configuration.clipTimeline
+            audioAsset = try await RecordingCompositionBuilder.makeAsset(
+                sources: configuration.sources, timeline: timeline)
+        }
         let duration = timeline.duration
         guard duration >= RecordingClipSegment.minimumDuration else {
             throw VideoTrimExportError.invalidRange
-        }
-
-        let audioAsset: AVAsset = if let replacementURL = configuration.replacementURL {
-            AVURLAsset(url: replacementURL)
-        } else {
-            try RecordingCompositionBuilder.makeAsset(
-                from: sourceAsset,
-                timeline: timeline,
-                sourceDuration: sourceDuration
-            )
         }
 
         let tracks = try await audioAsset.loadTracks(withMediaType: .audio)
@@ -131,7 +148,15 @@ nonisolated final class RecordingAudioExporter: @unchecked Sendable {
             start: .zero,
             duration: CMTime(seconds: duration, preferredTimescale: 600)
         )
-        let output = AVAssetReaderAudioMixOutput(audioTracks: tracks, audioSettings: nil)
+        let audioSettings: [String: Any]? = configuration.sources.isEmpty ? nil : [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: 48_000,
+            AVNumberOfChannelsKey: 2,
+            AVLinearPCMIsFloatKey: true,
+            AVLinearPCMBitDepthKey: 32,
+            AVLinearPCMIsNonInterleaved: false
+        ]
+        let output = AVAssetReaderAudioMixOutput(audioTracks: tracks, audioSettings: audioSettings)
         output.alwaysCopiesSampleData = false
         reader.add(output)
 
@@ -153,8 +178,24 @@ nonisolated final class RecordingAudioExporter: @unchecked Sendable {
         writer.startSession(atSourceTime: .zero)
 
         do {
-            while let sampleBuffer = output.copyNextSampleBuffer() {
+            while var sampleBuffer = output.copyNextSampleBuffer() {
                 try Task.checkCancellation()
+                if !configuration.sources.isEmpty {
+                    // Retimed audio can outlast the reader range; bound actual PCM before encoding.
+                    let remaining = CMTime(seconds: duration, preferredTimescale: 600)
+                        - CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+                    let frames = CMTimeConvertScale(remaining, timescale: 48_000, method: .roundTowardZero)
+                    guard frames.isNumeric else { throw ExportError.writerFailed(nil) }
+                    if frames.value <= 0 { break }
+                    if frames.value < CMSampleBufferGetNumSamples(sampleBuffer) {
+                        var bounded: CMSampleBuffer?
+                        let status = CMSampleBufferCopySampleBufferForRange(
+                            allocator: kCFAllocatorDefault, sampleBuffer: sampleBuffer,
+                            sampleRange: CFRange(location: 0, length: Int(frames.value)), sampleBufferOut: &bounded)
+                        guard status == noErr, let bounded else { throw ExportError.writerFailed(nil) }
+                        sampleBuffer = bounded
+                    }
+                }
                 while !input.isReadyForMoreMediaData {
                     try Task.checkCancellation()
                     try await Task.sleep(nanoseconds: 2_000_000)
@@ -177,6 +218,9 @@ nonisolated final class RecordingAudioExporter: @unchecked Sendable {
             throw error
         }
 
+        if !configuration.sources.isEmpty {
+            writer.endSession(atSourceTime: CMTime(seconds: duration, preferredTimescale: 600))
+        }
         input.markAsFinished()
         await withCheckedContinuation { continuation in
             writer.finishWriting {
@@ -207,6 +251,8 @@ nonisolated final class RecordingAudioExporter: @unchecked Sendable {
 /// synchronously while the user drags a trim handle.
 nonisolated struct RecordingReplacementAudio {
     let url: URL
+    // AVAssetTrack holds its asset weakly; keep it alive for later composition rebuilds.
+    let asset: AVURLAsset
     /// The file's name as the user chose it, for the inspector.
     let displayName: String
     let track: AVAssetTrack
@@ -222,6 +268,7 @@ nonisolated struct RecordingReplacementAudio {
         }
         return RecordingReplacementAudio(
             url: url,
+            asset: asset,
             displayName: displayName,
             track: track,
             duration: duration

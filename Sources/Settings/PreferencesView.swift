@@ -5,13 +5,13 @@ import UniformTypeIdentifiers
 import ServiceManagement
 
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case home, general, capture, overlay, recording, shortcuts, sharing, about
+    case home, general, capture, overlay, recording, agentAccess, shortcuts, sharing, about
 
     var id: String { rawValue }
 
     static let sidebar: [(title: String?, sections: [SettingsSection])] = [
         (nil, [.home]),
-        ("Settings", [.general, .capture, .overlay, .recording, .shortcuts, .sharing]),
+        ("Settings", [.general, .capture, .overlay, .recording, .agentAccess, .shortcuts, .sharing]),
         ("BetterShot", [.about]),
     ]
 
@@ -22,6 +22,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .capture: "Capture"
         case .overlay: "Overlay"
         case .recording: "Recording"
+        case .agentAccess: "Agent Access"
         case .shortcuts: "Shortcuts"
         case .sharing: "Sharing"
         case .about: "About"
@@ -35,6 +36,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .capture: "camera.viewfinder"
         case .overlay: "macwindow.on.rectangle"
         case .recording: "video"
+        case .agentAccess: "network"
         case .shortcuts: "keyboard"
         case .sharing: "icloud.and.arrow.up"
         case .about: "info.circle"
@@ -122,6 +124,7 @@ struct PreferencesView: View {
         case .capture: CaptureSettingsTab()
         case .overlay: OverlaySettingsTab()
         case .recording: RecordingSettingsTab()
+        case .agentAccess: RecordingAgentAccessSettingsTab()
         case .shortcuts: ShortcutSettingsTab()
         case .sharing: SharingSettingsTab()
         case .about: AboutTab()

@@ -27,6 +27,10 @@ struct RecordingClipTimelineView: NSViewRepresentable {
     /// anchor is the time under the pointer, which the caller keeps pinned to
     /// its current screen position while the scale changes.
     let onZoom: (Double, TimeInterval) -> Void
+    var sourceDurations: [UUID: TimeInterval] = [:]
+    var sourceNames: [UUID: String] = [:]
+    var onMoveClip: (UUID, Int) -> Void = { _, _ in }
+    var allowsClipEditing = true
     var isSplitting = false
     var onToggleSplit: () -> Void = {}
 
@@ -60,7 +64,11 @@ struct RecordingClipTimelineView: NSViewRepresentable {
             onTrim: onTrim,
             onZoom: onZoom
         )
-        nsView.isSplitting = isSplitting
+        nsView.sourceDurations = sourceDurations
+        nsView.sourceNames = sourceNames
+        nsView.moveRequested = onMoveClip
+        nsView.allowsClipEditing = allowsClipEditing
+        nsView.isSplitting = isSplitting && allowsClipEditing
         nsView.toggleSplitRequested = onToggleSplit
         nsView.update(
             timeline: timeline,
@@ -152,6 +160,10 @@ struct RecordingClipTimelineView: NSViewRepresentable {
 }
 
 final class RecordingClipTimelineControl: NSView {
+    var sourceDurations: [UUID: TimeInterval] = [:]
+    var sourceNames: [UUID: String] = [:]
+    var moveRequested: ((UUID, Int) -> Void)?
+    var allowsClipEditing = true
     var isSplitting = false
     var toggleSplitRequested: (() -> Void)?
     var selectionDidChange: ((UUID) -> Void)?
@@ -240,6 +252,10 @@ final class RecordingClipTimelineControl: NSView {
         }
         self.selectedClipID = selectedClipID
         self.playheadTime = min(max(playheadTime, 0), max(timeline.duration, 0))
+        let sourceID = timeline.segments.first(where: { $0.id == selectedClipID })?.sourceID
+        let source = sourceID.flatMap { sourceNames[$0] }
+        setAccessibilityLabel(source.map { "Recording timeline, selected recording: \($0)" } ?? "Recording timeline")
+        setAccessibilityHelp(sourceDurations.isEmpty ? "Select and trim clips" : "Select and trim clips. Control Option Left or Right moves the selected clip.")
         needsDisplay = true
     }
 
@@ -291,7 +307,7 @@ final class RecordingClipTimelineControl: NSView {
     }
 
     override func cursorUpdate(with event: NSEvent) {
-        if hoveredEdge != nil && !isSplitting {
+        if allowsClipEditing && hoveredEdge != nil && !isSplitting {
             NSCursor.resizeLeftRight.set()
         } else {
             NSCursor.crosshair.set()
@@ -311,7 +327,7 @@ final class RecordingClipTimelineControl: NSView {
             return
         }
         guard let location = timeline.location(at: time) else { return }
-        let edgeHit = edgeHit(at: point)
+        let edgeHit = allowsClipEditing ? edgeHit(at: point) : nil
         let targetClipID = edgeHit?.clipID ?? location.segmentID
 
         if selectedClipID != targetClipID {
@@ -449,20 +465,26 @@ final class RecordingClipTimelineControl: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
+        if allowsClipEditing, !sourceDurations.isEmpty,
+           event.modifierFlags.intersection(.deviceIndependentFlagsMask) == [.control, .option],
+           let selectedClipID, event.keyCode == 123 || event.keyCode == 124 {
+            moveRequested?(selectedClipID, event.keyCode == 123 ? -1 : 1)
+            return
+        }
         let action = ShortcutService.shared.action(keyCode: UInt32(event.keyCode),
             modifiers: ShortcutService.Shortcut.modifiers(from: event.modifierFlags), scope: .video)
-        if action == .videoSplitTool {
+        if allowsClipEditing, action == .videoSplitTool {
             toggleSplitRequested?()
             return
         }
-        if action == .videoCut {
+        if allowsClipEditing, action == .videoCut {
             let target = hoveredClipID != nil ? hoverTime ?? playheadTime : playheadTime
             if let time = splitTime(near: target, allowSnap: !NSEvent.modifierFlags.contains(.option)) {
                 splitRequested?(time)
             }
             return
         }
-        if action == .videoDelete {
+        if allowsClipEditing, action == .videoDelete {
             deleteRequested?()
             return
         }
@@ -489,7 +511,7 @@ final class RecordingClipTimelineControl: NSView {
         )
         split.target = self
         split.image = NSImage(systemSymbolName: "scissors", accessibilityDescription: nil)
-        split.isEnabled = splitTime(near: time, allowSnap: true) != nil
+        split.isEnabled = allowsClipEditing && splitTime(near: time, allowSnap: true) != nil
         menu.addItem(split)
 
         menu.addItem(.separator())
@@ -501,9 +523,29 @@ final class RecordingClipTimelineControl: NSView {
         )
         delete.target = self
         delete.image = NSImage(systemSymbolName: "trash", accessibilityDescription: nil)
-        delete.isEnabled = timeline.segments.count > 1
+        delete.isEnabled = allowsClipEditing && timeline.segments.count > 1
         menu.addItem(delete)
+        if !sourceDurations.isEmpty {
+            menu.addItem(.separator())
+            for (title, delta, selector) in [
+                ("Move Clip Earlier", -1, #selector(moveEarlier)),
+                ("Move Clip Later", 1, #selector(moveLater))
+            ] {
+                let item = NSMenuItem(title: title, action: selector, keyEquivalent: "")
+                item.target = self
+                item.isEnabled = allowsClipEditing && timeline.segments.indices.contains(location.segmentIndex + delta)
+                menu.addItem(item)
+            }
+        }
         return menu
+    }
+
+    @objc private func moveEarlier() {
+        if let contextClipID { moveRequested?(contextClipID, -1) }
+    }
+
+    @objc private func moveLater() {
+        if let contextClipID { moveRequested?(contextClipID, 1) }
     }
 
     @objc private func splitFromContextMenu() {
@@ -559,7 +601,8 @@ final class RecordingClipTimelineControl: NSView {
         guard let dragStartPoint,
               let startTimeline = dragStartTimeline,
               let original = dragStartClip,
-              let index = startTimeline.segments.firstIndex(where: { $0.id == clipID }) else {
+              let trimBounds = startTimeline.trimBounds(for: clipID, sourceDuration: sourceDuration,
+                                                       sourceDurations: sourceDurations) else {
             return
         }
 
@@ -570,22 +613,18 @@ final class RecordingClipTimelineControl: NSView {
         let editorDelta = Double((point.x - dragStartPoint.x) / max(timelineRect.width, 1))
             * startTimeline.duration
         let delta = editorDelta * original.speed
-        let previousEnd = index > 0 ? startTimeline.segments[index - 1].sourceEnd : 0
-        let nextStart = index + 1 < startTimeline.segments.count
-            ? startTimeline.segments[index + 1].sourceStart
-            : sourceDuration
         var replacement = original
 
         switch edge {
         case .leading:
             replacement.sourceStart = min(
-                max(original.sourceStart + delta, previousEnd),
+                max(original.sourceStart + delta, trimBounds.lowerBound),
                 original.sourceEnd - RecordingClipSegment.minimumDuration
             )
         case .trailing:
             replacement.sourceEnd = max(
                 original.sourceStart + RecordingClipSegment.minimumDuration,
-                min(original.sourceEnd + delta, nextStart)
+                min(original.sourceEnd + delta, trimBounds.upperBound)
             )
         }
         timeline = startTimeline.replacing(replacement)
@@ -687,6 +726,16 @@ final class RecordingClipTimelineControl: NSView {
             drawThumbnails(in: rect, clip: clip, dirtyRect: dirtyRect)
             NSColor.black.withAlphaComponent(0.08).setFill()
             rect.intersection(dirtyRect).fill()
+            if let sourceID = clip.sourceID, let name = sourceNames[sourceID], rect.width > 36 {
+                let text = name as NSString
+                let labelRect = CGRect(x: rect.minX + 9, y: rect.maxY - 18, width: max(0, rect.width - 18), height: 15)
+                let paragraph = NSMutableParagraphStyle()
+                paragraph.lineBreakMode = .byTruncatingTail
+                NSColor.black.withAlphaComponent(0.55).setFill()
+                labelRect.insetBy(dx: -3, dy: -1).fill()
+                text.draw(in: labelRect, withAttributes: [.font: NSFont.systemFont(ofSize: 10),
+                    .foregroundColor: NSColor.white, .paragraphStyle: paragraph])
+            }
             NSGraphicsContext.restoreGraphicsState()
         }
     }
@@ -704,7 +753,7 @@ final class RecordingClipTimelineControl: NSView {
         let pointsPerSourceSecond = rect.width / CGFloat(clip.duration)
         guard pointsPerSourceSecond > 0 else { return }
         let grid = thumbnails.grid(
-            forTargetSpan: Double(Metrics.thumbnailWidth / pointsPerSourceSecond)
+            forTargetSpan: Double(Metrics.thumbnailWidth / pointsPerSourceSecond), sourceID: clip.sourceID
         )
         guard grid.spacing > 0 else { return }
 
@@ -721,7 +770,7 @@ final class RecordingClipTimelineControl: NSView {
             let tileStart = max(Double(index) * grid.spacing, clip.sourceStart)
             let tileEnd = min(Double(index + 1) * grid.spacing, clip.sourceEnd)
             guard tileEnd > tileStart,
-                  let image = thumbnails.image(in: grid, tileIndex: index) else { continue }
+                  let image = thumbnails.image(in: grid, tileIndex: index, sourceID: clip.sourceID) else { continue }
             let minX = rect.minX
                 + CGFloat(tileStart - clip.sourceStart) * pointsPerSourceSecond
             let maxX = rect.minX
@@ -809,7 +858,7 @@ final class RecordingClipTimelineControl: NSView {
     }
 
     private func drawHoverEdgeHandle() {
-        guard !isSplitting else { return }
+        guard allowsClipEditing, !isSplitting else { return }
         let target: (clipID: UUID, edge: Edge)?
         if case .trim(let clipID, let edge) = dragTarget {
             target = (clipID, edge)

@@ -48,6 +48,7 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
                 Self.promptRestart()
             }
         }
+        Task { await RecordingAgentAccessController.shared.startIfEnabled() }
         didFinishLaunching = true
         performPendingURLActions()
     }
@@ -89,12 +90,23 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         ShortcutService.shared.unregisterAll()
+        Task { await RecordingAgentAccessController.shared.stopForTermination() }
     }
 
     /// Quitting mid-recording finishes and saves the recording first, and
     /// Studio's debounced autosave is flushed so no edit is lost.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         StudioProjectRegistry.shared.flushDrafts()
+        if StudioProjectRegistry.shared.hasActiveSourceTransactions {
+            NSApp.activate(ignoringOtherApps: true)
+            let alert = NSAlert()
+            alert.alertStyle = .informational
+            alert.messageText = "Finish adding or editing recordings before quitting"
+            alert.informativeText = "Return to Studio and choose Add Recording, Apply, or Cancel. Your pending recording changes are still open."
+            alert.addButton(withTitle: "Return to Studio")
+            alert.runModal()
+            return .terminateCancel
+        }
         guard ScreenRecordingManager.shared.isActive else { return .terminateNow }
 
         NSApp.activate(ignoringOtherApps: true)
