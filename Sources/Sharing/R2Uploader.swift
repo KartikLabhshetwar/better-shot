@@ -218,13 +218,14 @@ final class R2Uploader {
         throw R2UploadError(message: parseErrorMessage(data: data, statusCode: http.statusCode, credentials: credentials))
     }
 
+    /// Viewer links end in `s/<slug>` and direct file links in `s/<slug>/<file>`. Read from the end:
+    /// the Public Bucket URL in front of a direct link may contain any folder, including one named `s`.
     nonisolated static func slug(fromShareLink link: String) -> String? {
-        guard let components = URL(string: link)?.pathComponents,
-              let index = components.firstIndex(of: "s"),
-              index + 1 < components.count else {
-            return nil
-        }
-        return components[index + 1]
+        guard let components = URL(string: link)?.pathComponents else { return nil }
+        let count = components.count
+        if count >= 2, components[count - 2] == "s" { return components[count - 1] }
+        if count >= 3, components[count - 3] == "s" { return components[count - 2] }
+        return nil
     }
 
     /// Removes every object behind a share link: media, poster, and manifest.

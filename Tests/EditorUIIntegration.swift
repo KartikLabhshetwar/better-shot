@@ -1569,6 +1569,23 @@ private func checkGalleryDeletion(imageURL: URL, movieURL: URL, root: URL) async
     precondition(MediaGalleryItem.deletionSlug(for: link, publicBaseURL: "https://cdn.example.com") == "test-share")
     precondition(MediaGalleryItem.deletionSlug(for: link, publicBaseURL: "https://other.example.com") == nil)
     precondition(MediaGalleryItem.deletionSlug(for: URL(string: "https://example.com/s/other")!, publicBaseURL: "https://cdn.example.com") == nil)
+    // A bucket may be served from a folder, even one named s like the share prefix.
+    for base in ["https://cdn.example.com", "https://cdn.example.com/files", "https://cdn.example.com/s"] {
+        precondition(MediaGalleryItem.deletionSlug(for: ShareBundle.pageURL(id: "test-share", publicBaseURL: base)!,
+                                                   publicBaseURL: base) == "test-share")
+        for filename in ["clip.mp4", "my clip.mp4"] {
+            let direct = ShareBundle.directURL(id: "test-share", filename: filename, publicBaseURL: base)!
+            precondition(MediaGalleryItem.deletionSlug(for: direct, publicBaseURL: base) == "test-share",
+                         "Direct file links must be deletable with the Public Bucket URL that created them: \(direct)")
+            precondition(MediaGalleryItem.deletionSlug(for: direct, publicBaseURL: base + "/") == "test-share")
+            precondition(MediaGalleryItem.deletionSlug(for: direct, publicBaseURL: "https://other.example.com") == nil,
+                         "Direct file links from other storage must not be deleted")
+        }
+    }
+    for path in ["s/test-share", "s/test-share/extra/clip.mp4", "files/s/test-share/clip.mp4", "s/s/test-share/clip.mp4"] {
+        precondition(MediaGalleryItem.deletionSlug(for: URL(string: "https://cdn.example.com/" + path)!,
+                                                   publicBaseURL: "https://cdn.example.com") == nil)
+    }
     let trash = root.appendingPathComponent("trash", isDirectory: true)
     try fm.createDirectory(at: trash, withIntermediateDirectories: true)
     let targets = MediaGalleryItem.deletionTargets(entry.deletionURLs)
