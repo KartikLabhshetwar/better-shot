@@ -27,17 +27,20 @@ struct BetterShotApp: App {
             }
         }
 
+        // The delegate handles opened files and links; otherwise SwiftUI also opens an empty editor for each.
         WindowGroup("BetterShot Annotate", id: "ANNOTATION_EDITOR", for: URL.self) { value in
             AnnotationEditorWindow(url: value)
         }
         .windowResizability(.contentMinSize)
         .defaultSize(width: 1100, height: 760)
+        .handlesExternalEvents(matching: [])
 
         WindowGroup("BetterShot Recording Editor", id: "VIDEO_EDITOR", for: URL.self) { value in
             RecordingStudioWindow(url: value)
         }
         .windowResizability(.contentMinSize)
         .defaultSize(width: 1360, height: 860)
+        .handlesExternalEvents(matching: [])
     }
 
     /// The menu bar popover, preview card, and settings history are
