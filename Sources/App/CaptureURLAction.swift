@@ -1,4 +1,5 @@
 import Foundation
+import UniformTypeIdentifiers
 
 nonisolated enum CaptureURLAction: String, CaseIterable {
     case region = "capture/region"
@@ -17,5 +18,13 @@ nonisolated enum CaptureURLAction: String, CaseIterable {
               components.query == nil, components.fragment == nil,
               let host = components.host else { return nil }
         self.init(rawValue: host.lowercased() + components.path)
+    }
+}
+
+/// Finder's Open With delivers files through the same callback as `bettershot://` links.
+nonisolated enum OpenedImageFile {
+    static func isEditable(_ url: URL) -> Bool {
+        guard url.isFileURL, let type = UTType(filenameExtension: url.pathExtension) else { return false }
+        return type.conforms(to: .image)
     }
 }

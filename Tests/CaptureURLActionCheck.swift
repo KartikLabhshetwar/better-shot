@@ -16,6 +16,17 @@ struct CaptureURLActionCheck {
         ] {
             assert(CaptureURLAction(url: URL(string: value)!) == nil, value)
         }
-        print("CaptureURLActionCheck: URL routes and malformed URL rejection verified")
+        for path in ["/tmp/a.png", "/tmp/a.jpg", "/tmp/a.jpeg", "/tmp/A.PNG", "/tmp/a.heic"] {
+            assert(OpenedImageFile.isEditable(URL(fileURLWithPath: path)), path)
+            assert(CaptureURLAction(url: URL(fileURLWithPath: path)) == nil, path)
+        }
+        // Open With > Other… can pass any file.
+        for path in ["/tmp/a.mov", "/tmp/a.txt", "/tmp/a.pdf", "/tmp/a"] {
+            assert(!OpenedImageFile.isEditable(URL(fileURLWithPath: path)), path)
+        }
+        for value in ["https://example.com/a.png", "bettershot://capture/region"] {
+            assert(!OpenedImageFile.isEditable(URL(string: value)!), value)
+        }
+        print("CaptureURLActionCheck: URL routes, opened image files, and malformed URL rejection verified")
     }
 }

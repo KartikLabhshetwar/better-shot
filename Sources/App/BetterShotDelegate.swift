@@ -6,6 +6,7 @@ import TipKit
 final class BetterShotDelegate: NSObject, NSApplicationDelegate {
     private var didFinishLaunching = false
     private var pendingURLActions: [CaptureURLAction] = []
+    private var pendingImageURLs: [URL] = []
 
     /// The notification delegate has to be in place before launch finishes,
     /// or the system handles clicks on export notifications itself and never
@@ -26,10 +27,14 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
         } catch {
             print("BetterShot: Contextual tips unavailable: \(error.localizedDescription)")
         }
+        // Finder delivers Open With files before launch finishes.
+        let launchedToOpenImages = !pendingImageURLs.isEmpty
         // Present after launch setup; never put permission prompts in the launch path.
         DispatchQueue.main.async {
             if OnboardingState.shouldPresent() {
                 OnboardingWindowController.shared.show()
+            } else if launchedToOpenImages {
+                // Keep the editor in focus; unread release notes wait for the next launch.
             } else if ReleaseNotesWindowController.shared.show(onlyIfNew: true) {
                 // Keep the update notes in focus instead of also opening the capture bar.
             } else if UserDefaults.standard.object(forKey: AppPreferences.showCaptureBarAtLaunchKey) as? Bool ?? true {
@@ -54,10 +59,13 @@ final class BetterShotDelegate: NSObject, NSApplicationDelegate {
 
     func application(_ application: NSApplication, open urls: [URL]) {
         pendingURLActions.append(contentsOf: urls.compactMap(CaptureURLAction.init(url:)))
+        pendingImageURLs.append(contentsOf: urls.filter(OpenedImageFile.isEditable))
         if didFinishLaunching { performPendingURLActions() }
     }
 
     private func performPendingURLActions() {
+        pendingImageURLs.forEach(PreviewPanelPresenter.shared.openEditor(for:))
+        pendingImageURLs.removeAll()
         let actions = pendingURLActions
         pendingURLActions.removeAll()
         guard !actions.isEmpty else { return }

@@ -21,6 +21,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     checkTransferToastPresentation(movieURL: movieURL)
     try await checkGeneralEditorDefaults(movieURL: movieURL)
     try await checkCameraAspectRatios(movieURL: movieURL)
+    checkEditorRequestsBeforeSceneSetup()
     for appearanceName in [NSAppearance.Name.aqua, .darkAqua] {
         NSAppearance(named: appearanceName)!.performAsCurrentDrawingAppearance {
             let neutral = StudioChrome.accentNSColor.usingColorSpace(.deviceRGB)!
@@ -1549,6 +1550,24 @@ private func checkMediaGallery(imageURL: URL, movieURL: URL) async throws {
     print("PASS gallery source merging, project reopening, local/cloud/type/search filters, missing local shares, and compact/light/dark layouts")
 }
 
+/// Finder's Open With can deliver files before the scene installs the editor handlers.
+@MainActor
+private func checkEditorRequestsBeforeSceneSetup() {
+    let presenter = PreviewPanelPresenter.shared
+    let (annotate, editVideo) = (presenter.onAnnotate, presenter.onEditVideo)
+    defer { (presenter.onAnnotate, presenter.onEditVideo) = (annotate, editVideo) }
+    presenter.onAnnotate = nil
+    presenter.onEditVideo = nil
+    let image = URL(fileURLWithPath: "/tmp/opened-before-scene.png")
+    let movie = URL(fileURLWithPath: "/tmp/opened-before-scene.mov")
+    presenter.openEditor(for: image)
+    presenter.openEditor(for: movie)
+    var opened: [URL] = []
+    presenter.onAnnotate = { opened.append($0) }
+    presenter.onEditVideo = { opened.append($0) }
+    precondition(opened == [image, movie], "Editors requested before scene setup must open once it is ready, got \(opened)")
+    print("PASS editors requested before scene setup open once it is ready")
+}
 
 @MainActor
 private func checkGalleryDeletion(imageURL: URL, movieURL: URL, root: URL) async throws {

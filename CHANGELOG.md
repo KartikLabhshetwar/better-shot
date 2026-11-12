@@ -5,6 +5,12 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Open images from Finder in the editor.** Right-click a PNG or JPEG and choose Open With > BetterShot to annotate it. Your default image app does not change; use Get Info > Open with > Change All… to make BetterShot the default. Opening several images opens an editor for each, and starting BetterShot this way skips the capture bar and release notes. Save adds the edited image to your save folder and leaves the original file unchanged (closes [#186](https://github.com/KartikLabhshetwar/better-shot/issues/186), thanks [@m0n99](https://github.com/m0n99))
+
 ## [0.5.9] - 2026-10-11
 
 ### Added

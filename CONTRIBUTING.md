@@ -316,8 +316,11 @@ refresh labels without changing stored key codes. Number-row labels stay digits,
 and printable keypad keys still pass through the recording modifier guard.
 
 [CaptureURLAction.swift](Sources/App/CaptureURLAction.swift) parses the supported
-`bettershot://` routes. The app delegate dispatches them. Preserve malformed-URL
-rejection and the guard against starting a second recording session.
+`bettershot://` routes, and `OpenedImageFile` accepts the image files Finder's
+Open With sends for the document types in `Resources/Info.plist`. The app delegate
+dispatches both. `PreviewPanelPresenter` holds editor requests that arrive before
+the scene installs its handlers. Preserve malformed-URL rejection and the guard
+against starting a second recording session.
 
 ### 3D video shots
 

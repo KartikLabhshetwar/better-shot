@@ -49,6 +49,7 @@ subtitles and teleprompter speech tracking need macOS 26.
 - **Screenshots:** region, window, fullscreen, and scrolling capture, plus OCR and a color picker.
 - **Image editor:** arrows, shapes, text, numbered markers, highlights, blur, and pixelate.
   Crop, rotate, flip, and frame captures with backgrounds, padding, corners, and shadow.
+  Open existing PNG and JPEG files from Finder with Open With > BetterShot.
 - **Recording:** a display, window, or area, with system audio, microphone, camera, and a teleprompter.
 - **Video editor:** cuts, speed, zooms, captions, masks, camera layouts, cursor styles, and 3D shots.
   Export MP4 or MOV at 30 or 60 fps.

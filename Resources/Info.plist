@@ -33,6 +33,23 @@
             </array>
         </dict>
     </array>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Image</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <!-- Alternate lists BetterShot in Open With without replacing the default app. -->
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>public.png</string>
+                <string>public.jpeg</string>
+            </array>
+        </dict>
+    </array>
     <key>NSInputMonitoringUsageDescription</key>
     <string>BetterShot uses input monitoring for precise pointer motion during recordings and, when enabled, shortcut and special-key overlays. Plain typing is never recorded.</string>
     <key>NSCameraUsageDescription</key>
