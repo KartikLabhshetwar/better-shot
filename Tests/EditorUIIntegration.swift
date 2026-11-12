@@ -1569,6 +1569,18 @@ private func checkGalleryDeletion(imageURL: URL, movieURL: URL, root: URL) async
     precondition(MediaGalleryItem.deletionSlug(for: link, publicBaseURL: "https://cdn.example.com") == "test-share")
     precondition(MediaGalleryItem.deletionSlug(for: link, publicBaseURL: "https://other.example.com") == nil)
     precondition(MediaGalleryItem.deletionSlug(for: URL(string: "https://example.com/s/other")!, publicBaseURL: "https://cdn.example.com") == nil)
+    for filename in ["clip.mp4", "my clip.mp4"] {
+        let direct = ShareBundle.directURL(id: "test-share", filename: filename, publicBaseURL: "https://cdn.example.com")!
+        precondition(MediaGalleryItem.deletionSlug(for: direct, publicBaseURL: "https://cdn.example.com") == "test-share",
+                     "Direct file links must be deletable with the Public Bucket URL that created them")
+        precondition(MediaGalleryItem.deletionSlug(for: direct, publicBaseURL: "https://cdn.example.com/") == "test-share")
+        precondition(MediaGalleryItem.deletionSlug(for: direct, publicBaseURL: "https://other.example.com") == nil,
+                     "Direct file links from other storage must not be deleted")
+    }
+    for path in ["s/test-share", "s/test-share/extra/clip.mp4", "files/s/test-share/clip.mp4"] {
+        precondition(MediaGalleryItem.deletionSlug(for: URL(string: "https://cdn.example.com/" + path)!,
+                                                   publicBaseURL: "https://cdn.example.com") == nil)
+    }
     let trash = root.appendingPathComponent("trash", isDirectory: true)
     try fm.createDirectory(at: trash, withIntermediateDirectories: true)
     let targets = MediaGalleryItem.deletionTargets(entry.deletionURLs)

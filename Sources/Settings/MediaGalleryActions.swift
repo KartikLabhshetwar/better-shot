@@ -45,10 +45,13 @@ extension MediaGalleryItem {
         try HistoryStore.shared.forgetCloudLink(cloudURL.absoluteString)
     }
 
+    /// Accepts a viewer page or direct file link only if the current Public Bucket URL rebuilds it exactly.
     static func deletionSlug(for url: URL, publicBaseURL: String) -> String? {
         guard let slug = R2Uploader.slug(fromShareLink: url.absoluteString), !slug.isEmpty,
               slug.unicodeScalars.allSatisfy({ CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_").contains($0) }),
-              ShareBundle.pageURL(id: slug, publicBaseURL: publicBaseURL) == url else { return nil }
+              ShareBundle.pageURL(id: slug, publicBaseURL: publicBaseURL) == url
+                  || ShareBundle.directURL(id: slug, filename: url.lastPathComponent, publicBaseURL: publicBaseURL) == url
+        else { return nil }
         return slug
     }
 }
