@@ -81,6 +81,52 @@ func checkScreenshotComposition() throws {
     let shadowed = try ScreenshotCompositionRenderer.render(document, scale: 1)
     precondition(pixel(shadowed, 185, 160).alphaComponent > 0, "Shadows must survive transparent export")
     precondition(pixel(shadowed, 110, 190).blueComponent > 0.9, "Shadow caster must not blacken image interiors")
+    // A Retina capture fitted at half size loses one-pixel text strokes at 1x.
+    // Auto must retain the source pixel count and reproduce those strokes exactly,
+    // including fractional placement and a non-integer canvas export scale.
+    let stripes = CGContext(data: nil, width: 400, height: 240, bitsPerComponent: 8, bytesPerRow: 0,
+        space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    stripes.setFillColor(NSColor.white.cgColor)
+    stripes.fill(CGRect(x: 0, y: 0, width: 400, height: 240))
+    stripes.setFillColor(NSColor.black.cgColor)
+    for x in stride(from: 0, to: 400, by: 2) { stripes.fill(CGRect(x: x, y: 0, width: 1, height: 240)) }
+    let original = stripes.makeImage()!
+    var detail = ScreenshotComposition()
+    detail.size = CGSize(width: 400, height: 400)
+    detail.screenshots = [CompositionScreenshot(id: UUID(), image: original, name: "Retina text strokes",
+        frame: CGRect(x: 40.25, y: 40.25, width: 200, height: 120), cornerRadius: 0, shadow: 0)]
+    precondition(detail.sourceResolutionScale == 2)
+    let reduced = try ScreenshotCompositionRenderer.render(detail, scale: 1)
+    let reducedPixels = NSBitmapImageRep(cgImage: reduced)
+    let reducedColor = reducedPixels.colorAt(x: 100, y: 100)!.usingColorSpace(.sRGB)!
+    precondition(reducedColor.redComponent > 0.1 && reducedColor.redComponent < 0.9,
+                 "The fixture must reproduce fine-line contrast loss at 1x")
+    for frame in [CGRect(x: 40.25, y: 40.25, width: 200, height: 120),
+                  CGRect(x: 40, y: 40, width: 160, height: 96)] {
+        detail.screenshots[0].frame = frame
+        let scale = detail.sourceResolutionScale
+        let detailURL = directory.appendingPathComponent("native-detail.png")
+        try ScreenshotCompositionRenderer.export(detail, scale: scale, to: detailURL)
+        let exported = CGImageSourceCreateImageAtIndex(CGImageSourceCreateWithURL(detailURL as CFURL, nil)!, 0, nil)!
+        let pixels = NSBitmapImageRep(cgImage: exported)
+        let sourcePixels = NSBitmapImageRep(cgImage: original)
+        for y in stride(from: 4, to: 236, by: 7) {
+            for x in 4..<396 {
+                let actual = pixels.colorAt(x: Int((frame.minX * scale).rounded()) + x,
+                                             y: Int((frame.minY * scale).rounded()) + y)!.usingColorSpace(.sRGB)!
+                let expected = sourcePixels.colorAt(x: x, y: y)!.usingColorSpace(.sRGB)!
+                precondition(abs(actual.redComponent - expected.redComponent) < 1.0 / 255,
+                             "Native-resolution export must not soften one-pixel strokes")
+            }
+        }
+    }
+    // The smallest placement determines the shared scale for mixed image sizes.
+    detail.screenshots.append(CompositionScreenshot(id: UUID(), image: original, name: "Smaller screenshot",
+        frame: CGRect(x: 10, y: 10, width: 100, height: 60), cornerRadius: 0, shadow: 0))
+    precondition(detail.sourceResolutionScale == 4)
+    precondition(ScreenshotComposition().sourceResolutionScale == 1)
+    print("PASS 1x fine-line softness reproduced; Auto PNG preserves native detail at 2x and 2.5x with pixel-aligned placement")
+
     let output = directory.appendingPathComponent("combined.png")
     try ScreenshotCompositionRenderer.export(document, scale: 2, to: output)
     let saved = CGImageSourceCreateImageAtIndex(CGImageSourceCreateWithURL(output as CFURL, nil)!, 0, nil)!

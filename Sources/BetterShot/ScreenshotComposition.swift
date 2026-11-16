@@ -34,6 +34,15 @@ struct ScreenshotComposition {
         CGRect(origin: .zero, size: size).insetBy(dx: padding, dy: padding)
     }
 
+    /// Small canvas placements must not silently discard Retina capture detail.
+    /// Auto chooses one canvas scale that keeps every source at least native size.
+    var sourceResolutionScale: CGFloat {
+        screenshots.reduce(CGFloat(1)) { scale, item in
+            max(scale, CGFloat(item.image.width) / max(1, item.frame.width),
+                CGFloat(item.image.height) / max(1, item.frame.height))
+        }
+    }
+
     func fittedFrame(_ frame: CGRect) -> CGRect {
         let bounds = contentRect
         let ratio = min(1, bounds.width / max(1, frame.width), bounds.height / max(1, frame.height))
@@ -208,14 +217,21 @@ nonisolated enum ScreenshotCompositionRenderer {
         AnnotationBackgroundRenderer.drawBackground(document.background, in: CGRect(origin: .zero, size: document.size), context: context)
         context.interpolationQuality = .high
         for item in document.screenshots {
-            let rect = CGRect(x: item.frame.minX, y: document.size.height - item.frame.maxY,
-                              width: item.frame.width, height: item.frame.height)
+            // Snap in final output pixels, including non-integer Auto scales.
+            // Subpixel translation otherwise filters even a native-size image.
+            let pixelWidth = max(1, (item.frame.width * scale).rounded())
+            let pixelHeight = max(1, (item.frame.height * scale).rounded())
+            let rect = CGRect(x: (item.frame.minX * scale).rounded() / scale,
+                              y: (size.height - (item.frame.maxY * scale).rounded()) / scale,
+                              width: pixelWidth / scale, height: pixelHeight / scale)
             let radius = min(rect.width, rect.height) * item.cornerRadius
             let path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
             AnnotationBackgroundRenderer.drawShadow(path: path, knockoutPath: path, strength: item.shadow,
                                                     style: item.shadowStyle, context: context)
             context.saveGState()
             context.addPath(path); context.clip()
+            context.interpolationQuality = pixelWidth == CGFloat(item.image.width)
+                && pixelHeight == CGFloat(item.image.height) ? .none : .high
             context.draw(item.image, in: rect)
             context.restoreGState()
         }

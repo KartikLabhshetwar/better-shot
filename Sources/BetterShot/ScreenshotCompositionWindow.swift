@@ -85,7 +85,7 @@ struct ScreenshotCompositionWindow: View {
     @Bindable var model: ScreenshotCompositionModel
     var onExportAvailable: (@escaping () -> Void) -> Void = { _ in }
     @State private var layout: ScreenshotCompositionLayout = .row
-    @State private var exportScale: CGFloat = 1
+    @State private var exportScale: CGFloat = 0
     @State private var transferStatus: TransferStatus?
     @State private var isExporting = false
     @State private var isImporting = false
@@ -372,14 +372,20 @@ struct ScreenshotCompositionWindow: View {
             .offset(x: item.frame.minX * scale, y: item.frame.minY * scale)
     }
 
+    private var resolvedExportScale: CGFloat {
+        exportScale == 0 ? model.document.sourceResolutionScale : exportScale
+    }
+
     private var footer: some View {
         HStack(spacing: 12) {
             Text("Drag to move · Drag the blue corner to resize").font(.caption).foregroundStyle(.secondary)
             Spacer()
             Picker("Export Scale", selection: $exportScale) {
+                Text("Auto").tag(CGFloat(0))
                 Text("1×").tag(CGFloat(1)); Text("2×").tag(CGFloat(2)); Text("3×").tag(CGFloat(3))
-            }.frame(width: 160)
-            Text("\(Int(model.document.size.width * exportScale)) × \(Int(model.document.size.height * exportScale)) px")
+            }.frame(width: 170)
+                .help("Auto keeps screenshots at least at their original pixel dimensions. Choose 1×, 2×, or 3× for a fixed output size.")
+            Text("\(Int((model.document.size.width * resolvedExportScale).rounded())) × \(Int((model.document.size.height * resolvedExportScale).rounded())) px")
                 .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
         }.padding(.horizontal, 16).frame(height: 44).studioGlass(cornerRadius: 0)
     }
@@ -420,7 +426,7 @@ struct ScreenshotCompositionWindow: View {
 
     private func exportPNG() {
         guard !isExporting, !model.document.screenshots.isEmpty else { return }
-        do { _ = try ScreenshotCompositionRenderer.outputSize(model.document, scale: exportScale) }
+        do { _ = try ScreenshotCompositionRenderer.outputSize(model.document, scale: resolvedExportScale) }
         catch { model.errorMessage = error.localizedDescription; return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
@@ -428,7 +434,7 @@ struct ScreenshotCompositionWindow: View {
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             let snapshot = model.document
-            let scale = exportScale
+            let scale = resolvedExportScale
             isExporting = true
             transferStatus = .working(stage: .exporting, progress: nil)
             Task { @MainActor in

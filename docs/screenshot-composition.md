@@ -16,9 +16,14 @@ Open **Compose Screenshots** from BetterShot's menu tray.
    spacing is applied by Arrange. Adjust corners, shadow amount, and shadow style
    independently for the selected screenshot. Backward/Forward changes overlap
    order. Undo/Redo covers imports, removal, geometry, order, and styling.
-5. Choose 1×, 2×, or 3× and **Export PNG…**. The footer shows the output dimensions.
-   Export uses original source pixels, with lossless PNG and transparent backgrounds.
-   Increasing the scale cannot invent detail absent from an original image.
+5. Leave **Export Scale** on **Auto** to retain the original pixel detail of every
+   screenshot, or choose 1×, 2×, or 3× for a fixed output size, then **Export PNG…**.
+   The footer shows the output dimensions. At 1×, a large or Retina capture fitted
+   into a smaller area is downsampled, which can soften fine text. Auto increases
+   the whole canvas resolution enough to avoid that reduction. Export uses original
+   source pixels, with lossless PNG and transparent backgrounds. Increasing the
+   scale cannot invent detail absent from an original image. Native-size images
+   are aligned to output pixels and drawn without interpolation.
 
 The new canvas reads General's Default Look when opened. Editing it does not
 change those defaults or any imported files. Window captures exclude the native
@@ -34,7 +39,8 @@ baked-in shadow, allowing the per-image shadow to remain adjustable.
   per canvas. Animated files use their first frame. Imports decode synchronously;
   large batches may briefly pause the editor.
 - Canvas dimensions: 400–6,000 pixels per edge. Exports: at most 64 megapixels and
-  16,384 pixels per edge; oversized scale choices give a recoverable error.
+  16,384 pixels per edge; oversized scale choices, including Auto, give a recoverable
+  error. Choose a fixed lower export scale if Auto exceeds this limit.
 - Resize is proportional. No crop, per-image annotation editing, rotation,
   snapping guides, multiple selection, or direct capture-deck batch selection.
 - Background wallpaper is retained when supplied by Default Look; choosing a new

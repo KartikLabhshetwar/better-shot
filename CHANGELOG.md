@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Composition exports default to Auto resolution so smaller canvas placements
+  retain Retina source detail. Native-size image drawing is aligned to output
+  pixels and skips interpolation to keep fine text sharp.
+
 ### Added
 
 - **Compose Screenshots** combines imported images and repeated window captures on
