@@ -38,6 +38,8 @@ struct ExportIntegration {
             try checkCaptureControlsUI()
             return
         }
+        try checkScreenshotComposition()
+        if ProcessInfo.processInfo.environment["BETTERSHOT_CHECK_COMPOSITION"] == "1" { return }
         let succeeded = try ScreenCapture.validateCommandResult(status: 0, diagnostic: "")
         let cancelled = try ScreenCapture.validateCommandResult(status: 1, diagnostic: "\n")
         precondition(succeeded && !cancelled)
