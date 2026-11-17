@@ -254,6 +254,20 @@ after asynchronous conversion. Keep the naming and failed-save regressions in
 
 ### Editing, rendering, and persistence
 
+The multi-screenshot editor starts at `ScreenshotCompositionWindowController` and
+uses `ScreenshotCompositionModel` for source images, pixel coordinates, layer
+order, layouts, and grouped undo. `ScreenshotCompositionRenderer` draws both the
+fitted preview and full-resolution PNG with the shared background/shadow helpers.
+Composition state stays in memory; it must never overwrite General's Default Look
+or edit the imported files. `Tests/ScreenshotCompositionIntegration.swift` runs
+through `make test`, including actual rendered pixels and compact light/dark
+snapshots. `Tests/CompositionPreview.swift` is an optional native interaction
+fixture; build it with `bash Tests/run-composition-preview.sh` after `make test`,
+then open `.build/CompositionPreview.app`. Run
+`BETTERSHOT_CHECK_COMPOSITION=1 bash Tests/run-exports.sh` for focused composition
+checks against an existing test build. It uses a separate
+process identity and sets `BETTERSHOT_TESTING=1` before creating the editor.
+
 Image annotations use source-pixel coordinates. `AnnoShapeDrawing` is shared by
 the canvas and export; `AnnotationImageTransform` handles full-resolution rotation
 and reflection while retaining editable annotations and undo history. A

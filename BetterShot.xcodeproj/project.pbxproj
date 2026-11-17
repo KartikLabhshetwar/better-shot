@@ -12,6 +12,7 @@
 		02404D9AD03DCC77348C50CF /* MathUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9CAA6D017C7FB19CD3466D7 /* MathUtils.swift */; };
 		03F85A9D98CD49F2756DC41F /* AnnotationWallpaperStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0B3FA610508133B8AB26A35 /* AnnotationWallpaperStore.swift */; };
 		041B87BB64D98E1277AA5C83 /* AfterCaptureActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 016FCFAE69ED3C0FD92C5D3B /* AfterCaptureActions.swift */; };
+		058D7A1DA0C681EB65496CF3 /* ScreenshotCompositionWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCE34282D4676BD3133856FC /* ScreenshotCompositionWindow.swift */; };
 		07ADFBC530D80E5AC5AD2B71 /* RecordingPointerStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73C4496D1286F55946F77EBA /* RecordingPointerStream.swift */; };
 		08438912627871CAC2592D71 /* AnnotationInspectorSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC94C1BE0CE4840EE91F1A8C /* AnnotationInspectorSlider.swift */; };
 		0AA73A072B6327A23D08F89E /* ScrollCaptureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 797BDC98FC7C054D427684E4 /* ScrollCaptureController.swift */; };
@@ -158,6 +159,7 @@
 		AECE06FCCA388F3C27CA5C9C /* RecordingExportReframe.swift in Sources */ = {isa = PBXBuildFile; fileRef = F02562FF53E7AE39E8DE3E81 /* RecordingExportReframe.swift */; };
 		B0D43AF92D661FDC828C1399 /* GeoPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = A077E702B85C092E049C33BA /* GeoPaths.swift */; };
 		B59A11814CC73A048E1A925D /* ScrollFrameAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8566C51E6448E2BC40BD938A /* ScrollFrameAnalyzer.swift */; };
+		B61DCE07C6F710ACFF8995D9 /* ScreenshotComposition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88A9A8045CBA2C6B3AB891B5 /* ScreenshotComposition.swift */; };
 		B67249B2788081263585AB5D /* RecordingExportOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7881A05DB7FD7C0160C3D30 /* RecordingExportOptions.swift */; };
 		B6A1C17303643E0C512127E3 /* RecordingTranscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEC5745BD6B7DD30BD91DEA0 /* RecordingTranscription.swift */; };
 		B713F9D891DBC6B6756A4C71 /* RecordingStudioExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E260FCA6C4E719CE4AE0F45 /* RecordingStudioExporter.swift */; };
@@ -361,6 +363,7 @@
 		868BDBFEC12D9D90939923A2 /* RecordingAreaHighlightPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingAreaHighlightPresenter.swift; sourceTree = "<group>"; };
 		868F0E1B6C8FC7DF50B4A79B /* RegionSelectionOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegionSelectionOverlay.swift; sourceTree = "<group>"; };
 		885F73431C6FEAD7062AA6FE /* AnnotationKeyboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationKeyboard.swift; sourceTree = "<group>"; };
+		88A9A8045CBA2C6B3AB891B5 /* ScreenshotComposition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotComposition.swift; sourceTree = "<group>"; };
 		8944EFA56AE64C38C83ED9E1 /* RecordingKeystrokeCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingKeystrokeCapture.swift; sourceTree = "<group>"; };
 		8B3D8697A2AEA9FD3527BA3D /* PinnedScreenshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedScreenshot.swift; sourceTree = "<group>"; };
 		8EB02705C403A4D300A1000F /* VideoTrimSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoTrimSelection.swift; sourceTree = "<group>"; };
@@ -406,6 +409,7 @@
 		BB86758B02F912A3E117CC99 /* AnnoEditorInteraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnoEditorInteraction.swift; sourceTree = "<group>"; };
 		BB9AE65970CD5EA6BDABF0B5 /* Box.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Box.swift; sourceTree = "<group>"; };
 		BBB142546D772FEE8698651C /* AnnotationTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationTool.swift; sourceTree = "<group>"; };
+		BCE34282D4676BD3133856FC /* ScreenshotCompositionWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotCompositionWindow.swift; sourceTree = "<group>"; };
 		BD2210BD486C338B11D6608E /* AnnotationImageCropper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationImageCropper.swift; sourceTree = "<group>"; };
 		BE8FF05309B340FEAE149775 /* BackgroundStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundStyle.swift; sourceTree = "<group>"; };
 		C1546D84751A7403E9E6ACF0 /* AnnotationCropOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationCropOverlay.swift; sourceTree = "<group>"; };
@@ -709,6 +713,8 @@
 				0DF213690A822844610DB6E0 /* RecordingViewportTimeline.swift */,
 				5D7E69E0EAA9CE007DACC8EE /* RecordingZoomFocusPad.swift */,
 				21453FFFE9FF2E1860B1BB7E /* ScreenRecordingManager.swift */,
+				88A9A8045CBA2C6B3AB891B5 /* ScreenshotComposition.swift */,
+				BCE34282D4676BD3133856FC /* ScreenshotCompositionWindow.swift */,
 				624270E3E0F68E35ED9C7FC1 /* ScreenshotCompressionService.swift */,
 				4EC83F060B8C618716847D95 /* ScreenshotFileNaming.swift */,
 				179A1F464B2325D933B003EB /* ScreenshotHistoryStore.swift */,
@@ -1072,6 +1078,8 @@
 				760A8018E366C9C6A658DFDB /* ScreenCapturePermission.swift in Sources */,
 				CB270F6BDD39E72E8CEE4F5D /* ScreenRecordingManager.swift in Sources */,
 				E5EC3D5ABA7F21EA6052C1A4 /* ScreencaptureRunner.swift in Sources */,
+				B61DCE07C6F710ACFF8995D9 /* ScreenshotComposition.swift in Sources */,
+				058D7A1DA0C681EB65496CF3 /* ScreenshotCompositionWindow.swift in Sources */,
 				A069BBE1EEC909EAF7668718 /* ScreenshotCompressionService.swift in Sources */,
 				BACCC6CAD5B08E0987F79EE4 /* ScreenshotFileNaming.swift in Sources */,
 				118F7D00871572DFAF7B5E84 /* ScreenshotHistoryStore.swift in Sources */,

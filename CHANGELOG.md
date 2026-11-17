@@ -5,6 +5,21 @@ All notable changes to Better Shot will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Composition exports default to Auto resolution so smaller canvas placements
+  retain Retina source detail. Native-size image drawing is aligned to output
+  pixels and skips interpolation to keep fine text sharp.
+
+### Added
+
+- **Compose Screenshots** combines imported images and repeated window captures on
+  one canvas, with drag/resize, layer order, per-image corners/shadows, row/column/grid
+  layouts, background/padding controls, undo, and high-resolution PNG export.
+  This first pass keeps editable canvas state in memory; PNG exports are flattened.
+
 ## [0.5.9] - 2026-10-11
 
 ### Added

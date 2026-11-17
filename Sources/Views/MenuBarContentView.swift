@@ -155,6 +155,12 @@ struct MenuBarContentView: View {
             TrayGridMenu(title: "Recent Captures", icon: "clock.arrow.circlepath", menuItems: recentMenuItems())
                 .frame(height: 32)
 
+            TrayFullWidthButton(title: "Compose Screenshots", icon: "square.stack") {
+                let screen = originScreen
+                dismissPopover()
+                DispatchQueue.main.async { ScreenshotCompositionWindowController.shared.open(on: screen) }
+            }
+
             TrayFullWidthButton(title: "Media Gallery", icon: "photo.on.rectangle") {
                 let screen = originScreen
                 dismissPopover()

@@ -277,7 +277,7 @@ nonisolated enum AnnotationBackgroundRenderer {
         context.restoreGState()
     }
 
-    private static func drawBackground(
+    static func drawBackground(
         _ style: AnnotationBackgroundStyle,
         in rect: CGRect,
         context: CGContext
@@ -424,7 +424,7 @@ nonisolated enum AnnotationBackgroundRenderer {
     /// Paints the shadow without laying any ink inside the card: the fill is
     /// clipped away so only the spill survives. That keeps translucent borders
     /// and screenshots with alpha from being backed by black.
-    private static func drawShadow(
+    static func drawShadow(
         path: CGPath,
         knockoutPath: CGPath,
         strength: CGFloat,
