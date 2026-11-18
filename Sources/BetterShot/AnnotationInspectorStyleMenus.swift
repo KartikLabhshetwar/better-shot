@@ -114,26 +114,69 @@ struct AnnotationStrokePicker: View {
     }
 }
 
-/// Routes the shared `NSColorPanel` to whichever swatch strip opened it last.
-/// The panel sends continuous `changeColor` actions while the user scrubs, so
-/// annotations update live just like the old popover's embedded picker.
+struct AnnotationColorButton: View {
+    let title: String
+    let color: NSColor
+    var supportsOpacity = false
+    let onChange: (NSColor) -> Void
+
+    var body: some View {
+        Button {
+            AnnotationColorPanelBridge.shared.present(
+                current: color, supportsOpacity: supportsOpacity, onChange: onChange
+            )
+        } label: {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(Color(nsColor: color))
+                .frame(width: 22, height: 12)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 3).strokeBorder(.primary.opacity(0.2))
+                }
+        }
+        .controlSize(.small)
+        .help(title)
+        .accessibilityLabel(title)
+    }
+}
+
+/// Applies the panel's final color after tracking so the editor does not
+/// rebuild its SwiftUI view graph during the native color wheel's drag loop.
 @MainActor
 final class AnnotationColorPanelBridge: NSObject {
     static let shared = AnnotationColorPanelBridge()
 
     private var onChange: ((NSColor) -> Void)?
+    private var previousContinuous: Bool?
 
-    func present(current: NSColor, onChange: @escaping (NSColor) -> Void) {
+    func present(current: NSColor, supportsOpacity: Bool = false, onChange: @escaping (NSColor) -> Void) {
         let panel = NSColorPanel.shared
-        panel.showsAlpha = false
-        panel.color = current
-        self.onChange = onChange
+        if previousContinuous == nil {
+            previousContinuous = panel.isContinuous
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(panelWillClose(_:)), name: NSWindow.willCloseNotification, object: panel
+            )
+        }
+        self.onChange = nil
         panel.setTarget(self)
         panel.setAction(#selector(colorDidChange(_:)))
+        panel.isContinuous = false
+        panel.showsAlpha = supportsOpacity
+        panel.color = current
+        self.onChange = onChange
         panel.makeKeyAndOrderFront(nil)
     }
 
     @objc private func colorDidChange(_ sender: NSColorPanel) {
         onChange?(sender.color)
+    }
+
+    @objc private func panelWillClose(_ notification: Notification) {
+        guard let panel = notification.object as? NSColorPanel, let previousContinuous else { return }
+        NotificationCenter.default.removeObserver(self, name: NSWindow.willCloseNotification, object: panel)
+        panel.isContinuous = previousContinuous
+        panel.setTarget(nil)
+        panel.setAction(nil)
+        onChange = nil
+        self.previousContinuous = nil
     }
 }
