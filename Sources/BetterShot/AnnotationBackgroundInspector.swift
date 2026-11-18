@@ -217,23 +217,17 @@ struct AnnotationBackgroundCustomColorRow: View {
     let style: AnnotationBackgroundStyle
     let onSelect: (AnnotationBackgroundColor) -> Void
 
-    private var selection: Binding<Color> {
-        Binding(
-            get: {
-                guard case .solid(let color) = style else { return AnnotationBackgroundColor.white.color }
-                return color.color
-            },
-            set: { onSelect(.custom(from: $0)) }
-        )
+    private var currentColor: NSColor {
+        guard case .solid(let color) = style else { return AnnotationBackgroundColor.white.nsColor }
+        return color.nsColor
     }
 
     var body: some View {
         InspectorRow("Custom") {
-            ColorPicker("Custom background color", selection: selection, supportsOpacity: false)
-                .labelsHidden()
-                .controlSize(.small)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .help("Choose any background color")
+            AnnotationColorButton(title: "Custom background color", color: currentColor) { color in
+                onSelect(.custom(from: Color(nsColor: color)))
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
     }
 }
@@ -357,13 +351,6 @@ struct AnnotationWatermarkInspector: View {
         )
     }
 
-    private var watermarkColor: Binding<Color> {
-        Binding(
-            get: { settings.color.color },
-            set: { settings.color = .custom(from: $0) }
-        )
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: InspectorMetrics.rowSpacing) {
             if isTextEditing {
@@ -408,9 +395,9 @@ struct AnnotationWatermarkInspector: View {
 
                     Spacer(minLength: 0)
 
-                    ColorPicker("", selection: watermarkColor, supportsOpacity: false)
-                        .labelsHidden()
-                        .controlSize(.small)
+                    AnnotationColorButton(title: "Watermark color", color: settings.color.nsColor) { color in
+                        settings.color = .custom(from: color)
+                    }
                 }
                 .frame(maxWidth: .infinity)
             }

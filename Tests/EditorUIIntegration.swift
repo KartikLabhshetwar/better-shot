@@ -15,6 +15,7 @@ func checkEditorUI(imageURL: URL, movieURL: URL) async throws {
     try checkCaptureControlsUI()
     checkRecordingConfirmations()
     try checkImageTransforms(imageURL: imageURL)
+    checkEditorColorPanelTracking()
     try await checkColorPickerAndToast()
     try await checkPreviewOverlay(imageURL: imageURL)
     try await checkMediaGallery(imageURL: imageURL, movieURL: movieURL)
@@ -1879,6 +1880,33 @@ private func checkPreviewOverlay(imageURL: URL) async throws {
     AppPreferences.resetOverlaySettings()
     precondition(AppPreferences.overlayToolLayout == .standard)
     print("PASS overlay configuration/reset, share recovery/retention, cancelled preparation, and small/medium/large light/dark snapshots")
+}
+
+@MainActor
+private func checkEditorColorPanelTracking() {
+    let panel = NSColorPanel.shared
+    let previousContinuous = panel.isContinuous
+    defer { panel.isContinuous = previousContinuous }
+    panel.isContinuous = true
+
+    let bridge = AnnotationColorPanelBridge.shared
+    var backgroundColors: [NSColor] = []
+    var annotationColors: [NSColor] = []
+    bridge.present(current: .orange) { backgroundColors.append($0) }
+    precondition(!panel.isContinuous, "Color wheel movement must not continuously update the editor")
+    precondition(!panel.showsAlpha, "Opaque color controls must hide opacity")
+
+    bridge.present(current: .blue, supportsOpacity: true) { annotationColors.append($0) }
+    precondition(!panel.isContinuous, "Switching color controls must not re-enable continuous updates")
+    precondition(panel.showsAlpha, "Annotation colors must keep opacity controls")
+    precondition(backgroundColors.isEmpty && annotationColors.isEmpty, "Opening either picker must not edit the image")
+
+    panel.color = .green
+    precondition(backgroundColors.isEmpty && annotationColors == [.green], "Only the active control gets the committed color")
+
+    panel.close()
+    precondition(panel.isContinuous, "Closing must restore the shared color panel's tracking behavior")
+    print("PASS annotation color panel applies on completion and restores shared AppKit tracking")
 }
 
 @MainActor

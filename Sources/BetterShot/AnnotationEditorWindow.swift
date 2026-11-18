@@ -281,14 +281,12 @@ struct AnnotationEditorWindow: View {
                         model.setSwatch(swatch)
                     }
                 }
-                ColorPicker("Annotation color", selection: Binding(
-                    get: { model.selectedSwatch.color },
-                    set: { color in
-                        clearInspectorFocus()
-                        model.setSwatch(.custom(from: color))
-                    }
-                ))
-                .labelsHidden()
+                AnnotationColorButton(
+                    title: "Annotation color", color: model.selectedSwatch.nsColor, supportsOpacity: true
+                ) { color in
+                    clearInspectorFocus()
+                    model.setSwatch(.custom(from: color))
+                }
                 .fixedSize()
             }
             if model.isStrokeStyleAvailable {
